@@ -2,3 +2,6 @@
 numpy
 keras
 tensorflow
+matplotlib
+pydot
+graphviz
