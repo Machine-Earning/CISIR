@@ -1,0 +1,4 @@
+# keras functional API dependencies
+numpy
+keras
+tensorflow
