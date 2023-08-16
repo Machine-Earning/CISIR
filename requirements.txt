@@ -1,7 +1,0 @@
-# keras functional API dependencies
-numpy
-keras
-tensorflow
-matplotlib
-pydot
-graphviz
