@@ -10,9 +10,6 @@
 #SBATCH --output=testjob.%J.out       # Output file
 #SBATCH --error=testjob.%J.err        # Error file
 
-module load python3                   # Load Python module (or the specific module with GPU support)
-module load tensorflow                # Load TensorFlow module
-
 echo "Starting at date $(date)"
 
 echo "Running on hosts: $SLURM_NODELIST"
