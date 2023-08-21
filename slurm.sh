@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1                    # Number of tasks
 #SBATCH --mem=50MB                    # Memory per node
 #SBATCH --time=00:15:00               # Time limit (15 minutes)
-#SBATCH --partition=gpu               # GPU partition
+#SBATCH --partition=gpu1              # GPU partition
 #SBATCH --gres=gpu:1                  # Number of GPUs per node
 #SBATCH --output=testjob.%J.out       # Output file
 #SBATCH --error=testjob.%J.err        # Error file
