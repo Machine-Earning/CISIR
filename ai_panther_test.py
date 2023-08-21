@@ -97,6 +97,50 @@ def reciprocal_loss(y_true, y_pred, reduction=tf.keras.losses.Reduction.AUTO):
         return _reciprocal_loss
 
 
+def focal_loss(y_true, y_pred, gamma=2.0, alpha=0.25, reduction=tf.keras.losses.Reduction.AUTO):
+    """
+        focal loss for multi-class classification, tf.keras style.
+        RL(p_t) = - (1 - p_t) * log(p_t), where p_t is the probability associated with the true class.
+
+        :param y_true: Ground truth labels, shape of [batch_size, num_classes].
+        :param y_pred: Predicted class probabilities, shape of [batch_size, num_classes].
+        :param reduction: Reduction method to apply to the loss (default tf.keras.losses.Reduction.NONE).
+        :return: A scalar representing the mean focal loss over the batch.
+        NOTE: written assuming GPU support to make use of fast Tensor operations.
+        """
+    # Create a Categorical Cross-Entropy loss instance
+    cce = tf.keras.losses.CategoricalCrossentropy(
+        reduction=tf.keras.losses.Reduction.NONE  # Keep unreduced loss tensor
+    )
+    # printing y_pred
+    print(f'y_pred before clipping: {y_pred}')
+    cross_entropy = cce(y_true, y_pred)  # batch_sizex1
+    print(f'cross entropy before clipping: {cross_entropy}')
+    # adding clipping to avoid log(0)
+    _y_pred = K.clip(y_pred, 1e-2, 1.0)
+
+    print(f'_y_pred after clipping: {_y_pred}')
+    # _y_pred = y_pred
+    cross_entropy = cce(y_true, _y_pred)  # batch_sizex1
+    print(f'cross entropy after clipping: {cross_entropy}')
+    # find the probability associated with the true class
+    _y_true = K.argmax(y_true, axis=1)
+    # get the predicted probability of the true class
+    _y_pred = K.sum(_y_pred * y_true, axis=1)
+    # print(f'y_true: {_y_true}')
+    # print(f'y_pred: {_y_pred}')
+    # print(f'cross entropy: {cross_entropy}')
+    # focal loss by dividing the cross entropy by the predicted probability of the true class
+    _focal_loss = alpha * K.pow(1 - _y_pred, gamma) * cross_entropy   # focal loss
+
+    if reduction == tf.keras.losses.Reduction.AUTO:
+        return K.mean(_focal_loss)
+    elif reduction == tf.keras.losses.Reduction.SUM:
+        return K.sum(_focal_loss)
+    else:  # No reduction
+        return _focal_loss
+
+
 def create_imbalanced_data(x, y, imbalance_rate=0.5):
     """
     Create an imbalanced dataset based on a given probability distribution.
@@ -163,7 +207,7 @@ def main():
         metrics=metrics)
     model_fl.compile(
         optimizer=tf.keras.optimizers.SGD(),
-        loss=tf.keras.losses.CategoricalFocalCrossentropy(),
+        loss=focal_loss,
         metrics=metrics)
     model_rl.compile(
         optimizer=tf.keras.optimizers.SGD(learning_rate=3e-4),
