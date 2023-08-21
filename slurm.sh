@@ -20,4 +20,4 @@ echo "Running on $SLURM_NPROCS processors."
 
 echo "Current working directory is $(pwd)"
 
-srun python3 /path/to/your/my_script.py # Run your Python script
+srun python3 ai_panther_test.py # Run your Python script
