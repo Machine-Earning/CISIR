@@ -69,23 +69,13 @@ def reciprocal_loss(y_true, y_pred, reduction=tf.keras.losses.Reduction.AUTO):
         reduction=tf.keras.losses.Reduction.NONE  # Keep unreduced loss tensor
     )
     # printing y_pred
-    print(f'y_pred before clipping: {y_pred}')
     cross_entropy = cce(y_true, y_pred)  # batch_sizex1
-    print(f'cross entropy before clipping: {cross_entropy}')
-    # adding clipping to avoid log(0)
-    _y_pred = K.clip(y_pred, 1e-2, 1.0)
-
-    print(f'_y_pred after clipping: {_y_pred}')
-    # _y_pred = y_pred
-    cross_entropy = cce(y_true, _y_pred)  # batch_sizex1
     print(f'cross entropy after clipping: {cross_entropy}')
+    _y_pred = y_pred
     # find the probability associated with the true class
     _y_true = K.argmax(y_true, axis=1)
     # get the predicted probability of the true class
     _y_pred = K.sum(_y_pred * y_true, axis=1)
-    # print(f'y_true: {_y_true}')
-    # print(f'y_pred: {_y_pred}')
-    # print(f'cross entropy: {cross_entropy}')
     # reciprocal loss by dividing the cross entropy by the predicted probability of the true class
     _reciprocal_loss = cross_entropy / _y_pred  # reciprocal loss
 
@@ -113,23 +103,13 @@ def focal_loss(y_true, y_pred, gamma=2.0, alpha=0.25, reduction=tf.keras.losses.
         reduction=tf.keras.losses.Reduction.NONE  # Keep unreduced loss tensor
     )
     # printing y_pred
-    print(f'y_pred before clipping: {y_pred}')
     cross_entropy = cce(y_true, y_pred)  # batch_sizex1
-    print(f'cross entropy before clipping: {cross_entropy}')
-    # adding clipping to avoid log(0)
-    _y_pred = K.clip(y_pred, 1e-2, 1.0)
-
-    print(f'_y_pred after clipping: {_y_pred}')
-    # _y_pred = y_pred
-    cross_entropy = cce(y_true, _y_pred)  # batch_sizex1
     print(f'cross entropy after clipping: {cross_entropy}')
+    _y_pred = y_pred
     # find the probability associated with the true class
     _y_true = K.argmax(y_true, axis=1)
     # get the predicted probability of the true class
     _y_pred = K.sum(_y_pred * y_true, axis=1)
-    # print(f'y_true: {_y_true}')
-    # print(f'y_pred: {_y_pred}')
-    # print(f'cross entropy: {cross_entropy}')
     # focal loss by dividing the cross entropy by the predicted probability of the true class
     _focal_loss = alpha * K.pow(1 - _y_pred, gamma) * cross_entropy   # focal loss
 
