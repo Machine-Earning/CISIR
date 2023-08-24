@@ -35,11 +35,11 @@ Electron + CME combined dataset
 		31. sunspots: The daily sunspot count.
 		32. flare_intensity: The peak intensity value.
 		33. ESP: Energetic Storm Particles
-        	34. is_ESP: Related to the ESP.
-        	35. ESP_formula: Related to the ESP.
-        	36. only_longitude_ESP: Related to the ESP.
-        	37. is_ESP_hw: Related to the ESP.
-        	38. speed_times_HW: donki_speed * donki_hw
+        34. is_ESP: Related to the ESP.
+        35. ESP_formula: Related to the ESP.
+        36. only_longitude_ESP: Related to the ESP.
+        37. is_ESP_hw: Related to the ESP.
+        38. speed_times_HW: donki_speed * donki_hw
 	- Electron Intensity (past 2 hours)
 		- electron (past 2 hours): natural log of electron flux from >0.25 MeV channel
 		- electron_high (past 2 hours): natural log of electron flux from >0.67 MeV channel
