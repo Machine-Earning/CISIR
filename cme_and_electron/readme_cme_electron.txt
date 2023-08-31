@@ -26,20 +26,12 @@ Electron + CME combined dataset
 		22. richardson_formula_hw_0_degrees ... richardson_formula_10_degrees: More experimentation with the Richardson formula.
 		23. log_richardson_formula_hw_0_degrees ... log_richardson_formula_10_degrees: The log of the Richardson formula.
 		24. richardson_formula_degrees: The Richardson formula calculation in degrees.
-		25. V^V^2_replacement: The V(V^2) mentioned in Appendix A of Torres's paper.
 		26. CMEs_past_month: A history feature calculated based on the number of CMEs in this dataset in the past month.
 		27. CMEs_past_9_hours: A history feature calculated based on the number of CMEs in this dataset in the past 9 hours.
-		28. DONKI_double_CME: A hand-picked annotated feature by Dr. Zhang related to Double CME.
 		29. Max_speed_past_day: A history feature calculated based on the maximum donki_speed of CMEs occurring in this dataset in the past day.
 		30. CMEs_over_1000_past_9_hrs: A history feature calculated based on the number of CMEs in this dataset in the past 9 hours with a donki_speed >= 1000.
 		31. sunspots: The daily sunspot count.
-		32. flare_intensity: The peak intensity value.
-		33. ESP: Energetic Storm Particles
-        34. is_ESP: Related to the ESP.
-        35. ESP_formula: Related to the ESP.
-        36. only_longitude_ESP: Related to the ESP.
-        37. is_ESP_hw: Related to the ESP.
-        38. speed_times_HW: donki_speed * donki_hw
+
 	- Electron Intensity (past 2 hours)
 		- electron (past 2 hours): natural log of electron flux from >0.25 MeV channel
 		- electron_high (past 2 hours): natural log of electron flux from >0.67 MeV channel
