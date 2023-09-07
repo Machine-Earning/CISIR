@@ -98,14 +98,14 @@ class ModelBuilder:
 
         return extended_model
 
-    def train_model(self,
+    def train_features(self,
                     model: Model,
                     X_train: Tensor,
                     y_train: Tensor,
                     learning_rate: float = 1e-3,
                     epochs: int = 100,
                     batch_size: int = 32,
-                    patience: int = 16) -> callbacks.History:
+                    patience: int = 9) -> callbacks.History:
         """
 
         :param learning_rate:
@@ -137,7 +137,7 @@ class ModelBuilder:
                          learning_rate: float = 1e-3,
                          epochs: int = 100,
                          batch_size: int = 32,
-                         patience: int = 16) -> callbacks.History:
+                         patience: int = 9) -> callbacks.History:
         """
         Train a neural network model focusing only on the regression output.
         Include reweighting for balancing the loss.
@@ -228,7 +228,7 @@ class ModelBuilder:
         squared_difference = (self.zdist(z1, z2) - self.ydist(label1, label2)) ** 2
         return tf.reduce_sum(squared_difference)
 
-    def custom_loss(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
+    def custom_loss(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.SUM):
         """
         Computes the loss for a batch of predicted features and their labels.
 

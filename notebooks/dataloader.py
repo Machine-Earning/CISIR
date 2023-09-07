@@ -31,9 +31,13 @@ class DatasetGenerator:
     min_pdf = None
     max_pdf = None
     avg_reweight = None
+    reweights = None
     alpha = None
     min_jpdf = None
     max_jpdf = None
+    avg_jreweight = None
+    jreweights = None
+
 
     def __init__(self, n_train: int = 1000, n_test: int = 1000, n_features: int = 4, debug: bool = True) -> None:
         """
