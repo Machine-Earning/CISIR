@@ -5,9 +5,11 @@
 
 # imports
 import numpy as np
+from numpy import ndarray
 from scipy.stats import gaussian_kde
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 # types for type hinting
 from typing import Tuple
 
@@ -38,7 +40,6 @@ class DatasetGenerator:
     avg_jreweight = None
     jreweights = None
 
-
     def __init__(self, n_train: int = 1000, n_test: int = 1000, n_features: int = 4, debug: bool = True) -> None:
         """
         Create a synthetic regression dataset.
@@ -52,6 +53,8 @@ class DatasetGenerator:
         :return: X_train, y_train, X_test, y_test
         """
 
+        self.yb = None
+        self.ya = None
         self.debug = debug
 
         # Create training data
@@ -69,7 +72,8 @@ class DatasetGenerator:
 
         self.kde = gaussian_kde(self.y_train, bw_method='scott')
         self.alpha = 1
-        self.reweights = self.preprocess_reweighting(self.y_train)
+        self.reweights = self.preprocess_reweighting(self.y_train)  # for labels
+        self.jreweights = self.preprocess_jreweighting(self.y_train)  # for pairs of labels
 
         # print 4 first rows of X_train, y_train, X_test, y_test
         if self.debug:
@@ -80,6 +84,7 @@ class DatasetGenerator:
             print('min_val y in after norm: ', self.min_y)
             print('max_val y in after norm: ', self.max_y)
             self.plot_density_kde_reweights()
+            self.plot_density_kde_jreweights()
 
     def plot_density_kde_reweights(self):
         """
@@ -108,6 +113,75 @@ class DatasetGenerator:
         plt.legend()
         plt.title('Label Density, KDE, and Reweights')
         plt.show()
+
+    def plot_density_kde_jreweights(self):
+        """
+        Plot the joint label density, joint KDE, and joint reweights as separate subplots.
+        """
+        y_values = np.linspace(self.min_y, self.max_y, 100)
+        Y1, Y2 = np.meshgrid(y_values, y_values)
+
+        ya_values = Y1.ravel()
+        yb_values = Y2.ravel()
+
+        joint_hist_density, X, Y = self.compute_joint_hist_density(ya_values, yb_values)
+        joint_kde_values = self.compute_joint_kde(ya_values, yb_values)
+        joint_reweights = self.normalized_jreweight(ya_values, yb_values, self.alpha)
+
+        joint_kde_values = joint_kde_values.reshape(Y1.shape)
+        joint_reweights = joint_reweights.reshape(Y1.shape)
+
+        fig = plt.figure(figsize=(18, 18))
+
+        ax1 = fig.add_subplot(131, projection='3d')
+        ax1.plot_surface(X, Y, joint_hist_density, cmap='viridis', alpha=0.7)
+        ax1.set_title('Joint Density')
+        ax1.set_xlabel('ya')
+        ax1.set_ylabel('yb')
+        ax1.set_zlabel('Value')
+
+        ax2 = fig.add_subplot(132, projection='3d')
+        ax2.plot_surface(Y1, Y2, joint_kde_values, cmap='coolwarm', alpha=0.7)
+        ax2.set_title('Joint KDE')
+        ax2.set_xlabel('ya')
+        ax2.set_ylabel('yb')
+        ax2.set_zlabel('Value')
+
+        ax3 = fig.add_subplot(133, projection='3d')
+        ax3.plot_surface(Y1, Y2, joint_reweights, cmap='autumn', alpha=0.7)
+        ax3.set_title('Joint Reweights')
+        ax3.set_xlabel('ya')
+        ax3.set_ylabel('yb')
+        ax3.set_zlabel('Value')
+
+        plt.show()
+
+    def compute_joint_hist_density(self, ya_values, yb_values, bins=30):
+        """
+        Computes the joint histogram density for a set of ya and yb values.
+
+        :param ya_values: NumPy array of ya values to be binned.
+        :param yb_values: NumPy array of yb values to be binned.
+        :param bins: Number of bins or a sequence defining the bin edges.
+        :return: Joint histogram density as a 2D NumPy array.
+        """
+        hist, x_edges, y_edges = np.histogram2d(ya_values, yb_values, bins=bins, density=True)
+
+        # Create 2D array representing the bin centers
+        x_centers = (x_edges[:-1] + x_edges[1:]) / 2
+        y_centers = (y_edges[:-1] + y_edges[1:]) / 2
+        X, Y = np.meshgrid(x_centers, y_centers)
+
+        return hist, X, Y
+
+    def compute_joint_kde(self, ya_values, yb_values):
+        """
+        Computes the joint KDE for a set of ya and yb values.
+        """
+        # Assume self.kde is already a gaussian_kde object fitted with y_train data
+        kde_ya = self.kde.evaluate(ya_values)
+        kde_yb = self.kde.evaluate(yb_values)
+        return kde_ya * kde_yb
 
     def create_synthetic_data(self, n_train: int = 1000, n_test: int = 1000, n_features: int = 4) -> Tuple[
         np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -257,27 +331,15 @@ class DatasetGenerator:
 
         return X_augmented, y_augmented
 
-    def jpdf(self, ya: tf.Tensor, yb: tf.Tensor) -> tf.Tensor:
+    def jpdf(self, ya: np.ndarray, yb: np.ndarray) -> np.ndarray:
         """
-        Joint Probability Density Function for two independent variables ya and yb.
+        Joint Probability Density Function for labels ya and yb.
 
-        :param kde: The kernel density estimation object.
-        :param ya: The first y value as a TensorFlow tensor.
-        :param yb: The second y value as a TensorFlow tensor.
-        :return: The product of the probability densities at ya and yb as a TensorFlow tensor.
+        :param ya: The y value for the first variable as a NumPy array.
+        :param yb: The y value for the second variable as a NumPy array.
+        :return: The joint probability density as a NumPy array.
         """
-
-        def py_jpdf(ya, yb):
-            # Density of ya and yb
-            density_ya = self.kde.evaluate(ya)
-            density_yb = self.kde.evaluate(yb)
-
-            # Joint density
-            joint_density = density_ya * density_yb
-
-            return joint_density[0]
-
-        return tf.py_function(func=py_jpdf, inp=[ya, yb], Tout=tf.float32)
+        return self.kde.evaluate(ya) * self.kde.evaluate(yb)
 
     def pdf(self, y: np.ndarray) -> np.ndarray:
         """
@@ -286,6 +348,22 @@ class DatasetGenerator:
         :return: The probability density at y as a NumPy array.
         """
         return self.kde.evaluate(y)
+
+    def find_min_max_jpdf(self, ya: np.ndarray, yb: np.ndarray) -> None:
+        """
+        Find the minimum and maximum joint PDF values for a given NumPy array of labels ya and yb.
+
+        :param ya: A NumPy array containing labels for the first variable.
+        :param yb: A NumPy array containing labels for the second variable.
+        :return: None. Updates self.min_jpdf and self.max_jpdf.
+        """
+        joint_pdf_values = self.jpdf(ya, yb)
+        # NOTE: this assume ya and yb are augmented with
+        # all the possible pairings of original ya and yb
+        # and this ya and yb will admit duplicates
+
+        self.min_jpdf = np.min(joint_pdf_values)
+        self.max_jpdf = np.max(joint_pdf_values)
 
     def find_min_max_pdf(self, y: np.ndarray) -> None:
         """
@@ -298,6 +376,26 @@ class DatasetGenerator:
 
         self.min_pdf = np.min(pdf_values)
         self.max_pdf = np.max(pdf_values)
+
+    def jreweight(self, ya: np.ndarray, yb: np.ndarray, alpha: float, epsilon: float = 1e-7) -> np.ndarray:
+        """
+        Calculate the reweighting factor for joint labels ya and yb.
+
+        :param ya, yb: The y-values of the data points as NumPy arrays.
+        :param alpha: Parameter to adjust the reweighting.
+        :param epsilon: A small constant to avoid zero reweighting.
+        :return: The reweighting factor for the labels as a NumPy array.
+        """
+        # Compute the joint density
+        joint_density = self.jpdf(ya, yb)
+
+        # Normalize the joint density
+        normalized_jpdf = (joint_density - self.min_jpdf) / (self.max_jpdf - self.min_jpdf)
+
+        # Compute the reweighting factor
+        jreweighting_factor = np.maximum(1 - alpha * normalized_jpdf, epsilon)
+
+        return jreweighting_factor
 
     def reweight(self, y: np.ndarray, alpha: float, epsilon: float = 1e-7) -> np.ndarray:
         """
@@ -319,6 +417,20 @@ class DatasetGenerator:
 
         return reweighting_factor
 
+    def find_avg_jreweight(self, ya: np.ndarray, yb: np.ndarray, alpha: float, epsilon: float = 1e-7) -> float:
+        """
+        Find the average reweighting factor for joint labels ya and yb.
+        :param ya, yb: labels.
+        :param alpha: Parameter to adjust the reweighting.
+        :param epsilon: A small constant to avoid zero reweighting.
+        :return: The average reweighting factor.
+        """
+
+        total_jreweight = np.sum(self.jreweight(ya, yb, alpha, epsilon))
+        count = len(ya)
+
+        self.avg_jreweight = total_jreweight / count if count > 0 else 0
+
     def find_avg_reweight(self, y: np.ndarray, alpha: float, epsilon: float = 1e-7) -> float:
         """
         Find the average reweighting factor for y
@@ -332,6 +444,24 @@ class DatasetGenerator:
         count = len(y)
 
         self.avg_reweight = total_reweight / count if count > 0 else 0
+
+    def normalized_jreweight(self, ya: np.ndarray, yb: np.ndarray, alpha: float, epsilon: float = 1e-7) -> np.ndarray:
+        """
+        Calculate the normalized reweighting factor for joint labels ya and yb.
+
+        :param ya, yb: The y-values as NumPy arrays.
+        :param alpha: Parameter to adjust the reweighting.
+        :param epsilon: A small constant to avoid zero reweighting.
+        :return: The normalized reweighting factor for the labels as a NumPy array.
+        """
+        # Ensure average reweight is not zero to avoid division by zero
+        if self.avg_jreweight == 0:
+            raise ValueError("Average reweighting factor should not be zero.")
+
+        jreweight_factor = self.jreweight(ya, yb, alpha, epsilon)
+        normalized_joint_factor = jreweight_factor / self.avg_jreweight
+
+        return normalized_joint_factor
 
     def normalized_reweight(self, y: np.ndarray, alpha: float, epsilon: float = 1e-7) -> np.ndarray:
         """
@@ -351,6 +481,38 @@ class DatasetGenerator:
 
         return normalized_factor
 
+    def preprocess_jreweighting(self, y: np.ndarray) -> ndarray:
+        """
+        Preprocess reweighting for joint PDF based on a single dataset y and
+        stores the unique pairs of ya and yb labels in self.ya and self.yb.
+
+        :param y: The target dataset as a NumPy array.
+        :return: None. Populates self.ya and self.yb with unique pairs.
+        """
+
+        # Step 1: Find all unique pairs of ya and yb
+        # indices = range(len(y))
+        # unique_pairs = list(combinations(indices, 2)) # NOT efficient
+        # self.ya, self.yb = zip(*[(y[i], y[j]) for i, j in unique_pairs])
+        n = len(y)
+        i, j = np.triu_indices(n, k=1)  # Get upper triangle indices, excluding diagonal
+        self.ya, self.yb = y[i], y[j]  # Get the unique pairs of ya and yb
+
+        # Convert to NumPy arrays for efficient numerical operations
+        self.ya = np.array(self.ya)
+        self.yb = np.array(self.yb)
+
+        # Step 2: Find min and max joint PDF values and store them
+        self.find_min_max_jpdf(self.ya, self.yb)
+
+        # Step 3: Find average joint reweighting factor
+        self.find_avg_jreweight(self.ya, self.yb, self.alpha)
+
+        # Step 4: Calculate normalized joint reweighting factors
+        normalized_joint_factors = self.normalized_jreweight(self.ya, self.yb, self.alpha)
+
+        return normalized_joint_factors
+
     def preprocess_reweighting(self, y: np.ndarray) -> np.ndarray:
         """
         Preprocess reweighting for a dataset y and returns the normalized reweighting factors.
@@ -369,32 +531,3 @@ class DatasetGenerator:
         normalized_factors = self.normalized_reweight(y, self.alpha)
 
         return normalized_factors
-
-
-    def jreweight(self, ya: float, yb: float, alpha: float, epsilon: float = 1e-7) -> float:
-        """
-        Calculate the reweighting factor for a pair of labels ya and yb.
-
-        :param ya: The y-value of the first data point.
-        :param yb: The y-value of the second data point.
-        :param min_jpdf: The minimum jpdf value in the dataset.
-        :param max_jpdf: The maximum jpdf value in the dataset.
-        :param kde_model: Trained KDE model.
-        :param alpha: Parameter to adjust the reweighting.
-        :param epsilon: A small constant to avoid zero reweighting.
-        :return: The reweighting factor for the pair ya, yb.
-        """
-
-        # Compute the joint density of ya and yb
-        joint_density = self.jpdf(ya, yb)
-
-        # Make sure joint_density is a tensor with proper shape and dtype
-        joint_density = tf.ensure_shape(joint_density, ())
-
-        # Normalize the joint density
-        normalized_jpdf = (joint_density - self.min_jpdf) / (self.max_jpdf - self.min_jpdf)
-
-        # Compute the reweighting factor
-        reweighting_factor = tf.math.maximum(1 - alpha * normalized_jpdf, epsilon)
-
-        return reweighting_factor
