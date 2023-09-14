@@ -8,7 +8,8 @@
 import tensorflow as tf
 from tensorflow.keras import layers, callbacks, Model
 import datetime
-
+import numpy as np
+import matplotlib.pyplot as plt
 
 # types for type hinting
 from typing import Tuple, List, Optional, Callable
@@ -99,33 +100,57 @@ class ModelBuilder:
         return extended_model
 
     def train_features(self,
-                    model: Model,
-                    X_train: Tensor,
-                    y_train: Tensor,
-                    learning_rate: float = 1e-3,
-                    epochs: int = 100,
-                    batch_size: int = 32,
-                    patience: int = 9) -> callbacks.History:
+                       model: Model,
+                       X_train: Tensor,
+                       y_train: Tensor,
+                       learning_rate: float = 1e-3,
+                       epochs: int = 100,
+                       batch_size: int = 32,
+                       patience: int = 9) -> callbacks.History:
+        """
+        Trains the model and returns the training history.
+
+        :param model: The TensorFlow model to train.
+        :param X_train: The training feature set.
+        :param y_train: The training labels.
+        :param learning_rate: The learning rate for the Adam optimizer.
+        :param epochs: The maximum number of epochs for training.
+        :param batch_size: The batch size for training.
+        :param patience: The number of epochs with no improvement to wait before early stopping.
+        :return: The training history as a History object.
         """
 
-        :param learning_rate:
-        :param model:
-        :param X_train:
-        :param y_train:
-        :param epochs:
-        :param batch_size:
-        :return:
-        """
-
-        # setup tensorboard
+        # Setup TensorBoard
         log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         tensorboard_cb = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
 
         print("Run the command line:\n tensorboard --logdir logs/fit")
+
+        # Setup early stopping
         early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
+
+        # Compile the model
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.custom_loss)
-        history = model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, validation_split=0.2,
+
+        # First train the model with a validation set to determine the best epoch
+        history = model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, validation_split=0.3,
                             callbacks=[tensorboard_cb, early_stopping_cb])
+
+        # Get the best epoch from early stopping
+        best_epoch = np.argmin(history.history['val_loss']) + 1
+
+        # Plot training loss and validation loss
+        plt.plot(history.history['loss'], label='Training Loss')
+        plt.plot(history.history['val_loss'], label='Validation Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Training and Validation Loss Over Epochs')
+        plt.legend()
+        plt.show()
+
+        # Retrain the model on the entire dataset to the best epoch found
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.custom_loss)
+        model.fit(X_train, y_train, epochs=best_epoch, batch_size=batch_size)
 
         return history
 
@@ -142,7 +167,7 @@ class ModelBuilder:
         Train a neural network model focusing only on the regression output.
         Include reweighting for balancing the loss.
 
-        :param sample_weights: sample weights to tackle imbalance
+        :param sample_weights: Sample weights to tackle imbalance.
         :param learning_rate: Learning rate for Adam optimizer.
         :param model: The neural network model.
         :param X_train: Training features.
@@ -160,28 +185,50 @@ class ModelBuilder:
         print("Run the command line:\n tensorboard --logdir logs/fit")
 
         # Early stopping callback
-        early_stopping_cb = callbacks.EarlyStopping(monitor='val_regression_head_loss', patience=patience,
-                                                    restore_best_weights=True)
+        early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
 
-        # Compile the model, focusing only on the regression head output for training
+        # Compile the model with 'mse' loss for regression head
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+                      loss={'regression_head': 'mse'},
+                      metrics={'regression_head': 'mse'})
+
+        # Train the model initially with a validation set
+        if sample_weights is None:
+            history = model.fit(X_train, {'regression_head': y_train},
+                                epochs=epochs,
+                                batch_size=batch_size,
+                                validation_split=0.3,
+                                callbacks=[tensorboard_cb, early_stopping_cb])
+        else:
+            history = model.fit(X_train, {'regression_head': y_train},
+                                sample_weight=sample_weights,
+                                epochs=epochs,
+                                batch_size=batch_size,
+                                validation_split=0.3,
+                                callbacks=[tensorboard_cb, early_stopping_cb])
+
+        # Find the best epoch from early stopping
+        best_epoch = np.argmin(history.history['val_loss']) + 1
+
+        # Plot training and validation loss
+        plt.plot(history.history['loss'], label='Training Loss')
+        plt.plot(history.history['val_loss'], label='Validation Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Training and Validation Loss Over Epochs')
+        plt.legend()
+        plt.show()
+
+        # Retrain the model without validation set to the best epoch
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
                       loss={'regression_head': 'mse'},
                       metrics={'regression_head': 'mse'})
 
         if sample_weights is None:
-            history = model.fit(X_train, {'regression_head': y_train},
-                                epochs=epochs,
-                                batch_size=batch_size,
-                                validation_split=0.2,
-                                callbacks=[tensorboard_cb, early_stopping_cb])
+            model.fit(X_train, {'regression_head': y_train}, epochs=best_epoch, batch_size=batch_size)
         else:
-            # Train the model with sample weights
-            history = model.fit(X_train, {'regression_head': y_train},
-                                sample_weight=sample_weights,
-                                epochs=epochs,
-                                batch_size=batch_size,
-                                validation_split=0.2,
-                                callbacks=[tensorboard_cb, early_stopping_cb])
+            model.fit(X_train, {'regression_head': y_train}, sample_weight=sample_weights, epochs=best_epoch,
+                      batch_size=batch_size)
 
         return history
 
@@ -264,9 +311,6 @@ class ModelBuilder:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
 
-
-
-
 class NormalizeLayer(layers.Layer):
     def __init__(self, epsilon: float = 1e-9, **kwargs):
         """
@@ -300,5 +344,3 @@ class NormalizeLayer(layers.Layer):
             "epsilon": self.epsilon,
         })
         return config
-
-
