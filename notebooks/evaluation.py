@@ -57,14 +57,27 @@ class Evaluator:
         # Calculate the Mean Squared Error using TensorFlow
         mse = tf.keras.losses.MeanSquaredError()(y_test, y_pred).numpy()
 
-        # Print the MSE
+        # Calculate the Root Mean Squared Error
+        rmse = np.sqrt(mse)
+
+        # Print the MSE and RMSE
         print(f"Mean Squared Error: {mse}")
+        print(f"Root Mean Squared Error: {rmse}")
 
         # Generate bins for plotting
         self.get_bins(list(y_test), res)
 
         # Plot error per bin
         self.plot_error_per_bin(y_test, y_pred)
+
+        # Plot actual vs predicted
+        plt.figure()
+        plt.scatter(y_test, y_pred, alpha=0.5)
+        plt.xlabel('Actual')
+        plt.ylabel('Predicted')
+        plt.title('Actual vs Predicted')
+        plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'r--')
+        plt.show()
 
         # Calculate individual errors
         individual_errors = np.abs(y_test - y_pred)
