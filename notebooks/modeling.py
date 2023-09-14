@@ -27,6 +27,16 @@ class ModelBuilder:
     hidden_arch = None
     input_size = None
     output_size = None
+    lambda_coef = None
+
+    def __init__(self, debug: bool = True) -> None:
+        """
+        Initialize the class variables.
+
+        :param debug: Boolean to enable debug output.
+        """
+        self.debug = debug
+        self.lambda_coef = 4 # coefficient for matching feature loss and regression loss
 
     def create_model(self, inputs: int, outputs: int, hiddens: List[int]) -> Model:
         """
@@ -130,7 +140,7 @@ class ModelBuilder:
         early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
 
         # Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.custom_loss)
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
 
         # First train the model with a validation set to determine the best epoch
         history = model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, validation_split=0.3,
@@ -149,7 +159,7 @@ class ModelBuilder:
         plt.show()
 
         # Retrain the model on the entire dataset to the best epoch found
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.custom_loss)
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
         model.fit(X_train, y_train, epochs=best_epoch, batch_size=batch_size)
 
         return history
@@ -188,9 +198,7 @@ class ModelBuilder:
         early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
 
         # Compile the model with 'mse' loss for regression head
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-                      loss={'regression_head': 'mse'},
-                      metrics={'regression_head': 'mse'})
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss={'regression_head': 'mse'})
 
         # Train the model initially with a validation set
         if sample_weights is None:
@@ -220,9 +228,7 @@ class ModelBuilder:
         plt.show()
 
         # Retrain the model without validation set to the best epoch
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-                      loss={'regression_head': 'mse'},
-                      metrics={'regression_head': 'mse'})
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss={'regression_head': 'mse'})
 
         if sample_weights is None:
             model.fit(X_train, {'regression_head': y_train}, epochs=best_epoch, batch_size=batch_size)
@@ -275,7 +281,7 @@ class ModelBuilder:
         squared_difference = (self.zdist(z1, z2) - self.ydist(label1, label2)) ** 2
         return tf.reduce_sum(squared_difference)
 
-    def custom_loss(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.SUM):
+    def repr_loss(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
         """
         Computes the loss for a batch of predicted features and their labels.
 
