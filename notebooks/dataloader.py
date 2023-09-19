@@ -40,22 +40,26 @@ class DatasetGenerator:
     avg_jreweight = None
     jreweights = None
 
-    def __init__(self, n_train: int = 1000, n_test: int = 1000, n_features: int = 4, debug: bool = True) -> None:
+    def __init__(self, n_train: int = 1000, n_test: int = 1000, n_features: int = 4, alpha: float = 1,
+                 debug: bool = False) -> None:
         """
         Create a synthetic regression dataset.
         The input features (X) are randomly generated using a normal distribution centered at 0 with a standard
         deviation of 1.
+
         The target values (y) are calculated as the L2 norm (Euclidean norm) of the input features.
 
         :param n_train: Number of training instances.
         :param n_test: Number of testing instances.
         :param n_features: Number of input features.
+        :param alpha: rewweighing coefficient
         :return: X_train, y_train, X_test, y_test
         """
 
         self.yb = None
         self.ya = None
         self.debug = debug
+        self.alpha = alpha
 
         # Create training data
         self.X_train = np.random.normal(loc=0, scale=1, size=(n_train, n_features))
@@ -71,20 +75,102 @@ class DatasetGenerator:
         self.max_y = np.max(self.y_train)
 
         self.kde = gaussian_kde(self.y_train, bw_method='scott')
-        self.alpha = 1
-        self.reweights = self.preprocess_reweighting(self.y_train)  # for labels
-        self.jreweights = self.preprocess_jreweighting(self.y_train)  # for pairs of labels
+        self.reweights = self.preprocess_reweighting(self.y_train)  # for labels, order maintained
+        # self.jreweights = self.preprocess_jreweighting(self.y_train)  # for pairs of labels
 
-        # print 4 first rows of X_train, y_train, X_test, y_test
+        self.X_val = np.empty((0, self.X_train.shape[1]))
+        self.y_val = np.empty((0,))
+        self.val_reweights = np.empty((0,))
+
+        # get the validation set
+        self.X_val, self.y_val, self.val_reweights = self.get_val_data(prob=.25)
+
+        # print 12 first rows of X_train, y_train, X_test, y_test,  X_val, y_val
         if self.debug:
-            print('X_train: ', self.X_train[:4])
-            print('y_train: ', self.y_train[:4])
+            print('X_train: ', self.X_train[:12])
+            print("Validation X:", self.X_val[:12])
+            print('y_train: ', self.y_train[:12])
+            print("Validation y:", self.y_val[:12])
             print('X_test: ', self.X_test[:4])
             print('y_test: ', self.y_test[:4])
             print('min_val y in after norm: ', self.min_y)
             print('max_val y in after norm: ', self.max_y)
-            self.plot_density_kde_reweights()
-            self.plot_density_kde_jreweights()
+            # self.plot_density_kde_reweights()
+            # self.plot_density_kde_jreweights()
+
+    def plot_distributions(self, y_train, y_val):
+        """
+        Plot the sorted distributions of training and validation labels.
+
+        :param y_train: Training labels
+        :param y_val: Validation labels
+        """
+        plt.figure(figsize=(12, 6))
+
+        plt.subplot(1, 2, 1)
+        plt.title("Sorted Training Labels Distribution")
+        plt.plot(np.sort(y_train), marker='o', linestyle='')
+        plt.xlabel("Index")
+        plt.ylabel("Value")
+
+        plt.subplot(1, 2, 2)
+        plt.title("Sorted Validation Labels Distribution")
+        plt.plot(np.sort(y_val), marker='o', linestyle='')
+        plt.xlabel("Index")
+        plt.ylabel("Value")
+
+        plt.tight_layout()
+        plt.show()
+
+    def get_val_data(self, prob: float = .25):
+        """
+        Get validation data using stratified sampling.
+        Sort the labels in descending order, and randomly pick one out of every 1/prob.
+        Also sorts the sample weights and carries them to the validation data.
+
+        :param prob: probability of picking out a label
+        :return: X_val, y_val, val_reweights
+        """
+        # Sort labels and weights in descending order
+        sorted_idx = np.argsort(self.y_train)[::-1]
+        sorted_y_train = self.y_train[sorted_idx]
+        sorted_X_train = self.X_train[sorted_idx]
+        sorted_reweights = self.reweights[sorted_idx]
+
+        # Calculate the number of samples and step size for picking validation samples
+        n = len(self.y_train)
+        stepsize = int(1 / prob)
+
+        # Initialize validation arrays and weights
+        self.X_val = np.empty((0, sorted_X_train.shape[1]))
+        self.y_val = np.empty((0,))
+        self.val_reweights = np.empty((0,))
+
+        # To keep track of the indices we've picked for the validation set in original arrays
+        original_val_idx = []
+
+        # Iterate over sorted labels and pick one random sample every 1/prob samples
+        for i in range(0, n, stepsize):
+            upper_bound = min(i + stepsize, n)
+            idx = np.random.randint(i, upper_bound)
+
+            # Add picked sample and weight to the validation set
+            self.X_val = np.concatenate((self.X_val, [sorted_X_train[idx]]), axis=0)
+            self.y_val = np.concatenate((self.y_val, [sorted_y_train[idx]]), axis=0)
+            self.val_reweights = np.concatenate((self.val_reweights, [sorted_reweights[idx]]), axis=0)
+
+            # Store the original index for removing later
+            original_val_idx.append(sorted_idx[idx])
+
+        # Remove validation samples and their weights from the training set
+        keep_idx = np.setdiff1d(np.arange(n), np.array(original_val_idx))
+        self.X_train = self.X_train[keep_idx]
+        self.y_train = self.y_train[keep_idx]
+        self.reweights = self.reweights[keep_idx]
+
+        # self.plot_distributions(self.y_train, self.y_val)
+
+        return self.X_val, self.y_val, self.val_reweights
 
     def plot_density_kde_reweights(self):
         """
