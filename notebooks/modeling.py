@@ -134,32 +134,34 @@ class ModelBuilder:
 
         return extended_model
 
-    def reset_regression_head(self, extended_model: Model) -> Model:
+    def remove_heads(self, extended_model: Model) -> Model:
         """
-        Reset the regression head of an extended neural network model.
-
+        Reset both the regression and decoder heads of an extended neural network model.
+    
         :param extended_model: The extended neural network model.
-        :return: The base model without the regression head.
+        :return: The base model without the regression and decoder heads.
         """
+    
         # Serialize the model to a config dictionary
         config = extended_model.get_config()
-
-        # Remove the regression head layer from the config
+    
+        # Remove the last two layers (regression head and decoder head) from the config
         config['layers'].pop()
-
-        # Remove the regression head from output_layers
-        config['output_layers'] = [x for x in config['output_layers'] if x[0] != 'regression_head']
-
+        config['layers'].pop()
+    
+        # Remove the regression head and decoder head from output_layers
+        config['output_layers'] = [x for x in config['output_layers'] if x[0] not in ['regression_head', 'decoder_head']]
+    
         # Provide the NormalizeLayer as custom object
-        custom_objects = {'NormalizeLayer': NormalizeLayer}
-
+        custom_objects = {'NormalizeLayer': NormalizeLayer}  # Assuming NormalizeLayer is defined
+    
         # Reconstruct the model from the config
-        base_model = Model.from_config(config, custom_objects=custom_objects)
-
-        # Copy weights for all layers except the last one (the regression head)
-        for layer, old_layer in zip(base_model.layers, extended_model.layers[:-1]):
+        base_model = tf.keras.Model.from_config(config, custom_objects=custom_objects)
+    
+        # Copy weights for all layers except the last two (the regression and decoder heads)
+        for layer, old_layer in zip(base_model.layers, extended_model.layers[:-2]):
             layer.set_weights(old_layer.get_weights())
-
+    
         return base_model
 
     def freeze_features(self, model: Model) -> None:
@@ -188,7 +190,7 @@ class ModelBuilder:
                       epochs: int = 100,
                       batch_size: int = 32,
                       patience: int = 9,
-                      lambda_coef: float = 4.0) -> callbacks.History:
+                      lambda_coef: float = 2.0) -> callbacks.History:
         """
         Train a neural network model focusing on both the feature representation and regression output.
 
@@ -444,6 +446,100 @@ class ModelBuilder:
 
         return history
 
+    def train_regression_with_ae(self,
+                         model: tf.keras.Model,
+                         X_train: np.ndarray,
+                         y_train: np.ndarray,
+                         X_val: np.ndarray,
+                         y_val: np.ndarray,
+                         sample_weights: Optional[np.ndarray] = None,
+                         sample_val_weights: Optional[np.ndarray] = None,
+                         learning_rate: float = 1e-3,
+                         epochs: int = 100,
+                         batch_size: int = 32,
+                         patience: int = 9,
+                         use_ae: bool = False,
+                         lambda_coef: float = 1.) -> callbacks.History:
+        """
+        Train a neural network model focusing on the regression and/or autoencoder output.
+        Include reweighting for balancing the loss.
+
+        :param model: The neural network model.
+        :param X_train: Training features.
+        :param y_train: Training labels.
+        :param X_val: Validation features.
+        :param y_val: Validation labels.
+        :param sample_weights: Sample weights for training set.
+        :param sample_val_weights: Sample weights for validation set.
+        :param learning_rate: Learning rate for Adam optimizer.
+        :param epochs: Number of epochs.
+        :param batch_size: Batch size.
+        :param patience: Number of epochs for early stopping.
+        :param use_ae: Whether to use the autoencoder head.
+        :param lambda_coef: Coefficient for the reconstruction loss.
+        :return: Training history.
+        """
+
+        # Callbacks
+        log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        tensorboard_cb = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+        early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
+
+        # Compile model
+        if use_ae:
+            model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+                          loss={'regression_head': 'mse', 'decoder_head': 'mse'},
+                          loss_weights={'regression_head': 1.0, 'decoder_head': lambda_coef})
+        else:
+            model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+                          loss={'regression_head': 'mse'})
+
+        # Prepare data dictionary
+        y_dict = {'regression_head': y_train}
+        val_y_dict = {'regression_head': y_val}
+
+        if use_ae:
+            y_dict['decoder_head'] = X_train
+            val_y_dict['decoder_head'] = X_val
+
+        # Training
+        history = model.fit(X_train, y_dict,
+                            sample_weight=sample_weights,
+                            epochs=epochs,
+                            batch_size=batch_size,
+                            validation_data=(X_val, val_y_dict, sample_val_weights),
+                            callbacks=[tensorboard_cb, early_stopping_cb])
+
+        # Find best epoch
+        best_epoch = np.argmin(history.history['val_loss']) + 1
+
+        # Plot loss
+        plt.plot(history.history['loss'], label='Training Loss')
+        plt.plot(history.history['val_loss'], label='Validation Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Training and Validation Loss Over Epochs')
+        plt.legend()
+        plt.show()
+
+        # Combine training and validation data
+        X_full = np.concatenate([X_train, X_val], axis=0)
+        y_full = np.concatenate([y_train, y_val], axis=0)
+
+        # Combine sample weights
+        full_sample_weights = np.concatenate([sample_weights, sample_val_weights],
+                                             axis=0) if sample_weights is not None and sample_val_weights is not None else None
+
+        # Retrain to best epoch
+        model.fit(X_full,
+                  {'regression_head': y_full, 'decoder_head': X_full} if use_ae else {'regression_head': y_full},
+                  sample_weight=full_sample_weights,
+                  epochs=best_epoch,
+                  batch_size=batch_size,
+                  callbacks=[tensorboard_cb])
+
+        return history
+
     def plot_model(self, model: Model) -> None:
         """
         Plot the model architecture and save the figure.
@@ -476,7 +572,7 @@ class ModelBuilder:
     def error(self, z1: Tensor, z2: Tensor, label1: float, label2: float) -> float:
         """
         Computes the error between the zdist of two input predicted z values and their ydist.
-        Range of the error is [0, 16].
+        Range of the error is [0, 8].
 
         :param z1: The predicted z value for the first input sample.
         :param z2: The predicted z value for the second input sample.
@@ -484,7 +580,8 @@ class ModelBuilder:
         :param label2: The label of the second input sample.
         :return: The squared difference between the zdist and ydist.
         """
-        squared_difference = (self.zdist(z1, z2) - self.ydist(label1, label2)) ** 2
+        squared_difference = .5 * (self.zdist(z1, z2) - self.ydist(label1, label2)) ** 2 
+        # added multiplication by .5 to reduce the error range to 0-8
         return tf.reduce_sum(squared_difference)
 
     def repr_loss_fast(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
