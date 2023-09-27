@@ -396,6 +396,12 @@ class ModelBuilder:
             batch_X = X[batch_indices]
             batch_y = y[batch_indices]
 
+            # Shuffle the entire batch
+            indices = np.arange(batch_X.shape[0])
+            np.random.shuffle(indices)
+            batch_X = batch_X[indices]
+            batch_y = batch_y[indices]
+
             yield batch_X, batch_y
 
     def train_features_injection(self,
