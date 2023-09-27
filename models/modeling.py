@@ -141,27 +141,28 @@ class ModelBuilder:
         :param extended_model: The extended neural network model.
         :return: The base model without the regression and decoder heads.
         """
-    
+
         # Serialize the model to a config dictionary
         config = extended_model.get_config()
-    
+
         # Remove the last two layers (regression head and decoder head) from the config
         config['layers'].pop()
         config['layers'].pop()
-    
+
         # Remove the regression head and decoder head from output_layers
-        config['output_layers'] = [x for x in config['output_layers'] if x[0] not in ['regression_head', 'decoder_head']]
-    
+        config['output_layers'] = [x for x in config['output_layers'] if
+                                   x[0] not in ['regression_head', 'decoder_head']]
+
         # Provide the NormalizeLayer as custom object
         custom_objects = {'NormalizeLayer': NormalizeLayer}  # Assuming NormalizeLayer is defined
-    
+
         # Reconstruct the model from the config
         base_model = tf.keras.Model.from_config(config, custom_objects=custom_objects)
-    
+
         # Copy weights for all layers except the last two (the regression and decoder heads)
         for layer, old_layer in zip(base_model.layers, extended_model.layers[:-2]):
             layer.set_weights(old_layer.get_weights())
-    
+
         return base_model
 
     def freeze_features(self, model: Model) -> None:
@@ -362,6 +363,94 @@ class ModelBuilder:
         else:
             model.fit(X_combined, y_combined, epochs=best_epoch, batch_size=batch_size)
 
+        return history
+
+    def train_features_fast(self,
+                       model: Model,
+                       X_train: Tensor,
+                       y_train: Tensor,
+                       X_val: Tensor,
+                       y_val: Tensor,
+                       sample_joint_weights: np.ndarray = None,
+                       learning_rate: float = 1e-3,
+                       epochs: int = 100,
+                       batch_size: int = 32,
+                       patience: int = 9) -> callbacks.History:
+        """
+        Trains the model and returns the training history.
+
+        :param model: The TensorFlow model to train.
+        :param X_train: The training feature set.
+        :param y_train: The training labels.
+        :param X_val: Validation features.
+        :param y_val: Validation labels.
+        :param sample_joint_weights: The reweighting factors for pairs of labels.
+        :param learning_rate: The learning rate for the Adam optimizer.
+        :param epochs: The maximum number of epochs for training.
+        :param batch_size: The batch size for training.
+        :param patience: The number of epochs with no improvement to wait before early stopping.
+        :return: The training history as a History object.
+        """
+
+        # Setup TensorBoard
+        log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        tensorboard_cb = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+
+        print("Run the command line:\n tensorboard --logdir logs/fit")
+
+        # Setup early stopping
+        early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
+
+        # In your Callback
+        class WeightedLossCallback(callbacks.Callback):
+            def on_train_batch_begin(self, batch, logs=None):
+                idx1, idx2 = np.triu_indices(len(y_train), k=1)
+                one_d_indices = [map_to_1D_idx(i, j, len(y_train)) for i, j in zip(idx1, idx2)]
+                joint_weights_batch = sample_joint_weights[one_d_indices]  # Retrieve weights for this batch
+                self.model.loss_weights = joint_weights_batch  # Set loss weights for this batch
+
+        # Create an instance of the custom callback
+        weighted_loss_cb = WeightedLossCallback()
+
+        # Include weighted_loss_cb in callbacks only if sample_joint_weights is not None
+        callback_list = [tensorboard_cb, early_stopping_cb]
+        if sample_joint_weights is not None:
+            callback_list.append(weighted_loss_cb)
+
+        # Compile the model
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss_fast)
+
+        # First train the model with a validation set to determine the best epoch
+        history = model.fit(X_train, y_train,
+                            epochs=epochs,
+                            batch_size=batch_size,
+                            validation_data=(X_val, y_val),
+                            callbacks=callback_list)
+
+        # Get the best epoch from early stopping
+        best_epoch = np.argmin(history.history['val_loss']) + 1
+
+        # Plot training loss and validation loss
+        plt.plot(history.history['loss'], label='Training Loss')
+        plt.plot(history.history['val_loss'], label='Validation Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Training and Validation Loss Over Epochs')
+        plt.legend()
+        plt.show()
+
+        # Retrain the model on the combined dataset (training + validation) to the best epoch found
+        X_combined = np.concatenate((X_train, X_val), axis=0)
+        y_combined = np.concatenate((y_train, y_val), axis=0)
+
+        if sample_joint_weights is not None:
+            sample_joint_weights_combined = np.concatenate((sample_joint_weights, sample_joint_weights), axis=0)
+
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss_fast)
+        if sample_joint_weights is not None:
+            model.fit(X_combined, y_combined, epochs=best_epoch, batch_size=batch_size, callbacks=[weighted_loss_cb])
+        else:
+            model.fit(X_combined, y_combined, epochs=best_epoch, batch_size=batch_size)
 
         return history
 
@@ -402,13 +491,14 @@ class ModelBuilder:
         print("Run the command line:\n tensorboard --logdir logs/fit")
 
         # Early stopping callback
-        early_stopping_cb = callbacks.EarlyStopping(monitor='val_regression_head_loss', patience=patience, restore_best_weights=True)
+        early_stopping_cb = callbacks.EarlyStopping(monitor='val_regression_head_loss', patience=patience,
+                                                    restore_best_weights=True)
 
         # Compile the model
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss={'regression_head': 'mse'})
 
         # Train the model with a validation set
-        history = model.fit(X_train,  {'regression_head': y_train},
+        history = model.fit(X_train, {'regression_head': y_train},
                             sample_weight=sample_weights,
                             epochs=epochs,
                             batch_size=batch_size,
@@ -447,19 +537,19 @@ class ModelBuilder:
         return history
 
     def train_regression_with_ae(self,
-                         model: tf.keras.Model,
-                         X_train: np.ndarray,
-                         y_train: np.ndarray,
-                         X_val: np.ndarray,
-                         y_val: np.ndarray,
-                         sample_weights: Optional[np.ndarray] = None,
-                         sample_val_weights: Optional[np.ndarray] = None,
-                         learning_rate: float = 1e-3,
-                         epochs: int = 100,
-                         batch_size: int = 32,
-                         patience: int = 9,
-                         use_ae: bool = False,
-                         lambda_coef: float = 1.) -> callbacks.History:
+                                 model: tf.keras.Model,
+                                 X_train: np.ndarray,
+                                 y_train: np.ndarray,
+                                 X_val: np.ndarray,
+                                 y_val: np.ndarray,
+                                 sample_weights: Optional[np.ndarray] = None,
+                                 sample_val_weights: Optional[np.ndarray] = None,
+                                 learning_rate: float = 1e-3,
+                                 epochs: int = 100,
+                                 batch_size: int = 32,
+                                 patience: int = 9,
+                                 use_ae: bool = False,
+                                 lambda_coef: float = 1.) -> callbacks.History:
         """
         Train a neural network model focusing on the regression and/or autoencoder output.
         Include reweighting for balancing the loss.
@@ -580,9 +670,26 @@ class ModelBuilder:
         :param label2: The label of the second input sample.
         :return: The squared difference between the zdist and ydist.
         """
-        squared_difference = .5 * (self.zdist(z1, z2) - self.ydist(label1, label2)) ** 2 
+        squared_difference = .5 * (self.zdist(z1, z2) - self.ydist(label1, label2)) ** 2
         # added multiplication by .5 to reduce the error range to 0-8
         return tf.reduce_sum(squared_difference)
+
+    def error_vectorized(self, z1: tf.Tensor, z2: tf.Tensor, label1: tf.Tensor, label2: tf.Tensor) -> tf.Tensor:
+        """
+        Vectorized function to compute the error between the zdist of two batches of input predicted z values
+        and their ydist. Range of the error is [0, 8].
+
+        :param z1: A tensor containing the predicted z values for the first batch of input samples.
+        :param z2: A tensor containing the predicted z values for the second batch of input samples.
+        :param label1: A tensor containing the labels of the first batch of input samples.
+        :param label2: A tensor containing the labels of the second batch of input samples.
+        :return: A tensor containing the squared differences between the zdist and ydist for each pair.
+        """
+        z_distance = tf.reduce_sum(tf.square(z1 - z2), axis=-1)
+        y_distance = tf.square(label1 - label2)
+        squared_difference = 0.5 * tf.square(z_distance - y_distance)
+
+        return squared_difference
 
     def repr_loss_fast(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
         """
@@ -605,12 +712,11 @@ class ModelBuilder:
         label2 = tf.expand_dims(y_true, 0)
 
         # Compute the pairwise errors using the 'self.error' function
-        err_matrix = self.error(z1, z2, label1, label2)
+        err_matrix = self.error_vectorized(z1, z2, label1, label2)
 
-        # Exclude the diagonal (self-comparisons) and take upper triangle
-        mask = 1 - tf.eye(batch_size, dtype=tf.float32)
-        err_matrix *= mask  # Mask out diagonal
-        total_error = tf.reduce_sum(err_matrix) / 2  # Sum over upper triangle elements
+        mask_upper_triangle = tf.linalg.band_part(tf.ones_like(err_matrix), 0, -1)  # Upper triangular matrix of ones
+        mask_no_diag = mask_upper_triangle - tf.eye(tf.shape(err_matrix)[0])  # Remove diagonal
+        total_error = tf.reduce_sum(err_matrix * mask_no_diag)
 
         if reduction == tf.keras.losses.Reduction.SUM:
             return total_error  # total loss
@@ -622,6 +728,7 @@ class ModelBuilder:
     def repr_loss(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
         """
         Computes the loss for a batch of predicted features and their labels.
+        verified!
 
         :param y_true: A batch of true label values, shape of [batch_size, 1].
         :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
