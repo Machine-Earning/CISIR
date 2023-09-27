@@ -10,6 +10,7 @@ from tensorflow.keras import layers, callbacks, Model
 import datetime
 import numpy as np
 import matplotlib.pyplot as plt
+from itertools import cycle
 
 # types for type hinting
 from typing import Tuple, List, Optional, Callable
@@ -312,6 +313,10 @@ class ModelBuilder:
         # Setup early stopping
         early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
 
+        # checkpoint callback
+        # Setup model checkpointing
+        checkpoint_cb = callbacks.ModelCheckpoint("model_weights.h5", save_weights_only=True)
+
         # In your Callback
         class WeightedLossCallback(callbacks.Callback):
             def on_train_batch_begin(self, batch, logs=None):
@@ -324,7 +329,7 @@ class ModelBuilder:
         weighted_loss_cb = WeightedLossCallback()
 
         # Include weighted_loss_cb in callbacks only if sample_joint_weights is not None
-        callback_list = [tensorboard_cb, early_stopping_cb]
+        callback_list = [tensorboard_cb, early_stopping_cb, checkpoint_cb]
         if sample_joint_weights is not None:
             callback_list.append(weighted_loss_cb)
 
@@ -359,23 +364,173 @@ class ModelBuilder:
 
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
         if sample_joint_weights is not None:
-            model.fit(X_combined, y_combined, epochs=best_epoch, batch_size=batch_size, callbacks=[weighted_loss_cb])
+            model.fit(X_combined, y_combined, epochs=best_epoch, batch_size=batch_size,
+                      callbacks=[weighted_loss_cb, tensorboard_cb, checkpoint_cb])
         else:
-            model.fit(X_combined, y_combined, epochs=best_epoch, batch_size=batch_size)
+            model.fit(X_combined, y_combined, epochs=best_epoch, batch_size=batch_size,
+                      clallbacks=[tensorboard_cb, checkpoint_cb])
 
         return history
 
+    def custom_data_generator(self, X, y, batch_size):
+        """
+        Yields batches of data such that the last two samples in each batch
+        have target labels above ln(10), and the remaining have labels below ln(10).
+        Below-threshold samples cycle through before repeating.
+        """
+        above_threshold_indices = np.where(y > np.log(10))[0]
+        below_threshold_indices = np.where(y <= np.log(10))[0]
+
+        # Create an iterator that will cycle through the below_threshold_indices
+        cyclic_below_threshold = cycle(below_threshold_indices)
+
+        while True:
+            # Select random above-threshold indices
+            batch_indices_above = np.random.choice(above_threshold_indices, 2, replace=False)
+
+            # Select (batch_size - 2) below-threshold indices in a cyclic manner
+            batch_indices_below = [next(cyclic_below_threshold) for _ in range(batch_size - 2)]
+
+            batch_indices = np.concatenate([batch_indices_below, batch_indices_above])
+
+            batch_X = X[batch_indices]
+            batch_y = y[batch_indices]
+
+            yield batch_X, batch_y
+
+    def train_features_injection(self,
+                                 model: Model,
+                                 X_train: Tensor,
+                                 y_train: Tensor,
+                                 X_val: Tensor,
+                                 y_val: Tensor,
+                                 sample_joint_weights: np.ndarray = None,
+                                 learning_rate: float = 1e-3,
+                                 epochs: int = 100,
+                                 batch_size: int = 32,
+                                 patience: int = 9) -> callbacks.History:
+        """
+        Trains the model and returns the training history. injection of rare examples
+
+        :param model: The TensorFlow model to train.
+        :param X_train: The training feature set.
+        :param y_train: The training labels.
+        :param X_val: Validation features.
+        :param y_val: Validation labels.
+        :param sample_joint_weights: The reweighting factors for pairs of labels.
+        :param learning_rate: The learning rate for the Adam optimizer.
+        :param epochs: The maximum number of epochs for training.
+        :param batch_size: The batch size for training.
+        :param patience: The number of epochs with no improvement to wait before early stopping.
+        :return: The training history as a History object.
+        """
+
+        # Create custom data generators for training and validation
+        train_gen = self.custom_data_generator(X_train, y_train, batch_size)
+        val_gen = self.custom_data_generator(X_val, y_val, batch_size)
+
+        train_steps = len(y_train) // batch_size
+        val_steps = len(y_val) // batch_size
+
+        # Setup TensorBoard
+        log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        tensorboard_cb = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+
+        print("Run the command line:\n tensorboard --logdir logs/fit")
+
+        # Setup early stopping
+        early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
+
+        # checkpoint callback
+        # Setup model checkpointing
+        checkpoint_cb = callbacks.ModelCheckpoint("model_weights.h5", save_weights_only=True)
+
+        # In your Callback
+        class WeightedLossCallback(callbacks.Callback):
+            def on_train_batch_begin(self, batch, logs=None):
+                idx1, idx2 = np.triu_indices(len(y_train), k=1)
+                one_d_indices = [map_to_1D_idx(i, j, len(y_train)) for i, j in zip(idx1, idx2)]
+                joint_weights_batch = sample_joint_weights[one_d_indices]  # Retrieve weights for this batch
+                self.model.loss_weights = joint_weights_batch  # Set loss weights for this batch
+
+        # Create an instance of the custom callback
+        weighted_loss_cb = WeightedLossCallback()
+
+        # Include weighted_loss_cb in callbacks only if sample_joint_weights is not None
+        callback_list = [tensorboard_cb, early_stopping_cb, checkpoint_cb]
+        if sample_joint_weights is not None:
+            callback_list.append(weighted_loss_cb)
+
+        # Compile the model
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
+
+        # First train the model with a validation set to determine the best epoch
+        history = model.fit(train_gen,
+                            steps_per_epoch=train_steps,
+                            validation_data=val_gen,
+                            validation_steps=val_steps,
+                            epochs=epochs,
+                            batch_size=batch_size,
+                            callbacks=callback_list)
+
+        # Get the best epoch from early stopping
+        best_epoch = np.argmin(history.history['val_loss']) + 1
+
+        # Plot training loss and validation loss
+        plt.plot(history.history['loss'], label='Training Loss')
+        plt.plot(history.history['val_loss'], label='Validation Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Training and Validation Loss Over Epochs')
+        plt.legend()
+        plt.show()
+
+        # Retrain the model on the combined dataset (training + validation) to the best epoch found
+        X_combined = np.concatenate((X_train, X_val), axis=0)
+        y_combined = np.concatenate((y_train, y_val), axis=0)
+
+        # Create custom generators for combined data
+        train_gen_comb = self.custom_data_generator(X_combined, y_combined, batch_size)
+
+        # Calculate the number of steps per epoch for training
+        train_steps_comb = len(X_combined) // batch_size
+
+        if sample_joint_weights is not None:
+            sample_joint_weights_combined = np.concatenate((sample_joint_weights, sample_joint_weights), axis=0)
+
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
+        if sample_joint_weights is not None:
+            model.fit(train_gen_comb, steps_per_epoch=train_steps_comb, epochs=best_epoch, batch_size=batch_size,
+                      callbacks=[weighted_loss_cb, tensorboard_cb, checkpoint_cb])
+        else:
+            model.fit(train_gen_comb, steps_per_epoch=train_steps_comb, epochs=best_epoch, batch_size=batch_size,
+                      callbacks=[tensorboard_cb, checkpoint_cb])
+
+        return history
+
+    def load_model_weights(self, model: Model, weight_file: str = "model_weights.h5"):
+        """
+        Loads weights into a given TensorFlow model from a specified HDF5 weight file.
+
+        :param model: The TensorFlow model into which weights will be loaded.
+        :param weight_file: The name of the HDF5 weight file.
+
+        :return model: The loaded TensorFlow model.
+        """
+        model.load_weights(weight_file)
+        return model
+
     def train_features_fast(self,
-                       model: Model,
-                       X_train: Tensor,
-                       y_train: Tensor,
-                       X_val: Tensor,
-                       y_val: Tensor,
-                       sample_joint_weights: np.ndarray = None,
-                       learning_rate: float = 1e-3,
-                       epochs: int = 100,
-                       batch_size: int = 32,
-                       patience: int = 9) -> callbacks.History:
+                            model: Model,
+                            X_train: Tensor,
+                            y_train: Tensor,
+                            X_val: Tensor,
+                            y_val: Tensor,
+                            sample_joint_weights: np.ndarray = None,
+                            learning_rate: float = 1e-3,
+                            epochs: int = 100,
+                            batch_size: int = 32,
+                            patience: int = 9) -> callbacks.History:
         """
         Trains the model and returns the training history.
 
@@ -694,8 +849,7 @@ class ModelBuilder:
     def repr_loss_fast(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
         """
         Computes the loss for a batch of predicted features and their labels.
-        TODO: to fix, values are off
-
+         TODO: Leads to wrong losses, how to fix it?
         :param y_true: A batch of true label values, shape of [batch_size, 1].
         :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
         :param reduction: The type of reduction to apply to the loss.
