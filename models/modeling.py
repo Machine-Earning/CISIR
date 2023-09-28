@@ -368,7 +368,7 @@ class ModelBuilder:
                       callbacks=[weighted_loss_cb, tensorboard_cb, checkpoint_cb])
         else:
             model.fit(X_combined, y_combined, epochs=best_epoch, batch_size=batch_size,
-                      clallbacks=[tensorboard_cb, checkpoint_cb])
+                      callbacks=[tensorboard_cb, checkpoint_cb])
 
         return history
 
