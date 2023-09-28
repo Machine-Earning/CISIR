@@ -287,7 +287,8 @@ class ModelBuilder:
                        learning_rate: float = 1e-3,
                        epochs: int = 100,
                        batch_size: int = 32,
-                       patience: int = 9) -> callbacks.History:
+                       patience: int = 9,
+                       save_tag=None) -> callbacks.History:
         """
         Trains the model and returns the training history.
 
@@ -315,7 +316,7 @@ class ModelBuilder:
 
         # checkpoint callback
         # Setup model checkpointing
-        checkpoint_cb = callbacks.ModelCheckpoint("model_weights.h5", save_weights_only=True)
+        checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_{str(save_tag)}.h5", save_weights_only=True)
 
         # In your Callback
         class WeightedLossCallback(callbacks.Callback):
@@ -369,6 +370,9 @@ class ModelBuilder:
         else:
             model.fit(X_combined, y_combined, epochs=best_epoch, batch_size=batch_size,
                       callbacks=[tensorboard_cb, checkpoint_cb])
+
+        # save the model weights
+        model.save_weights(f"model_weights_{str(save_tag)}.h5")
 
         return history
 
@@ -436,7 +440,7 @@ class ModelBuilder:
         val_gen = self.custom_data_generator(X_val, y_val, batch_size)
 
         train_steps = len(y_train) // batch_size
-        val_steps = len(y_val) // batch_size
+        val_steps = len(y_val) // batch_size if len(y_val) > batch_size else len(y_val)
 
         # Setup TensorBoard
         log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")

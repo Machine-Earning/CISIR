@@ -77,7 +77,21 @@ def shuffle_sets(train_x, train_y, val_x, val_y, test_x, test_y):
     return train_x, train_y, val_x, val_y, test_x, test_y
 
 
-def plot_tsne_and_save_with_timestamp(model, X, y, prefix):
+def count_above_threshold(y_values, threshold=np.log(10)):
+    """
+    Count the number of y values that are above a given threshold.
+
+    Parameters:
+    - y_values (array-like): The array of y-values to check.
+    - threshold (float, optional): The threshold value to use for counting. Default is log(10).
+
+    Returns:
+    - int: The count of y-values that are above the threshold.
+    """
+    return np.sum(y_values > threshold)
+
+
+def plot_tsne_and_save_with_timestamp(model, X, y, prefix, save_tag=None):
     """
     Applies t-SNE to the features extracted by the given model and saves the plot in 2D with a timestamp.
     The color of the points is determined by their label values.
@@ -91,30 +105,42 @@ def plot_tsne_and_save_with_timestamp(model, X, y, prefix):
     Returns:
     - Saves a 2D t-SNE plot to a file with a timestamp
     """
+    # saving the threshold
+    threshold = np.log(10)
     # Extract features using the trained model
     features = model.predict(X)
-    
+
     # Apply t-SNE
     tsne = TSNE(n_components=2, random_state=42)
     tsne_result = tsne.fit_transform(features)
-    
-    # Create a scatter plot
+
+    # Identify above and below threshold indices
+    above_threshold_indices = np.where(y > threshold)[0]
+    below_threshold_indices = np.where(y <= threshold)[0]
+
+    # Create scatter plot for below-threshold points
     plt.figure(figsize=(12, 8))
-    scatter = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap='viridis', alpha=0.6)
+    plt.scatter(tsne_result[below_threshold_indices, 0], tsne_result[below_threshold_indices, 1],
+                c=y[below_threshold_indices], cmap='viridis', alpha=0.6, label='Below Threshold')
+
+    # Overlay scatter plot for above-threshold points
+    scatter = plt.scatter(tsne_result[above_threshold_indices, 0], tsne_result[above_threshold_indices, 1],
+                          c=y[above_threshold_indices], cmap='viridis', alpha=1.0, edgecolors='r',
+                          label='Above Threshold')
 
     # Add a color bar
     cbar = plt.colorbar(scatter)
     cbar.set_label('Label Value')
 
+    # Add legend to differentiate above-threshold points
+    plt.legend()
+
     plt.title('2D t-SNE Visualization')
     plt.xlabel('Dimension 1')
     plt.ylabel('Dimension 2')
-    
-    # Generate a timestamp
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    
+
     # Save the plot
-    file_path = f"{prefix}_tsne_plot_{timestamp}.png"
+    file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
     plt.savefig(file_path)
     plt.close()
 
@@ -136,18 +162,35 @@ def main():
     shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y, shuffled_test_x, shuffled_test_y = shuffle_sets(
         train_x, train_y, val_x, val_y, test_x, test_y)
 
+    train_count = count_above_threshold(shuffled_train_y)
+    val_count = count_above_threshold(shuffled_val_y)
+    test_count = count_above_threshold(shuffled_test_y)
+
+    print(f'Training set: {train_count} above the threshold')
+    print(f'Validation set: {val_count} above the threshold')
+    print(f'Test set: {test_count} above the threshold')
+
     mb = modeling.ModelBuilder()
 
     # create my feature extractor
     feature_extractor = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
-
+    # Generate a timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
-    mb.train_features_injection(feature_extractor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
-            learning_rate=1e-4, epochs=2000, batch_size=400, patience=300)
+    Options = {
+        'batch_size': 400,
+        'epochs': 200,
+        'patience': 300,
+        'learning_rate': 1e-4,
+    }
+    mb.train_features(feature_extractor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
+                      learning_rate=1e-4, epochs=200, batch_size=400, patience=300, save_tag=timestamp)
 
-    plot_tsne_and_save_with_timestamp(feature_extractor, shuffled_train_x, shuffled_train_y, 'training')
+    plot_tsne_and_save_with_timestamp(feature_extractor, shuffled_train_x, shuffled_train_y, 'training',
+                                      save_tag=timestamp)
 
-    plot_tsne_and_save_with_timestamp(feature_extractor, shuffled_test_x, shuffled_test_y, 'testing')
+    plot_tsne_and_save_with_timestamp(feature_extractor, shuffled_test_x, shuffled_test_y, 'testing',
+                                      save_tag=timestamp)
 
 
 if __name__ == '__main__':
