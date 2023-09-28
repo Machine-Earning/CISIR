@@ -106,7 +106,7 @@ def plot_tsne_and_save_with_timestamp(model, X, y, prefix, save_tag=None):
     - Saves a 2D t-SNE plot to a file with a timestamp
     """
     # saving the threshold
-    threshold = np.log(10)
+    threshold = np.log(9)
     # Extract features using the trained model
     features = model.predict(X)
 
@@ -178,13 +178,19 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': 400,
+        'batch_size': 927,
         'epochs': 200,
-        'patience': 300,
+        'patience': 25,
         'learning_rate': 1e-4,
     }
+
+    # print options used 
+    print(Options)
     mb.train_features(feature_extractor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
-                      learning_rate=1e-4, epochs=200, batch_size=400, patience=300, save_tag=timestamp)
+                      learning_rate=Options['learning_rate'], 
+                      epochs=Options['epochs'], 
+                      batch_size=Options['batch_size'], 
+                      patience=Options['patience'], save_tag=timestamp)
 
     plot_tsne_and_save_with_timestamp(feature_extractor, shuffled_train_x, shuffled_train_y, 'training',
                                       save_tag=timestamp)
