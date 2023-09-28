@@ -100,13 +100,37 @@ class ModelBuilder:
         :return: The extended model with a regression head.
         """
         # Extract the output of the last layer of the base model
-        last_layer_output = base_model.output
+        repr_output = base_model.output
 
         # Add a Dense layer with one output unit for regression
-        regression_head = layers.Dense(1, activation='linear', name="regression_head")(last_layer_output)
+        regression_head = layers.Dense(1, activation='linear', name="regression_head")(repr_output)
 
         # Create the new extended model
-        extended_model = Model(inputs=base_model.input, outputs=[last_layer_output, regression_head])
+        extended_model = Model(inputs=base_model.input, outputs=[repr_output, regression_head])
+
+        return extended_model
+
+    def add_regression_head_with_proj(self, base_model: Model) -> Model:
+        """
+        Add a regression head with one output unit and a projection layer to an existing neural network model.
+
+        :param base_model: The base neural network model.
+        :return: The extended model with a projection layer and a regression head.
+        """
+        # Extract the output of the last layer of the base model
+        repr_output = base_model.output
+
+        # Add a Dense layer with 6 neurons (Projection Layer)
+        projection_layer = layers.Dense(6, name="projection_layer")(repr_output)
+
+        # Add LeakyReLU activation to the projection layer
+        projection_activation = layers.LeakyReLU(name="projection_activation")(projection_layer)
+
+        # Add a Dense layer with one output unit for regression
+        regression_head = layers.Dense(1, activation='linear', name="regression_head")(projection_activation)
+
+        # Create the new extended model
+        extended_model = Model(inputs=base_model.input, outputs=[repr_output, regression_head])
 
         return extended_model
 
@@ -630,7 +654,8 @@ class ModelBuilder:
                          learning_rate: float = 1e-3,
                          epochs: int = 100,
                          batch_size: int = 32,
-                         patience: int = 9) -> callbacks.History:
+                         patience: int = 9,
+                         save_tag=None) -> callbacks.History:
         """
         Train a neural network model focusing only on the regression output.
         Include reweighting for balancing the loss.
@@ -658,7 +683,8 @@ class ModelBuilder:
         # Early stopping callback
         early_stopping_cb = callbacks.EarlyStopping(monitor='val_regression_head_loss', patience=patience,
                                                     restore_best_weights=True)
-
+        # Setup model checkpointing
+        checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_{str(save_tag)}.h5", save_weights_only=True)
         # Compile the model
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss={'regression_head': 'mse'})
 
@@ -668,7 +694,7 @@ class ModelBuilder:
                             epochs=epochs,
                             batch_size=batch_size,
                             validation_data=(X_val, {'regression_head': y_val}, sample_val_weights),
-                            callbacks=[tensorboard_cb, early_stopping_cb])
+                            callbacks=[tensorboard_cb, early_stopping_cb, checkpoint_cb])
 
         # Find the best epoch from early stopping
         best_epoch = np.argmin(history.history['val_regression_head_loss']) + 1
@@ -697,7 +723,10 @@ class ModelBuilder:
                   sample_weight=full_sample_weights,
                   epochs=best_epoch,
                   batch_size=batch_size,
-                  callbacks=[tensorboard_cb])
+                  callbacks=[tensorboard_cb, checkpoint_cb])
+
+        # save the model weights
+        model.save_weights(f"model_weights_{str(save_tag)}.h5")
 
         return history
 

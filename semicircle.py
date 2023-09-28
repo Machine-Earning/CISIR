@@ -95,18 +95,18 @@ def plot_tsne_and_save_with_timestamp(model, X, y, prefix, save_tag=None):
     """
     Applies t-SNE to the features extracted by the given model and saves the plot in 2D with a timestamp.
     The color of the points is determined by their label values.
-    
+
     Parameters:
     - model: Trained feature extractor model
     - X: Input data (NumPy array or compatible)
     - y: Target labels (NumPy array or compatible)
     - prefix: Prefix for the file name
-    
+
     Returns:
     - Saves a 2D t-SNE plot to a file with a timestamp
     """
     # saving the threshold
-    threshold = np.log(10)
+    threshold = np.log(9)
     # Extract features using the trained model
     features = model.predict(X)
 
@@ -174,17 +174,28 @@ def main():
 
     # create my feature extractor
     feature_extractor = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
+
+    # load weights to continue training
+    feature_extractor.load_weights('model_weights_2023-09-28_13-46-32.h5')
+    print('weights loaded successfully!')
+
     # Generate a timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': 400,
-        'epochs': 200,
-        'patience': 300,
-        'learning_rate': 1e-4,
+        'batch_size': 768,
+        'epochs': 1000,
+        'patience': 25,
+        'learning_rate': 3e-3,
     }
+
+    # print options used
+    print(Options)
     mb.train_features(feature_extractor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
-                      learning_rate=1e-4, epochs=200, batch_size=400, patience=300, save_tag=timestamp)
+                      learning_rate=Options['learning_rate'],
+                      epochs=Options['epochs'],
+                      batch_size=Options['batch_size'],
+                      patience=Options['patience'], save_tag=timestamp)
 
     plot_tsne_and_save_with_timestamp(feature_extractor, shuffled_train_x, shuffled_train_y, 'training',
                                       save_tag=timestamp)
