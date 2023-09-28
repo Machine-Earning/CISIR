@@ -14,7 +14,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from typing import Tuple
 
 
-class DatasetGenerator:
+class DenseReweights:
     """
     Class for generating synthetic regression datasets.
     """
@@ -40,7 +40,7 @@ class DatasetGenerator:
     avg_jreweight = None
     jreweights = None
 
-    def __init__(self, n_train: int = 1000, n_test: int = 1000, n_features: int = 4, alpha: float = 1,
+    def __init__(self, X, y, alpha: float = .9,
                  debug: bool = False) -> None:
         """
         Create a synthetic regression dataset.
@@ -62,14 +62,14 @@ class DatasetGenerator:
         self.alpha = alpha
 
         # Create training data
-        self.X_train = np.random.normal(loc=0, scale=1, size=(n_train, n_features))
-        self.y_train = np.linalg.norm(self.X_train, axis=1)  # Compute the L2-norm
+        self.X_train = X
+        self.y_train = y
         # Create testing data
-        self.X_test = np.random.normal(loc=0, scale=1, size=(n_test, n_features))
-        self.y_test = np.linalg.norm(self.X_test, axis=1)  # Compute the L2-norm
-        # normalize labels
-        self.y_train = self.normalize_labels(self.y_train)
-        self.y_test = self.normalize_labels(self.y_test)
+        # self.X_test = test_x
+        # self.y_test = test_y
+        # # normalize labels
+        # self.y_train = self.normalize_labels(self.y_train)
+        # self.y_test = self.normalize_labels(self.y_test)
 
         self.min_y = np.min(self.y_train)
         self.max_y = np.max(self.y_train)
@@ -78,24 +78,25 @@ class DatasetGenerator:
         self.reweights = self.preprocess_reweighting(self.y_train)  # for labels, order maintained
         # self.jreweights = self.preprocess_jreweighting(self.y_train)  # for pairs of labels
 
-        self.X_val = np.empty((0, self.X_train.shape[1]))
-        self.y_val = np.empty((0,))
-        self.val_reweights = np.empty((0,))
+        # self.X_val = np.empty((0, self.X_train.shape[1]))
+        # self.y_val = np.empty((0,))
+        # self.val_reweights = np.empty((0,))
 
         # get the validation set
-        self.X_val, self.y_val, self.val_reweights = self.get_val_data(prob=.25)
+        # self.X_val, self.y_val, self.val_reweights = self.get_val_data(prob=.25)
 
         # print 12 first rows of X_train, y_train, X_test, y_test,  X_val, y_val
         if self.debug:
             print('X_train: ', self.X_train[:12])
-            print("Validation X:", self.X_val[:12])
+            # print("Validation X:", self.X_val[:12])
             print('y_train: ', self.y_train[:12])
-            print("Validation y:", self.y_val[:12])
-            print('X_test: ', self.X_test[:4])
-            print('y_test: ', self.y_test[:4])
-            print('min_val y in after norm: ', self.min_y)
-            print('max_val y in after norm: ', self.max_y)
-            # self.plot_density_kde_reweights()
+            print('reweights: ', self.reweights[:12])
+            # print("Validation y:", self.y_val[:12])
+            # print('X_test: ', self.X_test[:4])
+            # print('y_test: ', self.y_test[:4])
+            # print('min_val y in after norm: ', self.min_y)
+            # print('max_val y in after norm: ', self.max_y)
+            self.plot_density_kde_reweights()
             # self.plot_density_kde_jreweights()
 
     def plot_distributions(self, y_train, y_val):

@@ -726,7 +726,7 @@ class ModelBuilder:
                   callbacks=[tensorboard_cb, checkpoint_cb])
 
         # save the model weights
-        model.save_weights(f"model_weights_{str(save_tag)}.h5")
+        model.save_weights(f"extended_model_weights_{str(save_tag)}.h5")
 
         return history
 
