@@ -142,8 +142,8 @@ def main():
     feature_extractor = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
 
     # training
-    mb.train_features_injection(feature_extractor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
-            learning_rate=1e-4, epochs=2000, batch_size=400, patience=300)
+    mb.train_features(feature_extractor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
+            learning_rate=3e-2, epochs=200, batch_size=768, patience=100)
 
     plot_tsne_and_save_with_timestamp(feature_extractor, shuffled_train_x, shuffled_train_y, 'training')
 
