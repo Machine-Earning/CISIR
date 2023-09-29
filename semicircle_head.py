@@ -11,6 +11,18 @@ from datetime import datetime
 from dataload import DenseReweights as dr
 from evaluate import evaluation as eval
 
+# SEEDING
+SEED = 42  # seed number 
+
+# Set NumPy seed
+np.random.seed(SEED)
+
+# Set TensorFlow seed
+tf.random.set_seed(SEED)
+
+# Set random seed
+random.seed(SEED)
+
 
 def split_data(df):
     """
@@ -72,9 +84,9 @@ def shuffle_sets(train_x, train_y, val_x, val_y, test_x, test_y):
     :return:
     - Shuffled versions of train_x, train_y, val_x, val_y, test_x, test_y
     """
-    train_x, train_y = shuffle(train_x, train_y)
-    val_x, val_y = shuffle(val_x, val_y)
-    test_x, test_y = shuffle(test_x, test_y)
+    train_x, train_y = shuffle(train_x, train_y, random_state=SEED)
+    val_x, val_y = shuffle(val_x, val_y, random_state=SEED)
+    test_x, test_y = shuffle(test_x, test_y, random_state=SEED)
 
     return train_x, train_y, val_x, val_y, test_x, test_y
 
@@ -114,7 +126,7 @@ def plot_tsne_and_save_extended(model, X, y, prefix, save_tag=None):
     features, _ = model.predict(X)
 
     # Apply t-SNE
-    tsne = TSNE(n_components=2, random_state=42)
+    tsne = TSNE(n_components=2, random_state=SEED)
     tsne_result = tsne.fit_transform(features)
 
     # Identify above and below threshold indices
@@ -183,8 +195,8 @@ def main():
     feature_extractor = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
 
     # load weights to continue training
-    feature_extractor.load_weights('model_weights_2023-09-28_13-46-32.h5')
-    print('weights loaded successfully!')
+    feature_extractor.load_weights('model_weights_2023-09-28_18-10-52.h5')
+    print('weights model_weights_2023-09-28_18-10-52.h5 loaded successfully!')
 
     # add the regression head with dense weighting
     regressor = mb.add_regression_head_with_proj(feature_extractor)
@@ -193,10 +205,10 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': 768,
-        'epochs': 1000,
+        'batch_size': 768,#len(shuffled_train_x), #768,
+        'epochs': 100000,
         'patience': 25,
-        'learning_rate': 3e-3,
+        'learning_rate': 3e-5,
     }
 
     # print options used

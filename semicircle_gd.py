@@ -10,6 +10,19 @@ import random
 from datetime import datetime
 
 
+# SEEDING
+SEED = 42  # seed number 
+
+# Set NumPy seed
+np.random.seed(SEED)
+
+# Set TensorFlow seed
+tf.random.set_seed(SEED)
+
+# Set random seed
+random.seed(SEED)
+
+
 def split_data(df):
     """
     Splits the data into training, validation, and test sets according to the specified rules.
@@ -70,9 +83,9 @@ def shuffle_sets(train_x, train_y, val_x, val_y, test_x, test_y):
     :return:
     - Shuffled versions of train_x, train_y, val_x, val_y, test_x, test_y
     """
-    train_x, train_y = shuffle(train_x, train_y)
-    val_x, val_y = shuffle(val_x, val_y)
-    test_x, test_y = shuffle(test_x, test_y)
+    train_x, train_y = shuffle(train_x, train_, random_state=SEED)
+    val_x, val_y = shuffle(val_x, val_y, random_state=SEED)
+    test_x, test_y = shuffle(test_x, test_y, random_state=SEED)
 
     return train_x, train_y, val_x, val_y, test_x, test_y
 
@@ -111,7 +124,7 @@ def plot_tsne_and_save_with_timestamp(model, X, y, prefix, save_tag=None):
     features = model.predict(X)
 
     # Apply t-SNE
-    tsne = TSNE(n_components=2, random_state=42)
+    tsne = TSNE(n_components=2, random_state=SEED)
     tsne_result = tsne.fit_transform(features)
 
     # Identify above and below threshold indices
@@ -179,9 +192,9 @@ def main():
     # training
     Options = {
         'batch_size': len(train_y),
-        'epochs': 200,
+        'epochs': 1000,
         'patience': 25,
-        'learning_rate': 1e-4,
+        'learning_rate': 1e-2,
     }
 
     # print options used 
