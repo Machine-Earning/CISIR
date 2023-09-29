@@ -39,7 +39,7 @@ class ModelBuilder:
         self.debug = debug
         self.lambda_coef = 4  # coefficient for matching feature loss and regression loss
 
-    def create_model(self, inputs: int, outputs: int, hiddens: List[int]) -> Model:
+    def create_model(self, inputs: int, feat_dim: int, outputs: int, hiddens: List[int]) -> Model:
         """
         Create a neural network model with two branches using the Keras functional API.
         One branch will be used for fitting the output to the label, and the other will use the Z features for the
@@ -56,14 +56,11 @@ class ModelBuilder:
             x = layers.Dense(nodes)(x)
             x = layers.LeakyReLU()(x)  # Replacing 'relu' activation with LeakyReLU
         # Define the representation layer (Z features)
-        repr_layer = layers.Dense(2)(x)
+        repr_layer = layers.Dense(feat_dim)(x)
         repr_layer = layers.LeakyReLU(name='repr_layer')(repr_layer)  # Replacing 'relu' activation with LeakyReLU
-        # Normalize the representation layer to fit on the unit circle
-        # repr_layer = Lambda(lambda z: z / tf.norm(z, axis=1, keepdims=True))(x)
-        # Define the output layer for fitting to the label
-        pred_output = layers.Dense(outputs, name='pred_output')(repr_layer)
+        regression_head = layers.Dense(outputs, name='regression_head')(repr_layer)
         # Bundle the Z features and fitting output into a model
-        self.model = Model(inputs=inputs, outputs=[pred_output])  # , repr_layer])
+        self.model = Model(inputs=inputs, outputs=[repr_layer, regression_head])  # , repr_layer])
 
         return self.model
 
@@ -110,13 +107,23 @@ class ModelBuilder:
 
         return extended_model
 
-    def add_regression_head_with_proj(self, base_model: Model) -> Model:
+    def add_regression_head_with_proj(self, base_model: Model, freeze_features: bool = False) -> Model:
         """
         Add a regression head with one output unit and a projection layer to an existing neural network model.
 
         :param base_model: The base neural network model.
+        :param freeze_features: Whether to freeze the layers of the base model or not.
         :return: The extended model with a projection layer and a regression head.
         """
+
+        print(f'Features are frozen: {freeze_features}')
+
+
+        # If freeze_features is True, freeze the layers of the base model
+        if freeze_features:
+            for layer in base_model.layers:
+                layer.trainable = False
+
         # Extract the output of the last layer of the base model
         repr_output = base_model.output
 
@@ -131,6 +138,53 @@ class ModelBuilder:
 
         # Create the new extended model
         extended_model = Model(inputs=base_model.input, outputs=[repr_output, regression_head])
+
+        # If freeze_features is False, make all layers trainable
+        if not freeze_features:
+            for layer in extended_model.layers:
+                layer.trainable = True
+
+        return extended_model
+
+    def add_regression_head_with_proj_rrt(self, rrt_model: Model, freeze_features: bool = True) -> Model:
+        """
+        Add a regression head with one output unit and a projection layer to an existing RRT model,
+        replacing the last prediction layer.
+
+        :param rrt_model: The existing RRT model.
+        :param freeze_features: Whether to freeze the layers of the base model or not.
+        :return: The modified model with a projection layer and a regression head.
+        """
+
+        print(f'Features are frozen: {freeze_features}')
+
+        # Remove the last layer (the existing prediction layer)
+        new_base_model = Model(inputs=rrt_model.input, outputs=rrt_model.get_layer('repr_layer').output)
+
+        # If freeze_features is True, freeze the layers of the new base model
+        if freeze_features:
+            for layer in new_base_model.layers:
+                layer.trainable = False
+
+        # Extract the output of the last layer of the new base model
+        repr_output = new_base_model.output
+
+        # Add a Dense layer with 6 neurons (Projection Layer)
+        projection_layer = layers.Dense(6, name="projection_layer")(repr_output)
+
+        # Add LeakyReLU activation to the projection layer
+        projection_activation = layers.LeakyReLU(name="projection_activation")(projection_layer)
+
+        # Add a Dense layer with one output unit for regression
+        regression_head = layers.Dense(1, activation='linear', name="regression_head")(projection_activation)
+
+        # Create the new extended model
+        extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, regression_head])
+
+        # If freeze_features is False, make all layers trainable
+        if not freeze_features:
+            for layer in extended_model.layers:
+                layer.trainable = True
 
         return extended_model
 
@@ -378,7 +432,9 @@ class ModelBuilder:
         plt.ylabel('Loss')
         plt.title('Training and Validation Loss Over Epochs')
         plt.legend()
-        plt.show()
+        file_path = f"training_plot_{str(save_tag)}.png"
+        plt.savefig(file_path)
+        plt.close()
 
         # Retrain the model on the combined dataset (training + validation) to the best epoch found
         X_combined = np.concatenate((X_train, X_val), axis=0)
@@ -567,7 +623,7 @@ class ModelBuilder:
                             patience: int = 9) -> callbacks.History:
         """
         Trains the model and returns the training history.
-
+        TODO: fix this issue where loss values are not correct
         :param model: The TensorFlow model to train.
         :param X_train: The training feature set.
         :param y_train: The training labels.
@@ -706,7 +762,9 @@ class ModelBuilder:
         plt.ylabel('Loss')
         plt.title('Training and Validation Loss Over Epochs')
         plt.legend()
-        plt.show()
+        file_path = f"training_reg_plot_{str(save_tag)}.png"
+        plt.savefig(file_path)
+        plt.close()
 
         # Combine training and validation data for final training
         X_full = np.concatenate([X_train, X_val], axis=0)

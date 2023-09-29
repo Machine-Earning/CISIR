@@ -198,8 +198,10 @@ def main():
     feature_extractor.load_weights('model_weights_2023-09-28_18-10-52.h5')
     print('weights model_weights_2023-09-28_18-10-52.h5 loaded successfully!')
 
+
+
     # add the regression head with dense weighting
-    regressor = mb.add_regression_head_with_proj(feature_extractor)
+    regressor = mb.add_regression_head_with_proj(feature_extractor, freeze_features=True)
 
     # Generate a timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -227,8 +229,11 @@ def main():
                                 save_tag=timestamp)
 
     ev = eval.Evaluator()
-    ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=10, save_tag=timestamp)
-    ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=1, save_tag=timestamp)
+    ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=10, save_tag='test_' + timestamp)
+    ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=1, save_tag='test_' + timestamp)
+
+    ev.evaluate(regressor, shuffled_train_x, shuffled_train_y, threshold=10, save_tag='training_' + timestamp)
+    ev.evaluate(regressor, shuffled_train_x, shuffled_train_y, threshold=1, save_tag='training_' + timestamp)
 
 
 if __name__ == '__main__':
