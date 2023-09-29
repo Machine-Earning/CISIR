@@ -31,7 +31,8 @@ class Evaluator:
     def __init__(self):
         pass
 
-    def evaluate(self, model: Model, X_test: np.ndarray, y_test: np.ndarray, res: float = 0.1) -> float:
+    def evaluate(self, model: Model, X_test: np.ndarray, y_test: np.ndarray, res: float = 0.5,
+                 threshold: float = 10, save_tag=None) -> float:
         """
         Evaluate the performance of the model on test data using TensorFlow's MSE and plot error per bin.
 
@@ -41,13 +42,17 @@ class Evaluator:
         :param res: The resolution of the bins for plotting error per bin.
         :return: Performance as a percentage based on MSE. Lower is better.
         """
+
+        threshold_val = threshold
+        threshold = np.log(threshold_val)
+
         # Predict the y-values using the model
         y_pred = model.predict(X_test)
 
         # Assuming y_pred may have multiple outputs and you're interested in the regression head
         if isinstance(y_pred, list) and len(y_pred) > 1:
             if self.debug:
-                print(f"y_pred: {y_pred}")  # TODO: double check this
+                print(f"y_pred: {y_pred}")
             y_pred = y_pred[1]
 
         # Flatten arrays for easier calculations
@@ -55,29 +60,45 @@ class Evaluator:
         y_test = y_test.flatten()
 
         # Calculate the Mean Squared Error using TensorFlow
-        mse = tf.keras.losses.MeanSquaredError()(y_test, y_pred).numpy()
+        mae = tf.keras.losses.MeanAbsoluteError()(y_test, y_pred).numpy()
 
         # Calculate the Root Mean Squared Error
-        rmse = np.sqrt(mse)
+        # rmse = np.sqrt(mse)
 
         # Print the MSE and RMSE
-        print(f"Mean Squared Error: {mse}")
-        print(f"Root Mean Squared Error: {rmse}")
+        print(f"Mean Absolute Error: {mae}")
+        # print(f"Root Mean Squared Error: {rmse}")
 
         # Generate bins for plotting
         self.get_bins(list(y_test), res)
 
         # Plot error per bin
-        self.plot_error_per_bin(y_test, y_pred)
+        self.plot_error_per_bin(y_test, y_pred, save_tag=save_tag)
+
+        # Define lower threshold
+        lower_threshold = np.log(threshold_val / np.exp(2))
+
+        # Identify different types of events
+        SEP_indices = np.where(y_test > threshold)[0]
+        Elevated_indices = np.where((y_test <= threshold) & (y_test > lower_threshold))[0]
+        Background_indices = np.where(y_test <= lower_threshold)[0]
 
         # Plot actual vs predicted
-        plt.figure()
-        plt.scatter(y_test, y_pred, alpha=0.5)
-        plt.xlabel('Actual')
-        plt.ylabel('Predicted')
-        plt.title('Actual vs Predicted')
-        plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'r--')
-        plt.show()
+        plt.figure(figsize=(10, 10))
+        plt.scatter(y_test[Background_indices], y_pred[Background_indices], c='b', alpha=0.5, label='Background')
+        plt.scatter(y_test[Elevated_indices], y_pred[Elevated_indices], c='g', alpha=0.5, label='Elevated')
+        plt.scatter(y_test[SEP_indices], y_pred[SEP_indices], c='r', alpha=0.5, label='SEP')
+        plt.axhline(threshold, color='gray', linestyle='--', linewidth=0.8)
+        plt.axvline(threshold, color='gray', linestyle='--', linewidth=0.8)
+        plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'gray', linestyle='--', linewidth=0.8)
+        plt.xlabel('Ln Peak Intensity')
+        plt.ylabel('Predicted Ln Peak Intensity')
+        plt.title('Ln Peak Intensity vs Predicted Ln Peak Intensity')
+        plt.legend()
+        # Save the plot
+        file_path = f"test_{threshold_val}_matrix_plot_{str(save_tag)}.png"
+        plt.savefig(file_path)
+        plt.close()
 
         # Calculate individual errors
         individual_errors = np.abs(y_test - y_pred)
@@ -92,9 +113,9 @@ class Evaluator:
             bin_number = np.digitize(y_value, self.bins)
             print(f"Sample with y = {y_value} belongs to bin {bin_number} and has an error of {error}")
 
-        return mse
+        return mae
 
-    def plot_error_per_bin(self, y_true: np.ndarray, y_pred: np.ndarray):
+    def plot_error_per_bin(self, y_true: np.ndarray, y_pred: np.ndarray, save_tag: Optional[str] = None) -> None:
         """
         Plot the error per bin in a bar chart.
 
@@ -119,7 +140,7 @@ class Evaluator:
                 continue
             true_subset = y_true[indices]
             pred_subset = y_pred[indices]
-            mse = tf.keras.losses.MeanSquaredError()(true_subset, pred_subset).numpy()
+            mse = tf.keras.losses.MeanAbsoluteError()(true_subset, pred_subset).numpy()
             bin_errors[i - 1] = mse
 
         # Plotting
@@ -130,7 +151,9 @@ class Evaluator:
         plt.ylabel('Mean Squared Error')
         plt.title('Error per Bin')
         plt.xticks(rotation=45)
-        plt.show()
+        file_path = f"test_bin_error_plot_{str(save_tag)}.png"
+        plt.savefig(file_path)
+        plt.close()
 
     def get_bins(self, y: List[float], res: float = .1) -> Tuple[List[float], float, float]:
         """

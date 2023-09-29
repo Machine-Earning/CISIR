@@ -9,6 +9,7 @@ import tensorflow as tf
 import random
 from datetime import datetime
 from dataload import DenseReweights as dr
+from evaluate import evaluation as eval
 
 
 def split_data(df):
@@ -213,6 +214,9 @@ def main():
     plot_tsne_and_save_extended(regressor, shuffled_test_x, shuffled_test_y, 'testing',
                                 save_tag=timestamp)
 
+    ev = eval.Evaluator()
+    ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=10, save_tag=timestamp)
+    ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=1, save_tag=timestamp)
 
 if __name__ == '__main__':
     main()
