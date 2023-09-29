@@ -147,15 +147,15 @@ class Evaluator:
                 continue
             true_subset = y_true[indices]
             pred_subset = y_pred[indices]
-            mse = tf.keras.losses.MeanAbsoluteError()(true_subset, pred_subset).numpy()
-            bin_errors[i - 1] = mse
+            mae = tf.keras.losses.MeanAbsoluteError()(true_subset, pred_subset).numpy()
+            bin_errors[i - 1] = mae
 
         # Plotting
         plt.figure(figsize=(12, 6))
         plt.bar(range(len(bin_errors)), bin_errors,
                 tick_label=[f"{self.bins[i]:.2f}-{self.bins[i + 1]:.2f}" for i in range(len(self.bins) - 1)])
         plt.xlabel('Bin Range')
-        plt.ylabel('Mean Squared Error')
+        plt.ylabel('Mean Absolute Error')
         plt.title('Error per Bin')
         plt.xticks(rotation=45)
         file_path = f"test_bin_error_plot_{str(save_tag)}.png"
