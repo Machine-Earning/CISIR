@@ -20,4 +20,4 @@ echo "Running on $SLURM_NPROCS processors."
 
 echo "Current working directory is $(pwd)"
 
-srun python3 semicircle_no.py # Run your Python script
+srun python3 semicircle_head_gd_ft.py # Run your Python script

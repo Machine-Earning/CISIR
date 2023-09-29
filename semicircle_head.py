@@ -10,6 +10,7 @@ import random
 from datetime import datetime
 from dataload import DenseReweights as dr
 from evaluate import evaluation as eval
+from dataload import seploader as sepl
 
 # SEEDING
 SEED = 42  # seed number 
@@ -23,72 +24,6 @@ tf.random.set_seed(SEED)
 # Set random seed
 random.seed(SEED)
 
-
-def split_data(df):
-    """
-    Splits the data into training, validation, and test sets according to the specified rules.
-
-    :param:
-    - df: DataFrame containing the data. Assumes 'log_peak_intensity' is the target column.
-
-    :return:
-    - train_x, train_y, val_x, val_y, test_x, test_y: Numpy arrays containing the split data
-    """
-    # Sort the DataFrame by 'log_peak_intensity' in descending order
-    df_sorted = df.sort_values(by='log_peak_intensity', ascending=False).reset_index(drop=True)
-
-    # Initialize empty lists to store indices for training, validation, and test sets
-    train_indices = []
-    val_indices = []
-    test_indices = []
-
-    # Group every 3 rows for test set selection
-    for i in range(0, len(df_sorted), 3):
-        group = list(range(i, min(i + 3, len(df_sorted))))
-        test_idx = np.random.choice(group, 1)[0]
-        train_indices.extend([idx for idx in group if idx != test_idx])
-        test_indices.append(test_idx)
-
-    # Group every 4 rows for validation set selection from the training set
-    for i in range(0, len(train_indices), 4):
-        group = train_indices[i: i + 4]
-        if len(group) == 0:
-            continue
-        val_idx = np.random.choice(group, 1)[0]
-        val_indices.append(val_idx)
-        train_indices = [idx for idx in train_indices if idx != val_idx]
-
-    # Extract the feature and target sets based on selected indices
-    features = df_sorted.drop(columns=['log_peak_intensity']).to_numpy()
-    target = df_sorted['log_peak_intensity'].to_numpy()
-
-    train_x = features[train_indices]
-    train_y = target[train_indices]
-    val_x = features[val_indices]
-    val_y = target[val_indices]
-    test_x = features[test_indices]
-    test_y = target[test_indices]
-
-    return train_x, train_y, val_x, val_y, test_x, test_y
-
-
-def shuffle_sets(train_x, train_y, val_x, val_y, test_x, test_y):
-    """
-    Shuffle the data within each of the training, validation, and test sets.
-
-    :param:
-    - train_x, train_y: Numpy arrays containing the training features and labels
-    - val_x, val_y: Numpy arrays containing the validation features and labels
-    - test_x, test_y: Numpy arrays containing the test features and labels
-
-    :return:
-    - Shuffled versions of train_x, train_y, val_x, val_y, test_x, test_y
-    """
-    train_x, train_y = shuffle(train_x, train_y, random_state=SEED)
-    val_x, val_y = shuffle(val_x, val_y, random_state=SEED)
-    test_x, test_y = shuffle(test_x, test_y, random_state=SEED)
-
-    return train_x, train_y, val_x, val_y, test_x, test_y
 
 
 def count_above_threshold(y_values, threshold=np.log(10)):
@@ -168,14 +103,10 @@ def main():
     # check for gpus
     tf.config.list_physical_devices('GPU')
     # Read the CSV file
-    file_path = './cme_and_electron/cme_josias_10MeV.csv'
-    df = pd.read_csv(file_path)
-    # Split the data into training, validation, and test sets
-    # Test the function
-    train_x, train_y, val_x, val_y, test_x, test_y = split_data(df)
-
-    shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y, shuffled_test_x, shuffled_test_y = shuffle_sets(
-        train_x, train_y, val_x, val_y, test_x, test_y)
+    loader = sepl.SEPLoader()
+    shuffled_train_x, shuffled_train_y, shuffled_val_x, \
+        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir(
+        '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data')
 
     # get validation sample weights based on dense weights
     sample_weights = dr.DenseReweights(shuffled_train_x, shuffled_train_y, alpha=.9, debug=False).reweights
@@ -210,7 +141,7 @@ def main():
         'batch_size': 768,#len(shuffled_train_x), #768,
         'epochs': 100000,
         'patience': 25,
-        'learning_rate': 3e-5,
+        'learning_rate': 3e-4,
     }
 
     # print options used
@@ -222,7 +153,11 @@ def main():
                         batch_size=Options['batch_size'],
                         patience=Options['patience'], save_tag=timestamp)
 
-    plot_tsne_and_save_extended(regressor, shuffled_train_x, shuffled_train_y, 'training',
+    # combine training and validation
+    combined_train_x, combined_train_y = loader.combine(shuffled_train_x, shuffled_train_y, shuffled_val_x,
+                                                        shuffled_val_y)
+
+    plot_tsne_and_save_extended(regressor, combined_train_x, combined_train_y, 'training',
                                 save_tag=timestamp)
 
     plot_tsne_and_save_extended(regressor, shuffled_test_x, shuffled_test_y, 'testing',
@@ -230,10 +165,10 @@ def main():
 
     ev = eval.Evaluator()
     ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=10, save_tag='test_' + timestamp)
-    ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=1, save_tag='test_' + timestamp)
+    # ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=1, save_tag='test_' + timestamp)
 
     ev.evaluate(regressor, shuffled_train_x, shuffled_train_y, threshold=10, save_tag='training_' + timestamp)
-    ev.evaluate(regressor, shuffled_train_x, shuffled_train_y, threshold=1, save_tag='training_' + timestamp)
+    # ev.evaluate(regressor, shuffled_train_x, shuffled_train_y, threshold=1, save_tag='training_' + timestamp)
 
 
 if __name__ == '__main__':

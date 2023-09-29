@@ -8,6 +8,8 @@ from sklearn.manifold import TSNE
 import tensorflow as tf
 import random
 from datetime import datetime
+from dataload import DenseReweights as dr
+from evaluate import evaluation as eval
 from dataload import seploader as sepl
 
 # SEEDING
@@ -37,13 +39,13 @@ def count_above_threshold(y_values, threshold=np.log(10)):
     return np.sum(y_values > threshold)
 
 
-def plot_tsne_and_save_with_timestamp(model, X, y, prefix, save_tag=None):
+def plot_tsne_and_save_extended(model, X, y, prefix, save_tag=None):
     """
-    Applies t-SNE to the features extracted by the given model and saves the plot in 2D with a timestamp.
+    Applies t-SNE to the features extracted by the given extended model and saves the plot in 2D with a timestamp.
     The color of the points is determined by their label values.
 
     Parameters:
-    - model: Trained feature extractor model
+    - model: Trained extended feature extractor model
     - X: Input data (NumPy array or compatible)
     - y: Target labels (NumPy array or compatible)
     - prefix: Prefix for the file name
@@ -52,9 +54,10 @@ def plot_tsne_and_save_with_timestamp(model, X, y, prefix, save_tag=None):
     - Saves a 2D t-SNE plot to a file with a timestamp
     """
     # saving the threshold
-    threshold = np.log(9)
-    # Extract features using the trained model
-    features = model.predict(X)
+    threshold = np.log(10)
+
+    # Extract features using the trained extended model
+    features, _ = model.predict(X)
 
     # Apply t-SNE
     tsne = TSNE(n_components=2, random_state=SEED)
@@ -101,7 +104,12 @@ def main():
     # Read the CSV file
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
-        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir('../cme_and_electron/data')
+        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir(
+        '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data')
+
+    # get validation sample weights based on dense weights
+    sample_weights = dr.DenseReweights(shuffled_train_x, shuffled_train_y, alpha=.9, debug=False).reweights
+    val_sample_weights = dr.DenseReweights(shuffled_val_x, shuffled_val_y, alpha=.9, debug=False).reweights
 
     train_count = count_above_threshold(shuffled_train_y)
     val_count = count_above_threshold(shuffled_val_y)
@@ -117,36 +125,47 @@ def main():
     feature_extractor = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
 
     # load weights to continue training
-    feature_extractor.load_weights('model_weights_2023-09-28_18-25-47.h5')
-    print('weights loaded successfully!')
+    feature_extractor.load_weights('model_weights_2023-09-28_18-10-52.h5')
+    print('weights model_weights_2023-09-28_18-10-52.h5 loaded successfully!')
+
+    # add the regression head with dense weighting
+    regressor = mb.add_regression_head_with_proj(feature_extractor, freeze_features=False)
 
     # Generate a timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': 768,
-        'epochs': 1000,
+        'batch_size': 768,  # len(shuffled_train_x), #768,
+        'epochs': 100000,
         'patience': 25,
-        'learning_rate': 1e-3,
+        'learning_rate': 3e-4,
     }
 
     # print options used
     print(Options)
-    mb.train_features(feature_extractor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
-                      learning_rate=Options['learning_rate'],
-                      epochs=Options['epochs'],
-                      batch_size=Options['batch_size'],
-                      patience=Options['patience'], save_tag=timestamp)
+    mb.train_regression(regressor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
+                        sample_weights=sample_weights, sample_val_weights=val_sample_weights,
+                        learning_rate=Options['learning_rate'],
+                        epochs=Options['epochs'],
+                        batch_size=Options['batch_size'],
+                        patience=Options['patience'], save_tag=timestamp)
 
     # combine training and validation
     combined_train_x, combined_train_y = loader.combine(shuffled_train_x, shuffled_train_y, shuffled_val_x,
                                                         shuffled_val_y)
 
-    plot_tsne_and_save_with_timestamp(feature_extractor, combined_train_x, combined_train_y, 'training',
-                                      save_tag=timestamp)
+    plot_tsne_and_save_extended(regressor, combined_train_x, combined_train_y, 'training',
+                                save_tag=timestamp)
 
-    plot_tsne_and_save_with_timestamp(feature_extractor, shuffled_test_x, shuffled_test_y, 'testing',
-                                      save_tag=timestamp)
+    plot_tsne_and_save_extended(regressor, shuffled_test_x, shuffled_test_y, 'testing',
+                                save_tag=timestamp)
+
+    ev = eval.Evaluator()
+    ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=10, save_tag='test_' + timestamp)
+    # ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=1, save_tag='test_' + timestamp)
+
+    ev.evaluate(regressor, shuffled_train_x, shuffled_train_y, threshold=10, save_tag='training_' + timestamp)
+    # ev.evaluate(regressor, shuffled_train_x, shuffled_train_y, threshold=1, save_tag='training_' + timestamp)
 
 
 if __name__ == '__main__':
