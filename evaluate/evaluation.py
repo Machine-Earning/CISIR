@@ -83,6 +83,13 @@ class Evaluator:
         Elevated_indices = np.where((y_test <= threshold) & (y_test > lower_threshold))[0]
         Background_indices = np.where(y_test <= lower_threshold)[0]
 
+        y_test_SEP = y_test[SEP_indices]
+        y_pred_SEP = y_pred[SEP_indices]
+
+        # Calculate the MAE for only SEP events
+        mae_SEP = tf.keras.losses.MeanAbsoluteError()(y_test_SEP, y_pred_SEP).numpy()
+        print(f"Mean Absolute Error for SEP events: {mae_SEP}")
+
         # Plot actual vs predicted
         plt.figure(figsize=(10, 10))
         plt.scatter(y_test[Background_indices], y_pred[Background_indices], c='b', alpha=0.5, label='Background')
