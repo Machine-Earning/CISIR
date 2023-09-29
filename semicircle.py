@@ -101,7 +101,7 @@ def main():
     # Read the CSV file
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
-        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir('../cme_and_electron/data')
+        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir('/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data')
 
     train_count = count_above_threshold(shuffled_train_y)
     val_count = count_above_threshold(shuffled_val_y)
@@ -117,15 +117,15 @@ def main():
     feature_extractor = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
 
     # load weights to continue training
-    feature_extractor.load_weights('model_weights_2023-09-28_18-25-47.h5')
-    print('weights loaded successfully!')
+    # feature_extractor.load_weights('model_weights_2023-09-28_18-25-47.h5')
+    # print('weights loaded successfully!')
 
     # Generate a timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
         'batch_size': 768,
-        'epochs': 1000,
+        'epochs': 10000,
         'patience': 25,
         'learning_rate': 1e-3,
     }

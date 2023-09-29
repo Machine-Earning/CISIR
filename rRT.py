@@ -104,7 +104,7 @@ def main():
     # Read the CSV file
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
-        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir('../cme_and_electron/data')
+        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir('/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data')
 
     # get validation sample weights based on dense weights
     sample_weights = dr.DenseReweights(shuffled_train_x, shuffled_train_y, alpha=.9, debug=False).reweights
@@ -131,10 +131,10 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': 768,  # len(shuffled_train_x), #768,
+        'batch_size': len(shuffled_train_x), #768,
         'epochs': 100000,
         'patience': 25,
-        'learning_rate': 3e-5,
+        'learning_rate': 3e-4,
     }
 
     # print options used
@@ -161,10 +161,10 @@ def main():
 
     # training
     Options = {
-        'batch_size': 768,  # len(shuffled_train_x), #768,
+        'batch_size': len(shuffled_train_x), #768,
         'epochs': 100000,
         'patience': 25,
-        'learning_rate': 3e-5,
+        'learning_rate': 3e-4,
     }
 
     # print options used
