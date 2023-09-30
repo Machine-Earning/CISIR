@@ -1,4 +1,0 @@
-ERROR: Unable to locate a modulefile for 'python3'
-ERROR: Unable to locate a modulefile for 'tensorflow'
-/usr/bin/python3: can't open file '/path/to/your/my_script.py': [Errno 2] No such file or directory
-srun: error: gpu01: task 0: Exited with exit code 2
