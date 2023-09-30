@@ -167,3 +167,8 @@ weights/
 fit/
 
 *.csv
+
+# error and output files from panther ai
+*.err
+*.out
+*.h5
