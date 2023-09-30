@@ -125,8 +125,8 @@ def main():
     feature_extractor = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
 
     # load weights to continue training
-    feature_extractor.load_weights('model_weights_2023-09-28_18-10-52.h5')
-    print('weights model_weights_2023-09-28_18-10-52.h5 loaded successfully!')
+    feature_extractor.load_weights('/home1/jmoukpe2016/keras-functional-api/9-28--29-2023/model_weights_2023-09-29_19-44-41.h5')
+    print('weights /home1/jmoukpe2016/keras-functional-api/9-28--29-2023/model_weights_2023-09-29_19-44-41.h5 loaded successfully!')
 
     # add the regression head with dense weighting
     regressor = mb.add_regression_head_with_proj(feature_extractor, freeze_features=False)
@@ -164,7 +164,7 @@ def main():
     ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=10, save_tag='test_' + timestamp)
     # ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=1, save_tag='test_' + timestamp)
 
-    ev.evaluate(regressor, shuffled_train_x, shuffled_train_y, threshold=10, save_tag='training_' + timestamp)
+    ev.evaluate(regressor, combined_train_x, combined_train_y, threshold=10, save_tag='training_' + timestamp)
     # ev.evaluate(regressor, shuffled_train_x, shuffled_train_y, threshold=1, save_tag='training_' + timestamp)
 
 

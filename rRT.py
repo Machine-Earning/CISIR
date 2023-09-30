@@ -131,7 +131,7 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': len(shuffled_train_x), #768,
+        'batch_size': 768, #len(shuffled_train_x), #768,
         'epochs': 100000,
         'patience': 25,
         'learning_rate': 3e-4,
@@ -161,7 +161,7 @@ def main():
 
     # training
     Options = {
-        'batch_size': len(shuffled_train_x), #768,
+        'batch_size': 768, #len(shuffled_train_x), #768,
         'epochs': 100000,
         'patience': 25,
         'learning_rate': 3e-4,
@@ -186,7 +186,7 @@ def main():
     ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=10, save_tag='test_' + timestamp)
     # ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=1, save_tag='test_' + timestamp)
 
-    ev.evaluate(regressor, shuffled_train_x, shuffled_train_y, threshold=10, save_tag='training_' + timestamp)
+    ev.evaluate(regressor, combined_train_x, combined_train_y, threshold=10, save_tag='training_' + timestamp)
     # ev.evaluate(regressor, shuffled_train_x, shuffled_train_y, threshold=1, save_tag='training_' + timestamp)
 
 
