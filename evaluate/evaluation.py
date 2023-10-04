@@ -71,7 +71,7 @@ class Evaluator:
         # print(f"Root Mean Squared Error: {rmse}")
 
         # # Generate bins for plotting
-        # self.get_bins(list(y_test), res)
+        self.get_bins(list(y_test), res)
         #
         # # Plot error per bin
         # self.plot_error_per_bin(y_test, y_pred, save_tag=save_tag)
