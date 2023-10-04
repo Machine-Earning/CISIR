@@ -31,7 +31,7 @@ def main():
     Main function for testing the AI Panther
     :return: None
     """
-    title = 'rRT, with batches, frozen features'
+    title = 'rRT, with batches, fine-tuned features'
     print(title)
 
     # check for gpus
@@ -95,7 +95,7 @@ def main():
                                 save_tag=timestamp)
 
     # add the regression head with dense weighting
-    regressor = mb.add_regression_head_with_proj_rrt(feature_extractor_plus_head, freeze_features=True)
+    regressor = mb.add_regression_head_with_proj_rrt(feature_extractor_plus_head, freeze_features=False)
 
     # training
     Options = {

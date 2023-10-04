@@ -31,7 +31,8 @@ def main():
     Main function for testing the AI Panther
     :return: None
     """
-    title = 'rRT, with batches, frozen features'
+
+    title = 'rRT+AE, with batches, fine-tuned features'
     print(title)
 
     # check for gpus
@@ -57,7 +58,7 @@ def main():
     mb = modeling.ModelBuilder()
 
     # create my feature extractor
-    feature_extractor_plus_head = mb.create_model(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
+    feat_reg_ae = mb.create_model_with_ae(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
 
     # load weights to continue training
     # feature_extractor_plus_head.load_weights('model_weights_2023-09-28_18-10-52.h5')
@@ -75,27 +76,25 @@ def main():
 
     # print options used
     print(Options)
-    mb.train_regression(feature_extractor_plus_head, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
-                        # sample_weights=sample_weights, sample_val_weights=val_sample_weights,
-                        learning_rate=Options['learning_rate'],
-                        epochs=Options['epochs'],
-                        batch_size=Options['batch_size'],
-                        patience=Options['patience'], save_tag='rrt_stage_1_' + timestamp)
+    mb.train_regression_with_ae(feat_reg_ae, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
+                                # sample_weights=sample_weights, sample_val_weights=val_sample_weights,
+                                learning_rate=Options['learning_rate'],
+                                epochs=Options['epochs'],
+                                batch_size=Options['batch_size'],
+                                patience=Options['patience'], save_tag='rrtae_stage_1_' + timestamp)
 
     # combine training and validation
     combined_train_x, combined_train_y = loader.combine(shuffled_train_x, shuffled_train_y, shuffled_val_x,
                                                         shuffled_val_y)
 
-    plot_tsne_and_save_extended(feature_extractor_plus_head, combined_train_x, combined_train_y, title,
-                                'rrt_stage1_training_',
-                                save_tag=timestamp)
+    plot_tsne_and_save_extended(feat_reg_ae, combined_train_x, combined_train_y, title, 'rrtae_stage1_training_',
+                                with_ae=True, save_tag=timestamp)
 
-    plot_tsne_and_save_extended(feature_extractor_plus_head, shuffled_test_x, shuffled_test_y, title,
-                                'rrt_stage1_testing_',
-                                save_tag=timestamp)
+    plot_tsne_and_save_extended(feat_reg_ae, shuffled_test_x, shuffled_test_y, title, 'rrtae_stage1_testing_',
+                                with_ae=True, save_tag=timestamp)
 
     # add the regression head with dense weighting
-    regressor = mb.add_regression_head_with_proj_rrt(feature_extractor_plus_head, freeze_features=True)
+    regressor = mb.add_regression_head_with_proj_rrtae(feat_reg_ae, freeze_features=False)
 
     # training
     Options = {
@@ -112,20 +111,22 @@ def main():
                         learning_rate=Options['learning_rate'],
                         epochs=Options['epochs'],
                         batch_size=Options['batch_size'],
-                        patience=Options['patience'], save_tag='rrt_stage_2_' + timestamp)
+                        patience=Options['patience'], save_tag='rrtae_stage_2_' + timestamp)
 
-    plot_tsne_and_save_extended(regressor, combined_train_x, combined_train_y, title, 'rrt_stage2_training_',
+    plot_tsne_and_save_extended(regressor, combined_train_x, combined_train_y, title, 'rrtae_stage2_training_',
                                 save_tag=timestamp)
 
-    plot_tsne_and_save_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'rrt_stage2_testing_',
+    plot_tsne_and_save_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'rrtae_stage2_testing_',
                                 save_tag=timestamp)
 
     ev = eval.Evaluator()
-    ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, title, threshold=10, save_tag='test_' + timestamp)
+    ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, title, threshold=10, save_tag='rrtae_test_' + timestamp)
     # ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=1, save_tag='test_' + timestamp)
 
-    ev.evaluate(regressor, combined_train_x, combined_train_y, title, threshold=10, save_tag='training_' + timestamp)
+    ev.evaluate(regressor, combined_train_x, combined_train_y, title, threshold=10,
+                save_tag='rrtae_training_' + timestamp)
     # ev.evaluate(regressor, shuffled_train_x, shuffled_train_y, threshold=1, save_tag='training_' + timestamp)
+
 
 if __name__ == '__main__':
     main()

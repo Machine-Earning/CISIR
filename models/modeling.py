@@ -68,7 +68,6 @@ class ModelBuilder:
         """
         Create a neural network model with a representation layer, regression head, and an autoencoder (AE) head.
         The AE head serves as the decoder that tries to reconstruct the input.
-        TODO: test this
         :param inputs: Integer, the dimension of the input features.
         :param feat_dim: Integer, the dimension of the representation layer.
         :param outputs: Integer, the dimension of the output.
@@ -157,7 +156,6 @@ class ModelBuilder:
 
         print(f'Features are frozen: {freeze_features}')
 
-
         # If freeze_features is True, freeze the layers of the base model
         if freeze_features:
             for layer in base_model.layers:
@@ -227,7 +225,7 @@ class ModelBuilder:
 
         return extended_model
 
-    def add_regression_head_with_proj_rrtae(rrtae_model: Model, freeze_features: bool = True) -> Model:
+    def add_regression_head_with_proj_rrtae(self, rrtae_model: Model, freeze_features: bool = True) -> Model:
         """
         Add a regression head with one output unit and a projection layer to an existing RR+AE model,
         replacing both the existing prediction and decoder heads.
@@ -869,8 +867,52 @@ class ModelBuilder:
 
         return history
 
-    def train_regression_with_ae(self,
-                                 model: tf.keras.Model,
+    def estimate_lambda_coef(self, model, X_train, y_train, X_val, y_val,
+                             sample_weights=None, sample_val_weights=None,
+                             learning_rate=1e-3, n_epochs=10, batch_size=32):
+        """
+        Estimate the lambda coefficient for balancing the regression and decoder losses.
+
+        :param model: The neural network model.
+        :param X_train: Training features.
+        :param y_train: Training labels.
+        :param X_val: Validation features.
+        :param y_val: Validation labels.
+        :param sample_weights: Sample weights for training set.
+        :param sample_val_weights: Sample weights for validation set.
+        :param learning_rate: Learning rate for Adam optimizer.
+        :param n_epochs: Number of epochs to train each branch for lambda estimation.
+        :param batch_size: Batch size.
+        :return: Estimated lambda coefficient.
+        """
+
+        # Train regression branch only
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss={'regression_head': 'mse'})
+        history_reg = model.fit(X_train, {'regression_head': y_train},
+                                sample_weight=sample_weights,
+                                epochs=n_epochs,
+                                batch_size=batch_size,
+                                validation_data=(X_val, {'regression_head': y_val}, sample_val_weights))
+
+        reg_losses = history_reg.history['val_loss']
+
+        # Train decoder branch only
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss={'decoder_head': 'mse'})
+        history_dec = model.fit(X_train, {'decoder_head': X_train},
+                                sample_weight=sample_weights,
+                                epochs=n_epochs,
+                                batch_size=batch_size,
+                                validation_data=(X_val, {'decoder_head': X_val}, sample_val_weights))
+
+        dec_losses = history_dec.history['val_loss']
+
+        # Calculate lambda as the sum of the ratios
+        ratios = [r / d for r, d in zip(reg_losses, dec_losses)]
+        lambda_coef = np.mean(ratios)
+
+        return lambda_coef
+
+    def train_regression_with_ae(self, model: Model,
                                  X_train: np.ndarray,
                                  y_train: np.ndarray,
                                  X_val: np.ndarray,
@@ -881,11 +923,10 @@ class ModelBuilder:
                                  epochs: int = 100,
                                  batch_size: int = 32,
                                  patience: int = 9,
-                                 use_ae: bool = False,
-                                 lambda_coef: float = 1.) -> callbacks.History:
+                                 save_tag=None) -> callbacks.History:
         """
-        Train a neural network model focusing on the regression and/or autoencoder output.
-        Include reweighting for balancing the loss.
+        Train a neural network model focusing on the regression and autoencoder output.
+        Includes reweighting for balancing the loss and saves the model weights.
 
         :param model: The neural network model.
         :param X_train: Training features.
@@ -898,68 +939,79 @@ class ModelBuilder:
         :param epochs: Number of epochs.
         :param batch_size: Batch size.
         :param patience: Number of epochs for early stopping.
-        :param use_ae: Whether to use the autoencoder head.
-        :param lambda_coef: Coefficient for the reconstruction loss.
+        :param save_tag: Tag for saving model weights and plots.
         :return: Training history.
         """
 
-        # Callbacks
+        epochs_for_estimation = 25
+
+        lambda_coef = self.estimate_lambda_coef(model, X_train, y_train, X_val, y_val,
+                                                sample_weights, sample_val_weights,
+                                                learning_rate, epochs_for_estimation, batch_size)
+
+        print(f"Lambda coefficient found: {lambda_coef}")
+
+        # Setup TensorBoard
         log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         tensorboard_cb = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+        print("Run the command line:\n tensorboard --logdir logs/fit")
+
+        # Early stopping callback
         early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
 
-        # Compile model
-        if use_ae:
-            model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-                          loss={'regression_head': 'mse', 'decoder_head': 'mse'},
-                          loss_weights={'regression_head': 1.0, 'decoder_head': lambda_coef})
-        else:
-            model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-                          loss={'regression_head': 'mse'})
+        # Model checkpointing
+        checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_ae_{str(save_tag)}.h5", save_weights_only=True)
+
+        # Compile the model
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+                      loss={'regression_head': 'mse', 'decoder_head': 'mse'},
+                      loss_weights={'regression_head': 1.0, 'decoder_head': lambda_coef})
 
         # Prepare data dictionary
-        y_dict = {'regression_head': y_train}
-        val_y_dict = {'regression_head': y_val}
+        y_dict = {'regression_head': y_train, 'decoder_head': X_train}
+        val_y_dict = {'regression_head': y_val, 'decoder_head': X_val}
 
-        if use_ae:
-            y_dict['decoder_head'] = X_train
-            val_y_dict['decoder_head'] = X_val
-
-        # Training
+        # Train the model
         history = model.fit(X_train, y_dict,
                             sample_weight=sample_weights,
                             epochs=epochs,
                             batch_size=batch_size,
                             validation_data=(X_val, val_y_dict, sample_val_weights),
-                            callbacks=[tensorboard_cb, early_stopping_cb])
+                            callbacks=[tensorboard_cb, early_stopping_cb, checkpoint_cb])
 
-        # Find best epoch
+        # Find the best epoch from early stopping
         best_epoch = np.argmin(history.history['val_loss']) + 1
 
-        # Plot loss
+        # Plot training and validation loss
         plt.plot(history.history['loss'], label='Training Loss')
         plt.plot(history.history['val_loss'], label='Validation Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.title('Training and Validation Loss Over Epochs')
         plt.legend()
-        plt.show()
+        file_path = f"training_ae_plot_{str(save_tag)}.png"
+        plt.savefig(file_path)
+        plt.close()
 
-        # Combine training and validation data
+        # Combine training and validation data for final training
         X_full = np.concatenate([X_train, X_val], axis=0)
         y_full = np.concatenate([y_train, y_val], axis=0)
 
-        # Combine sample weights
-        full_sample_weights = np.concatenate([sample_weights, sample_val_weights],
-                                             axis=0) if sample_weights is not None and sample_val_weights is not None else None
+        # Combine sample weights if provided
+        if sample_weights is not None and sample_val_weights is not None:
+            full_sample_weights = np.concatenate([sample_weights, sample_val_weights], axis=0)
+        else:
+            full_sample_weights = None
 
-        # Retrain to best epoch
-        model.fit(X_full,
-                  {'regression_head': y_full, 'decoder_head': X_full} if use_ae else {'regression_head': y_full},
+        # Retrain the model to the best epoch using combined data
+        model.fit(X_full, {'regression_head': y_full, 'decoder_head': X_full},
                   sample_weight=full_sample_weights,
                   epochs=best_epoch,
                   batch_size=batch_size,
-                  callbacks=[tensorboard_cb])
+                  callbacks=[tensorboard_cb, checkpoint_cb])
+
+        # Save the extended model weights
+        model.save_weights(f"extended_model_weights_ae_{str(save_tag)}.h5")
 
         return history
 

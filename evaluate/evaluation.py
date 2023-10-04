@@ -13,6 +13,7 @@ import tensorflow as tf
 from typing import Tuple, List, Optional, Any
 from numpy import ndarray
 from tensorflow.keras import Model
+from sklearn.metrics import confusion_matrix, f1_score
 
 
 class Evaluator:
@@ -31,7 +32,7 @@ class Evaluator:
     def __init__(self):
         pass
 
-    def evaluate(self, model: Model, X_test: np.ndarray, y_test: np.ndarray, res: float = 0.5,
+    def evaluate(self, model: Model, X_test: np.ndarray, y_test: np.ndarray, title, res: float = 0.5,
                  threshold: float = 10, save_tag=None) -> float:
         """
         Evaluate the performance of the model on test data using TensorFlow's MSE and plot error per bin.
@@ -66,14 +67,14 @@ class Evaluator:
         # rmse = np.sqrt(mse)
 
         # Print the MSE and RMSE
-        print(f"Mean Absolute Error: {mae}")
+        print(f"{save_tag} Mean Absolute Error: {mae}")
         # print(f"Root Mean Squared Error: {rmse}")
 
-        # Generate bins for plotting
-        self.get_bins(list(y_test), res)
-
-        # Plot error per bin
-        self.plot_error_per_bin(y_test, y_pred, save_tag=save_tag)
+        # # Generate bins for plotting
+        # self.get_bins(list(y_test), res)
+        #
+        # # Plot error per bin
+        # self.plot_error_per_bin(y_test, y_pred, save_tag=save_tag)
 
         # Define lower threshold
         lower_threshold = np.log(threshold_val / np.exp(2)) + 1e-9 # + 1e-9 to avoid backgrounds being considered
@@ -88,7 +89,29 @@ class Evaluator:
 
         # Calculate the MAE for only SEP events
         mae_SEP = tf.keras.losses.MeanAbsoluteError()(y_test_SEP, y_pred_SEP).numpy()
-        print(f"Mean Absolute Error for SEP events: {mae_SEP}")
+        print(f"{save_tag} Mean Absolute Error for SEP events: {mae_SEP}")
+
+        # Classify events based on the given threshold
+        y_true = (y_test > threshold).astype(int)
+        y_pred_class = (y_pred > threshold).astype(int)
+
+        # Calculate the confusion matrix
+        TN, FP, FN, TP = confusion_matrix(y_true, y_pred_class).ravel()
+
+        # Calculate F1 score
+        f1 = f1_score(y_true, y_pred_class)
+
+        # Calculate True Skill Statistic (TSS)
+        TSS = TP / (TP + FN) - FP / (FP + TN)
+
+        # Calculate Heidke Skill Score (HSS)
+        HSS = 2 * (TP * TN - FP * FN) / ((TP + FN) * (FN + TN) + (TP + FP) * (FP + TN))
+
+        print(f"True Positives: {TP}, False Positives: {FP}, True Negatives: {TN}, False Negatives: {FN}")
+        print(f"F1 Score: {f1}")
+        print(f"True Skill Statistic (TSS): {TSS}")
+        print(f"Heidke Skill Score (HSS): {HSS}")
+        print('-----------------------------------------------------')
 
         # Plot actual vs predicted
         plt.figure(figsize=(10, 10))
@@ -98,9 +121,9 @@ class Evaluator:
         plt.axhline(threshold, color='gray', linestyle='--', linewidth=0.8)
         plt.axvline(threshold, color='gray', linestyle='--', linewidth=0.8)
         plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'gray', linestyle='--', linewidth=0.8)
-        plt.xlabel('Ln Peak Intensity')
+        plt.xlabel('Actual Ln Peak Intensity')
         plt.ylabel('Predicted Ln Peak Intensity')
-        plt.title('Ln Peak Intensity vs Predicted Ln Peak Intensity')
+        plt.title(title)
         plt.legend()
         # Save the plot
         file_path = f"test_{threshold_val}_matrix_plot_{str(save_tag)}.png"

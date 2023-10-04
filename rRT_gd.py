@@ -31,7 +31,7 @@ def main():
     Main function for testing the AI Panther
     :return: None
     """
-    title = 'rRT, with batches, frozen features'
+    title = 'rRT, without batches, frozen features'
     print(title)
 
     # check for gpus
@@ -67,7 +67,7 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': 768,  # len(shuffled_train_x), #768,
+        'batch_size': len(shuffled_train_y), #768,
         'epochs': 100000,
         'patience': 25,
         'learning_rate': 3e-4,
@@ -99,7 +99,7 @@ def main():
 
     # training
     Options = {
-        'batch_size': 768,  # len(shuffled_train_x), #768,
+        'batch_size': len(shuffled_train_y), #768,
         'epochs': 100000,
         'patience': 25,
         'learning_rate': 3e-4,

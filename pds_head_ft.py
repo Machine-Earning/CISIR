@@ -11,9 +11,10 @@ from datetime import datetime
 from dataload import DenseReweights as dr
 from evaluate import evaluation as eval
 from dataload import seploader as sepl
+from evaluate.utils import count_above_threshold, plot_tsne_and_save_extended
 
 # SEEDING
-SEED = 42  # seed number
+SEED = 42  # seed number 
 
 # Set NumPy seed
 np.random.seed(SEED)
@@ -25,81 +26,13 @@ tf.random.set_seed(SEED)
 random.seed(SEED)
 
 
-
-def count_above_threshold(y_values, threshold=np.log(10)):
-    """
-    Count the number of y values that are above a given threshold.
-
-    Parameters:
-    - y_values (array-like): The array of y-values to check.
-    - threshold (float, optional): The threshold value to use for counting. Default is log(10).
-
-    Returns:
-    - int: The count of y-values that are above the threshold.
-    """
-    return np.sum(y_values > threshold)
-
-
-def plot_tsne_and_save_extended(model, X, y, prefix, save_tag=None):
-    """
-    Applies t-SNE to the features extracted by the given extended model and saves the plot in 2D with a timestamp.
-    The color of the points is determined by their label values.
-
-    Parameters:
-    - model: Trained extended feature extractor model
-    - X: Input data (NumPy array or compatible)
-    - y: Target labels (NumPy array or compatible)
-    - prefix: Prefix for the file name
-
-    Returns:
-    - Saves a 2D t-SNE plot to a file with a timestamp
-    """
-    # saving the threshold
-    threshold = np.log(10)
-
-    # Extract features using the trained extended model
-    features, _ = model.predict(X)
-
-    # Apply t-SNE
-    tsne = TSNE(n_components=2, random_state=SEED)
-    tsne_result = tsne.fit_transform(features)
-
-    # Identify above and below threshold indices
-    above_threshold_indices = np.where(y > threshold)[0]
-    below_threshold_indices = np.where(y <= threshold)[0]
-
-    # Create scatter plot for below-threshold points
-    plt.figure(figsize=(12, 8))
-    plt.scatter(tsne_result[below_threshold_indices, 0], tsne_result[below_threshold_indices, 1],
-                c=y[below_threshold_indices], cmap='viridis', alpha=0.6, label='Below Threshold')
-
-    # Overlay scatter plot for above-threshold points
-    scatter = plt.scatter(tsne_result[above_threshold_indices, 0], tsne_result[above_threshold_indices, 1],
-                          c=y[above_threshold_indices], cmap='viridis', alpha=1.0, edgecolors='r',
-                          label='Above Threshold')
-
-    # Add a color bar
-    cbar = plt.colorbar(scatter)
-    cbar.set_label('Label Value')
-
-    # Add legend to differentiate above-threshold points
-    plt.legend()
-
-    plt.title('2D t-SNE Visualization')
-    plt.xlabel('Dimension 1')
-    plt.ylabel('Dimension 2')
-
-    # Save the plot
-    file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
-    plt.savefig(file_path)
-    plt.close()
-
-
 def main():
     """
     Main function for testing the AI Panther
     :return: None
     """
+    title = 'PDS, with batches, fine-tuned features'
+    print(title)
     # check for gpus
     tf.config.list_physical_devices('GPU')
     # Read the CSV file
@@ -126,8 +59,10 @@ def main():
     feature_extractor = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
 
     # load weights to continue training
-    feature_extractor.load_weights('/home1/jmoukpe2016/keras-functional-api/9-28--29-2023/model_weights_2023-09-29_19-45-44.h5')
-    print('weights /home1/jmoukpe2016/keras-functional-api/9-28--29-2023/model_weights_2023-09-29_19-45-44.h5 loaded successfully!')
+    feature_extractor.load_weights(
+        '/home1/jmoukpe2016/keras-functional-api/9-28--29-2023/model_weights_2023-09-29_19-44-41.h5')
+    print(
+        'weights /home1/jmoukpe2016/keras-functional-api/9-28--29-2023/model_weights_2023-09-29_19-44-41.h5 loaded successfully!')
 
     # add the regression head with dense weighting
     regressor = mb.add_regression_head_with_proj(feature_extractor, freeze_features=False)
@@ -136,7 +71,7 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': len(shuffled_train_x),
+        'batch_size': 768,  # len(shuffled_train_x), #768,
         'epochs': 100000,
         'patience': 25,
         'learning_rate': 3e-4,
@@ -155,17 +90,17 @@ def main():
     combined_train_x, combined_train_y = loader.combine(shuffled_train_x, shuffled_train_y, shuffled_val_x,
                                                         shuffled_val_y)
 
-    plot_tsne_and_save_extended(regressor, combined_train_x, combined_train_y, 'training',
+    plot_tsne_and_save_extended(regressor, combined_train_x, combined_train_y, title, 'training',
                                 save_tag=timestamp)
 
-    plot_tsne_and_save_extended(regressor, shuffled_test_x, shuffled_test_y, 'testing',
+    plot_tsne_and_save_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'testing',
                                 save_tag=timestamp)
 
     ev = eval.Evaluator()
-    ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=10, save_tag='test_' + timestamp)
+    ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, title, threshold=10, save_tag='test_' + timestamp)
     # ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, threshold=1, save_tag='test_' + timestamp)
 
-    ev.evaluate(regressor, combined_train_x, combined_train_y, threshold=10, save_tag='training_' + timestamp)
+    ev.evaluate(regressor, combined_train_x, combined_train_y, title, threshold=10, save_tag='training_' + timestamp)
     # ev.evaluate(regressor, shuffled_train_x, shuffled_train_y, threshold=1, save_tag='training_' + timestamp)
 
 
