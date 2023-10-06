@@ -1015,14 +1015,15 @@ class ModelBuilder:
 
         return history
 
-    def plot_model(self, model: Model) -> None:
+    def plot_model(self, model: Model, name) -> None:
         """
         Plot the model architecture and save the figure.
 
+        :param name:
         :param model: The model to plot.
         :return: None
         """
-        tf.keras.utils.plot_model(model, to_file='../notebooks/model.png', show_shapes=True, show_layer_names=True)
+        tf.keras.utils.plot_model(model, to_file=f'./notebooks/{name}.png', show_shapes=True, show_layer_names=True)
 
     def zdist(self, vec1: Tensor, vec2: Tensor) -> float:
         """
