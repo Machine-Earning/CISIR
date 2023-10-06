@@ -11,7 +11,7 @@ import tensorflow as tf
 SEED = 42  # seed number
 
 
-def plot_tsne_and_save_extended(model, X, y, title, prefix, sep_shape='o', model_type='feature', save_tag=None):
+def plot_tsne_and_save_extended(model, X, y, title, prefix, sep_shape='o', model_type='features', save_tag=None):
     """
     Applies t-SNE to the features extracted by the given model and saves the plot in 2D with a timestamp.
     The color of the points is determined by their label values.
@@ -33,11 +33,11 @@ def plot_tsne_and_save_extended(model, X, y, title, prefix, sep_shape='o', model
     threshold = np.log(10 / np.exp(2)) + 1e8  # threshold
 
     # Extract features using the trained extended model
-    if model_type == 'feature_reg_dec':
+    if model_type == 'features_reg_dec':
         features, _, _ = model.predict(X)
-    elif model_type == 'feature_reg':
+    elif model_type == 'features_reg':
         features, _ = model.predict(X)
-    else:  # model_type == 'feature'
+    else:  # model_type == 'features'
         features = model.predict(X)
 
     # Apply t-SNE
@@ -194,18 +194,19 @@ def load_and_plot_tsne(model_path, model_type, title, sep_marker, data_dir='./cm
 
     # Plot and save t-SNE
     plot_tsne_and_save_extended(loaded_model,
+                                test_x, test_y,
+                                title,
+                                model_type + '_testing_',
+                                model_type=model_type,
+                                save_tag=timestamp)
+    plot_tsne_and_save_extended(loaded_model,
                                 combined_train_x,
                                 combined_train_y,
                                 title,
                                 model_type + '_training_',
                                 model_type=model_type,
                                 save_tag=timestamp)
-    plot_tsne_and_save_extended(loaded_model,
-                                test_x, test_y,
-                                title,
-                                model_type + '_testing_',
-                                model_type=model_type,
-                                save_tag=timestamp)
+
 
 
 def load_and_test(model_path, model_type, title, threshold=10, data_dir='./cme_and_electron/data'):

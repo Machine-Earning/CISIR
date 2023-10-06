@@ -37,6 +37,9 @@ class Evaluator:
         """
         Evaluate the performance of the model on test data using TensorFlow's MSE and plot error per bin.
 
+        :param save_tag:
+        :param title:
+        :param threshold:
         :param model: Model to test
         :param X_test: Test features as a NumPy array.
         :param y_test: Test labels for the regression output as a NumPy array.
