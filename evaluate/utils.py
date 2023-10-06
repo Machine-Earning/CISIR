@@ -30,15 +30,13 @@ def plot_tsne_and_save_extended(model, X, y, title, prefix, sep_shape='o', model
     - Saves a 2D t-SNE plot to a file with a timestamp
     """
     # Define the threshold
-    threshold = np.log(10 / np.exp(2)) + 1e8  # threshold
+    threshold = np.log(10 / np.exp(2)) + 1e-8  # threshold
 
     # Extract features using the trained extended model
     if model_type == 'features_reg_dec':
         features, _, _ = model.predict(X)
-    elif model_type == 'features_reg':
+    else:  # model_type == 'features' or 'features_reg'
         features, _ = model.predict(X)
-    else:  # model_type == 'features'
-        features = model.predict(X)
 
     # Apply t-SNE
     tsne = TSNE(n_components=2, random_state=42)
@@ -51,19 +49,38 @@ def plot_tsne_and_save_extended(model, X, y, title, prefix, sep_shape='o', model
     # Create scatter plot for below-threshold points (in gray)
     plt.figure(figsize=(12, 8))
     plt.scatter(tsne_result[below_threshold_indices, 0], tsne_result[below_threshold_indices, 1],
-                color='gray', alpha=0.6, label='Below Threshold')
+                color='gray', alpha=0.6)
+
+    # # Overlay scatter plot for above-threshold points (in plasma palette)
+    # scatter = plt.scatter(tsne_result[above_threshold_indices, 0], tsne_result[above_threshold_indices, 1],
+    #                       c=y[above_threshold_indices], cmap='plasma', alpha=1.0, marker=sep_shape)
+
+    # # Add a color bar
+    # cbar = plt.colorbar(scatter)
+    # cbar.set_label('ln Intensity')
+    # Compute marker sizes based on y-values
+  # Compute marker sizes based on y-values
+    # Compute marker sizes based on y-values. Squaring to amplify differences.
+    marker_sizes = (50 * ((y[above_threshold_indices] - np.min(y[above_threshold_indices])) 
+                / (np.max(y[above_threshold_indices]) - np.min(y[above_threshold_indices]))) + 10)
+
+    # Normalize y-values for better color mapping
+    norm = plt.Normalize(y[above_threshold_indices].min(), y[above_threshold_indices].max())
 
     # Overlay scatter plot for above-threshold points (in plasma palette)
     scatter = plt.scatter(tsne_result[above_threshold_indices, 0], tsne_result[above_threshold_indices, 1],
-                          c=y[above_threshold_indices], cmap='plasma', alpha=1.0, marker=sep_shape,
-                          label='Above Threshold')
+                        c=y[above_threshold_indices], cmap='plasma', norm=norm, alpha=0.6, s=marker_sizes, marker=sep_shape)
 
     # Add a color bar
     cbar = plt.colorbar(scatter)
-    cbar.set_label('Label Value')
+    cbar.set_label('ln Intensity')
 
-    # Add legend to differentiate above-threshold points
-    plt.legend()
+    # Create custom legend
+    legend_labels = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=10),
+                    plt.Line2D([0], [0], marker=sep_shape, color='w', markerfacecolor='yellow', markersize=10)]
+
+    plt.legend(legend_labels, ['Background (Below Threshold)', 'SEPs (Above Threshold)'], loc='upper left')
+
 
     plt.title(f'{title}\n2D t-SNE Visualization')
     plt.xlabel('Dimension 1')
@@ -168,11 +185,16 @@ def load_and_plot_tsne(model_path, model_type, title, sep_marker, data_dir='./cm
     # Load the appropriate model
     mb = modeling.ModelBuilder()
     if model_type == 'features':
-        loaded_model = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
+        features_model = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
+        loaded_model = mb.add_regression_head_with_proj(features_model, freeze_features=False)
     elif model_type == 'features_reg':
+        features_model = mb.create_model(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
+        loaded_model = mb.add_regression_head_with_proj_rrt(features_model, freeze_features=False)
+    elif model_type == 'features_reg_dec':
+        features_model = mb.create_model_with_ae(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
+        loaded_model = mb.add_regression_head_with_proj_rrtae(features_model, freeze_features=False)
+    else: # regular reg
         loaded_model = mb.create_model(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
-    else:  # features_reg_dec
-        loaded_model = mb.create_model_with_ae(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
 
     loaded_model.load_weights(model_path)
     print(f'Model loaded from {model_path}')
@@ -233,11 +255,16 @@ def load_and_test(model_path, model_type, title, threshold=10, data_dir='./cme_a
     tf.config.list_physical_devices('GPU')
     # Load the appropriate model
     mb = modeling.ModelBuilder()
-    if model_type == 'features_reg_dec' or model_type == 'features_reg':
-        loaded_model = mb.create_model(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
-    else:  # features
-        feature_extractor = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
-        loaded_model = mb.add_regression_head_with_proj(feature_extractor, freeze_features=False)
+
+    if model_type == 'features':
+        features_model = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
+        loaded_model = mb.add_regression_head_with_proj(features_model, freeze_features=False)
+    elif model_type == 'features_reg':
+        features_model = mb.create_model(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
+        loaded_model = mb.add_regression_head_with_proj_rrt(features_model, freeze_features=False)
+    else:  # features_reg_dec
+        features_model = mb.create_model_with_ae(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
+        loaded_model = mb.add_regression_head_with_proj_rrtae(features_model, freeze_features=False)
 
     loaded_model.load_weights(model_path)
     print(f'Model loaded from {model_path}')
