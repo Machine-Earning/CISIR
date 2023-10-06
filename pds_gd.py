@@ -63,7 +63,7 @@ def main():
         'batch_size': len(shuffled_train_y),
         'epochs': 10000,
         'patience': 25,
-        'learning_rate': 1e-3,
+        'learning_rate': 0.1,
     }
 
     # print options used

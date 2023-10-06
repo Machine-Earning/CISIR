@@ -60,9 +60,9 @@ def main():
 
     # load weights to continue training
     feature_extractor.load_weights(
-        '/home1/jmoukpe2016/keras-functional-api/9-28--29-2023/model_weights_2023-09-29_19-45-44.h5')
+        '/home1/jmoukpe2016/keras-functional-api/model_weights_2023-10-04_08-54-53.h5')
     print(
-        'weights /home1/jmoukpe2016/keras-functional-api/9-28--29-2023/model_weights_2023-09-29_19-45-44.h5 loaded successfully!')
+        'weights /home1/jmoukpe2016/keras-functional-api/model_weights_2023-10-04_08-54-53.h5 loaded successfully!')
 
     # add the regression head with dense weighting
     regressor = mb.add_regression_head_with_proj(feature_extractor, freeze_features=False)
