@@ -37,7 +37,7 @@ def main():
     # Read the CSV file
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
-        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir('/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data')
+        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir('./cme_and_electron/data')
 
     train_count = count_above_threshold(shuffled_train_y)
     val_count = count_above_threshold(shuffled_val_y)
@@ -51,6 +51,11 @@ def main():
 
     # create my feature extractor
     feature_extractor = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
+
+    # plot the model
+    mb.plot_model(feature_extractor, "pds_stage1")
+
+    exit()
 
     # load weights to continue training
     # feature_extractor.load_weights('model_weights_2023-09-28_18-25-47.h5')
