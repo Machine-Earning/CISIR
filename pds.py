@@ -68,7 +68,7 @@ def main():
         'batch_size': 768,
         'epochs': 10000,
         'patience': 25,
-        'learning_rate': 1e-3,
+        'learning_rate': 0.1,
     }
 
     # print options used

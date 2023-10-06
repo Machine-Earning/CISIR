@@ -32,6 +32,7 @@ def main():
     :return: None
     """
     title = 'PDS, with batches, frozen features'
+    print(title)
     # check for gpus
     tf.config.list_physical_devices('GPU')
     # Read the CSV file
