@@ -440,7 +440,6 @@ class ModelBuilder:
                        y_train: Tensor,
                        X_val: Tensor,
                        y_val: Tensor,
-                       sample_joint_weights: np.ndarray = None,
                        learning_rate: float = 1e-3,
                        epochs: int = 100,
                        batch_size: int = 32,
@@ -449,6 +448,88 @@ class ModelBuilder:
         """
         Trains the model and returns the training history.
 
+        :param save_tag: tag to use for saving experiments
+        :param model: The TensorFlow model to train.
+        :param X_train: The training feature set.
+        :param y_train: The training labels.
+        :param X_val: Validation features.
+        :param y_val: Validation labels.
+        :param learning_rate: The learning rate for the Adam optimizer.
+        :param epochs: The maximum number of epochs for training.
+        :param batch_size: The batch size for training.
+        :param patience: The number of epochs with no improvement to wait before early stopping.
+        :return: The training history as a History object.
+        """
+
+        # Setup TensorBoard
+        log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        tensorboard_cb = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+
+        print("Run the command line:\n tensorboard --logdir logs/fit")
+
+        # Setup early stopping
+        early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
+
+        # checkpoint callback
+        # Setup model checkpointing
+        checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_{str(save_tag)}.h5", save_weights_only=True)
+
+        # Include weighted_loss_cb in callbacks only if sample_joint_weights is not None
+        callback_list = [tensorboard_cb, early_stopping_cb, checkpoint_cb]
+
+        # Compile the model
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
+
+        # First train the model with a validation set to determine the best epoch
+        history = model.fit(X_train, y_train,
+                            epochs=epochs,
+                            batch_size=batch_size,
+                            validation_data=(X_val, y_val),
+                            callbacks=callback_list)
+
+        # Get the best epoch from early stopping
+        best_epoch = np.argmin(history.history['val_loss']) + 1
+
+        # Plot training loss and validation loss
+        plt.plot(history.history['loss'], label='Training Loss')
+        plt.plot(history.history['val_loss'], label='Validation Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Training and Validation Loss Over Epochs')
+        plt.legend()
+        file_path = f"training_plot_{str(save_tag)}.png"
+        plt.savefig(file_path)
+        plt.close()
+
+        # Retrain the model on the combined dataset (training + validation) to the best epoch found
+        X_combined = np.concatenate((X_train, X_val), axis=0)
+        y_combined = np.concatenate((y_train, y_val), axis=0)
+
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
+        model.fit(X_combined, y_combined, epochs=best_epoch, batch_size=batch_size,
+                  callbacks=[tensorboard_cb, checkpoint_cb])
+
+        # save the model weights
+        model.save_weights(f"model_weights_{str(save_tag)}.h5")
+
+        return history
+
+    def train_features_bal(self,
+                           model: Model,
+                           X_train: Tensor,
+                           y_train: Tensor,
+                           X_val: Tensor,
+                           y_val: Tensor,
+                           sample_joint_weights: np.ndarray = None,
+                           val_sample_joint_weights: np.ndarray = None,
+                           learning_rate: float = 1e-3,
+                           epochs: int = 100,
+                           batch_size: int = 32,
+                           patience: int = 9,
+                           save_tag=None) -> callbacks.History:
+        """
+        Trains the model and returns the training history.
+         fix this so the sample joint weights work
         :param model: The TensorFlow model to train.
         :param X_train: The training feature set.
         :param y_train: The training labels.

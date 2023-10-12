@@ -1,10 +1,5 @@
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.utils import shuffle
-# types for type hinting
 from models import modeling
-from sklearn.manifold import TSNE
 import tensorflow as tf
 import random
 from datetime import datetime
