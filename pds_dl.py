@@ -36,10 +36,14 @@ def main():
         shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir('./cme_and_electron/data')
 
     # get validation sample weights based on dense weights
-    sample_joint_weights = dr.DenseReweights(
-        shuffled_train_x, shuffled_train_y, alpha=.9, debug=False).jreweights
-    val_sample_joint_weights = dr.DenseReweights(
-        shuffled_val_x, shuffled_val_y, alpha=.9, debug=False).jreweights
+    train_jweights = dr.DenseJointReweights(
+        shuffled_train_x, shuffled_train_y, alpha=.9, debug=False)
+    sample_joint_weights = train_jweights.jreweights
+    sample_joint_weights_indices = train_jweights.jindices
+    val_jweights = dr.DenseJointReweights(
+        shuffled_val_x, shuffled_val_y, alpha=.9, debug=False)
+    val_sample_joint_weights = val_jweights.jreweights
+    val_sample_joint_weights_indices = val_jweights.jindices
 
     train_count = count_above_threshold(shuffled_train_y)
     val_count = count_above_threshold(shuffled_val_y)
@@ -57,8 +61,6 @@ def main():
     # plot the model
     mb.plot_model(feature_extractor, "pds_stage1")
 
-    exit()
-
     # load weights to continue training
     # feature_extractor.load_weights('model_weights_2023-09-28_18-25-47.h5')
     # print('weights loaded successfully!')
@@ -68,22 +70,24 @@ def main():
     # training
     Options = {
         'batch_size': 768,
-        'epochs': 10000,
+        'epochs': 2,
         'patience': 25,
         'learning_rate': 0.1,
     }
 
     # print options used
     print(Options)
-    mb.train_features_bal(feature_extractor,
-                          shuffled_train_x, shuffled_train_y,
-                          shuffled_val_x, shuffled_val_y,
-                          sample_joint_weights=sample_joint_weights,
-                          val_sample_joint_weights=val_sample_joint_weights,
-                          learning_rate=Options['learning_rate'],
-                          epochs=Options['epochs'],
-                          batch_size=Options['batch_size'],
-                          patience=Options['patience'], save_tag=timestamp)
+    mb.train_features_dl(feature_extractor,
+                         shuffled_train_x, shuffled_train_y,
+                         shuffled_val_x, shuffled_val_y,
+                         sample_joint_weights=sample_joint_weights,
+                         sample_joint_weights_indices=sample_joint_weights_indices,
+                         val_sample_joint_weights=val_sample_joint_weights,
+                         val_sample_joint_weights_indices=val_sample_joint_weights_indices,
+                         learning_rate=Options['learning_rate'],
+                         epochs=Options['epochs'],
+                         batch_size=Options['batch_size'],
+                         patience=Options['patience'], save_tag=timestamp)
 
     # combine training and validation
     combined_train_x, combined_train_y = loader.combine(shuffled_train_x, shuffled_train_y, shuffled_val_x,
