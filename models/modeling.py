@@ -40,43 +40,21 @@ class ModelBuilder:
         self.debug = debug
         self.lambda_coef = 4  # coefficient for matching feature loss and regression loss
 
-    def create_model(self, inputs: int, feat_dim: int, outputs: int, hiddens: List[int]) -> Model:
+    def create_model(self, input_dim: int, feat_dim: int, output_dim: int, hiddens: List[int],
+                     with_ae: bool = False) -> Model:
         """
-        Create a neural network model with two branches using the Keras functional API.
-        One branch will be used for fitting the output to the label, and the other will use the Z features for the
-        custom loss.
-        The Z features are normalized to fit on the unit circle.
+        Create a neural network model with options for multiple heads using the Keras functional API.
 
+        :param input_dim: Integer representing the number of input features.
+        :param feat_dim: Integer representing the dimensionality of the feature (representation layer).
+        :param output_dim: Integer representing the dimensionality of the output.
         :param hiddens: List of integers representing the number of nodes in each hidden layer.
+        :param with_ae: Boolean flag to indicate whether to include an AutoEncoder (AE) head for input reconstruction.
+
         :return: The uncompiled model.
         """
-        inputs = layers.Input(shape=(inputs,))
-        x = inputs
-        # Define hidden layers according to architecture
-        for nodes in hiddens:
-            x = layers.Dense(nodes)(x)
-            x = layers.LeakyReLU()(x)  # Replacing 'relu' activation with LeakyReLU
-        # Define the representation layer (Z features)
-        repr_layer = layers.Dense(feat_dim)(x)
-        repr_layer = layers.LeakyReLU(name='repr_layer')(repr_layer)  # Replacing 'relu' activation with LeakyReLU
-        regression_head = layers.Dense(outputs, name='regression_head')(repr_layer)
-        # Bundle the Z features and fitting output into a model
-        self.model = Model(inputs=inputs, outputs=[repr_layer, regression_head])  # , repr_layer])
-
-        return self.model
-
-    def create_model_with_ae(self, inputs: int, feat_dim: int, outputs: int, hiddens: List[int]) -> Model:
-        """
-        Create a neural network model with a representation layer, regression head, and an autoencoder (AE) head.
-        The AE head serves as the decoder that tries to reconstruct the input.
-        :param inputs: Integer, the dimension of the input features.
-        :param feat_dim: Integer, the dimension of the representation layer.
-        :param outputs: Integer, the dimension of the output.
-        :param hiddens: List of integers representing the number of nodes in each hidden layer.
-        :return: The uncompiled model with three outputs: repr_layer, regression_head, and decoder_head.
-        """
         # Input layer
-        input_layer = layers.Input(shape=(inputs,))
+        input_layer = layers.Input(shape=(input_dim,))
         x = input_layer
 
         # Define hidden layers according to architecture
@@ -89,17 +67,22 @@ class ModelBuilder:
         repr_layer = layers.LeakyReLU(name='repr_layer')(repr_layer)
 
         # Add a regression head
-        regression_head = layers.Dense(outputs, activation='linear', name='regression_head')(repr_layer)
+        regression_head = layers.Dense(output_dim, activation='linear', name='regression_head')(repr_layer)
 
-        # Add a decoder (AE) head for input reconstruction
-        decoder_head = repr_layer
-        for nodes in reversed(hiddens):
-            decoder_head = layers.Dense(nodes)(decoder_head)
-            decoder_head = layers.LeakyReLU()(decoder_head)
-        decoder_head = layers.Dense(inputs, activation='linear', name='decoder_head')(decoder_head)
+        # Create output_dim list
+        outputs_list = [repr_layer, regression_head]
 
-        # Create the model with three outputs
-        model = Model(inputs=input_layer, outputs=[repr_layer, regression_head, decoder_head])
+        # Add a decoder (AE) head for input reconstruction if with_ae is True
+        if with_ae:
+            decoder_head = repr_layer
+            for nodes in reversed(hiddens):
+                decoder_head = layers.Dense(nodes)(decoder_head)
+                decoder_head = layers.LeakyReLU()(decoder_head)
+            decoder_head = layers.Dense(input_dim, activation='linear', name='decoder_head')(decoder_head)
+            outputs_list.append(decoder_head)
+
+        # Create the model, repr, reg, decoder
+        model = Model(inputs=input_layer, outputs=outputs_list)
 
         return model
 
@@ -130,6 +113,12 @@ class ModelBuilder:
 
         outputs = [repr_layer]
 
+        # Optional Regression Head
+        if with_reg:
+            x_reg = repr_layer
+            regression_output = layers.Dense(output_dim, activation='linear', name='regression_head')(x_reg)
+            outputs.append(regression_output)
+
         # Optional Decoder
         if with_ae:
             x_dec = repr_layer
@@ -139,13 +128,7 @@ class ModelBuilder:
             decoder_output = layers.Dense(input_dim, activation='linear', name='decoder_head')(x_dec)
             outputs.append(decoder_output)
 
-        # Optional Regression Head
-        if with_reg:
-            x_reg = repr_layer
-            regression_output = layers.Dense(output_dim, activation='linear', name='regression_head')(x_reg)
-            outputs.append(regression_output)
-
-        # Complete model
+        # Complete model, repr, reg, decoder
         model = Model(inputs=encoder_input, outputs=outputs if len(outputs) > 1 else outputs[0])
 
         # Storing the model
@@ -153,221 +136,30 @@ class ModelBuilder:
 
         return self.model
 
-    def create_model_feat(self, inputs: int, feat_dim: int, hiddens: List[int]) -> Model:
+    def add_reg_proj_head(self, model: Model, output_dim: int = 1, hiddens: Optional[List[int]] = None,
+                          freeze_features: bool = True, pds: bool = True) -> Model:
         """
-        Create a neural network model with two branches using the Keras functional API.
-        One branch will be used for fitting the output to the label, and the other will use the Z features for the custom loss.
-        The Z features are normalized to fit on the unit circle.
+        Add a regression head with one output unit and a projection layer to an existing model,
+        replacing the existing prediction layer and optionally the decoder layer.
 
-        :param hiddens: List of integers representing the number of nodes in each hidden layer.
-        :return: The uncompiled model.
-        """
-        inputs = layers.Input(shape=(inputs,))
-        x = inputs
-        # Define hidden layers according to architecture
-        for nodes in hiddens:
-            x = layers.Dense(nodes)(x)
-            x = layers.LeakyReLU()(x)
-        # Define the representation layer (Z features)
-        x = layers.Dense(feat_dim)(x)
-        x = layers.LeakyReLU()(x)
-        # Normalize the representation layer to fit on the unit circle
-        repr_layer = NormalizeLayer(name='normalize_layer')(x)
-        # Bundle the Z features and fitting output into a model
-        self.model = Model(inputs=inputs, outputs=repr_layer)
-
-        return self.model
-
-    def create_model_feat_ae(self, inputs: int, feat_dim: int, hiddens: List[int]) -> Model:
-        """
-        Create a neural network model with an encoder and a decoder using the Keras functional API.
-        The encoder will be used for feature extraction, and the decoder will reconstruct the input.
-
-        :param inputs: Integer representing the number of input features.
-        :param feat_dim: Integer representing the dimensionality of the feature (representation layer).
-        :param hiddens: List of integers representing the number of nodes in each hidden layer of the encoder.
-        :return: The uncompiled autoencoder model.
-        """
-        # Encoder
-        encoder_input = layers.Input(shape=(inputs,))
-        x = encoder_input
-        for nodes in hiddens:
-            x = layers.Dense(nodes)(x)
-            x = layers.LeakyReLU()(x)
-
-        x = layers.Dense(feat_dim)(x)
-        x = layers.LeakyReLU()(x)
-        repr_layer = NormalizeLayer(name='normalize_layer')(x)
-
-        # Decoder
-        for nodes in reversed(hiddens):
-            x = layers.Dense(nodes)(repr_layer)
-            x = layers.LeakyReLU()(x)
-
-        decoder_output = layers.Dense(inputs, activation='linear',  name='decoder_head')(x)
-
-        # Complete Autoencoder Model
-        autoencoder = Model(inputs=encoder_input, outputs=[repr_layer, decoder_output])
-
-        # Storing the model
-        self.model = autoencoder
-        return self.model
-
-    def create_model_feat_ae_reg(self, inputs: int, feat_dim: int, hiddens: List[int],
-                                 output_dim: Optional[int] = 1) -> Model:
-        """
-        Create a neural network model with an encoder, a decoder, and a regression head using the Keras functional API.
-        The encoder will be used for feature extraction, the decoder will reconstruct the input, and the regression head will fit to a target.
-
-        :param inputs: Integer representing the number of input features.
-        :param feat_dim: Integer representing the dimensionality of the feature (representation layer).
-        :param hiddens: List of integers representing the number of nodes in each hidden layer of the encoder.
-        :param output_dim: Integer representing the dimensionality of the regression output. Default is 1.
-        :return: The uncompiled multi-task model.
-        """
-        # Encoder
-        encoder_input = layers.Input(shape=(inputs,))
-        x = encoder_input
-        for nodes in hiddens:
-            x = layers.Dense(nodes)(x)
-            x = layers.LeakyReLU()(x)
-
-        x = layers.Dense(feat_dim)(x)
-        x = layers.LeakyReLU()(x)
-        repr_layer = NormalizeLayer(name='normalize_layer')(x)
-
-        # Decoder
-        x_dec = repr_layer
-        for nodes in reversed(hiddens):
-            x_dec = layers.Dense(nodes)(x_dec)
-            x_dec = layers.LeakyReLU()(x_dec)
-
-        decoder_output = layers.Dense(inputs, activation='linear', name='decoder_head')(x_dec)
-
-        # Regression head
-        x_reg = repr_layer
-        regression_output = layers.Dense(output_dim, activation='linear', name='regression_head')(x_reg)
-
-        # Complete Multi-Task Model
-        multi_task_model = Model(inputs=encoder_input, outputs=[repr_layer, decoder_output, regression_output])
-
-        # Storing the model
-        self.model = multi_task_model
-
-        return self.model
-
-    def add_regression_head(self, base_model: Model) -> Model:
-        """
-        Add a regression head with one output unit to an existing neural network model.
-
-        :param base_model: The base neural network model.
-        :return: The extended model with a regression head.
-        """
-        # Extract the output of the last layer of the base model
-        repr_output = base_model.output
-
-        # Add a Dense layer with one output unit for regression
-        regression_head = layers.Dense(1, activation='linear', name="regression_head")(repr_output)
-
-        # Create the new extended model
-        extended_model = Model(inputs=base_model.input, outputs=[repr_output, regression_head])
-
-        return extended_model
-
-    def add_regression_head_with_proj(self, base_model: Model, freeze_features: bool = False) -> Model:
-        """
-        Add a regression head with one output unit and a projection layer to an existing neural network model.
-
-        :param base_model: The base neural network model.
+        :param model: The existing model
+        :param output_dim: The dimensionality of the output of the regression head.
         :param freeze_features: Whether to freeze the layers of the base model or not.
-        :return: The extended model with a projection layer and a regression head.
-        """
-
-        print(f'Features are frozen: {freeze_features}')
-
-        # If freeze_features is True, freeze the layers of the base model
-        if freeze_features:
-            for layer in base_model.layers:
-                layer.trainable = False
-
-        # Extract the output of the last layer of the base model
-        repr_output = base_model.output
-
-        # Add a Dense layer with 6 neurons (Projection Layer)
-        projection_layer = layers.Dense(6, name="projection_layer")(repr_output)
-
-        # Add LeakyReLU activation to the projection layer
-        projection_activation = layers.LeakyReLU(name="projection_activation")(projection_layer)
-
-        # Add a Dense layer with one output unit for regression
-        regression_head = layers.Dense(1, activation='linear', name="regression_head")(projection_activation)
-
-        # Create the new extended model
-        extended_model = Model(inputs=base_model.input, outputs=[repr_output, regression_head])
-
-        # If freeze_features is False, make all layers trainable
-        if not freeze_features:
-            for layer in extended_model.layers:
-                layer.trainable = True
-
-        return extended_model
-
-    def add_regression_head_with_proj_rrt(self, rrt_model: Model, freeze_features: bool = True) -> Model:
-        """
-        Add a regression head with one output unit and a projection layer to an existing RRT model,
-        replacing the last prediction layer.
-
-        :param rrt_model: The existing RRT model.
-        :param freeze_features: Whether to freeze the layers of the base model or not.
+        :param hiddens: List of integers representing the hidden layers for the projection.
+        :param pds: Whether to adapt the model for PDS representations.
         :return: The modified model with a projection layer and a regression head.
         """
 
-        print(f'Features are frozen: {freeze_features}')
-
-        # Remove the last layer (the existing prediction layer)
-        new_base_model = Model(inputs=rrt_model.input, outputs=rrt_model.get_layer('repr_layer').output)
-
-        # If freeze_features is True, freeze the layers of the new base model
-        if freeze_features:
-            for layer in new_base_model.layers:
-                layer.trainable = False
-
-        # Extract the output of the last layer of the new base model
-        repr_output = new_base_model.output
-
-        # Add a Dense layer with 6 neurons (Projection Layer)
-        projection_layer = layers.Dense(6, name="projection_layer")(repr_output)
-
-        # Add LeakyReLU activation to the projection layer
-        projection_activation = layers.LeakyReLU(name="projection_activation")(projection_layer)
-
-        # Add a Dense layer with one output unit for regression
-        regression_head = layers.Dense(1, activation='linear', name="regression_head")(projection_activation)
-
-        # Create the new extended model
-        extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, regression_head])
-
-        # If freeze_features is False, make all layers trainable
-        if not freeze_features:
-            for layer in extended_model.layers:
-                layer.trainable = True
-
-        return extended_model
-
-    def add_regression_head_with_proj_rrtae(self, rrtae_model: Model, freeze_features: bool = True) -> Model:
-        """
-        Add a regression head with one output unit and a projection layer to an existing RR+AE model,
-        replacing both the existing prediction and decoder heads.
-
-        :param rrtae_model: The existing RR+AE model.
-        :param freeze_features: Whether to freeze the layers of the base model or not.
-        :return: The modified model with a projection layer and a regression head.
-        """
+        if hiddens is None:
+            hiddens = [6]
 
         print(f'Features are frozen: {freeze_features}')
 
-        # Remove both the existing prediction and decoder heads, keep only the representation layer
-        new_base_model = Model(inputs=rrtae_model.input, outputs=rrtae_model.get_layer('repr_layer').output)
+        # Determine the layer to be kept based on whether PDS representations are used
+        layer_to_keep = 'normalize_layer' if pds else 'repr_layer'
+
+        # Remove the last layer(s) to keep only the representation layer
+        new_base_model = Model(inputs=model.input, outputs=model.get_layer(layer_to_keep).output)
 
         # If freeze_features is True, freeze the layers of the new base model
         if freeze_features:
@@ -377,14 +169,14 @@ class ModelBuilder:
         # Extract the output of the last layer of the new base model (representation layer)
         repr_output = new_base_model.output
 
-        # Add a Dense layer with 6 neurons (Projection Layer)
-        projection_layer = layers.Dense(6, name="projection_layer")(repr_output)
-
-        # Add LeakyReLU activation to the projection layer
-        projection_activation = layers.LeakyReLU(name="projection_activation")(projection_layer)
+        # Projection Layer(s)
+        x_proj = repr_output
+        for i, nodes in enumerate(hiddens):
+            x_proj = layers.Dense(nodes, name=f"projection_layer_{i + 1}")(x_proj)
+            x_proj = layers.LeakyReLU(name=f"projection_activation_{i + 1}")(x_proj)
 
         # Add a Dense layer with one output unit for regression
-        regression_head = layers.Dense(1, activation='linear', name="regression_head")(projection_activation)
+        regression_head = layers.Dense(output_dim, activation='linear', name="regression_head")(x_proj)
 
         # Create the new extended model
         extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, regression_head])
@@ -395,38 +187,6 @@ class ModelBuilder:
                 layer.trainable = True
 
         return extended_model
-
-    def remove_heads(self, extended_model: Model) -> Model:
-        """
-        Reset both the regression and decoder heads of an extended neural network model.
-        TODO: might have to be fixed in the future
-    
-        :param extended_model: The extended neural network model.
-        :return: The base model without the regression and decoder heads.
-        """
-
-        # Serialize the model to a config dictionary
-        config = extended_model.get_config()
-
-        # Remove the last two layers (regression head and decoder head) from the config
-        config['layers'].pop()
-        config['layers'].pop()
-
-        # Remove the regression head and decoder head from output_layers
-        config['output_layers'] = [x for x in config['output_layers'] if
-                                   x[0] not in ['regression_head', 'decoder_head']]
-
-        # Provide the NormalizeLayer as custom object
-        custom_objects = {'NormalizeLayer': NormalizeLayer}  # Assuming NormalizeLayer is defined
-
-        # Reconstruct the model from the config
-        base_model = tf.keras.Model.from_config(config, custom_objects=custom_objects)
-
-        # Copy weights for all layers except the last two (the regression and decoder heads)
-        for layer, old_layer in zip(base_model.layers, extended_model.layers[:-2]):
-            layer.set_weights(old_layer.get_weights())
-
-        return base_model
 
     # def train_jointly(self,
     #                   model: Model,
@@ -787,7 +547,6 @@ class ModelBuilder:
         model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
 
         return history
-
 
     def custom_data_generator(self, X, y, batch_size):
         """
@@ -1269,15 +1028,13 @@ class ModelBuilder:
 
         return history
 
-    def plot_model(self, model: Model, name) -> None:
+    def plot_model(self, model: Model) -> None:
         """
         Plot the model architecture and save the figure.
-
-        :param name:
         :param model: The model to plot.
         :return: None
         """
-        tf.keras.utils.plot_model(model, to_file=f'./notebooks/{name}.png', show_shapes=True, show_layer_names=True)
+        tf.keras.utils.plot_model(model, show_shapes=True, show_layer_names=True)
 
     def zdist(self, vec1: Tensor, vec2: Tensor) -> float:
         """
