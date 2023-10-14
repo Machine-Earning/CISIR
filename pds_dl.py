@@ -40,6 +40,13 @@ def main():
         shuffled_train_x, shuffled_train_y, alpha=.9, debug=False)
     sample_joint_weights = train_jweights.jreweights
     sample_joint_weights_indices = train_jweights.jindices
+
+    # print sample_joint_weights_indices, sample_joint_weights
+    # print(f'sample_joint_weights_indices: {sample_joint_weights_indices[:2]}')
+    # print(f'sample_joint_weights: {sample_joint_weights[:2]}')
+    # print(f'size of sample_joint_weights: {len(sample_joint_weights)}')
+    # print(f'size of sample_joint_weights indices: {len(sample_joint_weights_indices)}')
+
     val_jweights = dr.DenseJointReweights(
         shuffled_val_x, shuffled_val_y, alpha=.9, debug=False)
     val_sample_joint_weights = val_jweights.jreweights
@@ -56,7 +63,7 @@ def main():
     mb = modeling.ModelBuilder()
 
     # create my feature extractor
-    feature_extractor = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
+    feature_extractor = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
 
     # plot the model
     mb.plot_model(feature_extractor, "pds_stage1")

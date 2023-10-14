@@ -284,17 +284,17 @@ class ModelBuilder:
     #
     #     return history
 
-    def train_features(self,
-                       model: Model,
-                       X_train: Tensor,
-                       y_train: Tensor,
-                       X_val: Tensor,
-                       y_val: Tensor,
-                       learning_rate: float = 1e-3,
-                       epochs: int = 100,
-                       batch_size: int = 32,
-                       patience: int = 9,
-                       save_tag=None) -> callbacks.History:
+    def train_pds(self,
+                  model: Model,
+                  X_train: Tensor,
+                  y_train: Tensor,
+                  X_val: Tensor,
+                  y_val: Tensor,
+                  learning_rate: float = 1e-3,
+                  epochs: int = 100,
+                  batch_size: int = 32,
+                  patience: int = 9,
+                  save_tag=None) -> callbacks.History:
         """
         Trains the model and returns the training history.
 
@@ -364,184 +364,450 @@ class ModelBuilder:
 
         return history
 
-    def train_features_dl(self,
-                          model: Model,
-                          X_train: Tensor,
-                          y_train: Tensor,
-                          X_val: Tensor,
-                          y_val: Tensor,
-                          sample_joint_weights: ndarray = None,
-                          sample_joint_weights_indices: ndarray = None,
-                          val_sample_joint_weights: ndarray = None,
-                          val_sample_joint_weights_indices: ndarray = None,
-                          learning_rate: float = 1e-3,
-                          epochs: int = 100,
-                          batch_size: int = 32,
-                          patience: int = 9,
-                          save_tag=None) -> callbacks.History:
+    def process_batch_weights(self, batch_indices: np.ndarray, all_weights: np.ndarray,
+                              all_weight_indices: List[Tuple[int, int]]) -> np.ndarray:
         """
-        Trains the model and returns the training history.
+        Process a batch of indices to return the corresponding joint weights.
+
+        :param batch_indices: A batch of sample indices.
+        :param all_weights: An array containing all joint weights for the dataset.
+        :param all_weight_indices: A list of tuples, each containing a pair of indices for which a joint weight exists.
+        :return: An array containing joint weights corresponding to the batch of indices.
+        """
+        batch_weights = []
+        for i in batch_indices:
+            for j in batch_indices:
+                if i < j:  # Only consider pairs (i, j) where i < j
+                    try:
+                        weight_idx = all_weight_indices.index((i, j))
+                    except ValueError:
+                        continue  # Skip if the pair doesn't have a corresponding weight
+                    batch_weights.append(all_weights[weight_idx])  # Append the weight for this pair
+
+        return np.array(batch_weights)
+
+    def train_for_one_epoch(self,
+                            model: tf.keras.Model,
+                            optimizer: tf.keras.optimizers.Optimizer,
+                            loss_fn,
+                            X: np.ndarray,
+                            y: np.ndarray,
+                            batch_size: int,
+                            all_weights: Optional[np.ndarray] = None,
+                            all_weight_indices: Optional[List[Tuple[int, int]]] = None,
+                            training: bool = True) -> float:
+        """
+        Train or evaluate the model for one epoch.
+
+        :param model: The model to train or evaluate.
+        :param optimizer: The optimizer to use.
+        :param loss_fn: The loss function to use.
+        :param X: The feature set.
+        :param y: The labels.
+        :param batch_size: The batch size for training or evaluation.
+        :param all_weights: Optional array containing all joint weights for the dataset.
+        :param all_weight_indices: Optional list of tuples, each containing a pair of indices for which a joint weight exists.
+        :param training: Whether to apply training (True) or run evaluation (False).
+        :return: The average loss for the epoch.
+        """
+        epoch_loss = 0.0
+        num_batches = 0
+
+        for batch_idx in range(0, len(X), batch_size):
+            batch_X = X[batch_idx:batch_idx + batch_size]
+            batch_y = y[batch_idx:batch_idx + batch_size]
+
+            # Get the corresponding joint weights for this batch
+            batch_weights = None
+            if all_weights is not None and all_weight_indices is not None:
+                batch_weights = self.process_batch_weights(
+                    np.arange(batch_idx, batch_idx + batch_size), all_weights, all_weight_indices)
+
+            with tf.GradientTape() as tape:
+                predictions = model(batch_X, training=training)
+                loss = loss_fn(batch_y, predictions, sample_weights=batch_weights)
+
+            if training:
+                gradients = tape.gradient(loss, model.trainable_variables)
+                optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+            epoch_loss += loss.numpy()
+            num_batches += 1
+
+            print(f"{num_batches}/{len(X) // batch_size}")
+
+        return epoch_loss / num_batches
+
+    def train_for_one_epoch_mh(
+            self,
+            model: tf.keras.Model,
+            optimizer: tf.keras.optimizers.Optimizer,
+            primary_loss_fn,
+            X: np.ndarray,
+            y: np.ndarray,
+            batch_size: int,
+            gamma_coeff: Optional[float] = None,
+            lambda_coeff: Optional[float] = None,
+            sample_weights: Optional[np.ndarray] = None,
+            all_weights: Optional[np.ndarray] = None,
+            all_weight_indices: Optional[List[Tuple[int, int]]] = None,
+            with_reg=False,
+            with_ae=False,
+            training: bool = True) -> float:
+        """
+        Train the model for one epoch.
+
+        :param with_ae:
+        :param with_reg:
+        :param model: The model to train.
+        :param optimizer: The optimizer to use.
+        :param primary_loss_fn: The primary loss function to use.
+        :param X: The feature set.
+        :param y: The labels.
+        :param batch_size: The batch size for training.
+        :param gamma_coeff: Coefficient for the regressor loss.
+        :param lambda_coeff: Coefficient for the decoder loss.
+        :param sample_weights: Individual sample weights.
+        :param all_weights: Optional array containing all joint weights for the dataset.
+        :param all_weight_indices: Optional list of tuples, each containing a pair of indices for which a joint weight exists.
+        :param training: Whether to apply training or evaluation (default is True for training).
+        :return: The average loss for the epoch.
+        """
+
+        epoch_loss = 0.0
+        num_batches = 0
+
+        for batch_idx in range(0, len(X), batch_size):
+            batch_X = X[batch_idx:batch_idx + batch_size]
+            batch_y = y[batch_idx:batch_idx + batch_size]
+            batch_sample_weights = None if sample_weights is None \
+                else sample_weights[batch_idx:batch_idx + batch_size]
+
+            # Get the corresponding joint weights for this batch
+            batch_weights = None
+            if all_weights is not None and all_weight_indices is not None:
+                batch_weights = self.process_batch_weights(
+                    np.arange(batch_idx, batch_idx + batch_size), all_weights, all_weight_indices)
+
+            with tf.GradientTape() as tape:
+                outputs = model(batch_X, training=training)
+
+                # Unpack the outputs based on the model configuration
+                if with_reg and with_ae:
+                    primary_predictions, regressor_predictions, decoder_predictions = outputs
+                elif with_reg:
+                    primary_predictions, regressor_predictions = outputs
+                    decoder_predictions = None
+                elif with_ae:
+                    primary_predictions, decoder_predictions = outputs
+                    regressor_predictions = None
+                else:
+                    primary_predictions = outputs
+                    regressor_predictions, decoder_predictions = None, None
+
+                # Primary loss
+                primary_loss = primary_loss_fn(batch_y, primary_predictions, sample_weights=batch_weights)
+
+                # Regressor loss
+                regressor_loss = 0
+                if with_reg and gamma_coeff is not None:
+                    regressor_loss = tf.keras.losses.mean_squared_error(batch_y, regressor_predictions)
+                    if batch_sample_weights is not None:
+                        regressor_loss = tf.reduce_sum(regressor_loss * batch_sample_weights) / tf.reduce_sum(
+                            batch_sample_weights)
+                    regressor_loss *= gamma_coeff
+
+                # Decoder loss
+                decoder_loss = 0
+                if with_ae and lambda_coeff is not None:
+                    decoder_loss = tf.keras.losses.mean_squared_error(batch_X, decoder_predictions)
+                    decoder_loss *= lambda_coeff
+
+                # Total loss
+                total_loss = primary_loss + regressor_loss + decoder_loss
+
+            if training:
+                gradients = tape.gradient(total_loss, model.trainable_variables)
+                optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+            epoch_loss += total_loss.numpy()
+            num_batches += 1
+
+            print(f"{num_batches}/{len(X) // batch_size}")
+
+        return epoch_loss / num_batches
+
+    def train_pds_dl(self,
+                     model: tf.keras.Model,
+                     X_train: np.ndarray,
+                     y_train: np.ndarray,
+                     X_val: np.ndarray,
+                     y_val: np.ndarray,
+                     sample_joint_weights: Optional[np.ndarray] = None,
+                     sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
+                     val_sample_joint_weights: Optional[np.ndarray] = None,
+                     val_sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
+                     learning_rate: float = 1e-3,
+                     epochs: int = 100,
+                     batch_size: int = 32,
+                     patience: int = 9,
+                     save_tag: Optional[str] = None) -> dict:
+        """
+        Custom training loop to train the model and returns the training history.
 
         :param model: The TensorFlow model to train.
         :param X_train: The training feature set.
         :param y_train: The training labels.
         :param X_val: Validation features.
         :param y_val: Validation labels.
-        :param sample_joint_weights: The reweighting factors for pairs of labels.
-        :param sample_joint_weights_indices: Indices of the reweighting factors.
-        :param val_sample_joint_weights: Validation reweighting factors.
-        :param val_sample_joint_weights_indices: Validation indices of the reweighting factors.
+        :param sample_joint_weights: The reweighting factors for pairs of labels in training set.
+        :param sample_joint_weights_indices: Indices of the reweighting factors in training set.
+        :param val_sample_joint_weights: The reweighting factors for pairs of labels in validation set.
+        :param val_sample_joint_weights_indices: Indices of the reweighting factors in validation set.
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
         :param batch_size: The batch size for training.
         :param patience: The number of epochs with no improvement to wait before early stopping.
         :param save_tag: Tag to use for saving experiments.
-        :return: The training history as a History object.
+        :return: The training history as a dictionary.
         """
-        # TODO: debug this
-        # Setup TensorBoard
-        log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        tensorboard_cb = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
 
-        print("Run the command line:\n tensorboard --logdir logs/fit")
-
-        # Initialize variables for early stopping
+        # Initialize early stopping and best epoch variables
         best_val_loss = float('inf')
         best_epoch = 0
         epochs_without_improvement = 0
 
-        # Optimizer
-        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        # Initialize TensorBoard
+        log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        tensorboard_cb = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
 
-        # Initialize history for plotting
+        print("Run the command line:\n tensorboard --logdir logs/fit")
+
+        # Optimizer and history initialization
+        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
         history = {'loss': [], 'val_loss': []}
 
         for epoch in range(epochs):
-            epoch_loss = 0
-            epoch_val_loss = 0
+            train_loss = self.train_for_one_epoch(
+                model, optimizer, self.repr_loss_dl, X_train, y_train,
+                batch_size, all_weights=sample_joint_weights,
+                all_weight_indices=sample_joint_weights_indices)
 
-            # Loop through training batches
-            for batch_idx in range(0, len(X_train), batch_size):
-                batch_X = X_train[batch_idx:batch_idx + batch_size]
-                batch_y = y_train[batch_idx:batch_idx + batch_size]
+            val_loss = self.train_for_one_epoch(
+                model, optimizer, self.repr_loss_dl, X_val, y_val,
+                batch_size, all_weights=val_sample_joint_weights,
+                all_weight_indices=val_sample_joint_weights_indices, training=False)
 
-                # Retrieve corresponding sample_joint_weights and sample_joint_weights_indices
-                batch_joint_weights = None
-                if sample_joint_weights is not None and sample_joint_weights_indices is not None:
-                    # Fetch joint weights based on indices for this batch
-                    batch_joint_weights = [sample_joint_weights[i] for i in
-                                           sample_joint_weights_indices[batch_idx:batch_idx + batch_size]]
+            # Log and save epoch losses
+            history['loss'].append(train_loss)
+            history['val_loss'].append(val_loss)
 
-                with tf.GradientTape() as tape:
-                    predictions = model(batch_X, training=True)
-                    loss = self.repr_loss_dl(batch_y, predictions, batch_joint_weights)
+            print(f"Epoch {epoch + 1}/{epochs}, Loss: {train_loss}, Validation Loss: {val_loss}")
 
-                gradients = tape.gradient(loss, model.trainable_variables)
-                optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-
-                epoch_loss += loss.numpy()
-
-            # Average training loss for the epoch
-            epoch_loss /= len(X_train) / batch_size
-            history['loss'].append(epoch_loss)
-
-            tensorboard_cb.on_epoch_end(epoch, {"loss": epoch_loss})
-
-            # Loop through validation batches
-            for batch_idx in range(0, len(X_val), batch_size):
-                val_batch_X = X_val[batch_idx:batch_idx + batch_size]
-                val_batch_y = y_val[batch_idx:batch_idx + batch_size]
-
-                # Retrieve corresponding val_sample_joint_weights and val_sample_joint_weights_indices
-                val_batch_joint_weights = None
-                if val_sample_joint_weights is not None and val_sample_joint_weights_indices is not None:
-                    # Fetch joint weights based on indices for this validation batch
-                    val_batch_joint_weights = [val_sample_joint_weights[i] for i in
-                                               val_sample_joint_weights_indices[batch_idx:batch_idx + batch_size]]
-
-                val_predictions = model(val_batch_X, training=False)
-                val_loss = self.repr_loss_dl(val_batch_y, val_predictions, val_batch_joint_weights)
-
-                epoch_val_loss += val_loss.numpy()
-
-            # Average validation loss for the epoch
-            epoch_val_loss /= len(X_val) / batch_size
-            history['val_loss'].append(epoch_val_loss)
-
-            tensorboard_cb.on_epoch_end(epoch, {"val_loss": epoch_val_loss})
-
-            # print epoch number, loss and validation loss
-            print(f'Epoch: {epoch}/{epochs}, loss: {epoch_loss}, validation loss: {epoch_val_loss}')
-
-            # Early stopping and model checkpoint logic
-            if epoch_val_loss < best_val_loss:
-                best_val_loss = epoch_val_loss
+            # Early stopping logic
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
                 best_epoch = epoch
                 epochs_without_improvement = 0
-                model.save_weights(f"model_weights_{str(save_tag)}.h5")
+                # Save the model weights
+                model.save_weights(f"best_model_weights_{str(save_tag)}.h5")
             else:
                 epochs_without_improvement += 1
                 if epochs_without_improvement >= patience:
                     print("Early stopping triggered.")
                     break
 
-            # Plotting the losses
-            plt.plot(history['loss'], label='Training Loss')
-            plt.plot(history['val_loss'], label='Validation Loss')
-            plt.xlabel('Epoch')
-            plt.ylabel('Loss')
-            plt.title('Training and Validation Loss Over Epochs')
-            plt.legend()
-            file_path = f"training_plot_{str(save_tag)}.png"
-            plt.savefig(file_path)
-            plt.close()
+        # Plotting the losses
+        plt.plot(history['loss'], label='Training Loss')
+        plt.plot(history['val_loss'], label='Validation Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Training and Validation Loss Over Epochs')
+        plt.legend()
+        plt.savefig(f"training_plot_{str(save_tag)}.png")
+        plt.close()
 
         # Retraining on the combined dataset
-        X_combined = tf.concat([X_train, X_val], 0)
-        y_combined = tf.concat([y_train, y_val], 0)
+        print(f"Retraining to the best epoch: {best_epoch}")
 
-        # Combine sample weights if they are provided
+        # Combine X_train and X_val, y_train and y_val, and also the sample weights
+        X_combined = np.concatenate([X_train, X_val])
+        y_combined = np.concatenate([y_train, y_val])
+        combined_sample_weights = None
+        combined_sample_weights_indices = None
         if sample_joint_weights is not None and val_sample_joint_weights is not None:
-            combined_sample_weights = np.concatenate([sample_joint_weights, val_sample_joint_weights], axis=0)
-            combined_sample_weights_indices = np.concatenate(
-                [sample_joint_weights_indices, val_sample_joint_weights_indices], axis=0)
-        else:
-            combined_sample_weights = None
-            combined_sample_weights_indices = None
+            combined_sample_weights = np.concatenate([sample_joint_weights, val_sample_joint_weights])
 
-        # Initialize variables for retraining loss
-        retraining_loss = 0
+            # Update val_sample_joint_weights_indices to reflect their new positions in the combined array
+            val_sample_joint_weights_indices_updated = [(i + len(X_train), j + len(X_train)) for (i, j) in
+                                                        val_sample_joint_weights_indices]
 
-        # Custom loop for retraining
-        for epoch in range(best_epoch):  # Retrain up to the best epoch
-            for batch_idx in range(0, len(X_combined), batch_size):
-                batch_X = X_combined[batch_idx:batch_idx + batch_size]
-                batch_y = y_combined[batch_idx:batch_idx + batch_size]
+            # Concatenate the indices
+            combined_sample_weights_indices = sample_joint_weights_indices + val_sample_joint_weights_indices_updated
 
-                # Retrieve corresponding combined_sample_weights and combined_sample_weights_indices
-                batch_joint_weights = None
-                if combined_sample_weights is not None and combined_sample_weights_indices is not None:
-                    # Fetch joint weights based on indices for this batch
-                    batch_joint_weights = [combined_sample_weights[i] for i in
-                                           combined_sample_weights_indices[batch_idx:batch_idx + batch_size]]
+        # Reset history for retraining
+        retrain_history = {'loss': []}
 
-                with tf.GradientTape() as tape:
-                    predictions = model(batch_X, training=True)
-                    loss = self.repr_loss_dl(batch_y, predictions, batch_joint_weights)
+        # Retrain up to the best epoch
+        for epoch in range(best_epoch):
+            retrain_loss = self.train_for_one_epoch(
+                model, optimizer, self.repr_loss_dl, X_combined, y_combined,
+                batch_size, all_weights=combined_sample_weights,
+                all_weight_indices=combined_sample_weights_indices)
 
-                gradients = tape.gradient(loss, model.trainable_variables)
-                optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+            # Log the retrain loss
+            retrain_history['loss'].append(retrain_loss)
 
-                retraining_loss += loss.numpy()
+            print(f"Retrain Epoch {epoch + 1}/{best_epoch}, Loss: {retrain_loss}")
 
-            # print epoch number and loss
-            print(f'epoch: {epoch}/{best_epoch}, loss {loss}')
-            # Log retraining loss to TensorBoard
-            # with tensorboard.summary_writer.as_default():
-            #     tf.summary.scalar('retraining_loss', retraining_loss / (len(X_combined) / batch_size), step=epoch)
+        # Save the final model
+        model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
 
-            # Reset retraining loss for the next epoch
-            retraining_loss = 0
+        return history
+
+    def train_pds_dl_heads(self,
+                           model: tf.keras.Model,
+                           X_train: np.ndarray,
+                           y_train: np.ndarray,
+                           X_val: np.ndarray,
+                           y_val: np.ndarray,
+                           sample_joint_weights: Optional[np.ndarray] = None,
+                           sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
+                           val_sample_joint_weights: Optional[np.ndarray] = None,
+                           val_sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
+                           sample_weights: Optional[np.ndarray] = None,
+                           val_sample_weights: Optional[np.ndarray] = None,
+                           with_reg: bool = False,
+                           with_ae: bool = False,
+                           learning_rate: float = 1e-3,
+                           epochs: int = 100,
+                           batch_size: int = 32,
+                           patience: int = 9,
+                           save_tag: Optional[str] = None) -> dict:
+        """
+        Custom training loop to train the model and returns the training history.
+
+        :param with_ae:
+        :param with_reg:
+        :param sample_weights:
+        :param val_sample_weights:
+        :param model: The TensorFlow model to train.
+        :param X_train: The training feature set.
+        :param y_train: The training labels.
+        :param X_val: Validation features.
+        :param y_val: Validation labels.
+        :param sample_joint_weights: The reweighting factors for pairs of labels in training set.
+        :param sample_joint_weights_indices: Indices of the reweighting factors in training set.
+        :param val_sample_joint_weights: The reweighting factors for pairs of labels in validation set.
+        :param val_sample_joint_weights_indices: Indices of the reweighting factors in validation set.
+        :param learning_rate: The learning rate for the Adam optimizer.
+        :param epochs: The maximum number of epochs for training.
+        :param batch_size: The batch size for training.
+        :param patience: The number of epochs with no improvement to wait before early stopping.
+        :param save_tag: Tag to use for saving experiments.
+        :return: The training history as a dictionary.
+        """
+
+        # Initialize early stopping and best epoch variables
+        best_val_loss = float('inf')
+        best_epoch = 0
+        epochs_without_improvement = 0
+
+        gamma_coeff = 1
+        lambda_coeff = 1
+
+        # Initialize TensorBoard
+        log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        tensorboard_cb = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+
+        print("Run the command line:\n tensorboard --logdir logs/fit")
+
+        # Optimizer and history initialization
+        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        history = {'loss': [], 'val_loss': []}
+
+        for epoch in range(epochs):
+            train_loss = self.train_for_one_epoch_mh(
+                model, optimizer, self.repr_loss_dl, X_train, y_train,
+                batch_size, gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
+                sample_weights=sample_weights, all_weights=sample_joint_weights,
+                all_weight_indices=sample_joint_weights_indices, with_reg=with_reg, with_ae=with_ae)
+
+            val_loss = self.train_for_one_epoch_mh(
+                model, optimizer, self.repr_loss_dl, X_val, y_val,
+                batch_size, gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
+                sample_weights=val_sample_weights, all_weights=val_sample_joint_weights,
+                all_weight_indices=val_sample_joint_weights_indices, with_reg=with_reg, with_ae=with_ae,
+                training=False)
+
+            # Log and save epoch losses
+            history['loss'].append(train_loss)
+            history['val_loss'].append(val_loss)
+
+            print(f"Epoch {epoch + 1}/{epochs}, Loss: {train_loss}, Validation Loss: {val_loss}")
+
+            # Early stopping logic
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_epoch = epoch
+                epochs_without_improvement = 0
+                # Save the model weights
+                model.save_weights(f"best_model_weights_{str(save_tag)}.h5")
+            else:
+                epochs_without_improvement += 1
+                if epochs_without_improvement >= patience:
+                    print("Early stopping triggered.")
+                    break
+
+        # Plotting the losses
+        plt.plot(history['loss'], label='Training Loss')
+        plt.plot(history['val_loss'], label='Validation Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Training and Validation Loss Over Epochs')
+        plt.legend()
+        plt.savefig(f"training_plot_{str(save_tag)}.png")
+        plt.close()
+
+        # Retraining on the combined dataset
+        print(f"Retraining to the best epoch: {best_epoch}")
+
+        # Combine X_train and X_val, y_train and y_val, and also the sample weights
+        X_combined = np.concatenate([X_train, X_val])
+        y_combined = np.concatenate([y_train, y_val])
+
+        combined_sample_weights = None
+        if sample_weights is not None and val_sample_weights is not None:
+            combined_sample_weights = np.concatenate([sample_weights, val_sample_weights])
+
+        combined_sample_joint_weights = None
+        combined_sample_joint_weights_indices = None
+        if sample_joint_weights is not None and val_sample_joint_weights is not None:
+            combined_sample_joint_weights = np.concatenate([sample_joint_weights, val_sample_joint_weights])
+
+            # Update val_sample_joint_weights_indices to reflect their new positions in the combined array
+            val_sample_joint_weights_indices_updated = [(i + len(X_train), j + len(X_train)) for (i, j) in
+                                                        val_sample_joint_weights_indices]
+
+            # Concatenate the indices
+            combined_sample_joint_weights_indices = sample_joint_weights_indices + val_sample_joint_weights_indices_updated
+
+        # Reset history for retraining
+        retrain_history = {'loss': []}
+
+        # Retrain up to the best epoch
+        for epoch in range(best_epoch):
+            retrain_loss = self.train_for_one_epoch_mh(
+                model, optimizer, self.repr_loss_dl, X_combined, y_combined,
+                batch_size, gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
+                sample_weights=combined_sample_weights,
+                all_weights=combined_sample_joint_weights,
+                all_weight_indices=combined_sample_joint_weights_indices,
+                with_reg=with_reg, with_ae=with_ae)
+
+            # Log the retrain loss
+            retrain_history['loss'].append(retrain_loss)
+            print(f"Retrain Epoch {epoch + 1}/{best_epoch}, Loss: {retrain_loss}")
 
         # Save the final model
         model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
@@ -586,7 +852,6 @@ class ModelBuilder:
                                  y_train: Tensor,
                                  X_val: Tensor,
                                  y_val: Tensor,
-                                 sample_joint_weights: ndarray = None,
                                  learning_rate: float = 1e-3,
                                  epochs: int = 100,
                                  batch_size: int = 32,
@@ -599,7 +864,6 @@ class ModelBuilder:
         :param y_train: The training labels.
         :param X_val: Validation features.
         :param y_val: Validation labels.
-        :param sample_joint_weights: The reweighting factors for pairs of labels.
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
         :param batch_size: The batch size for training.
@@ -626,22 +890,10 @@ class ModelBuilder:
         # checkpoint callback
         # Setup model checkpointing
         checkpoint_cb = callbacks.ModelCheckpoint("model_weights.h5", save_weights_only=True)
-
-        # In your Callback
-        class WeightedLossCallback(callbacks.Callback):
-            def on_train_batch_begin(self, batch, logs=None):
-                idx1, idx2 = np.triu_indices(len(y_train), k=1)
-                one_d_indices = [map_to_1D_idx(i, j, len(y_train)) for i, j in zip(idx1, idx2)]
-                joint_weights_batch = sample_joint_weights[one_d_indices]  # Retrieve weights for this batch
-                self.model.loss_weights = joint_weights_batch  # Set loss weights for this batch
-
         # Create an instance of the custom callback
-        weighted_loss_cb = WeightedLossCallback()
 
         # Include weighted_loss_cb in callbacks only if sample_joint_weights is not None
         callback_list = [tensorboard_cb, early_stopping_cb, checkpoint_cb]
-        if sample_joint_weights is not None:
-            callback_list.append(weighted_loss_cb)
 
         # Compile the model
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
@@ -677,30 +929,12 @@ class ModelBuilder:
         # Calculate the number of steps per epoch for training
         train_steps_comb = len(X_combined) // batch_size
 
-        if sample_joint_weights is not None:
-            sample_joint_weights_combined = np.concatenate((sample_joint_weights, sample_joint_weights), axis=0)
-
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
-        if sample_joint_weights is not None:
-            model.fit(train_gen_comb, steps_per_epoch=train_steps_comb, epochs=best_epoch, batch_size=batch_size,
-                      callbacks=[weighted_loss_cb, tensorboard_cb, checkpoint_cb])
-        else:
-            model.fit(train_gen_comb, steps_per_epoch=train_steps_comb, epochs=best_epoch, batch_size=batch_size,
-                      callbacks=[tensorboard_cb, checkpoint_cb])
+
+        model.fit(train_gen_comb, steps_per_epoch=train_steps_comb, epochs=best_epoch, batch_size=batch_size,
+                  callbacks=[tensorboard_cb, checkpoint_cb])
 
         return history
-
-    def load_model_weights(self, model: Model, weight_file: str = "model_weights.h5"):
-        """
-        Loads weights into a given TensorFlow model from a specified HDF5 weight file.
-
-        :param model: The TensorFlow model into which weights will be loaded.
-        :param weight_file: The name of the HDF5 weight file.
-
-        :return model: The loaded TensorFlow model.
-        """
-        model.load_weights(weight_file)
-        return model
 
     # def train_features_fast(self,
     #                         model: Model,
@@ -791,23 +1025,24 @@ class ModelBuilder:
     #
     #     return history
 
-    def train_regression(self,
-                         model: Model,
-                         X_train: ndarray,
-                         y_train: ndarray,
-                         X_val: ndarray,
-                         y_val: ndarray,
-                         sample_weights: Optional[ndarray] = None,
-                         sample_val_weights: Optional[ndarray] = None,
-                         learning_rate: float = 1e-3,
-                         epochs: int = 100,
-                         batch_size: int = 32,
-                         patience: int = 9,
-                         save_tag=None) -> callbacks.History:
+    def train_reg_head(self,
+                       model: Model,
+                       X_train: ndarray,
+                       y_train: ndarray,
+                       X_val: ndarray,
+                       y_val: ndarray,
+                       sample_weights: Optional[ndarray] = None,
+                       sample_val_weights: Optional[ndarray] = None,
+                       learning_rate: float = 1e-3,
+                       epochs: int = 100,
+                       batch_size: int = 32,
+                       patience: int = 9,
+                       save_tag=None) -> callbacks.History:
         """
         Train a neural network model focusing only on the regression output.
         Include reweighting for balancing the loss.
 
+        :param save_tag:
         :param model: The neural network model.
         :param X_train: Training features.
         :param y_train: Training labels.
@@ -925,18 +1160,18 @@ class ModelBuilder:
 
         return lambda_coef
 
-    def train_regression_with_ae(self, model: Model,
-                                 X_train: ndarray,
-                                 y_train: ndarray,
-                                 X_val: ndarray,
-                                 y_val: ndarray,
-                                 sample_weights: Optional[ndarray] = None,
-                                 sample_val_weights: Optional[ndarray] = None,
-                                 learning_rate: float = 1e-3,
-                                 epochs: int = 100,
-                                 batch_size: int = 32,
-                                 patience: int = 9,
-                                 save_tag=None) -> callbacks.History:
+    def train_reg_ae_heads(self, model: Model,
+                           X_train: ndarray,
+                           y_train: ndarray,
+                           X_val: ndarray,
+                           y_val: ndarray,
+                           sample_weights: Optional[ndarray] = None,
+                           sample_val_weights: Optional[ndarray] = None,
+                           learning_rate: float = 1e-3,
+                           epochs: int = 100,
+                           batch_size: int = 32,
+                           patience: int = 9,
+                           save_tag=None) -> callbacks.History:
         """
         Train a neural network model focusing on the regression and autoencoder output.
         Includes reweighting for balancing the loss and saves the model weights.
@@ -1028,13 +1263,14 @@ class ModelBuilder:
 
         return history
 
-    def plot_model(self, model: Model) -> None:
+    def plot_model(self, model: Model, name: str) -> None:
         """
         Plot the model architecture and save the figure.
+        :param name: name of the file
         :param model: The model to plot.
         :return: None
         """
-        tf.keras.utils.plot_model(model, show_shapes=True, show_layer_names=True)
+        tf.keras.utils.plot_model(model, to_file=f'./{name}.png', show_shapes=True, show_layer_names=True)
 
     def zdist(self, vec1: Tensor, vec2: Tensor) -> float:
         """
@@ -1088,75 +1324,6 @@ class ModelBuilder:
 
         return squared_difference
 
-    def repr_loss_fast(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
-        """
-        Computes the loss for a batch of predicted features and their labels.
-         TODO: Leads to wrong losses, how to fix it?
-        :param y_true: A batch of true label values, shape of [batch_size, 1].
-        :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
-        :param reduction: The type of reduction to apply to the loss.
-        :return: The average error for all unique combinations of the samples in the batch.
-        """
-        batch_size = tf.shape(z_pred)[0]
-        denom = tf.cast(batch_size * (batch_size - 1) / 2, dtype=tf.float32)
-
-        # Compute all pairs of errors at once
-        # We expand dimensions to prepare for broadcasting
-        z1 = tf.expand_dims(z_pred, 1)
-        z2 = tf.expand_dims(z_pred, 0)
-        label1 = tf.expand_dims(y_true, 1)
-        label2 = tf.expand_dims(y_true, 0)
-
-        # Compute the pairwise errors using the 'self.error' function
-        err_matrix = self.error_vectorized(z1, z2, label1, label2)
-
-        mask_upper_triangle = tf.linalg.band_part(tf.ones_like(err_matrix), 0, -1)  # Upper triangular matrix of ones
-        mask_no_diag = mask_upper_triangle - tf.eye(tf.shape(err_matrix)[0])  # Remove diagonal
-        total_error = tf.reduce_sum(err_matrix * mask_no_diag)
-
-        if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error  # total loss
-        elif reduction == tf.keras.losses.Reduction.NONE:
-            return total_error / (denom + 1e-9)  # average loss
-        else:
-            raise ValueError(f"Unsupported reduction type: {reduction}.")
-
-    def repr_loss(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
-        """
-        Computes the loss for a batch of predicted features and their labels.
-        verified!
-
-        :param y_true: A batch of true label values, shape of [batch_size, 1].
-        :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
-        :param reduction: The type of reduction to apply to the loss.
-        :return: The average error for all unique combinations of the samples in the batch.
-        """
-        int_batch_size = tf.shape(z_pred)[0]
-        batch_size = tf.cast(int_batch_size, dtype=tf.float32)
-        total_error = tf.constant(0.0, dtype=tf.float32)
-
-        # Loop through all unique pairs of samples in the batch
-        for i in tf.range(int_batch_size):
-            for j in tf.range(i + 1, int_batch_size):
-                z1, z2 = z_pred[i], z_pred[j]
-                # tf.print(z1, z2, sep=', ', end='\n')
-                label1, label2 = y_true[i], y_true[j]
-                # tf.print(label1, label2, sep=', ', end='\n')
-                err = self.error(z1, z2, label1, label2)
-                # tf.print(err, end='\n\n')
-                total_error += tf.cast(err, dtype=tf.float32)
-
-        # tf.print(total_error)
-
-        if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error  # total loss
-        elif reduction == tf.keras.losses.Reduction.NONE:
-            denom = tf.cast(batch_size * (batch_size - 1) / 2 + 1e-9, dtype=tf.float32)
-            # tf.print(denom)
-            return total_error / denom  # average loss
-        else:
-            raise ValueError(f"Unsupported reduction type: {reduction}.")
-
     def repr_loss_dl(self, y_true, z_pred, sample_weights=None, reduction=tf.keras.losses.Reduction.NONE):
         """
         Computes the weighted loss for a batch of predicted features and their labels.
@@ -1199,6 +1366,75 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
+    def repr_loss(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
+        """
+        Computes the loss for a batch of predicted features and their labels.
+        verified!
+
+        :param y_true: A batch of true label values, shape of [batch_size, 1].
+        :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
+        :param reduction: The type of reduction to apply to the loss.
+        :return: The average error for all unique combinations of the samples in the batch.
+        """
+        int_batch_size = tf.shape(z_pred)[0]
+        batch_size = tf.cast(int_batch_size, dtype=tf.float32)
+        total_error = tf.constant(0.0, dtype=tf.float32)
+
+        # Loop through all unique pairs of samples in the batch
+        for i in tf.range(int_batch_size):
+            for j in tf.range(i + 1, int_batch_size):
+                z1, z2 = z_pred[i], z_pred[j]
+                # tf.print(z1, z2, sep=', ', end='\n')
+                label1, label2 = y_true[i], y_true[j]
+                # tf.print(label1, label2, sep=', ', end='\n')
+                err = self.error(z1, z2, label1, label2)
+                # tf.print(err, end='\n\n')
+                total_error += tf.cast(err, dtype=tf.float32)
+
+        # tf.print(total_error)
+
+        if reduction == tf.keras.losses.Reduction.SUM:
+            return total_error  # total loss
+        elif reduction == tf.keras.losses.Reduction.NONE:
+            denom = tf.cast(batch_size * (batch_size - 1) / 2 + 1e-9, dtype=tf.float32)
+            # tf.print(denom)
+            return total_error / denom  # average loss
+        else:
+            raise ValueError(f"Unsupported reduction type: {reduction}.")
+
+    # def repr_loss_fast(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
+    #     """
+    #     Computes the loss for a batch of predicted features and their labels.
+    #      TODO: Leads to wrong losses, how to fix it?
+    #     :param y_true: A batch of true label values, shape of [batch_size, 1].
+    #     :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
+    #     :param reduction: The type of reduction to apply to the loss.
+    #     :return: The average error for all unique combinations of the samples in the batch.
+    #     """
+    #     batch_size = tf.shape(z_pred)[0]
+    #     denom = tf.cast(batch_size * (batch_size - 1) / 2, dtype=tf.float32)
+    #
+    #     # Compute all pairs of errors at once
+    #     # We expand dimensions to prepare for broadcasting
+    #     z1 = tf.expand_dims(z_pred, 1)
+    #     z2 = tf.expand_dims(z_pred, 0)
+    #     label1 = tf.expand_dims(y_true, 1)
+    #     label2 = tf.expand_dims(y_true, 0)
+    #
+    #     # Compute the pairwise errors using the 'self.error' function
+    #     err_matrix = self.error_vectorized(z1, z2, label1, label2)
+    #
+    #     mask_upper_triangle = tf.linalg.band_part(tf.ones_like(err_matrix), 0, -1)  # Upper triangular matrix of ones
+    #     mask_no_diag = mask_upper_triangle - tf.eye(tf.shape(err_matrix)[0])  # Remove diagonal
+    #     total_error = tf.reduce_sum(err_matrix * mask_no_diag)
+    #
+    #     if reduction == tf.keras.losses.Reduction.SUM:
+    #         return total_error  # total loss
+    #     elif reduction == tf.keras.losses.Reduction.NONE:
+    #         return total_error / (denom + 1e-9)  # average loss
+    #     else:
+    #         raise ValueError(f"Unsupported reduction type: {reduction}.")
+
 
 class NormalizeLayer(layers.Layer):
     def __init__(self, epsilon: float = 1e-9, **kwargs):
@@ -1211,15 +1447,15 @@ class NormalizeLayer(layers.Layer):
         self.epsilon = epsilon
         super(NormalizeLayer, self).__init__(**kwargs)
 
-    def call(self, inputs: Tensor) -> Tensor:
+    def call(self, reprs: Tensor) -> Tensor:
         """
         Forward pass for the NormalizeLayer.
 
-        :param inputs: Input tensor of shape [batch_size, ...].
+        :param reprs: Input tensor of shape [batch_size, ...].
         :return: Normalized input tensor of the same shape as inputs.
         """
-        norm = tf.norm(inputs, axis=1, keepdims=True) + self.epsilon
-        return inputs / norm
+        norm = tf.norm(reprs, axis=1, keepdims=True) + self.epsilon
+        return reprs / norm
 
     def get_config(self) -> dict:
         """
