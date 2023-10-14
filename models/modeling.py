@@ -412,6 +412,7 @@ class ModelBuilder:
         """
         epoch_loss = 0.0
         num_batches = 0
+        total_batch_size = len(X) // batch_size + 1
 
         for batch_idx in range(0, len(X), batch_size):
             batch_X = X[batch_idx:batch_idx + batch_size]
@@ -434,7 +435,7 @@ class ModelBuilder:
             epoch_loss += loss.numpy()
             num_batches += 1
 
-            print(f"{num_batches}/{len(X) // batch_size}")
+            print(f"{num_batches - 1}/{total_batch_size}")
 
         return epoch_loss / num_batches
 
