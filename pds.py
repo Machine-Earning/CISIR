@@ -37,7 +37,8 @@ def main():
     # Read the CSV file
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
-        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir('./cme_and_electron/data')
+        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir(
+        '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data')
 
     train_count = count_above_threshold(shuffled_train_y)
     val_count = count_above_threshold(shuffled_val_y)
@@ -82,10 +83,10 @@ def main():
                                                         shuffled_val_y)
 
     plot_tsne_pds(feature_extractor, combined_train_x, combined_train_y, title, 'training',
-                                      save_tag=timestamp)
+                  save_tag=timestamp)
 
     plot_tsne_pds(feature_extractor, shuffled_test_x, shuffled_test_y, title, 'testing',
-                                      save_tag=timestamp)
+                  save_tag=timestamp)
 
 
 if __name__ == '__main__':

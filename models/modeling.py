@@ -25,6 +25,7 @@ class ModelBuilder:
 
     # class variables
     debug = False
+
     def __init__(self, debug: bool = True) -> None:
         """
         Initialize the class variables.
@@ -703,12 +704,13 @@ class ModelBuilder:
         best_val_loss = float('inf')
         best_epoch = 0
         epochs_without_improvement = 0
+        epochs_for_estimation = 25
 
-        # TODO: find how to introduce this
         gamma_coeff, lambda_coeff = self.estimate_gamma_lambda_coeffs(
-            model, X_train, y_train, X_val, y_val, self.repr_loss_dl,
-            sample_weights=None, sample_val_weights=None,
-            learning_rate=1e-3, n_epochs=10, batch_size=32)
+            model, X_train, y_train, self.repr_loss_dl,
+            sample_weights, sample_joint_weights, sample_joint_weights_indices,
+            learning_rate=learning_rate, n_epochs=epochs_for_estimation, batch_size=batch_size,
+            with_ae=with_ae, with_reg=with_reg)
 
         # Initialize TensorBoard
         log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -841,15 +843,15 @@ class ModelBuilder:
             yield batch_X, batch_y
 
     def train_pds_injection(self,
-                                 model: Model,
-                                 X_train: Tensor,
-                                 y_train: Tensor,
-                                 X_val: Tensor,
-                                 y_val: Tensor,
-                                 learning_rate: float = 1e-3,
-                                 epochs: int = 100,
-                                 batch_size: int = 32,
-                                 patience: int = 9) -> callbacks.History:
+                            model: Model,
+                            X_train: Tensor,
+                            y_train: Tensor,
+                            X_val: Tensor,
+                            y_val: Tensor,
+                            learning_rate: float = 1e-3,
+                            epochs: int = 100,
+                            batch_size: int = 32,
+                            patience: int = 9) -> callbacks.History:
         """
         Trains the model and returns the training history. injection of rare examples
 
@@ -1109,8 +1111,86 @@ class ModelBuilder:
 
         return history
 
-    def estimate_lambda_coef(self, model, X_train, y_train, X_val, y_val,
-                             sample_weights=None, sample_val_weights=None,
+    def estimate_gamma_lambda_coeffs(self,
+                                     model: tf.keras.Model,
+                                     X_train: np.ndarray,
+                                     y_train: np.ndarray,
+                                     primary_loss_fn,
+                                     sample_weights: Optional[np.ndarray] = None,
+                                     sample_joint_weights: Optional[np.ndarray] = None,
+                                     sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
+                                     learning_rate: float = 1e-3, n_epochs: int = 10,
+                                     batch_size: int = 32,
+                                     with_ae=False, with_reg=False) -> Tuple[float, float]:
+        """
+        Estimate the gamma and lambda coefficients for balancing the primary, regression, and decoder losses.
+
+        :param with_ae:
+        :param with_reg:
+        :param sample_joint_weights:
+        :param sample_joint_weights_indices:
+        :param model: The neural network model.
+        :param X_train: Training features.
+        :param y_train: Training labels.
+        :param primary_loss_fn: Primary loss function.
+        :param sample_weights: Sample weights for training set.
+        :param sample_val_weights: Sample weights for validation set.
+        :param learning_rate: Learning rate for Adam optimizer.
+        :param n_epochs: Number of epochs to train each branch for coefficient estimation.
+        :param batch_size: Batch size.
+        :return: Estimated gamma and lambda coefficients.
+        """
+
+        # Initialize lists to store validation losses for each head
+        primary_losses = []
+        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        # Train the primary head using custom training loop
+        for epoch in range(n_epochs):
+            train_loss = self.train_for_one_epoch(
+                model, optimizer, primary_loss_fn, X_train, y_train,
+                batch_size, all_weights=sample_joint_weights,
+                all_weight_indices=sample_joint_weights_indices)
+            primary_losses.append(train_loss)
+
+        reg_losses = []
+        dec_losses = []
+
+        # Train regression branch only if with_reg is True
+        if with_reg:
+            model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+                          loss={'regression_head': 'mse'})
+            history_reg = model.fit(X_train, {'regression_head': y_train},
+                                    sample_weight=sample_weights,
+                                    epochs=n_epochs,
+                                    batch_size=batch_size)
+            reg_losses = history_reg.history['val_loss']
+
+        # Train decoder branch only if with_ae is True
+        if with_ae:
+            model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss={'decoder_head': 'mse'})
+            history_dec = model.fit(X_train, {'decoder_head': X_train},
+                                    sample_weight=sample_weights,
+                                    epochs=n_epochs,
+                                    batch_size=batch_size)
+            dec_losses = history_dec.history['val_loss']
+
+        # Initialize coefficients to None
+        gamma_coef = None
+        lambda_coef = None
+
+        # Calculate gamma and lambda as the sum of the ratios, if applicable
+        if with_reg:
+            gamma_ratios = [p / r for p, r in zip(primary_losses, reg_losses)]
+            gamma_coef = np.mean(gamma_ratios)
+
+        if with_ae:
+            lambda_ratios = [p / d for p, d in zip(primary_losses, dec_losses)]
+            lambda_coef = np.mean(lambda_ratios)
+
+        return gamma_coef, lambda_coef
+
+    def estimate_lambda_coef(self, model, X_train, y_train,
+                             sample_weights=None,
                              learning_rate=1e-3, n_epochs=10, batch_size=32):
         """
         Estimate the lambda coefficient for balancing the regression and decoder losses.
@@ -1118,10 +1198,7 @@ class ModelBuilder:
         :param model: The neural network model.
         :param X_train: Training features.
         :param y_train: Training labels.
-        :param X_val: Validation features.
-        :param y_val: Validation labels.
         :param sample_weights: Sample weights for training set.
-        :param sample_val_weights: Sample weights for validation set.
         :param learning_rate: Learning rate for Adam optimizer.
         :param n_epochs: Number of epochs to train each branch for lambda estimation.
         :param batch_size: Batch size.
@@ -1133,20 +1210,18 @@ class ModelBuilder:
         history_reg = model.fit(X_train, {'regression_head': y_train},
                                 sample_weight=sample_weights,
                                 epochs=n_epochs,
-                                batch_size=batch_size,
-                                validation_data=(X_val, {'regression_head': y_val}, sample_val_weights))
+                                batch_size=batch_size)
 
-        reg_losses = history_reg.history['val_loss']
+        reg_losses = history_reg.history['loss']
 
         # Train decoder branch only
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss={'decoder_head': 'mse'})
         history_dec = model.fit(X_train, {'decoder_head': X_train},
                                 sample_weight=sample_weights,
                                 epochs=n_epochs,
-                                batch_size=batch_size,
-                                validation_data=(X_val, {'decoder_head': X_val}, sample_val_weights))
+                                batch_size=batch_size)
 
-        dec_losses = history_dec.history['val_loss']
+        dec_losses = history_dec.history['loss']
 
         # Calculate lambda as the sum of the ratios
         ratios = [r / d for r, d in zip(reg_losses, dec_losses)]
@@ -1187,8 +1262,8 @@ class ModelBuilder:
 
         epochs_for_estimation = 25
 
-        lambda_coef = self.estimate_lambda_coef(model, X_train, y_train, X_val, y_val,
-                                                sample_weights, sample_val_weights,
+        lambda_coef = self.estimate_lambda_coef(model, X_train, y_train,
+                                                sample_weights,
                                                 learning_rate, epochs_for_estimation, batch_size)
 
         print(f"Lambda coefficient found: {lambda_coef}")
