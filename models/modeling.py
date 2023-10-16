@@ -505,6 +505,7 @@ class ModelBuilder:
                 if with_reg and gamma_coeff is not None:
                     regressor_loss = tf.keras.losses.mean_squared_error(batch_y, regressor_predictions)
                     if batch_sample_weights is not None:
+                        regressor_loss = tf.cast(regressor_loss, batch_sample_weights.dtype)
                         regressor_loss = tf.reduce_sum(regressor_loss * batch_sample_weights) / tf.reduce_sum(
                             batch_sample_weights)
                     regressor_loss *= gamma_coeff
@@ -515,6 +516,13 @@ class ModelBuilder:
                     decoder_loss = tf.keras.losses.mean_squared_error(batch_X, decoder_predictions)
                     decoder_loss *= lambda_coeff
 
+                # Make sure all loss tensors have the same dtype
+                dtype_to_use = tf.float32  # or tf.float64 based on your preference
+
+                primary_loss = tf.cast(primary_loss, dtype_to_use)
+                regressor_loss = tf.cast(regressor_loss, dtype_to_use)
+                decoder_loss = tf.cast(decoder_loss, dtype_to_use)
+
                 # Total loss
                 total_loss = primary_loss + regressor_loss + decoder_loss
 
@@ -522,7 +530,12 @@ class ModelBuilder:
                 gradients = tape.gradient(total_loss, model.trainable_variables)
                 optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
-            epoch_loss += total_loss.numpy()
+            # Make sure total_loss is reduced to a single scalar value.
+            total_loss_scalar = tf.reduce_sum(total_loss)
+
+            # Update epoch_loss
+            epoch_loss += total_loss_scalar.numpy()
+
             num_batches += 1
 
             print(f"{num_batches}/{len(X) // batch_size}")
@@ -704,13 +717,15 @@ class ModelBuilder:
         best_val_loss = float('inf')
         best_epoch = 0
         epochs_without_improvement = 0
-        epochs_for_estimation = 25
+        epochs_for_estimation = 2
 
         gamma_coeff, lambda_coeff = self.estimate_gamma_lambda_coeffs(
             model, X_train, y_train, self.repr_loss_dl,
             sample_weights, sample_joint_weights, sample_joint_weights_indices,
             learning_rate=learning_rate, n_epochs=epochs_for_estimation, batch_size=batch_size,
             with_ae=with_ae, with_reg=with_reg)
+
+        print(f'found gamma: {gamma_coeff}, lambda: {lambda_coeff}')
 
         # Initialize TensorBoard
         log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -1146,10 +1161,10 @@ class ModelBuilder:
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
         # Train the primary head using custom training loop
         for epoch in range(n_epochs):
-            train_loss = self.train_for_one_epoch(
+            train_loss = self.train_for_one_epoch_mh(
                 model, optimizer, primary_loss_fn, X_train, y_train,
-                batch_size, all_weights=sample_joint_weights,
-                all_weight_indices=sample_joint_weights_indices)
+                batch_size, sample_weights=sample_weights, all_weights=sample_joint_weights,
+                all_weight_indices=sample_joint_weights_indices, with_ae=with_ae, with_reg=with_reg)
             primary_losses.append(train_loss)
 
         reg_losses = []
@@ -1163,7 +1178,7 @@ class ModelBuilder:
                                     sample_weight=sample_weights,
                                     epochs=n_epochs,
                                     batch_size=batch_size)
-            reg_losses = history_reg.history['val_loss']
+            reg_losses = history_reg.history['loss']
 
         # Train decoder branch only if with_ae is True
         if with_ae:
@@ -1172,7 +1187,7 @@ class ModelBuilder:
                                     sample_weight=sample_weights,
                                     epochs=n_epochs,
                                     batch_size=batch_size)
-            dec_losses = history_dec.history['val_loss']
+            dec_losses = history_dec.history['loss']
 
         # Initialize coefficients to None
         gamma_coef = None
