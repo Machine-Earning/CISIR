@@ -11,7 +11,7 @@ from datetime import datetime
 from dataload import DenseReweights as dr
 from evaluate import evaluation as eval
 from dataload import seploader as sepl
-from evaluate.utils import count_above_threshold, plot_tsne_and_save_extended
+from evaluate.utils import count_above_threshold, plot_tsne_extended
 
 # SEEDING
 SEED = 42  # seed number
@@ -56,7 +56,7 @@ def main():
     mb = modeling.ModelBuilder()
 
     # create my feature extractor
-    feature_extractor = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
+    feature_extractor = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
 
     # load weights to continue training
     feature_extractor.load_weights(
@@ -65,7 +65,7 @@ def main():
         'weights /home1/jmoukpe2016/keras-functional-api/model_weights_2023-10-04_08-54-53.h5 loaded successfully!')
 
     # add the regression head with dense weighting
-    regressor = mb.add_regression_head_with_proj(feature_extractor, freeze_features=False)
+    regressor = mb.add_reg_proj_head(feature_extractor, freeze_features=False, pds=True)
 
     # Generate a timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -79,21 +79,21 @@ def main():
 
     # print options used
     print(Options)
-    mb.train_regression(regressor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
-                        sample_weights=sample_weights, sample_val_weights=val_sample_weights,
-                        learning_rate=Options['learning_rate'],
-                        epochs=Options['epochs'],
-                        batch_size=Options['batch_size'],
-                        patience=Options['patience'], save_tag=timestamp)
+    mb.train_reg_head(regressor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
+                      sample_weights=sample_weights, sample_val_weights=val_sample_weights,
+                      learning_rate=Options['learning_rate'],
+                      epochs=Options['epochs'],
+                      batch_size=Options['batch_size'],
+                      patience=Options['patience'], save_tag=timestamp)
 
     # combine training and validation
     combined_train_x, combined_train_y = loader.combine(shuffled_train_x, shuffled_train_y, shuffled_val_x,
                                                         shuffled_val_y)
 
-    plot_tsne_and_save_extended(regressor, combined_train_x, combined_train_y, title, 'training',
+    plot_tsne_extended(regressor, combined_train_x, combined_train_y, title, 'training',
                                 save_tag=timestamp)
 
-    plot_tsne_and_save_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'testing',
+    plot_tsne_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'testing',
                                 save_tag=timestamp)
 
     ev = eval.Evaluator()

@@ -11,7 +11,7 @@ from datetime import datetime
 from dataload import DenseReweights as dr
 from evaluate import evaluation as eval
 from dataload import seploader as sepl
-from evaluate.utils import count_above_threshold, plot_tsne_and_save_extended
+from evaluate.utils import count_above_threshold, plot_tsne_extended
 
 # SEEDING
 SEED = 42  # seed number
@@ -58,7 +58,7 @@ def main():
     mb = modeling.ModelBuilder()
 
     # create my feature extractor
-    feat_reg_ae = mb.create_model_with_ae(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
+    feat_reg_ae = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18], with_ae=True)
 
     # load weights to continue training
     # feature_extractor_plus_head.load_weights('model_weights_2023-09-28_18-10-52.h5')
@@ -76,25 +76,24 @@ def main():
 
     # print options used
     print(Options)
-    mb.train_regression_with_ae(feat_reg_ae, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
-                                # sample_weights=sample_weights, sample_val_weights=val_sample_weights,
-                                learning_rate=Options['learning_rate'],
-                                epochs=Options['epochs'],
-                                batch_size=Options['batch_size'],
-                                patience=Options['patience'], save_tag='rrtae_stage_1_' + timestamp)
+    mb.train_reg_ae_heads(feat_reg_ae, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
+                          learning_rate=Options['learning_rate'],
+                          epochs=Options['epochs'],
+                          batch_size=Options['batch_size'],
+                          patience=Options['patience'], save_tag='rrtae_stage_1_' + timestamp)
 
     # combine training and validation
     combined_train_x, combined_train_y = loader.combine(shuffled_train_x, shuffled_train_y, shuffled_val_x,
                                                         shuffled_val_y)
 
-    plot_tsne_and_save_extended(feat_reg_ae, combined_train_x, combined_train_y, title, 'rrtae_stage1_training_',
-                                with_ae=True, save_tag=timestamp)
+    plot_tsne_extended(feat_reg_ae, combined_train_x, combined_train_y, title, 'rrtae_stage1_training_',
+                                model_type='feature_reg_dec', save_tag=timestamp)
 
-    plot_tsne_and_save_extended(feat_reg_ae, shuffled_test_x, shuffled_test_y, title, 'rrtae_stage1_testing_',
-                                with_ae=True, save_tag=timestamp)
+    plot_tsne_extended(feat_reg_ae, shuffled_test_x, shuffled_test_y, title, 'rrtae_stage1_testing_',
+                                model_type='feature_reg_dec', save_tag=timestamp)
 
     # add the regression head with dense weighting
-    regressor = mb.add_regression_head_with_proj_rrtae(feat_reg_ae, freeze_features=True)
+    regressor = mb.add_reg_proj_head(feat_reg_ae, freeze_features=True)
 
     # training
     Options = {
@@ -106,17 +105,17 @@ def main():
 
     # print options used
     print(Options)
-    mb.train_regression(regressor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
-                        sample_weights=sample_weights, sample_val_weights=val_sample_weights,
-                        learning_rate=Options['learning_rate'],
-                        epochs=Options['epochs'],
-                        batch_size=Options['batch_size'],
-                        patience=Options['patience'], save_tag='rrtae_stage_2_' + timestamp)
+    mb.train_reg_head(regressor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
+                      sample_weights=sample_weights, sample_val_weights=val_sample_weights,
+                      learning_rate=Options['learning_rate'],
+                      epochs=Options['epochs'],
+                      batch_size=Options['batch_size'],
+                      patience=Options['patience'], save_tag='rrtae_stage_2_' + timestamp)
 
-    plot_tsne_and_save_extended(regressor, combined_train_x, combined_train_y, title, 'rrtae_stage2_training_',
+    plot_tsne_extended(regressor, combined_train_x, combined_train_y, title, 'rrtae_stage2_training_',
                                 save_tag=timestamp)
 
-    plot_tsne_and_save_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'rrtae_stage2_testing_',
+    plot_tsne_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'rrtae_stage2_testing_',
                                 save_tag=timestamp)
 
     ev = eval.Evaluator()

@@ -9,7 +9,7 @@ import tensorflow as tf
 import random
 from datetime import datetime
 from dataload import seploader as sepl
-from evaluate.utils import count_above_threshold, plot_tsne_and_save_with_timestamp
+from evaluate.utils import count_above_threshold, plot_tsne_pds
 
 # SEEDING
 SEED = 42  # seed number 
@@ -37,7 +37,8 @@ def main():
     # Read the CSV file
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
-        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir('/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data')
+        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir(
+        '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data')
 
     train_count = count_above_threshold(shuffled_train_y)
     val_count = count_above_threshold(shuffled_val_y)
@@ -50,7 +51,7 @@ def main():
     mb = modeling.ModelBuilder()
 
     # create my feature extractor
-    feature_extractor = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
+    feature_extractor = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
 
     # load weights to continue training
     # feature_extractor.load_weights('model_weights_2023-09-28_18-25-47.h5')
@@ -68,20 +69,20 @@ def main():
 
     # print options used
     print(Options)
-    mb.train_features(feature_extractor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
-                      learning_rate=Options['learning_rate'],
-                      epochs=Options['epochs'],
-                      batch_size=Options['batch_size'],
-                      patience=Options['patience'], save_tag=timestamp)
+    mb.train_pds(feature_extractor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
+                 learning_rate=Options['learning_rate'],
+                 epochs=Options['epochs'],
+                 batch_size=Options['batch_size'],
+                 patience=Options['patience'], save_tag=timestamp)
 
     # combine training and validation
     combined_train_x, combined_train_y = loader.combine(shuffled_train_x, shuffled_train_y, shuffled_val_x,
                                                         shuffled_val_y)
 
-    plot_tsne_and_save_with_timestamp(feature_extractor, combined_train_x, combined_train_y, title, 'training',
+    plot_tsne_pds(feature_extractor, combined_train_x, combined_train_y, title, 'training',
                                       save_tag=timestamp)
 
-    plot_tsne_and_save_with_timestamp(feature_extractor, shuffled_test_x, shuffled_test_y, title,'testing',
+    plot_tsne_pds(feature_extractor, shuffled_test_x, shuffled_test_y, title, 'testing',
                                       save_tag=timestamp)
 
 

@@ -25,12 +25,6 @@ class ModelBuilder:
 
     # class variables
     debug = False
-    model = None
-    hidden_arch = None
-    input_size = None
-    output_size = None
-    lambda_coef = None
-
     def __init__(self, debug: bool = True) -> None:
         """
         Initialize the class variables.
@@ -38,7 +32,6 @@ class ModelBuilder:
         :param debug: Boolean to enable debug output.
         """
         self.debug = debug
-        self.lambda_coef = 4  # coefficient for matching feature loss and regression loss
 
     def create_model(self, input_dim: int, feat_dim: int, output_dim: int, hiddens: List[int],
                      with_ae: bool = False) -> Model:
@@ -131,13 +124,10 @@ class ModelBuilder:
         # Complete model, repr, reg, decoder
         model = Model(inputs=encoder_input, outputs=outputs if len(outputs) > 1 else outputs[0])
 
-        # Storing the model
-        self.model = model
-
-        return self.model
+        return model
 
     def add_reg_proj_head(self, model: Model, output_dim: int = 1, hiddens: Optional[List[int]] = None,
-                          freeze_features: bool = True, pds: bool = True) -> Model:
+                          freeze_features: bool = True, pds: bool = False) -> Model:
         """
         Add a regression head with one output unit and a projection layer to an existing model,
         replacing the existing prediction layer and optionally the decoder layer.
@@ -714,8 +704,11 @@ class ModelBuilder:
         best_epoch = 0
         epochs_without_improvement = 0
 
-        gamma_coeff = 1
-        lambda_coeff = 1
+        # TODO: find how to introduce this
+        gamma_coeff, lambda_coeff = self.estimate_gamma_lambda_coeffs(
+            model, X_train, y_train, X_val, y_val, self.repr_loss_dl,
+            sample_weights=None, sample_val_weights=None,
+            learning_rate=1e-3, n_epochs=10, batch_size=32)
 
         # Initialize TensorBoard
         log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -847,7 +840,7 @@ class ModelBuilder:
 
             yield batch_X, batch_y
 
-    def train_features_injection(self,
+    def train_pds_injection(self,
                                  model: Model,
                                  X_train: Tensor,
                                  y_train: Tensor,
@@ -937,7 +930,7 @@ class ModelBuilder:
 
         return history
 
-    # def train_features_fast(self,
+    # def train_pds_fast(self,
     #                         model: Model,
     #                         X_train: Tensor,
     #                         y_train: Tensor,

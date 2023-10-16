@@ -5,7 +5,7 @@ import random
 from datetime import datetime
 from dataload import seploader as sepl
 from dataload import DenseReweights as dr
-from evaluate.utils import count_above_threshold, plot_tsne_and_save_with_timestamp
+from evaluate.utils import count_above_threshold, plot_tsne_pds
 
 # SEEDING
 SEED = 42  # seed number 
@@ -84,27 +84,27 @@ def main():
 
     # print options used
     print(Options)
-    mb.train_features_dl(feature_extractor,
-                         shuffled_train_x, shuffled_train_y,
-                         shuffled_val_x, shuffled_val_y,
-                         sample_joint_weights=sample_joint_weights,
-                         sample_joint_weights_indices=sample_joint_weights_indices,
-                         val_sample_joint_weights=val_sample_joint_weights,
-                         val_sample_joint_weights_indices=val_sample_joint_weights_indices,
-                         learning_rate=Options['learning_rate'],
-                         epochs=Options['epochs'],
-                         batch_size=Options['batch_size'],
-                         patience=Options['patience'], save_tag=timestamp)
+    mb.train_pds_dl(feature_extractor,
+                    shuffled_train_x, shuffled_train_y,
+                    shuffled_val_x, shuffled_val_y,
+                    sample_joint_weights=sample_joint_weights,
+                    sample_joint_weights_indices=sample_joint_weights_indices,
+                    val_sample_joint_weights=val_sample_joint_weights,
+                    val_sample_joint_weights_indices=val_sample_joint_weights_indices,
+                    learning_rate=Options['learning_rate'],
+                    epochs=Options['epochs'],
+                    batch_size=Options['batch_size'],
+                    patience=Options['patience'], save_tag=timestamp)
 
     # combine training and validation
     combined_train_x, combined_train_y = loader.combine(shuffled_train_x, shuffled_train_y, shuffled_val_x,
                                                         shuffled_val_y)
 
-    plot_tsne_and_save_with_timestamp(feature_extractor,
+    plot_tsne_pds(feature_extractor,
                                       combined_train_x, combined_train_y, title, 'training',
                                       save_tag=timestamp)
 
-    plot_tsne_and_save_with_timestamp(feature_extractor,
+    plot_tsne_pds(feature_extractor,
                                       shuffled_test_x, shuffled_test_y, title, 'testing',
                                       save_tag=timestamp)
 

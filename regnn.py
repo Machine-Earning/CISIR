@@ -11,7 +11,7 @@ from datetime import datetime
 from dataload import DenseReweights as dr
 from evaluate import evaluation as eval
 from dataload import seploader as sepl
-from evaluate.utils import count_above_threshold, plot_tsne_and_save_extended
+from evaluate.utils import count_above_threshold, plot_tsne_extended
 
 # SEEDING
 SEED = 42  # seed number
@@ -58,7 +58,7 @@ def main():
     mb = modeling.ModelBuilder()
 
     # create my feature extractor
-    regressor = mb.create_model(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
+    regressor = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18])
 
     # Generate a timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -78,17 +78,17 @@ def main():
 
     # print options used
     print(Options)
-    mb.train_regression(regressor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
-                        sample_weights=sample_weights, sample_val_weights=val_sample_weights,
-                        learning_rate=Options['learning_rate'],
-                        epochs=Options['epochs'],
-                        batch_size=Options['batch_size'],
-                        patience=Options['patience'], save_tag='reg_nn_' + timestamp)
+    mb.train_reg_head(regressor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
+                      sample_weights=sample_weights, sample_val_weights=val_sample_weights,
+                      learning_rate=Options['learning_rate'],
+                      epochs=Options['epochs'],
+                      batch_size=Options['batch_size'],
+                      patience=Options['patience'], save_tag='reg_nn_' + timestamp)
 
-    plot_tsne_and_save_extended(regressor, combined_train_x, combined_train_y, title, 'reg_nn_training_',
+    plot_tsne_extended(regressor, combined_train_x, combined_train_y, title, 'reg_nn_training_',
                                 save_tag=timestamp)
 
-    plot_tsne_and_save_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'reg_nn_testing_',
+    plot_tsne_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'reg_nn_testing_',
                                 save_tag=timestamp)
 
     ev = eval.Evaluator()

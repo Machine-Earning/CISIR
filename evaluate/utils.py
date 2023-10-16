@@ -11,7 +11,7 @@ import tensorflow as tf
 SEED = 42  # seed number
 
 
-def plot_tsne_and_save_extended(model, X, y, title, prefix, sep_shape='o', model_type='features', save_tag=None):
+def plot_tsne_extended(model, X, y, title, prefix, sep_shape='o', model_type='features_reg', save_tag=None):
     """
     Applies t-SNE to the features extracted by the given model and saves the plot in 2D with a timestamp.
     The color of the points is determined by their label values.
@@ -59,17 +59,18 @@ def plot_tsne_and_save_extended(model, X, y, title, prefix, sep_shape='o', model
     # cbar = plt.colorbar(scatter)
     # cbar.set_label('ln Intensity')
     # Compute marker sizes based on y-values
-  # Compute marker sizes based on y-values
+    # Compute marker sizes based on y-values
     # Compute marker sizes based on y-values. Squaring to amplify differences.
-    marker_sizes = (50 * ((y[above_threshold_indices] - np.min(y[above_threshold_indices])) 
-                / (np.max(y[above_threshold_indices]) - np.min(y[above_threshold_indices]))) + 10)
+    marker_sizes = (50 * ((y[above_threshold_indices] - np.min(y[above_threshold_indices]))
+                          / (np.max(y[above_threshold_indices]) - np.min(y[above_threshold_indices]))) + 10)
 
     # Normalize y-values for better color mapping
     norm = plt.Normalize(y[above_threshold_indices].min(), y[above_threshold_indices].max())
 
     # Overlay scatter plot for above-threshold points (in plasma palette)
     scatter = plt.scatter(tsne_result[above_threshold_indices, 0], tsne_result[above_threshold_indices, 1],
-                        c=y[above_threshold_indices], cmap='plasma', norm=norm, alpha=0.6, s=marker_sizes, marker=sep_shape)
+                          c=y[above_threshold_indices], cmap='plasma', norm=norm, alpha=0.6, s=marker_sizes,
+                          marker=sep_shape)
 
     # Add a color bar
     cbar = plt.colorbar(scatter)
@@ -77,10 +78,9 @@ def plot_tsne_and_save_extended(model, X, y, title, prefix, sep_shape='o', model
 
     # Create custom legend
     legend_labels = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=10),
-                    plt.Line2D([0], [0], marker=sep_shape, color='w', markerfacecolor='yellow', markersize=10)]
+                     plt.Line2D([0], [0], marker=sep_shape, color='w', markerfacecolor='yellow', markersize=10)]
 
     plt.legend(legend_labels, ['Background (Below Threshold)', 'SEPs (Above Threshold)'], loc='upper left')
-
 
     plt.title(f'{title}\n2D t-SNE Visualization')
     plt.xlabel('Dimension 1')
@@ -92,7 +92,7 @@ def plot_tsne_and_save_extended(model, X, y, title, prefix, sep_shape='o', model
     plt.close()
 
 
-def plot_tsne_and_save_with_timestamp(model, X, y, title, prefix, save_tag=None):
+def plot_tsne_pds(model, X, y, title, prefix, save_tag=None):
     """
     Applies t-SNE to the features extracted by the given model and saves the plot in 2D with a timestamp.
     The color of the points is determined by their label values.
@@ -185,16 +185,16 @@ def load_and_plot_tsne(model_path, model_type, title, sep_marker, data_dir='./cm
     # Load the appropriate model
     mb = modeling.ModelBuilder()
     if model_type == 'features':
-        features_model = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
-        loaded_model = mb.add_regression_head_with_proj(features_model, freeze_features=False)
+        features_model = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
+        loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False, pds=True)
     elif model_type == 'features_reg':
-        features_model = mb.create_model(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
-        loaded_model = mb.add_regression_head_with_proj_rrt(features_model, freeze_features=False)
+        features_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18])
+        loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False)
     elif model_type == 'features_reg_dec':
-        features_model = mb.create_model_with_ae(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
-        loaded_model = mb.add_regression_head_with_proj_rrtae(features_model, freeze_features=False)
-    else: # regular reg
-        loaded_model = mb.create_model(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
+        features_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18], with_ae=True)
+        loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False)
+    else:  # regular reg
+        loaded_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18])
 
     loaded_model.load_weights(model_path)
     print(f'Model loaded from {model_path}')
@@ -215,20 +215,19 @@ def load_and_plot_tsne(model_path, model_type, title, sep_marker, data_dir='./cm
     combined_train_x, combined_train_y = loader.combine(train_x, train_y, val_x, val_y)
 
     # Plot and save t-SNE
-    plot_tsne_and_save_extended(loaded_model,
-                                test_x, test_y,
-                                title,
-                                model_type + '_testing_',
-                                model_type=model_type,
-                                save_tag=timestamp)
-    plot_tsne_and_save_extended(loaded_model,
-                                combined_train_x,
-                                combined_train_y,
-                                title,
-                                model_type + '_training_',
-                                model_type=model_type,
-                                save_tag=timestamp)
-
+    plot_tsne_extended(loaded_model,
+                       test_x, test_y,
+                       title,
+                       model_type + '_testing_',
+                       model_type=model_type,
+                       save_tag=timestamp)
+    plot_tsne_extended(loaded_model,
+                       combined_train_x,
+                       combined_train_y,
+                       title,
+                       model_type + '_training_',
+                       model_type=model_type,
+                       save_tag=timestamp)
 
 
 def load_and_test(model_path, model_type, title, threshold=10, data_dir='./cme_and_electron/data'):
@@ -257,14 +256,14 @@ def load_and_test(model_path, model_type, title, threshold=10, data_dir='./cme_a
     mb = modeling.ModelBuilder()
 
     if model_type == 'features':
-        features_model = mb.create_model_feat(inputs=19, feat_dim=9, hiddens=[18])
-        loaded_model = mb.add_regression_head_with_proj(features_model, freeze_features=False)
+        features_model = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
+        loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False)
     elif model_type == 'features_reg':
-        features_model = mb.create_model(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
-        loaded_model = mb.add_regression_head_with_proj_rrt(features_model, freeze_features=False)
+        features_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18])
+        loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False)
     else:  # features_reg_dec
-        features_model = mb.create_model_with_ae(inputs=19, feat_dim=9, outputs=1, hiddens=[18])
-        loaded_model = mb.add_regression_head_with_proj_rrtae(features_model, freeze_features=False)
+        features_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18], with_ae=True)
+        loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False)
 
     loaded_model.load_weights(model_path)
     print(f'Model loaded from {model_path}')
