@@ -25,7 +25,7 @@ def main():
     Main function for testing the AI Panther
     :return: None
     """
-    title = 'PDS, Dense Loss with AE, with batches'
+    title = 'PDS, Dense Joint Loss, AE, with batches'
     print(title)
 
     # check for gpus
@@ -34,7 +34,7 @@ def main():
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
         shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir(
-        './cme_and_electron/data')
+        '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data')
 
     # get validation sample weights based on dense weights
     train_jweights = dr.DenseJointReweights(
@@ -62,8 +62,7 @@ def main():
     mb = modeling.ModelBuilder()
 
     # create my feature extractor
-    feature_extractor = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18], output_dim=1, with_ae=True,
-                                            with_reg=True)
+    feature_extractor = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18], output_dim=1, with_ae=True)
 
     # plot the model
     mb.plot_model(feature_extractor, "pds_stage1")
@@ -76,10 +75,10 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': 16,
-        'epochs': 2,
+        'batch_size': 768,
+        'epochs': 10000,
         'patience': 25,
-        'learning_rate': 0.1,
+        'learning_rate': 0.06,
     }
 
     # print options used
@@ -93,7 +92,6 @@ def main():
                           val_sample_joint_weights_indices=val_sample_joint_weights_indices,
                           sample_weights=sample_weights,
                           val_sample_weights=val_sample_weights,
-                          with_reg=True,
                           with_ae=True,
                           learning_rate=Options['learning_rate'],
                           epochs=Options['epochs'],
@@ -107,12 +105,12 @@ def main():
 
     plot_tsne_extended(feature_extractor,
                        combined_train_x, combined_train_y, title, 'training',
-                       model_type='features_reg_dec',
+                       model_type='features_reg',
                        save_tag=timestamp)
 
     plot_tsne_extended(feature_extractor,
                        shuffled_test_x, shuffled_test_y, title, 'testing',
-                       model_type='features_reg_dec',
+                       model_type='features_reg',
                        save_tag=timestamp)
 
 

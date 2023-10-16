@@ -25,7 +25,7 @@ def main():
     Main function for testing the AI Panther
     :return: None
     """
-    title = 'PDS, Dense Loss, with batches'
+    title = 'PDS, Dense Joint Loss, without batches'
     print(title)
 
     # check for gpus
@@ -80,7 +80,7 @@ def main():
         'batch_size': len(shuffled_train_y),
         'epochs': 10000,
         'patience': 25,
-        'learning_rate': 0.1,
+        'learning_rate': 0.06,
     }
 
     # print options used
