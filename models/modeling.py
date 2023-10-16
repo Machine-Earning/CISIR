@@ -311,12 +311,17 @@ class ModelBuilder:
         # Setup early stopping
         early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
 
-        # checkpoint callback
+        # reduce learning rate on plateau
+        # Initialize the ReduceLROnPlateau callback
+        reduce_lr_cb = callbacks.ReduceLROnPlateau(monitor='val_loss',
+                                                   factor=0.1,
+                                                   patience=5,
+                                                   min_lr=1e-6)
         # Setup model checkpointing
         checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_{str(save_tag)}.h5", save_weights_only=True)
 
         # Include weighted_loss_cb in callbacks only if sample_joint_weights is not None
-        callback_list = [tensorboard_cb, early_stopping_cb, checkpoint_cb]
+        callback_list = [tensorboard_cb, early_stopping_cb, checkpoint_cb, reduce_lr_cb]
 
         # Compile the model
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
