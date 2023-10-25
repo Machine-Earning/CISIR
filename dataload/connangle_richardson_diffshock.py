@@ -131,18 +131,18 @@ def calculate_diffusive_shock(df: pd.DataFrame, mev: int = 10) -> None:
 
     # Conditional gamma calculation
     m = m.clip(lower=1.1)  # clip lower values of m to 1.1
-    gamma = (4 * m ** 2) / (m ** 2 - 1)
+    gamma = (4 * m.pow(2)) / (m.pow(2) - 1)
 
     # terms
     term_1 = N
     term_2 = v
     term_3 = 1 / (gamma - 1)
-    term_4_sub_1 = (vinj ** 2) / (k * vth ** 2)
-    term_4 = 1 / (1 + term_4_sub_1) ** (k + 1)
-    term_5 = (vinj / v) ** (gamma + 1)
+    term_4_sub_1 = vinj.pow(2) / (k * math.pow(vth, 2))
+    term_4 = 1 / (1 + term_4_sub_1).pow(k + 1)
+    term_5 = (vinj / v).pow(gamma + 1)
 
     # Calculate diffusive shock
-    df['diffusive_shock'] = term_1 + term_2 + term_3 + term_4 + term_5
+    df['diffusive_shock'] = term_1 * term_2 * term_3 * term_4 * term_5
 
 
 def calculate_richardson(df: pd.DataFrame) -> None:
