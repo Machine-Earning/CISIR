@@ -172,3 +172,6 @@ fit/
 *.err
 *.out
 *.h5
+
+# plots
+*.png
