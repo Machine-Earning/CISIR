@@ -130,7 +130,7 @@ def calculate_diffusive_shock(df: pd.DataFrame, mev: int = 10) -> None:
     m = vsh / va
 
     # Conditional gamma calculation
-    m = max(m, 1.1)
+    m = m.clip(lower=1.1)  # clip lower values of m to 1.1
     gamma = (4 * m ** 2) / (m ** 2 - 1)
 
     # terms
