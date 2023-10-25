@@ -34,7 +34,7 @@ def main():
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
         shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir(
-        '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data')
+        './cme_and_electron/data')
 
     # get validation sample weights based on dense weights
     train_jweights = dr.DenseJointReweights(
@@ -51,13 +51,12 @@ def main():
     sample_weights = dr.DenseReweights(shuffled_train_x, shuffled_train_y, alpha=.9, debug=False).reweights
     val_sample_weights = dr.DenseReweights(shuffled_val_x, shuffled_val_y, alpha=.9, debug=False).reweights
 
-    train_count = count_above_threshold(shuffled_train_y)
-    val_count = count_above_threshold(shuffled_val_y)
-    test_count = count_above_threshold(shuffled_test_y)
-
-    print(f'Training set: {train_count} above the threshold')
-    print(f'Validation set: {val_count} above the threshold')
-    print(f'Test set: {test_count} above the threshold')
+    elevateds, seps = count_above_threshold(shuffled_train_y)
+    print(f'Sub-Training set: elevated events: {elevateds}  and sep events: {seps}')
+    elevateds, seps = count_above_threshold(shuffled_val_y)
+    print(f'Validation set: elevated events: {elevateds}  and sep events: {seps}')
+    elevateds, seps = count_above_threshold(shuffled_test_y)
+    print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
 
     mb = modeling.ModelBuilder()
 
@@ -75,8 +74,8 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': 768,
-        'epochs': 10000,
+        'batch_size': 16,
+        'epochs': 2,
         'patience': 25,
         'learning_rate': 0.06,
     }

@@ -60,8 +60,8 @@ def calculate_connection_angle(data, newFeatureName):
         # phi_2 = angular_speed_of_sun * 1 AU / solar_wind_speed (in degrees)
         # angular_speed_of_sun = 360 / 27.27 * 86400) degrees/second
         # 1 AU = 1.5 * 10^8 km
-        theta_1 = float(elem["latitude"])
-        phi_1 = float(elem["longitude"])
+        theta_1 = float(elem["CME_DONKI_latitude"])
+        phi_1 = float(elem["CME_DONKI_longitude"])
         theta_2 = 0
         phi_2 = angular_speed_of_sun * au / float(elem["solar_wind_speed"])
 
@@ -89,24 +89,36 @@ def calculate_connection_angle(data, newFeatureName):
         elem[newFeatureName] = math.degrees(connection_angle_rad)
 
 
-def calculate_diffusive_shock_v():
+def calculate_diffusive_shock_v(mev=10):
     """
     Calculate the v component of the diffusive shock equation
+    mev : int, optional
+        The Mega electronvolts value, default is 10.
     Output : float
         The v component of the diffusive shock equation for 100 MeV
     """
-    # v (Particle speed for 100 MeV protons): (3 * 10^5 km/s) * sqrt(1 - (1/((100 MeV + 938 MeV) / 938 MeV))^2)
-    v_c = 3 * math.pow(10, 5)  # km/s
-    v_gamma = (100.0 + 938.0) / (938.0)
+    # v (Particle speed for 100 MeV protons): (3 * v_in_km/s) * sqrt(1 - (1/((100 MeV + 938 MeV) / 938 MeV))^2)
+    # Particle speed for 100 MeV protons: 138425 km/s
+    # Particle speed for 10 MeV protons: 43774 km/s
+    if mev == 100:
+        v = 138425
+    elif mev == 10:
+        v = 43774
+    else:
+        raise ValueError("Unsupported MeV value")
+    v_c = 3 * v  # math.pow(10, 5)  # km/s
+    v_gamma = (mev + 938.0) / 938.0
     return v_c * math.sqrt(1 - math.pow((1.0 / v_gamma), 2))
 
 
-def calculate_diffusive_shock(data, newFeatureName):
+def calculate_diffusive_shock(data, newFeatureName, mev=10):
     """
     Calculate the diffusive shock for each row from its CME features
     data : List[Dict[str: str]]
         The CSV file data where each row is a dictionary in the list mapping fieldnames to contents.
         Each row will be updated in place.
+    mev : int, optional
+        The Mega electronvolts value, default is 10.
     newFeatureName : str
         The name of the diffusive shock feature to write. This is the fieldname heading that will be used for the calculated feature
     """
@@ -130,8 +142,8 @@ def calculate_diffusive_shock(data, newFeatureName):
     # Vth (proton thermal speed): 150 km/s
     for elem in data:
         N = 0.1
-        v = calculate_diffusive_shock_v()
-        vsh = float(elem["donki_speed"])
+        v = calculate_diffusive_shock_v(mev)
+        vsh = float(elem["CME_DONKI_speed"])
         va = float(600)
         vinj = 2.5 * vsh
         k = float(2)
@@ -151,6 +163,25 @@ def calculate_diffusive_shock(data, newFeatureName):
         diffusive_shock = term_1 * term_2 * term_3 * term_4 * term_5
 
         elem[newFeatureName] = diffusive_shock
+
+
+# Complete the calculate_richardson function according to the given equation
+def calculate_richardson(data, newFeatureName):
+    """
+    Calculate the Richardson for each row from its connection angle feature.
+
+    data : List[Dict[str: str]]
+        The CSV file data where each row is a dictionary in the list mapping fieldnames to contents.
+        Each row will be updated in place.
+
+    newFeatureName : str
+        The name of the Richardson feature to write. This is the fieldname heading that will be used for the calculated feature.
+    """
+    # Richardson = - (phi ^ 2) / (2*(43^2))
+    for elem in data:
+        phi = float(elem["connection_angle_degrees"])
+        richardson = - (math.pow(phi, 2)) / (2 * math.pow(43, 2))
+        elem[newFeatureName] = richardson
 
 
 def sortDataIndex(e):
@@ -173,12 +204,6 @@ def main():
     args = parser.parse_args()
 
     # Read the CSV file with features
-    # Each row must at least have the following keys:
-    # latitude : latitude of the CME
-    # longitude : longitude of the CME
-    # solar_wind_speed : the solar wind speed associated with the CME
-    # donki_speed : the linear speed of the CME from the DONKi catalog
-    # index : an identifying index number for the row. Preferably this will be unique amongst the other data. Used for sorting
     data = readCSVFile(args.data_filename)
 
     # Extract out the feature names
@@ -186,13 +211,18 @@ def main():
 
     # Calculate diffusive shock and update the data in-place. Add feature name to fieldnames list
     diffusive_shock_feature_name = "diffusive_shock"
-    calculate_diffusive_shock(data, diffusive_shock_feature_name)
+    calculate_diffusive_shock(data, diffusive_shock_feature_name, mev=10)
     fieldnames.append(diffusive_shock_feature_name)
 
     # Calculate connection angle and update the data in-place. Add feature name to fieldnames list
     connection_angle_feature_name = "connection_angle_degrees"
     calculate_connection_angle(data, connection_angle_feature_name)
     fieldnames.append(connection_angle_feature_name)
+
+    # Calculate Richardson and update the data in-place. Add feature name to fieldnames list
+    richardson_feature_name = "richardson_value"
+    calculate_richardson(data, richardson_feature_name)
+    fieldnames.append(richardson_feature_name)
 
     # Resort to the provided order (assumes it was provided by index)
     data.sort(key=sortDataIndex)

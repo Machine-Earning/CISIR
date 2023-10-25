@@ -1,17 +1,17 @@
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 from datetime import datetime
 from models import modeling
 from evaluate import evaluation as eval
 from dataload import seploader as sepl
 import tensorflow as tf
+from typing import List, Tuple
 
 SEED = 42  # seed number
 
 
-def plot_tsne_extended(model, X, y, title, prefix, sep_shape='o', model_type='features_reg', save_tag=None):
+def plot_tsne_extended(model, X, y, title, prefix, model_type='features_reg', save_tag=None):
     """
     Applies t-SNE to the features extracted by the given model and saves the plot in 2D with a timestamp.
     The color of the points is determined by their label values.
@@ -29,8 +29,9 @@ def plot_tsne_extended(model, X, y, title, prefix, sep_shape='o', model_type='fe
     Returns:
     - Saves a 2D t-SNE plot to a file with a timestamp
     """
-    # Define the threshold
-    threshold = np.log(10 / np.exp(2)) + 1e-8  # threshold
+    # Define the thresholds
+    threshold = np.log(10 / np.exp(2)) + 1e-6
+    sep_threshold = np.log(10)
 
     # Extract features using the trained extended model
     if model_type == 'features_reg_dec':
@@ -42,45 +43,45 @@ def plot_tsne_extended(model, X, y, title, prefix, sep_shape='o', model_type='fe
     tsne = TSNE(n_components=2, random_state=42)
     tsne_result = tsne.fit_transform(features)
 
-    # Identify above and below threshold indices
-    above_threshold_indices = np.where(y > threshold)[0]
+    # Identify indices based on thresholds
+    above_sep_threshold_indices = np.where(y > sep_threshold)[0]
+    elevated_event_indices = np.where((y > threshold) & (y <= sep_threshold))[0]
     below_threshold_indices = np.where(y <= threshold)[0]
 
-    # Create scatter plot for below-threshold points (in gray)
     plt.figure(figsize=(12, 8))
-    plt.scatter(tsne_result[below_threshold_indices, 0], tsne_result[below_threshold_indices, 1],
+
+    # Create scatter plot for below-threshold points (in gray)
+    plt.scatter(tsne_result[below_threshold_indices, 0], tsne_result[below_threshold_indices, 1], marker='o',
                 color='gray', alpha=0.6)
 
-    # # Overlay scatter plot for above-threshold points (in plasma palette)
-    # scatter = plt.scatter(tsne_result[above_threshold_indices, 0], tsne_result[above_threshold_indices, 1],
-    #                       c=y[above_threshold_indices], cmap='plasma', alpha=1.0, marker=sep_shape)
-
-    # # Add a color bar
-    # cbar = plt.colorbar(scatter)
-    # cbar.set_label('ln Intensity')
-    # Compute marker sizes based on y-values
-    # Compute marker sizes based on y-values
-    # Compute marker sizes based on y-values. Squaring to amplify differences.
-    marker_sizes = (50 * ((y[above_threshold_indices] - np.min(y[above_threshold_indices]))
-                          / (np.max(y[above_threshold_indices]) - np.min(y[above_threshold_indices]))) + 10)
-
     # Normalize y-values for better color mapping
-    norm = plt.Normalize(y[above_threshold_indices].min(), y[above_threshold_indices].max())
+    norm = plt.Normalize(y.min(), y.max())
 
-    # Overlay scatter plot for above-threshold points (in plasma palette)
-    scatter = plt.scatter(tsne_result[above_threshold_indices, 0], tsne_result[above_threshold_indices, 1],
-                          c=y[above_threshold_indices], cmap='plasma', norm=norm, alpha=0.6, s=marker_sizes,
-                          marker=sep_shape)
+    # Compute marker sizes based on y-values. Squaring to amplify differences.
+    marker_sizes_elevated = 50 * ((y[elevated_event_indices] - y.min()) / (y.max() - y.min())) ** 2 + 10
+    marker_sizes_sep = 50 * ((y[above_sep_threshold_indices] - y.min()) / (y.max() - y.min())) ** 2 + 10
+
+    # Create scatter plot for elevated events (square marker)
+    plt.scatter(tsne_result[elevated_event_indices, 0], tsne_result[elevated_event_indices, 1],
+                c=y[elevated_event_indices], cmap='plasma', norm=norm, alpha=0.6, marker='o', s=marker_sizes_elevated)
+
+    # Create scatter plot for SEPs (diamond marker)
+    plt.scatter(tsne_result[above_sep_threshold_indices, 0], tsne_result[above_sep_threshold_indices, 1],
+                c=y[above_sep_threshold_indices], cmap='plasma', norm=norm, alpha=0.6, marker='d', s=marker_sizes_sep)
 
     # Add a color bar
-    cbar = plt.colorbar(scatter)
+    sm = plt.cm.ScalarMappable(cmap='plasma', norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm)
     cbar.set_label('ln Intensity')
 
-    # Create custom legend
+    # Add a legend
     legend_labels = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=10),
-                     plt.Line2D([0], [0], marker=sep_shape, color='w', markerfacecolor='yellow', markersize=10)]
+                     plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='blue', markersize=10),
+                     plt.Line2D([0], [0], marker='d', color='w', markerfacecolor='red', markersize=10)]
 
-    plt.legend(legend_labels, ['Background (Below Threshold)', 'SEPs (Above Threshold)'], loc='upper left')
+    plt.legend(legend_labels, ['Background', 'Elevated Events (darker colors)', 'SEPs (lighter colors)'],
+               loc='upper left')
 
     plt.title(f'{title}\n2D t-SNE Visualization')
     plt.xlabel('Dimension 1')
@@ -106,8 +107,10 @@ def plot_tsne_pds(model, X, y, title, prefix, save_tag=None):
     Returns:
     - Saves a 2D t-SNE plot to a file with a timestamp
     """
-    # saving the threshold
-    threshold = np.log(9)
+    # Define the thresholds
+    threshold = np.log(10 / np.exp(2)) + 1e-6
+    sep_threshold = np.log(10)
+
     # Extract features using the trained model
     features = model.predict(X)
 
@@ -115,26 +118,46 @@ def plot_tsne_pds(model, X, y, title, prefix, save_tag=None):
     tsne = TSNE(n_components=2, random_state=SEED)
     tsne_result = tsne.fit_transform(features)
 
-    # Identify above and below threshold indices
-    above_threshold_indices = np.where(y > threshold)[0]
+    # Identify indices based on thresholds
+    above_sep_threshold_indices = np.where(y > sep_threshold)[0]
+    elevated_event_indices = np.where((y > threshold) & (y <= sep_threshold))[0]
     below_threshold_indices = np.where(y <= threshold)[0]
 
-    # Create scatter plot for below-threshold points (in gray)
     plt.figure(figsize=(12, 8))
-    plt.scatter(tsne_result[below_threshold_indices, 0], tsne_result[below_threshold_indices, 1],
-                color='gray', alpha=0.6, label='Below Threshold')
 
-    # Overlay scatter plot for above-threshold points (in plasma palette)
-    scatter = plt.scatter(tsne_result[above_threshold_indices, 0], tsne_result[above_threshold_indices, 1],
-                          c=y[above_threshold_indices], cmap='plasma', alpha=1.0, edgecolors='r',
-                          label='Above Threshold')
+    # Create scatter plot for below-threshold points (in gray)
+    plt.scatter(tsne_result[below_threshold_indices, 0], tsne_result[below_threshold_indices, 1], marker='o',
+                color='gray', alpha=0.6)
+
+    # Normalize y-values for better color mapping
+    norm = plt.Normalize(y.min(), y.max())
+
+    # Compute marker sizes based on y-values
+    marker_sizes_elevated = 50 * ((y[elevated_event_indices] - y.min()) / (y.max() - y.min())) ** 2 + 10
+    marker_sizes_sep = 50 * ((y[above_sep_threshold_indices] - y.min()) / (y.max() - y.min())) ** 2 + 10
+
+    # Create scatter plot for elevated events (square marker)
+    plt.scatter(tsne_result[elevated_event_indices, 0], tsne_result[elevated_event_indices, 1],
+                c=y[elevated_event_indices], cmap='plasma', norm=norm, alpha=0.6, marker='o', s=marker_sizes_elevated)
+
+    # Create scatter plot for SEPs (diamond marker)
+    plt.scatter(tsne_result[above_sep_threshold_indices, 0], tsne_result[above_sep_threshold_indices, 1],
+                c=y[above_sep_threshold_indices], cmap='plasma', norm=norm, alpha=0.6, marker='d', s=marker_sizes_sep)
 
     # Add a color bar
-    cbar = plt.colorbar(scatter)
+    sm = plt.cm.ScalarMappable(cmap='plasma', norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm)
     cbar.set_label('Label Value')
 
-    # Add legend to differentiate above-threshold points
-    plt.legend()
+    # Add legend
+    # Add a legend
+    legend_labels = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=10),
+                     plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='blue', markersize=10),
+                     plt.Line2D([0], [0], marker='d', color='w', markerfacecolor='red', markersize=10)]
+
+    plt.legend(legend_labels, ['Background', 'Elevated Events (darker colors)', 'SEPs (lighter colors)'],
+               loc='upper left')
 
     plt.title(f'{title}\n2D t-SNE Visualization')
     plt.xlabel('Dimension 1')
@@ -146,18 +169,25 @@ def plot_tsne_pds(model, X, y, title, prefix, save_tag=None):
     plt.close()
 
 
-def count_above_threshold(y_values, threshold=np.log(10)):
+def count_above_threshold(y_values: List[float], threshold: float = 0.3027, sep_threshold: float = 2.3026) -> Tuple[
+    int, int]:
     """
-    Count the number of y values that are above a given threshold.
+    Count the number of y values that are above a given threshold for elevated events and above a sep_threshold for sep events.
 
     Parameters:
-    - y_values (array-like): The array of y-values to check.
-    - threshold (float, optional): The threshold value to use for counting. Default is log(10).
+    - y_values (List[float]): The array of y-values to check.
+    - threshold (float, optional): The threshold value to use for counting elevated events. Default is log(10 / e^2).
+    - sep_threshold (float, optional): The threshold value to use for counting sep events. Default is log(10).
 
     Returns:
-    - int: The count of y-values that are above the threshold.
+    - Tuple[int, int]: The count of y-values that are above the thresholds for elevated and sep events, respectively.
     """
-    return np.sum(y_values > threshold)
+
+    y_values_np = np.array(y_values)  # Convert list to NumPy array
+    elevated_count = np.sum((y_values_np > threshold) & (y_values_np <= sep_threshold))
+    sep_count = np.sum(y_values_np > sep_threshold)
+
+    return elevated_count, sep_count
 
 
 def load_and_plot_tsne(model_path, model_type, title, sep_marker, data_dir='./cme_and_electron/data'):
@@ -203,13 +233,12 @@ def load_and_plot_tsne(model_path, model_type, title, sep_marker, data_dir='./cm
     loader = sepl.SEPLoader()
     train_x, train_y, val_x, val_y, test_x, test_y = loader.load_from_dir(data_dir)
     # Extract counts of events
-    train_count = count_above_threshold(train_y)
-    val_count = count_above_threshold(val_y)
-    test_count = count_above_threshold(test_y)
-
-    print(f'Training set: {train_count} above the threshold')
-    print(f'Validation set: {val_count} above the threshold')
-    print(f'Test set: {test_count} above the threshold')
+    elevateds, seps = count_above_threshold(train_y)
+    print(f'Sub-Training set: elevated events: {elevateds}  and sep events: {seps}')
+    elevateds, seps = count_above_threshold(val_y)
+    print(f'Validation set: elevated events: {elevateds}  and sep events: {seps}')
+    elevateds, seps = count_above_threshold(test_y)
+    print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
 
     # Combine training and validation sets
     combined_train_x, combined_train_y = loader.combine(train_x, train_y, val_x, val_y)
@@ -272,13 +301,12 @@ def load_and_test(model_path, model_type, title, threshold=10, data_dir='./cme_a
     loader = sepl.SEPLoader()
     train_x, train_y, val_x, val_y, test_x, test_y = loader.load_from_dir(data_dir)
     # Extract counts of events
-    train_count = count_above_threshold(train_y)
-    val_count = count_above_threshold(val_y)
-    test_count = count_above_threshold(test_y)
-
-    print(f'Training set: {train_count} above the threshold')
-    print(f'Validation set: {val_count} above the threshold')
-    print(f'Test set: {test_count} above the threshold')
+    elevateds, seps = count_above_threshold(train_y)
+    print(f'Sub-Training set: elevated events: {elevateds}  and sep events: {seps}')
+    elevateds, seps = count_above_threshold(val_y)
+    print(f'Validation set: elevated events: {elevateds}  and sep events: {seps}')
+    elevateds, seps = count_above_threshold(test_y)
+    print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
 
     # Combine training and validation sets
     combined_train_x, combined_train_y = loader.combine(train_x, train_y, val_x, val_y)
