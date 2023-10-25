@@ -30,7 +30,7 @@ def plot_tsne_extended(model, X, y, title, prefix, model_type='features_reg', sa
     - Saves a 2D t-SNE plot to a file with a timestamp
     """
     # Define the thresholds
-    threshold = np.log(10 / np.exp(2)) + 1e-6
+    threshold = np.log(10 / np.exp(2)) + 1e-4
     sep_threshold = np.log(10)
 
     # Extract features using the trained extended model
@@ -108,7 +108,7 @@ def plot_tsne_pds(model, X, y, title, prefix, save_tag=None):
     - Saves a 2D t-SNE plot to a file with a timestamp
     """
     # Define the thresholds
-    threshold = np.log(10 / np.exp(2)) + 1e-6
+    threshold = np.log(10 / np.exp(2)) + 1e-4
     sep_threshold = np.log(10)
 
     # Extract features using the trained model
