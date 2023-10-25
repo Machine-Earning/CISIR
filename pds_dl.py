@@ -53,13 +53,12 @@ def main():
     val_sample_joint_weights = val_jweights.jreweights
     val_sample_joint_weights_indices = val_jweights.jindices
 
-    train_count = count_above_threshold(shuffled_train_y)
-    val_count = count_above_threshold(shuffled_val_y)
-    test_count = count_above_threshold(shuffled_test_y)
-
-    print(f'Training set: {train_count} above the threshold')
-    print(f'Validation set: {val_count} above the threshold')
-    print(f'Test set: {test_count} above the threshold')
+    elevateds, seps = count_above_threshold(shuffled_train_y)
+    print(f'Sub-Training set: elevated events: {elevateds}  and sep events: {seps}')
+    elevateds, seps = count_above_threshold(shuffled_val_y)
+    print(f'Validation set: elevated events: {elevateds}  and sep events: {seps}')
+    elevateds, seps = count_above_threshold(shuffled_test_y)
+    print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
 
     mb = modeling.ModelBuilder()
 
@@ -77,7 +76,7 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': 16,
+        'batch_size': 32,
         'epochs': 2,
         'patience': 25,
         'learning_rate': 0.06,
