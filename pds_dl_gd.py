@@ -66,7 +66,7 @@ def main():
     feature_extractor = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
 
     # plot the model
-    mb.plot_model(feature_extractor, "pds_stage1")
+    # mb.plot_model(feature_extractor, "pds_stage1")
 
     # load weights to continue training
     # feature_extractor.load_weights('model_weights_2023-09-28_18-25-47.h5')
