@@ -74,7 +74,7 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': 292,
+        'batch_size': 32,
         'epochs': 10000,
         'patience': 25,
         'learning_rate': 0.06,
