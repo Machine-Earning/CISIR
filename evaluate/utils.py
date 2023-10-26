@@ -211,7 +211,7 @@ def load_and_plot_tsne(model_path, model_type, title, sep_marker, data_dir='./cm
     # Generate a timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # check for gpus
-    tf.config.list_physical_devices('GPU')
+    print(tf.config.list_physical_devices('GPU'))
     # Load the appropriate model
     mb = modeling.ModelBuilder()
     if model_type == 'features':
@@ -280,7 +280,7 @@ def load_and_test(model_path, model_type, title, threshold=10, data_dir='./cme_a
     # Generate a timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # check for gpus
-    tf.config.list_physical_devices('GPU')
+    print(tf.config.list_physical_devices('GPU'))
     # Load the appropriate model
     mb = modeling.ModelBuilder()
 

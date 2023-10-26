@@ -20,4 +20,5 @@ echo "Running on $SLURM_NPROCS processors."
 
 echo "Current working directory is $(pwd)"
 
+srun conda activate tf-gpu
 srun python3 pds_gd.py # Run your Python script

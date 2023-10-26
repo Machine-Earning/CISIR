@@ -722,7 +722,7 @@ class ModelBuilder:
         best_val_loss = float('inf')
         best_epoch = 0
         epochs_without_improvement = 0
-        epochs_for_estimation = 2
+        epochs_for_estimation = 10
 
         gamma_coeff, lambda_coeff = self.estimate_gamma_lambda_coeffs(
             model, X_train, y_train, self.repr_loss_dl,
@@ -1280,7 +1280,7 @@ class ModelBuilder:
         :return: Training history.
         """
 
-        epochs_for_estimation = 25
+        epochs_for_estimation = 10
 
         lambda_coef = self.estimate_lambda_coef(model, X_train, y_train,
                                                 sample_weights,

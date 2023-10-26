@@ -33,7 +33,7 @@ def main():
     print(title)
 
     # check for gpus
-    tf.config.list_physical_devices('GPU')
+    print(tf.config.list_physical_devices('GPU'))
     # Read the CSV file
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
@@ -63,10 +63,10 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': 282,
+        'batch_size': 16,
         'epochs': 2,
         'patience': 25,
-        'learning_rate': 0.1,
+        'learning_rate': 0.06,
     }
 
     # print options used

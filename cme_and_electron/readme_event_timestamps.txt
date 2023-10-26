@@ -1,6 +1,0 @@
-- Each line is an SEP event; there are 39 SEP events in total
-- For each line:
-	- First entry is the onset time
-	- Second entry is the threshold time, when the proton flux exceeds ln(10)
-	- Third entry is the peak time
-	- Fourth entry is the end time

@@ -29,7 +29,7 @@ def main():
     print(title)
 
     # check for gpus
-    tf.config.list_physical_devices('GPU')
+    print(tf.config.list_physical_devices('GPU'))
     # Read the CSV file
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
