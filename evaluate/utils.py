@@ -190,7 +190,7 @@ def count_above_threshold(y_values: List[float], threshold: float = 0.3027, sep_
     return elevated_count, sep_count
 
 
-def load_and_plot_tsne(model_path, model_type, title, sep_marker, data_dir='./cme_and_electron/data'):
+def load_and_plot_tsne(model_path, model_type, title, sep_marker, data_dir='/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'):
     """
     Load a trained model and plot its t-SNE visualization.
 
@@ -259,7 +259,7 @@ def load_and_plot_tsne(model_path, model_type, title, sep_marker, data_dir='./cm
                        save_tag=timestamp)
 
 
-def load_and_test(model_path, model_type, title, threshold=10, data_dir='./cme_and_electron/data'):
+def load_and_test(model_path, model_type, title, threshold=10, data_dir='/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'):
     """
     Load a trained model and evaluate its performance.
 

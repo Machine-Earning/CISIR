@@ -34,7 +34,7 @@ def main():
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
         shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir(
-        './cme_and_electron/data')
+        '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data')
 
     # get validation sample weights based on dense weights
     sample_weights = dr.DenseReweights(shuffled_train_x, shuffled_train_y, alpha=.9, debug=False).reweights

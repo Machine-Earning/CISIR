@@ -34,7 +34,7 @@ def main():
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
         shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir(
-        './cme_and_electron/data')
+        '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data')
 
     # get validation sample weights based on dense weights
     train_jweights = dr.DenseJointReweights(
@@ -76,7 +76,7 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': 292,
+        'batch_size': 128,
         'epochs': 10000,
         'patience': 25,
         'learning_rate': 0.06,
