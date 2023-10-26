@@ -23,7 +23,7 @@ def plot_tsne_extended(model, X, y, title, prefix, model_type='features_reg', sa
     - title: Title for the plot
     - prefix: Prefix for the file name
     - sep_shape: The shape of the marker to use for SEP events (above threshold).
-    - model_type: The type of model to use (feature, feature_reg, feature_reg_dec)
+    - model_type: The type of model to use (feature, feature_reg, features_reg_dec)
     - save_tag: Optional tag to add to the saved file name
 
     Returns:

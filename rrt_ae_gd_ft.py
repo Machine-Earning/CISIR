@@ -86,10 +86,10 @@ def main():
                                                         shuffled_val_y)
 
     plot_tsne_extended(feat_reg_ae, combined_train_x, combined_train_y, title, 'rrtae_stage1_training_',
-                                model_type='feature_reg_dec', save_tag=timestamp)
+                                model_type='features_reg_dec', save_tag=timestamp)
 
     plot_tsne_extended(feat_reg_ae, shuffled_test_x, shuffled_test_y, title, 'rrtae_stage1_testing_',
-                                model_type='feature_reg_dec', save_tag=timestamp)
+                                model_type='features_reg_dec', save_tag=timestamp)
 
     # add the regression head with dense weighting
     regressor = mb.add_reg_proj_head(feat_reg_ae, freeze_features=False)

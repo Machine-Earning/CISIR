@@ -80,7 +80,7 @@ class Evaluator:
         # self.plot_error_per_bin(y_test, y_pred, save_tag=save_tag)
 
         # Define lower threshold
-        lower_threshold = np.log(threshold_val / np.exp(2)) + 1e-6  # + 1e-9 to avoid backgrounds being considered
+        lower_threshold = np.log(threshold_val / np.exp(2)) + 1e-4  # + 1e-9 to avoid backgrounds being considered
 
         # Identify different types of events
         SEP_indices = np.where(y_test > threshold)[0]

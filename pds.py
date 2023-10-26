@@ -63,10 +63,10 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': 16,
-        'epochs': 2,
+        'batch_size': 292,
+        'epochs': 10000,
         'patience': 25,
-        'learning_rate': 0.06,
+        'learning_rate': 0.1,
     }
 
     # print options used

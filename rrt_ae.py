@@ -67,7 +67,7 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': 768,  # len(shuffled_train_x), #768,
+        'batch_size': 292,  # len(shuffled_train_x), #768,
         'epochs': 100000,
         'patience': 25,
         'learning_rate': 3e-4,
@@ -86,17 +86,17 @@ def main():
                                                         shuffled_val_y)
 
     plot_tsne_extended(feat_reg_ae, combined_train_x, combined_train_y, title, 'rrtae_stage1_training_',
-                       model_type='feature_reg_dec', save_tag=timestamp)
+                       model_type='features_reg_dec', save_tag=timestamp)
 
     plot_tsne_extended(feat_reg_ae, shuffled_test_x, shuffled_test_y, title, 'rrtae_stage1_testing_',
-                       model_type='feature_reg_dec', save_tag=timestamp)
+                       model_type='features_reg_dec', save_tag=timestamp)
 
     # add the regression head with dense weighting
     regressor = mb.add_reg_proj_head(feat_reg_ae, freeze_features=True)
 
     # training
     Options = {
-        'batch_size': 768,  # len(shuffled_train_x), #768,
+        'batch_size': 292,  # len(shuffled_train_x), #768,
         'epochs': 100000,
         'patience': 25,
         'learning_rate': 3e-4,

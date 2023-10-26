@@ -25,7 +25,7 @@ def main():
     Main function for testing the AI Panther
     :return: None
     """
-    title = 'PDS, Dense Loss, with batches'
+    title = 'PDS, Dense Joint Loss, with batches'
     print(title)
 
     # check for gpus
@@ -76,8 +76,8 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # training
     Options = {
-        'batch_size': 32,
-        'epochs': 2,
+        'batch_size': 292,
+        'epochs': 10000,
         'patience': 25,
         'learning_rate': 0.06,
     }
