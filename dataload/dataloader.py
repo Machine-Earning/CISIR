@@ -3,15 +3,14 @@
 # (features might be added/removed over time, training/validation/test splits)
 ##############################################################################################################
 
+# types for type hinting
+from typing import Tuple
+
+import matplotlib.pyplot as plt
 # imports
 import numpy as np
 from numpy import ndarray
 from scipy.stats import gaussian_kde
-import tensorflow as tf
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-# types for type hinting
-from typing import Tuple
 
 
 class DatasetGenerator:

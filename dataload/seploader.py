@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 from sklearn.utils import shuffle
-
+from typing import Tuple
 
 class SEPLoader:
     def __init__(self):
@@ -45,18 +45,19 @@ class SEPLoader:
 
         return train_x, train_y, val_x, val_y, test_x, test_y
 
-    def combine(self, train_x, train_y, val_x, val_y):
+    def combine(self, *data: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Combine the training and validation sets.
+        Combine an arbitrary number of datasets using *args. Assumes that x arrays are at even indices
+        and y arrays are at odd indices in the arguments list.
 
-        :param train_x: Training features.
-        :param train_y: Training labels.
-        :param val_x: Validation features.
-        :param val_y: Validation labels.
-        :return: Combined features and labels.
+        Parameters:
+        - data (np.ndarray): Arbitrarily long list of numpy arrays. x arrays should be at even indices and y arrays at odd indices.
+
+        Returns:
+        - Tuple[np.ndarray, np.ndarray]: Combined features and labels.
         """
-        combined_x = np.concatenate([train_x, val_x], axis=0)
-        combined_y = np.concatenate([train_y, val_y], axis=0)
+        combined_x = np.concatenate([data[i] for i in range(0, len(data), 2)], axis=0)
+        combined_y = np.concatenate([data[i] for i in range(1, len(data), 2)], axis=0)
 
         return combined_x, combined_y
 

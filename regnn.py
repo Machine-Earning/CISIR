@@ -1,17 +1,15 @@
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.utils import shuffle
-# types for type hinting
-from models import modeling
-from sklearn.manifold import TSNE
-import tensorflow as tf
 import random
 from datetime import datetime
+
+import numpy as np
+import tensorflow as tf
+
 from dataload import DenseReweights as dr
-from evaluate import evaluation as eval
 from dataload import seploader as sepl
+from evaluate import evaluation as eval
 from evaluate.utils import count_above_threshold, plot_tsne_extended
+# types for type hinting
+from models import modeling
 
 # SEEDING
 SEED = 42  # seed number
@@ -85,10 +83,10 @@ def main():
                       patience=Options['patience'], save_tag='reg_nn_' + timestamp)
 
     plot_tsne_extended(regressor, combined_train_x, combined_train_y, title, 'reg_nn_training_',
-                                save_tag=timestamp)
+                       save_tag=timestamp)
 
     plot_tsne_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'reg_nn_testing_',
-                                save_tag=timestamp)
+                       save_tag=timestamp)
 
     ev = eval.Evaluator()
     ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, title, threshold=10, save_tag='reg_nn_test_' + timestamp)

@@ -3,13 +3,14 @@
 # (features might be added/removed over time, training/validation/test splits)
 ##############################################################################################################
 
+# types for type hinting
+from typing import Tuple, List
+
+import matplotlib.pyplot as plt
 # imports
 import numpy as np
 from numpy import ndarray
 from scipy.stats import gaussian_kde
-import matplotlib.pyplot as plt
-# types for type hinting
-from typing import Tuple, List
 
 
 class DenseJointReweights:
@@ -58,7 +59,7 @@ class DenseJointReweights:
         self.min_y = np.min(self.y_train)
         self.max_y = np.max(self.y_train)
 
-        self.kde = gaussian_kde(self.y_train, bw_method='scott')
+        self.kde = gaussian_kde(self.y_train, bw_method='silverman')
         self.jreweights, self.jindices = self.preprocess_jreweighting(self.y_train)  # for pairs of labels
 
         if self.debug:
@@ -325,33 +326,121 @@ class DenseReweights:
         plt.tight_layout()
         plt.show()
 
+    def get_density_at_points(self, kde, points):
+        """
+        Get the density of a KDE model at specific points.
+
+        Parameters:
+        - kde (scipy.stats.gaussian_kde): The KDE model.
+        - points (List[float]): List of points where the density needs to be evaluated.
+
+        Returns:
+        - List[float]: List of densities at the given points.
+        """
+        return kde.evaluate(points)
+
     def plot_density_kde_reweights(self):
         """
         Plot the label density, KDE, and reweights for the y_train dataset.
         """
-        # Create a range of y values for plotting
-        y_values = np.linspace(self.min_y, self.max_y, 1000)
+
+        # Create a range of y values for plotting, adjust number of dots with num arg
+        y_values = np.linspace(self.min_y, self.max_y, 250)
 
         # Compute density using the histogram method
-        hist_density, bin_edges = np.histogram(self.y_train, bins=30, density=True)
+        hist_density, bin_edges = np.histogram(self.y_train, bins=50, density=True)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
         # Compute KDE values
         kde_values = self.kde.evaluate(y_values)
 
-        # Get reweights for the plotting range (you can substitute this with your reweights)
-        reweights_plot = self.normalized_reweight(y_values, self.alpha)  # Assuming normalized_reweight method exists
+        # Points where you want to find the density
+        points_to_evaluate = [self.min_y, self.max_y, self.max_y - 1, 1.4]
 
-        # Plotting
-        plt.figure(figsize=(10, 6))
-        plt.plot(bin_centers, hist_density, label='Label Density', color='blue')
-        plt.plot(y_values, kde_values, label='KDE', color='green')
-        plt.plot(y_values, reweights_plot, label='Reweights', color='red')
+        # Get the density at these points
+        density_values = self.get_density_at_points(self.kde, points_to_evaluate)
+
+        # Print the density values
+        print(f"Density at min_y background ({self.min_y}): {density_values[0]}")
+        print(f"Density at max_y Sep ({self.max_y}): {density_values[1]}")
+        print(f"Density at max_y lower Sep ({self.max_y - 1}): {density_values[2]}")
+        print(f"Density at y=1.4 elevated: {density_values[3]}")
+
+        # print the probability of background, elevated, and seps
+        event_probs = self.calc_event_probs(self.y_train, self.kde)
+        print(f'event probabilities: {event_probs}')
+        print(f'KDE background to SEP ratio: {event_probs["background"]/event_probs["sep"]}')
+
+        # get background to sep ratio in frequency
+        background_threshold: float = np.log(10 / np.exp(2))
+        sep_threshold: float = np.log(10)
+
+        background_count = np.sum(self.y_train <= background_threshold)
+        sep_count = np.sum(self.y_train > sep_threshold)
+
+        # Avoid division by zero
+        if sep_count == 0:
+            return float('inf')  # Return infinity if there are no SEP events
+
+        print(f'Frequency background to SEP ratio: {background_count / sep_count}')
+
+        # Get reweights for the plotting range
+        reweights_plot = self.normalized_reweight(y_values, self.alpha)
+
+        # Plotting using dot plots
+        plt.figure(figsize=(12, 8))
+        # Adding grid for better visibility of plot
+        plt.grid(True, which="both", ls="--", c='#dddddd', zorder=0)
+        plt.scatter(bin_centers, hist_density, label='Label Density', color='blue', alpha=0.7, zorder=5)
+        plt.scatter(y_values, kde_values, label='KDE', color='green', alpha=0.7, s=10, zorder=5)
+        plt.scatter(y_values, reweights_plot, label='Reweights', color='red', alpha=0.7, s=10, zorder=5)
+
+        # Setting the scale to logarithmic
+        plt.yscale('log')
         plt.xlabel('y_values')
-        plt.ylabel('Density / Reweights')
+        plt.ylabel('Density / Reweights (Log Scale)')
         plt.legend()
-        plt.title('Label Density, KDE, and Reweights')
+        plt.title('Label Density, KDE, and Reweights (Log Scale)')
         plt.show()
+
+    def calc_event_probs(self, y_values: np.ndarray, kde: gaussian_kde, decimal_places: int = 4) -> dict:
+        """
+        Calculate the probabilities of background, elevated, and sep events based on given thresholds using KDE.
+
+        Parameters:
+        - y_values (np.ndarray): The array of y-values to check.
+        - kde (gaussian_kde): The KDE object for the y_values.
+        - decimal_places (int): The number of decimal places for the probabilities. Default is 4.
+
+        Returns:
+        - dict: Dictionary containing probabilities of each event type rounded to the specified number of decimal places.
+        """
+        background_threshold: float = np.log(10 / np.exp(2))
+        sep_threshold: float = np.log(10)
+        # Create a range of y values for integrating KDE
+        y_range = np.linspace(min(y_values), max(y_values), 1000)
+
+        # Evaluate the KDE across the y_range
+        kde_values = kde.evaluate(y_range)
+
+        # Calculate the integral (area under curve) using trapezoidal rule
+        total_area = np.trapz(kde_values, y_range)
+
+        # Calculate area for each event type
+        background_area = np.trapz(kde_values[y_range <= background_threshold],
+                                   y_range[y_range <= background_threshold])
+        elevated_area = np.trapz(kde_values[(y_range > background_threshold) & (y_range <= sep_threshold)],
+                                 y_range[(y_range > background_threshold) & (y_range <= sep_threshold)])
+        sep_area = np.trapz(kde_values[y_range > sep_threshold], y_range[y_range > sep_threshold])
+
+        # Calculate probabilities based on areas
+        probabilities = {
+            "background": round(background_area / total_area, decimal_places),
+            "elevated": round(elevated_area / total_area, decimal_places),
+            "sep": round(sep_area / total_area, decimal_places)
+        }
+
+        return probabilities
 
     def pdf(self, y: ndarray) -> ndarray:
         """
