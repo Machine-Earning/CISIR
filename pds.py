@@ -1,11 +1,9 @@
 import random
 from datetime import datetime
-
 import mlflow
 import mlflow.tensorflow
 import numpy as np
 import tensorflow as tf
-
 from dataload import seploader as sepl
 from evaluate.utils import count_above_threshold, plot_tsne_pds
 # types for type hinting

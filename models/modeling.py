@@ -1219,7 +1219,7 @@ class ModelBuilder:
                 sample_weights=sample_weights,
                 joint_weights=sample_joint_weights,
                 joint_weight_indices=sample_joint_weights_indices,
-                training=False,
+                training=True,
                 with_ae=with_ae, with_reg=with_reg)
             primary_losses.append(train_loss)
 
@@ -1230,19 +1230,20 @@ class ModelBuilder:
         if with_reg:
             model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
                           loss={'regression_head': 'mse'})
-            history_reg = model.evaluate(X_subtrain, {'regression_head': y_subtrain},
-                                         sample_weight=sample_weights,
-                                         epochs=n_epochs,
-                                         batch_size=batch_size)
+            history_reg = model.fit(X_subtrain, {'regression_head': y_subtrain},
+                                    sample_weight=sample_weights,
+                                    epochs=n_epochs,
+                                    batch_size=batch_size)
             reg_losses = history_reg.history['loss']
 
         # Train decoder branch only if with_ae is True
         if with_ae:
-            model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss={'decoder_head': 'mse'})
-            history_dec = model.evaluate(X_subtrain, {'decoder_head': X_subtrain},
-                                         sample_weight=sample_weights,
-                                         epochs=n_epochs,
-                                         batch_size=batch_size)
+            model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+                          loss={'decoder_head': 'mse'})
+            history_dec = model.fit(X_subtrain, {'decoder_head': X_subtrain},
+                                    sample_weight=sample_weights,
+                                    epochs=n_epochs,
+                                    batch_size=batch_size)
             dec_losses = history_dec.history['loss']
 
         # Initialize coefficients to None
@@ -1283,20 +1284,20 @@ class ModelBuilder:
         # Train regression branch only
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
                       loss={'regression_head': 'mse'})
-        history_reg = model.evaluate(X_subtrain, {'regression_head': y_subtrain},
-                                     sample_weight=sample_weights,
-                                     epochs=n_epochs,
-                                     batch_size=batch_size)
+        history_reg = model.fit(X_subtrain, {'regression_head': y_subtrain},
+                                sample_weight=sample_weights,
+                                epochs=n_epochs,
+                                batch_size=batch_size)
 
         reg_losses = history_reg.history['loss']
 
         # Train decoder branch only
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
                       loss={'decoder_head': 'mse'})
-        history_dec = model.evaluate(X_subtrain, {'decoder_head': X_subtrain},
-                                     sample_weight=sample_weights,
-                                     epochs=n_epochs,
-                                     batch_size=batch_size)
+        history_dec = model.fit(X_subtrain, {'decoder_head': X_subtrain},
+                                sample_weight=sample_weights,
+                                epochs=n_epochs,
+                                batch_size=batch_size)
 
         dec_losses = history_dec.history['loss']
 

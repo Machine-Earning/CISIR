@@ -10,7 +10,7 @@ import math
 import matplotlib.pyplot as plt
 import tensorflow as tf
 # types for type hinting
-from typing import Tuple, List, Optional, Any
+from typing import Tuple, List, Optional, Any, Dict, Union
 from numpy import ndarray
 from tensorflow.keras import Model
 from sklearn.metrics import confusion_matrix, f1_score
@@ -33,7 +33,7 @@ class Evaluator:
         pass
 
     def evaluate(self, model: Model, X_test: np.ndarray, y_test: np.ndarray, title, res: float = 0.5,
-                 threshold: float = 10, save_tag=None) -> float:
+                 threshold: float = 10, save_tag=None) -> Dict[str, Union[float, Any]]:
         """
         Evaluate the performance of the model on test data using TensorFlow's MSE and plot error per bin.
 
@@ -146,7 +146,11 @@ class Evaluator:
             bin_number = np.digitize(y_value, self.bins)
             print(f"Sample with y = {y_value} belongs to bin {bin_number} and has an error of {error}")
 
-        return mae
+        metrics = {'MAE': mae, 'MAE_SEP': mae_SEP, 'TP': TP, 'FP': FP, 'TN': TN, 'FN': FN, 'F1_Score': f1, 'TSS': TSS,
+                   'HSS': HSS, 'plot': file_path}
+        # Store the metrics in the dictionary
+
+        return metrics
 
     def plot_error_per_bin(self, y_true: np.ndarray, y_pred: np.ndarray, save_tag: Optional[str] = None) -> None:
         """

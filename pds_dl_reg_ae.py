@@ -97,7 +97,7 @@ def main():
         # training
         Options = {
             'batch_size': 16,
-            'epochs': 10000,
+            'epochs': 10,
             'patience': 25,
             'learning_rate': 0.06,
         }
