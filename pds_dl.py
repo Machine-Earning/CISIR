@@ -1,11 +1,15 @@
-import numpy as np
-from models import modeling
-import tensorflow as tf
 import random
 from datetime import datetime
-from dataload import seploader as sepl
+
+import mlflow
+import mlflow.tensorflow
+import numpy as np
+import tensorflow as tf
+
 from dataload import DenseReweights as dr
+from dataload import seploader as sepl
 from evaluate.utils import count_above_threshold, plot_tsne_pds
+from models import modeling
 
 # SEEDING
 SEED = 42  # seed number 
@@ -34,19 +38,13 @@ def main():
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
         shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir(
-        '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data')
+        './cme_and_electron/data')
 
     # get validation sample weights based on dense weights
     train_jweights = dr.DenseJointReweights(
         shuffled_train_x, shuffled_train_y, alpha=.9, debug=False)
     sample_joint_weights = train_jweights.jreweights
     sample_joint_weights_indices = train_jweights.jindices
-
-    # print sample_joint_weights_indices, sample_joint_weights
-    # print(f'sample_joint_weights_indices: {sample_joint_weights_indices[:2]}')
-    # print(f'sample_joint_weights: {sample_joint_weights[:2]}')
-    # print(f'size of sample_joint_weights: {len(sample_joint_weights)}')
-    # print(f'size of sample_joint_weights indices: {len(sample_joint_weights_indices)}')
 
     val_jweights = dr.DenseJointReweights(
         shuffled_val_x, shuffled_val_y, alpha=.9, debug=False)
@@ -60,54 +58,62 @@ def main():
     elevateds, seps = count_above_threshold(shuffled_test_y)
     print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
 
-    mb = modeling.ModelBuilder()
+    for batch_size in [32, 64, 128, 256, 300]:  # Replace with the batch sizes you're interested in
+        with mlflow.start_run(run_name=f"Batch_Size_{batch_size}"):
+            # Automatic logging
+            mlflow.tensorflow.autolog()
+            # Log the batch size
+            mlflow.log_param("batch_size", batch_size)
 
-    # create my feature extractor
-    feature_extractor = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
+        mb = modeling.ModelBuilder()
 
-    # plot the model
-    # # mb.plot_model(feature_extractor, "pds_stage1")
+        # create my feature extractor
+        feature_extractor = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
 
-    # load weights to continue training
-    # feature_extractor.load_weights('model_weights_2023-09-28_18-25-47.h5')
-    # print('weights loaded successfully!')
+        # plot the model
+        # # mb.plot_model(feature_extractor, "pds_stage1")
 
-    # Generate a timestamp
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    # training
-    Options = {
-        'batch_size': 128,
-        'epochs': 10000,
-        'patience': 25,
-        'learning_rate': 0.06,
-    }
+        # load weights to continue training
+        # feature_extractor.load_weights('model_weights_2023-09-28_18-25-47.h5')
+        # print('weights loaded successfully!')
 
-    # print options used
-    print(Options)
-    mb.train_pds_dl(feature_extractor,
-                    shuffled_train_x, shuffled_train_y,
-                    shuffled_val_x, shuffled_val_y,
-                    sample_joint_weights=sample_joint_weights,
-                    sample_joint_weights_indices=sample_joint_weights_indices,
-                    val_sample_joint_weights=val_sample_joint_weights,
-                    val_sample_joint_weights_indices=val_sample_joint_weights_indices,
-                    learning_rate=Options['learning_rate'],
-                    epochs=Options['epochs'],
-                    batch_size=Options['batch_size'],
-                    patience=Options['patience'], save_tag=timestamp)
+        # Generate a timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        # training
+        Options = {
+            'batch_size': batch_size,
+            'epochs': 10000,
+            'patience': 25,
+            'learning_rate': 0.06,
+        }
+        mlflow.log_param("batch_size", Options['batch_size'])
+        # print options used
+        print(Options)
+        mb.train_pds_dl(feature_extractor,
+                        shuffled_train_x, shuffled_train_y,
+                        shuffled_val_x, shuffled_val_y,
+                        sample_joint_weights=sample_joint_weights,
+                        sample_joint_weights_indices=sample_joint_weights_indices,
+                        val_sample_joint_weights=val_sample_joint_weights,
+                        val_sample_joint_weights_indices=val_sample_joint_weights_indices,
+                        learning_rate=Options['learning_rate'],
+                        epochs=Options['epochs'],
+                        batch_size=Options['batch_size'],
+                        patience=Options['patience'], save_tag=timestamp)
 
-    # combine training and validation
-    combined_train_x, combined_train_y = loader.combine(
-        shuffled_train_x, shuffled_train_y, shuffled_val_x,
-        shuffled_val_y)
+        # combine training and validation
+        combined_train_x, combined_train_y = loader.combine(
+            shuffled_train_x, shuffled_train_y, shuffled_val_x,
+            shuffled_val_y)
 
-    plot_tsne_pds(feature_extractor,
-                  combined_train_x, combined_train_y, title, 'training',
-                  save_tag=timestamp)
-
-    plot_tsne_pds(feature_extractor,
-                  shuffled_test_x, shuffled_test_y, title, 'testing',
-                  save_tag=timestamp)
+        file_path = plot_tsne_pds(feature_extractor,
+                                  combined_train_x, combined_train_y, title, 'training',
+                                  save_tag=timestamp)
+        mlflow.log_artifact(file_path)
+        file_path = plot_tsne_pds(feature_extractor,
+                                  shuffled_test_x, shuffled_test_y, title, 'testing',
+                                  save_tag=timestamp)
+        mlflow.log_artifact(file_path)
 
 
 if __name__ == '__main__':

@@ -1,15 +1,15 @@
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.utils import shuffle
-# types for type hinting
-from models import modeling
-from sklearn.manifold import TSNE
-import tensorflow as tf
 import random
 from datetime import datetime
+
+import mlflow
+import mlflow.tensorflow
+import numpy as np
+import tensorflow as tf
+
 from dataload import seploader as sepl
 from evaluate.utils import count_above_threshold, plot_tsne_pds
+# types for type hinting
+from models import modeling
 
 # SEEDING
 SEED = 42  # seed number 
@@ -38,7 +38,7 @@ def main():
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
         shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir(
-        '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data')
+        './cme_and_electron/data')
 
     elevateds, seps = count_above_threshold(shuffled_train_y)
     print(f'Sub-Training set: elevated events: {elevateds}  and sep events: {seps}')
@@ -47,45 +47,58 @@ def main():
     elevateds, seps = count_above_threshold(shuffled_test_y)
     print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
 
-    mb = modeling.ModelBuilder()
-
-    # create my feature extractor
-    feature_extractor = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
-
-    # plot the model
-    # mb.plot_model(feature_extractor, "pds_stage1")
-
-    # load weights to continue training
-    # feature_extractor.load_weights('model_weights_2023-09-28_18-25-47.h5')
-    # print('weights loaded successfully!')
-
-    # Generate a timestamp
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    # training
-    Options = {
-        'batch_size': 292,
-        'epochs': 10000,
-        'patience': 25,
-        'learning_rate': 0.06,
-    }
-
-    # print options used
-    print(Options)
-    mb.train_pds(feature_extractor, shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
-                 learning_rate=Options['learning_rate'],
-                 epochs=Options['epochs'],
-                 batch_size=Options['batch_size'],
-                 patience=Options['patience'], save_tag=timestamp)
-
     # combine training and validation
     combined_train_x, combined_train_y = loader.combine(shuffled_train_x, shuffled_train_y, shuffled_val_x,
                                                         shuffled_val_y)
 
-    plot_tsne_pds(feature_extractor, combined_train_x, combined_train_y, title, 'training',
-                  save_tag=timestamp)
+    for batch_size in [32, 64, 128, 256, 300]:  # Replace with the batch sizes you're interested in
+        with mlflow.start_run(run_name=f"Batch_Size_{batch_size}"):
+            # Automatic logging
+            mlflow.tensorflow.autolog()
+            # Log the batch size
+            mlflow.log_param("batch_size", batch_size)
 
-    plot_tsne_pds(feature_extractor, shuffled_test_x, shuffled_test_y, title, 'testing',
-                  save_tag=timestamp)
+            mb = modeling.ModelBuilder()
+
+            # create my feature extractor
+            feature_extractor = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
+
+            # plot the model
+            # mb.plot_model(feature_extractor, "pds_stage1")
+
+            # load weights to continue training
+            # feature_extractor.load_weights('model_weights_2023-09-28_18-25-47.h5')
+            # print('weights loaded successfully!')
+
+            # Generate a timestamp
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # training
+            Options = {
+                'batch_size': batch_size,
+                'epochs': 10000,
+                'patience': 25,
+                'learning_rate': 0.06,
+            }
+            mlflow.log_param("batch_size", Options['batch_size'])
+
+            # print options used
+            print(Options)
+            mb.train_pds(feature_extractor,
+                         shuffled_train_x, shuffled_train_y,
+                         shuffled_val_x, shuffled_val_y,
+                         combined_train_x, combined_train_y,
+                         learning_rate=Options['learning_rate'],
+                         epochs=Options['epochs'],
+                         batch_size=Options['batch_size'],
+                         patience=Options['patience'], save_tag=timestamp)
+
+            file_path = plot_tsne_pds(feature_extractor, combined_train_x, combined_train_y, title, 'training',
+                                      save_tag=timestamp)
+            mlflow.log_artifact(file_path)
+            file_path = plot_tsne_pds(feature_extractor, shuffled_test_x, shuffled_test_y, title, 'testing',
+                                      save_tag=timestamp)
+            # Log t-SNE plot
+            mlflow.log_artifact(file_path)
 
 
 if __name__ == '__main__':

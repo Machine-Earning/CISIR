@@ -4,13 +4,14 @@
 ##############################################################################################################
 
 # types for type hinting
-from typing import Tuple, List
+from typing import Tuple, List, Union, Optional
 
 import matplotlib.pyplot as plt
 # imports
 import numpy as np
 from numpy import ndarray
 from scipy.stats import gaussian_kde
+import mlflow
 
 
 class DenseJointReweights:
@@ -266,7 +267,12 @@ class DenseReweights:
     reweights = None
     alpha = None
 
-    def __init__(self, X, y, alpha: float = .9,
+    def __init__(self, X, y,
+                 alpha: float = .9,
+                 bw_factor: float = 1.8,
+                 min_norm_weight: Optional[float] = None,
+                 tag: Optional[str] = None,
+                 runid: Optional[str] = None,
                  debug: bool = False) -> None:
         """
         Create a synthetic regression dataset.
@@ -285,6 +291,7 @@ class DenseReweights:
         self.ya = None
         self.debug = debug
         self.alpha = alpha
+        self.min_norm_weight = min_norm_weight
 
         # Create training data
         self.X_train = X
@@ -294,13 +301,34 @@ class DenseReweights:
         self.max_y = np.max(self.y_train)
 
         self.kde = gaussian_kde(self.y_train, bw_method='scott')
+        self.adjust_bandwidth(self.kde, bw_factor)
         self.reweights = self.preprocess_reweighting(self.y_train)  # for labels, order maintained
 
         if self.debug:
             print('X_train: ', self.X_train[:12])
             print('y_train: ', self.y_train[:12])
             print('reweights: ', self.reweights[:12])
-            self.plot_density_kde_reweights()
+            self.plot_density_kde_reweights(tag, runid)
+
+    def adjust_bandwidth(self, kde: gaussian_kde, factor: Union[float, int]) -> None:
+        """
+        Adjust the bandwidth of a given KDE object by a multiplicative factor.
+
+        Parameters:
+        - kde (gaussian_kde): The KDE object whose bandwidth needs to be adjusted.
+        - factor (float|int): The factor by which to adjust the bandwidth.
+
+        Returns:
+        - None: The function modifies the KDE object in-place.
+        """
+        # Obtain the original bandwidth (factor)
+        original_bw = kde.factor
+
+        # Calculate the adjusted bandwidth
+        adjusted_bw = original_bw * factor
+
+        # Set the adjusted bandwidth back into the KDE object
+        kde.set_bandwidth(bw_method=adjusted_bw)
 
     def plot_distributions(self, y_train, y_val):
         """
@@ -339,7 +367,7 @@ class DenseReweights:
         """
         return kde.evaluate(points)
 
-    def plot_density_kde_reweights(self):
+    def plot_density_kde_reweights(self, tag: Optional[str] = None, runID: Optional[str] = None):
         """
         Plot the label density, KDE, and reweights for the y_train dataset.
         """
@@ -369,7 +397,8 @@ class DenseReweights:
         # print the probability of background, elevated, and seps
         event_probs = self.calc_event_probs(self.y_train, self.kde)
         print(f'event probabilities: {event_probs}')
-        print(f'KDE background to SEP ratio: {event_probs["background"]/event_probs["sep"]}')
+        kde_ratio = event_probs["background"] / event_probs["sep"]
+        print(f'KDE background to SEP ratio: {kde_ratio}')
 
         # get background to sep ratio in frequency
         background_threshold: float = np.log(10 / np.exp(2))
@@ -382,10 +411,28 @@ class DenseReweights:
         if sep_count == 0:
             return float('inf')  # Return infinity if there are no SEP events
 
-        print(f'Frequency background to SEP ratio: {background_count / sep_count}')
+        freq_ratio = background_count / sep_count
+        print(f'Frequency background to SEP ratio: {freq_ratio}')
 
         # Get reweights for the plotting range
         reweights_plot = self.normalized_reweight(y_values, self.alpha)
+
+        # with mlflow.start_run():
+            # Log parameters like min_y and max_y
+        mlflow.log_param("min_y", self.min_y)
+        mlflow.log_param("max_y", self.max_y)
+
+        # Print and Log density values
+        mlflow.log_metric("density_min_y_background", density_values[0])
+        mlflow.log_metric("density_max_y_sep", density_values[1])
+        mlflow.log_metric("density_lower_sep", density_values[2])
+        mlflow.log_metric("density_elevated", density_values[3])
+
+        mlflow.log_metric("prob_background", event_probs["background"])
+        mlflow.log_metric("prob_sep", event_probs["sep"])
+        mlflow.log_metric("prob_elevated", event_probs["elevated"])
+        mlflow.log_metric("kde_background_to_sep_ratio", kde_ratio)
+        mlflow.log_metric("freq_background_to_sep_ratio", freq_ratio)
 
         # Plotting using dot plots
         plt.figure(figsize=(12, 8))
@@ -400,8 +447,10 @@ class DenseReweights:
         plt.xlabel('y_values')
         plt.ylabel('Density / Reweights (Log Scale)')
         plt.legend()
-        plt.title('Label Density, KDE, and Reweights (Log Scale)')
-        plt.show()
+        plt.title(f'Label Density, KDE, and Reweights (Log Scale), kde factor {self.kde.factor}')
+        # plt.show()
+        plt.savefig(tag)
+        plt.close()
 
     def calc_event_probs(self, y_values: np.ndarray, kde: gaussian_kde, decimal_places: int = 4) -> dict:
         """
@@ -478,6 +527,8 @@ class DenseReweights:
         normalized_pdf = (density - self.min_pdf) / (self.max_pdf - self.min_pdf)
 
         # Compute the reweighting factor
+        if self.min_norm_weight is not None:
+            epsilon = self.min_norm_weight
         reweighting_factor = np.maximum(1 - alpha * normalized_pdf, epsilon)
 
         return reweighting_factor

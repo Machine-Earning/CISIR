@@ -92,6 +92,8 @@ def plot_tsne_extended(model, X, y, title, prefix, model_type='features_reg', sa
     plt.savefig(file_path)
     plt.close()
 
+    return file_path
+
 
 def plot_tsne_pds(model, X, y, title, prefix, save_tag=None):
     """
@@ -167,6 +169,8 @@ def plot_tsne_pds(model, X, y, title, prefix, save_tag=None):
     file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
     plt.savefig(file_path)
     plt.close()
+
+    return file_path
 
 
 def count_above_threshold(y_values: List[float], threshold: float = 0.3027, sep_threshold: float = 2.3026) -> Tuple[
