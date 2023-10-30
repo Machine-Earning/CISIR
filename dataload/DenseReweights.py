@@ -33,7 +33,11 @@ class DenseJointReweights:
     jreweights = None
     jindices = None
 
-    def __init__(self, X, y, alpha: float = .9,
+    def __init__(self,
+                 X, y,
+                 alpha: float = .9,
+                 bw_factor: float = 1.8,
+                 min_norm_weight: Optional[float] = None,
                  debug: bool = False) -> None:
         """
         Create a synthetic regression dataset.
@@ -52,6 +56,7 @@ class DenseJointReweights:
         self.ya = None
         self.debug = debug
         self.alpha = alpha
+        self.min_norm_weight = min_norm_weight
 
         # Create training data
         self.X_train = X
@@ -60,7 +65,8 @@ class DenseJointReweights:
         self.min_y = np.min(self.y_train)
         self.max_y = np.max(self.y_train)
 
-        self.kde = gaussian_kde(self.y_train, bw_method='silverman')
+        self.kde = gaussian_kde(self.y_train, bw_method='scott')
+        self.adjust_bandwidth(self.kde, bw_factor)
         self.jreweights, self.jindices = self.preprocess_jreweighting(self.y_train)  # for pairs of labels
 
         if self.debug:
@@ -69,6 +75,26 @@ class DenseJointReweights:
             print('joint indices', self.jindices[:12])
             print('joint reweights: ', self.jreweights[:12])
             self.plot_density_kde_jreweights()
+
+    def adjust_bandwidth(self, kde: gaussian_kde, factor: Union[float, int]) -> None:
+        """
+        Adjust the bandwidth of a given KDE object by a multiplicative factor.
+
+        Parameters:
+        - kde (gaussian_kde): The KDE object whose bandwidth needs to be adjusted.
+        - factor (float|int): The factor by which to adjust the bandwidth.
+
+        Returns:
+        - None: The function modifies the KDE object in-place.
+        """
+        # Obtain the original bandwidth (factor)
+        original_bw = kde.factor
+
+        # Calculate the adjusted bandwidth
+        adjusted_bw = original_bw * factor
+
+        # Set the adjusted bandwidth back into the KDE object
+        kde.set_bandwidth(bw_method=adjusted_bw)
 
     def preprocess_jreweighting(self, y: ndarray) -> Tuple[ndarray, List[Tuple[int, int]]]:
         """
@@ -150,6 +176,8 @@ class DenseJointReweights:
         normalized_jpdf = (joint_density - self.min_jpdf) / (self.max_jpdf - self.min_jpdf)
 
         # Compute the reweighting factor
+        if self.min_norm_weight is not None:
+            epsilon = self.min_norm_weight ** 2
         jreweighting_factor = np.maximum(1 - alpha * normalized_jpdf, epsilon)
 
         return jreweighting_factor
@@ -418,7 +446,7 @@ class DenseReweights:
         reweights_plot = self.normalized_reweight(y_values, self.alpha)
 
         # with mlflow.start_run():
-            # Log parameters like min_y and max_y
+        # Log parameters like min_y and max_y
         mlflow.log_param("min_y", self.min_y)
         mlflow.log_param("max_y", self.max_y)
 

@@ -92,10 +92,16 @@ def main():
                          batch_size=Options['batch_size'],
                          patience=Options['patience'], save_tag=timestamp)
 
-            file_path = plot_tsne_pds(feature_extractor, combined_train_x, combined_train_y, title, 'training',
+            file_path = plot_tsne_pds(feature_extractor,
+                                      combined_train_x,
+                                      combined_train_y,
+                                      title, 'training',
                                       save_tag=timestamp)
             mlflow.log_artifact(file_path)
-            file_path = plot_tsne_pds(feature_extractor, shuffled_test_x, shuffled_test_y, title, 'testing',
+            file_path = plot_tsne_pds(feature_extractor,
+                                      shuffled_test_x,
+                                      shuffled_test_y,
+                                      title, 'testing',
                                       save_tag=timestamp)
             # Log t-SNE plot
             mlflow.log_artifact(file_path)

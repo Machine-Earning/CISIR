@@ -11,6 +11,37 @@ from typing import List, Tuple
 SEED = 42  # seed number
 
 
+def split_combined_joint_weights_indices(
+        combined_weights: np.ndarray,
+        combined_indices: List[Tuple[int, int]],
+        len_train: int, len_val: int) -> Tuple[np.ndarray, List[Tuple[int, int]], np.ndarray, List[Tuple[int, int]]]:
+    """
+    Splits the combined joint weights and indices back into the original training and validation joint weights and indices.
+
+    Parameters:
+        combined_weights (np.ndarray): The combined joint weights of training and validation sets.
+        combined_indices (List[Tuple[int, int]]): The combined index pairs mapping to ya and yb in the original dataset.
+        len_train (int): The length of the original training set.
+        len_val (int): The length of the original validation set.
+
+    Returns:
+        Tuple[np.ndarray, List[Tuple[int, int]], np.ndarray, List[Tuple[int, int]]]:
+        Tuple containing the training and validation joint weights and index pairs.
+    """
+    train_weights, train_indices = [], []
+    val_weights, val_indices = [], []
+
+    for weight, (i, j) in zip(combined_weights, combined_indices):
+        if i < len_train and j < len_train:
+            train_weights.append(weight)
+            train_indices.append((i, j))
+        elif i >= len_train and j >= len_train:
+            val_weights.append(weight)
+            val_indices.append((i - len_train, j - len_train))
+
+    return np.array(train_weights), train_indices, np.array(val_weights), val_indices
+
+
 def plot_tsne_extended(model, X, y, title, prefix, model_type='features_reg', save_tag=None):
     """
     Applies t-SNE to the features extracted by the given model and saves the plot in 2D with a timestamp.
@@ -194,7 +225,8 @@ def count_above_threshold(y_values: List[float], threshold: float = 0.3027, sep_
     return elevated_count, sep_count
 
 
-def load_and_plot_tsne(model_path, model_type, title, sep_marker, data_dir='/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'):
+def load_and_plot_tsne(model_path, model_type, title, sep_marker,
+                       data_dir='/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'):
     """
     Load a trained model and plot its t-SNE visualization.
 
@@ -263,7 +295,8 @@ def load_and_plot_tsne(model_path, model_type, title, sep_marker, data_dir='/hom
                        save_tag=timestamp)
 
 
-def load_and_test(model_path, model_type, title, threshold=10, data_dir='/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'):
+def load_and_test(model_path, model_type, title, threshold=10,
+                  data_dir='/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'):
     """
     Load a trained model and evaluate its performance.
 
