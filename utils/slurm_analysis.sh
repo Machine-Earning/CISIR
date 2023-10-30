@@ -20,6 +20,6 @@ echo "Running on $SLURM_NPROCS processors."
 
 echo "Current working directory is $(pwd)"
 
-# srun python3 analysis_pds.py # Run your Python script
-# srun python3 analysis_rrt.py # Run your Python script
+# srun python3 plot_pds.py # Run your Python script
+# srun python3 plot_rrt.py # Run your Python script
 srun python3 analysis_regnn.py # Run your Python script

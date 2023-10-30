@@ -29,16 +29,15 @@ def main():
     Main function for testing the AI Panther
     :return: None
     """
-    title = 'PDS, Dense Joint Loss, with batches'
-    print(title)
 
+    # data_path = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'
+    data_path = './cme_and_electron/data'
     # check for gpus
     print(tf.config.list_physical_devices('GPU'))
     # Read the CSV file
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
-        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir(
-        './cme_and_electron/data')
+        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir(data_path)
 
     # combine training and validation
     combined_train_x, combined_train_y = loader.combine(
@@ -70,9 +69,10 @@ def main():
     elevateds, seps = count_above_threshold(shuffled_test_y)
     print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
 
-    for batch_size in [8, 16]:
-                       # 32, 64, 128, 256, 300]:  # Replace with the batch sizes you're interested in
-        with mlflow.start_run(run_name=f"Batch_Size_{batch_size}"):
+    for batch_size in [292, len_train]:
+        title = f'PDS, Dense Joint Loss, {"with" if batch_size == 292 else "without"} batches'
+        print(title)
+        with mlflow.start_run(run_name=f"PDS_DL_{batch_size}"):
             # Automatic logging
             mlflow.tensorflow.autolog()
             # Log the batch size
@@ -99,7 +99,6 @@ def main():
                 'patience': 25,
                 'learning_rate': 0.06,
             }
-            mlflow.log_param("batch_size", Options['batch_size'])
             # print options used
             print(Options)
             mb.train_pds_dl(feature_extractor,
@@ -115,14 +114,18 @@ def main():
                             learning_rate=Options['learning_rate'],
                             epochs=Options['epochs'],
                             batch_size=Options['batch_size'],
-                            patience=Options['patience'], save_tag=timestamp)
+                            patience=Options['patience'], save_tag=timestamp+"_features")
 
             file_path = plot_tsne_pds(feature_extractor,
-                                      combined_train_x, combined_train_y, title, 'training',
+                                      combined_train_x,
+                                      combined_train_y,
+                                      title, 'training',
                                       save_tag=timestamp)
             mlflow.log_artifact(file_path)
             file_path = plot_tsne_pds(feature_extractor,
-                                      shuffled_test_x, shuffled_test_y, title, 'testing',
+                                      shuffled_test_x,
+                                      shuffled_test_y,
+                                      title, 'testing',
                                       save_tag=timestamp)
             mlflow.log_artifact(file_path)
 

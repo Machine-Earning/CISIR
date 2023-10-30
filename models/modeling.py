@@ -502,6 +502,10 @@ class ModelBuilder:
         """
         Custom training loop to train the model and returns the training history.
 
+        :param X_train:
+        :param y_train:
+        :param train_sample_joint_weights:
+        :param train_sample_joint_weights_indices:
         :param model: The TensorFlow model to train.
         :param X_subtrain: The training feature set.
         :param y_subtrain: The training labels.
