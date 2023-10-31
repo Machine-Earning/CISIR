@@ -5,7 +5,8 @@
 #SBATCH --ntasks=1                    # Number of tasks
 #SBATCH --mem=16GB                    # Memory per node
 #SBATCH --time=99:99:99               # Time limit
-#SBATCH --partition=eternity              # Partition, dynamically set
+#SBATCH --partition=gpu1              # Partition, dynamically set
+#SBATCH --gres=gpu:1                  # Number of GPUs per node
 #SBATCH --output=testjob.%J.out       # Output file
 #SBATCH --error=testjob.%J.err        # Error file
 
@@ -14,7 +15,7 @@ echo "Starting at date $(date)"
 echo "Running on hosts: $SLURM_NODELIST"
 
 echo "Running on $SLURM_NNODES nodes."
- 
+
 echo "Running on $SLURM_NPROCS processors."
 
 echo "Current working directory is $(pwd)"
