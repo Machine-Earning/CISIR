@@ -85,29 +85,30 @@ def main():
         # print options used
         print(Options)
         mb.train_pds(feature_extractor,
-                        shuffled_train_x, shuffled_train_y,
-                        shuffled_val_x, shuffled_val_y,
-                        combined_train_x, combined_train_y,
-                        learning_rate=Options['learning_rate'],
-                        epochs=Options['epochs'],
-                        batch_size=Options['batch_size'],
-                        patience=Options['patience'], save_tag=timestamp+"_features")
+                     shuffled_train_x, shuffled_train_y,
+                     shuffled_val_x, shuffled_val_y,
+                     combined_train_x, combined_train_y,
+                     learning_rate=Options['learning_rate'],
+                     epochs=Options['epochs'],
+                     batch_size=Options['batch_size'],
+                     patience=Options['patience'], save_tag=timestamp + "_features")
 
         file_path = plot_tsne_pds(feature_extractor,
-                                    combined_train_x,
-                                    combined_train_y,
-                                    title, 'training',
-                                    save_tag=timestamp)
+                                  combined_train_x,
+                                  combined_train_y,
+                                  title, 'training',
+                                  save_tag=timestamp)
         # mlflow.log_artifact(file_path)
-        print('file_path'+ file_path)
+        print('file_path' + file_path)
         file_path = plot_tsne_pds(feature_extractor,
-                                    shuffled_test_x,
-                                    shuffled_test_y,
-                                    title, 'testing',
-                                    save_tag=timestamp)
+                                  shuffled_test_x,
+                                  shuffled_test_y,
+                                  title, 'testing',
+                                  save_tag=timestamp)
         # Log t-SNE plot
         # mlflow.log_artifact(file_path)
-        print('file_path'+ file_path)
+        print('file_path' + file_path)
+
 
 if __name__ == '__main__':
     main()

@@ -92,7 +92,6 @@ def main():
         # load weights to continue training
         # feature_extractor.load_weights('model_weights_2023-09-28_18-25-47.h5')
         # print('weights loaded successfully!')
-
         # Generate a timestamp
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         # training
@@ -118,6 +117,7 @@ def main():
                         epochs=Options['epochs'],
                         batch_size=Options['batch_size'],
                         patience=Options['patience'], save_tag=timestamp+"_features")
+
 
         file_path = plot_tsne_pds(feature_extractor,
                                     combined_train_x,

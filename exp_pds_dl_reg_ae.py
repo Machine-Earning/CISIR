@@ -6,6 +6,7 @@ from datetime import datetime
 from dataload import seploader as sepl
 from dataload import DenseReweights as dr
 from evaluate.utils import count_above_threshold, plot_tsne_extended, split_combined_joint_weights_indices
+
 # import mlflow
 # import mlflow.tensorflow
 
@@ -78,11 +79,11 @@ def main():
     for batch_size in [292, len_train]:
         title = f'PDS, Dense Joint Loss, Regression, AE, {"with" if batch_size == 292 else "without"} batches'
         print(title)
-    # with mlflow.start_run(run_name=f"PDS_DL_REG_AE_{batch_size}"):
-    #     # Automatic logging
-    #     mlflow.tensorflow.autolog()
-    #     # Log the batch size
-    #     mlflow.log_param("batch_size", batch_size)
+        # with mlflow.start_run(run_name=f"PDS_DL_REG_AE_{batch_size}"):
+        #     # Automatic logging
+        #     mlflow.tensorflow.autolog()
+        #     # Log the batch size
+        #     mlflow.log_param("batch_size", batch_size)
         mb = modeling.ModelBuilder()
 
         # create my feature extractor
@@ -109,37 +110,37 @@ def main():
         # print options used
         print(Options)
         mb.train_pds_dl_heads(feature_extractor,
-                                shuffled_train_x, shuffled_train_y,
-                                shuffled_val_x, shuffled_val_y,
-                                combined_train_x, combined_train_y,
-                                sample_joint_weights=sample_joint_weights,
-                                sample_joint_weights_indices=sample_joint_weights_indices,
-                                val_sample_joint_weights=val_sample_joint_weights,
-                                val_sample_joint_weights_indices=val_sample_joint_weights_indices,
-                                train_sample_joint_weights=train_sample_joint_weights,
-                                train_sample_joint_weights_indices=train_sample_joint_weights_indices,
-                                sample_weights=sample_weights,
-                                val_sample_weights=val_sample_weights,
-                                train_sample_weights=combined_sample_weights,
-                                with_reg=True,
-                                with_ae=True,
-                                learning_rate=Options['learning_rate'],
-                                epochs=Options['epochs'],
-                                batch_size=Options['batch_size'],
-                                patience=Options['patience'], save_tag=timestamp+"_features_reg_dec")
+                              shuffled_train_x, shuffled_train_y,
+                              shuffled_val_x, shuffled_val_y,
+                              combined_train_x, combined_train_y,
+                              sample_joint_weights=sample_joint_weights,
+                              sample_joint_weights_indices=sample_joint_weights_indices,
+                              val_sample_joint_weights=val_sample_joint_weights,
+                              val_sample_joint_weights_indices=val_sample_joint_weights_indices,
+                              train_sample_joint_weights=train_sample_joint_weights,
+                              train_sample_joint_weights_indices=train_sample_joint_weights_indices,
+                              sample_weights=sample_weights,
+                              val_sample_weights=val_sample_weights,
+                              train_sample_weights=combined_sample_weights,
+                              with_reg=True,
+                              with_ae=True,
+                              learning_rate=Options['learning_rate'],
+                              epochs=Options['epochs'],
+                              batch_size=Options['batch_size'],
+                              patience=Options['patience'], save_tag=timestamp + "_features_reg_dec")
 
         file_path = plot_tsne_extended(feature_extractor,
-                                        combined_train_x, combined_train_y, title, 'training',
-                                        model_type='features_reg_dec',
-                                        save_tag=timestamp)
+                                       combined_train_x, combined_train_y, title, 'training',
+                                       model_type='features_reg_dec',
+                                       save_tag=timestamp)
         # mlflow.log_artifact(file_path)
-        print('file_path'+ file_path)
+        print('file_path' + file_path)
         file_path = plot_tsne_extended(feature_extractor,
-                                        shuffled_test_x, shuffled_test_y, title, 'testing',
-                                        model_type='features_reg_dec',
-                                        save_tag=timestamp)
+                                       shuffled_test_x, shuffled_test_y, title, 'testing',
+                                       model_type='features_reg_dec',
+                                       save_tag=timestamp)
         # mlflow.log_artifact(file_path)
-        print('file_path'+ file_path)
+        print('file_path' + file_path)
 
 
 if __name__ == '__main__':

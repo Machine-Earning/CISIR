@@ -118,8 +118,8 @@ def main():
     elevateds, seps = count_above_threshold(shuffled_test_y)
     print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
 
-    for model_type in ['features', 'features_reg', 'features_dec', 'features_reg_dec']:
-        weight_path = ""
+    for model_type in ['features']: #, 'features_reg', 'features_dec', 'features_reg_dec']:
+        weight_path = "./best_model_weights_2023-10-30_20-46-53_features.h5"
         for batch_size, freeze in [(292, False), (292, True), (train_length, False), (train_length, True)]:
             title = f'PDS head, {"with" if batch_size == 292 else "without"} batches,\
              {"frozen" if freeze else "fine-tuned"} features'

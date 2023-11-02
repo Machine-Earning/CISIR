@@ -167,6 +167,7 @@ weights/
 fit/
 
 *.csv
+*.xlsx
 
 # error and output files from panther ai
 *.err
@@ -175,3 +176,9 @@ fit/
 
 # plots
 *.png
+
+#MLFlow stuffs
+mlruns/
+
+#dataset file
+cme_and_electron/

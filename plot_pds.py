@@ -23,13 +23,14 @@ def main():
     """
     title = 'PDS, with batches, fine-tuned features'
     print(title)
-
-    model_path = "/home1/jmoukpe2016/keras-functional-api/10-4-2023/extended_model_weights_2023-10-04_10-36-03.h5"
+    # root = "/home1/jmoukpe2016/keras-functional-api"
+    root = "."
+    model_path = root + "/best_model_weights_2023-10-30_22-57-59_features.h5"
     model_type = "features"
-    data_dir = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'
+    data_dir = root + '/cme_and_electron/data'
     sep_marker = "x"
 
-    load_and_plot_tsne(model_path, model_type, title, sep_marker, data_dir)
+    load_and_plot_tsne(model_path, model_type, title, sep_marker, data_dir, with_head=False)
 
 
 if __name__ == '__main__':

@@ -466,7 +466,7 @@ class DenseReweights:
         plt.figure(figsize=(12, 8))
         # Adding grid for better visibility of plot
         plt.grid(True, which="both", ls="--", c='#dddddd', zorder=0)
-        plt.scatter(bin_centers, hist_density, label='Label Density', color='blue', alpha=0.7, zorder=5)
+        # plt.scatter(bin_centers, hist_density, label='Label Density', color='blue', alpha=0.7, zorder=5)
         plt.scatter(y_values, kde_values, label='KDE', color='green', alpha=0.7, s=10, zorder=5)
         plt.scatter(y_values, reweights_plot, label='Reweights', color='red', alpha=0.7, s=10, zorder=5)
 

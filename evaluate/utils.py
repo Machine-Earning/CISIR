@@ -6,7 +6,7 @@ from models import modeling
 from evaluate import evaluation as eval
 from dataload import seploader as sepl
 import tensorflow as tf
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 SEED = 42  # seed number
 
@@ -224,9 +224,65 @@ def count_above_threshold(y_values: List[float], threshold: float = 0.3027, sep_
 
     return elevated_count, sep_count
 
+def load_model_with_weights(model_type: str,
+                            weight_path: str,
+                            input_dim: int = 19,
+                            feat_dim: int = 9,
+                            hiddens: Optional[list] = None,
+                            output_dim: int = 1) -> tf.keras.Model:
+    """
+    Load a model of a given type with pre-trained weights.
+
+    :param output_dim:
+    :param model_type: The type of the model to load ('features', 'reg', 'dec', 'features_reg_dec', etc.).
+    :param weight_path: The path to the saved weights.
+    :param input_dim: The input dimension for the model. Default is 19.
+    :param feat_dim: The feature dimension for the model. Default is 9.
+    :param hiddens: A list of integers specifying the number of hidden units for each hidden layer.
+    :return: A loaded model with pre-trained weights.
+    """
+    if hiddens is None:
+        hiddens = [18]
+    mb = modeling.ModelBuilder()
+
+    model = None  # will be determined by model type
+    if model_type == 'features_reg_dec':
+        # Add logic to create this type of model
+        model = mb.create_model_pds(
+            input_dim=input_dim,
+            feat_dim=feat_dim,
+            hiddens=hiddens,
+            output_dim=output_dim,
+            with_ae=True, with_reg=True)
+    elif model_type == 'features_reg':
+        model = mb.create_model_pds(
+            input_dim=input_dim,
+            feat_dim=feat_dim,
+            hiddens=hiddens,
+            output_dim=output_dim,
+            with_ae=False, with_reg=True)
+    elif model_type == 'features_dec':
+        model = mb.create_model_pds(
+            input_dim=input_dim,
+            feat_dim=feat_dim,
+            hiddens=hiddens,
+            output_dim=None,
+            with_ae=True, with_reg=False)
+    else:  # features
+        model = mb.create_model_pds(
+            input_dim=input_dim,
+            feat_dim=feat_dim,
+            hiddens=hiddens,
+            output_dim=None,
+            with_ae=False, with_reg=False)
+    # Load weights into the model
+    model.load_weights(weight_path)
+    print(f"Weights {weight_path} loaded successfully!")
+
+    return model
 
 def load_and_plot_tsne(model_path, model_type, title, sep_marker,
-                       data_dir='/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'):
+                       data_dir='/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data', with_head=False):
     """
     Load a trained model and plot its t-SNE visualization.
 
@@ -250,17 +306,22 @@ def load_and_plot_tsne(model_path, model_type, title, sep_marker,
     print(tf.config.list_physical_devices('GPU'))
     # Load the appropriate model
     mb = modeling.ModelBuilder()
-    if model_type == 'features':
-        features_model = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
-        loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False, pds=True)
-    elif model_type == 'features_reg':
-        features_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18])
-        loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False)
-    elif model_type == 'features_reg_dec':
-        features_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18], with_ae=True)
-        loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False)
-    else:  # regular reg
-        loaded_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18])
+
+    # load weights to continue training
+    features_model = load_model_with_weights(model_type, model_path)
+
+    if with_head:
+        if model_type == 'features':
+            features_model = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
+            loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False, pds=True)
+        elif model_type == 'features_reg':
+            features_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18])
+            loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False)
+        elif model_type == 'features_reg_dec':
+            features_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18], with_ae=True)
+            loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False)
+        else:  # regular reg
+            loaded_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18])
 
     loaded_model.load_weights(model_path)
     print(f'Model loaded from {model_path}')
@@ -279,20 +340,25 @@ def load_and_plot_tsne(model_path, model_type, title, sep_marker,
     # Combine training and validation sets
     combined_train_x, combined_train_y = loader.combine(train_x, train_y, val_x, val_y)
 
-    # Plot and save t-SNE
-    plot_tsne_extended(loaded_model,
-                       test_x, test_y,
-                       title,
-                       model_type + '_testing_',
-                       model_type=model_type,
-                       save_tag=timestamp)
-    plot_tsne_extended(loaded_model,
-                       combined_train_x,
-                       combined_train_y,
-                       title,
-                       model_type + '_training_',
-                       model_type=model_type,
-                       save_tag=timestamp)
+    if with_head:
+        # Plot and save t-SNE
+        plot_tsne_extended(features_model,
+                           test_x, test_y,
+                           title,
+                           model_type + '_testing_',
+                           model_type=model_type,
+                           save_tag=timestamp)
+        plot_tsne_extended(loaded_model,
+                           combined_train_x,
+                           combined_train_y,
+                           title,
+                           model_type + '_training_',
+                           model_type=model_type,
+                           save_tag=timestamp)
+    # else:
+    #     plot_tsne_pds(
+    #
+    #     )
 
 
 def load_and_test(model_path, model_type, title, threshold=10,
