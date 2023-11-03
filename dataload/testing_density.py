@@ -4,6 +4,9 @@ import seploader as sepl
 import DenseReweights as dr
 import mlflow
 
+# Set the tracking URI to a local directory
+mlflow.set_tracking_uri("http://127.0.0.1:5000/")
+mlflow.set_experiment("KDE")
 
 def main():
     """
@@ -25,7 +28,7 @@ def main():
             mlflow.log_param("bandwidth_factor", factor)
             # get the plot
             # Generate a filename in the local directory
-            local_filename = f"kde_plot_factor_{factor}.png"
+            local_filename = f"bandwidth_multiplier_{factor}.png"
             _ = dr.DenseReweights(concatenated_x, concatenated_y, alpha=.9, bw_factor=factor, tag=local_filename,
                                   runid=existing_run_id,
                                   debug=True).reweights
