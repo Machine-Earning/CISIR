@@ -67,8 +67,10 @@ def plot_tsne_extended(model, X, y, title, prefix, model_type='features_reg', sa
     # Extract features using the trained extended model
     if model_type == 'features_reg_dec':
         features, _, _ = model.predict(X)
-    else:  # model_type == 'features' or 'features_reg'
+    elif model_type == 'features_reg' or model_type == 'features_dec':
         features, _ = model.predict(X)
+    else:  # model_type == 'features'
+        features = model.predict(X)
 
     # Apply t-SNE
     tsne = TSNE(n_components=2, random_state=42)
@@ -224,6 +226,7 @@ def count_above_threshold(y_values: List[float], threshold: float = 0.3027, sep_
 
     return elevated_count, sep_count
 
+
 def load_model_with_weights(model_type: str,
                             weight_path: str,
                             input_dim: int = 19,
@@ -281,8 +284,13 @@ def load_model_with_weights(model_type: str,
 
     return model
 
-def load_and_plot_tsne(model_path, model_type, title, sep_marker,
-                       data_dir='/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data', with_head=False):
+
+def load_and_plot_tsne(
+        model_path,
+        model_type,
+        title,
+        data_dir='/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data',
+        with_head=False):
     """
     Load a trained model and plot its t-SNE visualization.
 
@@ -297,7 +305,6 @@ def load_and_plot_tsne(model_path, model_type, title, sep_marker,
     print('Model type:', model_type)
     print('Model path:', model_path)
     print('Title:', title)
-    print('SEP marker:', sep_marker)
     print('Data directory:', data_dir)
 
     # Generate a timestamp
@@ -306,9 +313,6 @@ def load_and_plot_tsne(model_path, model_type, title, sep_marker,
     print(tf.config.list_physical_devices('GPU'))
     # Load the appropriate model
     mb = modeling.ModelBuilder()
-
-    # load weights to continue training
-    features_model = load_model_with_weights(model_type, model_path)
 
     if with_head:
         if model_type == 'features':
@@ -323,8 +327,11 @@ def load_and_plot_tsne(model_path, model_type, title, sep_marker,
         else:  # regular reg
             loaded_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18])
 
-    loaded_model.load_weights(model_path)
-    print(f'Model loaded from {model_path}')
+        loaded_model.load_weights(model_path)
+        print(f'Model loaded from {model_path}')
+    else:
+        # load weights to continue training
+        loaded_model = load_model_with_weights(model_type, model_path)
 
     # Load data
     loader = sepl.SEPLoader()
@@ -340,25 +347,23 @@ def load_and_plot_tsne(model_path, model_type, title, sep_marker,
     # Combine training and validation sets
     combined_train_x, combined_train_y = loader.combine(train_x, train_y, val_x, val_y)
 
-    if with_head:
-        # Plot and save t-SNE
-        plot_tsne_extended(features_model,
-                           test_x, test_y,
-                           title,
-                           model_type + '_testing_',
-                           model_type=model_type,
-                           save_tag=timestamp)
-        plot_tsne_extended(loaded_model,
-                           combined_train_x,
-                           combined_train_y,
-                           title,
-                           model_type + '_training_',
-                           model_type=model_type,
-                           save_tag=timestamp)
-    # else:
-    #     plot_tsne_pds(
-    #
-    #     )
+    # Plot and save t-SNE
+    test_plot_path = plot_tsne_extended(loaded_model,
+                                        test_x, test_y,
+                                        title,
+                                        model_type + '_testing_',
+                                        model_type=model_type,
+                                        save_tag=timestamp)
+
+    training_plot_path = plot_tsne_extended(loaded_model,
+                                            combined_train_x,
+                                            combined_train_y,
+                                            title,
+                                            model_type + '_training_',
+                                            model_type=model_type,
+                                            save_tag=timestamp)
+
+    return test_plot_path, training_plot_path
 
 
 def load_and_test(model_path, model_type, title, threshold=10,

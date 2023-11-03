@@ -34,6 +34,13 @@ class ModelBuilder:
         :param debug: Boolean to enable debug output.
         """
         self.debug = debug
+        self.sep_sep_count = tf.Variable(0, dtype=tf.int32)
+        self.sep_elevated_count = tf.Variable(0, dtype=tf.int32)
+        self.sep_background_count = tf.Variable(0, dtype=tf.int32)
+        self.elevated_elevated_count = tf.Variable(0, dtype=tf.int32)
+        self.elevated_background_count = tf.Variable(0, dtype=tf.int32)
+        self.background_background_count = tf.Variable(0, dtype=tf.int32)
+        self.number_of_batches = 0
 
     def create_model(self,
                      input_dim: int,
@@ -275,10 +282,13 @@ class ModelBuilder:
         model.fit(X_train, y_train, epochs=best_epoch, batch_size=batch_size,
                   callbacks=[checkpoint_cb])
 
+        # Evaluate the model on the entire training set
+        entire_training_loss = model.evaluate(X_train, y_train)
+
         # save the model weights
         model.save_weights(f"model_weights_{str(save_tag)}.h5")
 
-        return history
+        return history, entire_training_loss
 
     def process_batch_weights(self,
                               batch_indices: np.ndarray,
@@ -1510,6 +1520,26 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
+    def update_pair_counts(self, label1, label2):
+        label1 = label1[0]
+        label2 = label2[0]
+
+        is_sep_1 = label1 > np.log(10.0)
+        is_sep_2 = label2 > np.log(10.0)
+        is_elevated_1 = (label1 > np.log(10.0 / np.exp(2))) & (label1 <= np.log(10.0))
+        is_elevated_2 = (label2 > np.log(10.0 / np.exp(2))) & (label2 <= np.log(10.0))
+        is_background_1 = label1 <= np.log(10.0 / np.exp(2))
+        is_background_2 = label2 <= np.log(10.0 / np.exp(2))
+
+        self.sep_sep_count.assign_add(tf.cast(is_sep_1 & is_sep_2, tf.int32))
+        self.sep_elevated_count.assign_add(tf.cast((is_sep_1 & is_elevated_2) | (is_elevated_1 & is_sep_2), tf.int32))
+        self.sep_background_count.assign_add(
+            tf.cast((is_sep_1 & is_background_2) | (is_background_1 & is_sep_2), tf.int32))
+        self.elevated_elevated_count.assign_add(tf.cast(is_elevated_1 & is_elevated_2, tf.int32))
+        self.elevated_background_count.assign_add(
+            tf.cast((is_elevated_1 & is_background_2) | (is_background_1 & is_elevated_2), tf.int32))
+        self.background_background_count.assign_add(tf.cast(is_background_1 & is_background_2, tf.int32))
+
     def repr_loss(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
         """
         Computes the loss for a batch of predicted features and their labels.
@@ -1524,12 +1554,16 @@ class ModelBuilder:
         batch_size = tf.cast(int_batch_size, dtype=tf.float32)
         total_error = tf.constant(0.0, dtype=tf.float32)
 
+        # tf.print(" received batch size:", int_batch_size)
+        self.number_of_batches += 1
+
         # Loop through all unique pairs of samples in the batch
         for i in tf.range(int_batch_size):
             for j in tf.range(i + 1, int_batch_size):
                 z1, z2 = z_pred[i], z_pred[j]
                 # tf.print(z1, z2, sep=', ', end='\n')
                 label1, label2 = y_true[i], y_true[j]
+                self.update_pair_counts(label1, label2)
                 # tf.print(label1, label2, sep=', ', end='\n')
                 err = self.error(z1, z2, label1, label2)
                 # tf.print(err, end='\n\n')

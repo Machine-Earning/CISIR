@@ -179,6 +179,7 @@ fit/
 
 #MLFlow stuffs
 mlruns/
+mlartifacts/
 
 #dataset file
 cme_and_electron/

@@ -2,6 +2,12 @@ import numpy as np
 import tensorflow as tf
 import random
 from evaluate.utils import load_and_plot_tsne
+import mlflow
+import mlflow.tensorflow
+
+# Set the tracking URI to a local directory
+mlflow.set_tracking_uri("http://127.0.0.1:5000/")
+mlflow.set_experiment("Default")
 
 # SEEDING
 SEED = 42  # seed number
@@ -21,16 +27,28 @@ def main():
     Main function for testing the AI Panther
     :return: None
     """
-    title = 'PDS, with batches, fine-tuned features'
+    # title = 'PDS, Dense Joint Loss, 128'
+    # title = 'PDS, Dense Joint Loss, Reg, 128'
+    # title = 'PDS, Dense Joint Loss, Reg, AE, 128'
+    title = 'PDS, Dense Joint Loss, AE, 128'
+
     print(title)
     # root = "/home1/jmoukpe2016/keras-functional-api"
     root = "."
-    model_path = root + "/best_model_weights_2023-10-30_22-57-59_features.h5"
-    model_type = "features"
+    model_path = root + "/10-29-2023/best_model_weights_2023-10-26_01-58-45_dl_dec.h5"
+    # model_type = "features"
+    # model_type = "features_reg_dec"
+    # model_type = "features_reg"
+    model_type = "features_dec"
     data_dir = root + '/cme_and_electron/data'
-    sep_marker = "x"
 
-    load_and_plot_tsne(model_path, model_type, title, sep_marker, data_dir, with_head=False)
+    with mlflow.start_run(run_name=f"PDS_Stage1_DL_{model_type}"):
+        # Automatic logging
+        mlflow.tensorflow.autolog()
+        test_plot_path, training_plot_path = load_and_plot_tsne(
+            model_path, model_type, title, data_dir, with_head=False)
+        mlflow.log_artifact(test_plot_path)
+        mlflow.log_artifact(training_plot_path)
 
 
 if __name__ == '__main__':
