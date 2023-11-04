@@ -3,6 +3,13 @@ import numpy as np
 
 
 class Ttest:
+    """
+    fill the tables comparing methods with mean and standard deviations
+    of each metrics for each methods over the selected number of samples (>30).
+    for the methods of higher interest or high uncertainty in comparisons,
+    run the t-TEST
+    """
+
     def __init__(self, method1_data: np.array, method2_data: np.array):
         """
         Initialize the Ttest object with two arrays of data.
