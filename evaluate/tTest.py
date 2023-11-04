@@ -4,6 +4,13 @@ import numpy as np
 
 class Ttest:
     def __init__(self, method1_data: np.array, method2_data: np.array):
+        """
+        Initialize the Ttest object with two arrays of data.
+
+        Parameters:
+        method1_data (np.array): Data from method 1.
+        method2_data (np.array): Data from method 2.
+        """
         self.method1_data = method1_data
         self.method2_data = method2_data
 
@@ -11,6 +18,13 @@ class Ttest:
         """
         Check the normality of data distribution using the Shapiro-Wilk test.
         Returns True if the data is normally distributed, False otherwise.
+
+        Parameters:
+        data (np.array): Data to be tested for normality.
+        alpha (float): Significance level, default is 0.05.
+
+        Returns:
+        bool: True if data distribution is normal, False otherwise.
         """
         _, p_value = stats.shapiro(data)
         return p_value > alpha
@@ -19,6 +33,9 @@ class Ttest:
         """
         Check the variance between two methods using Levene's test.
         Returns True if the assumption of equal variances holds, False otherwise.
+
+        Returns:
+        bool: True if variances are equal, False otherwise.
         """
         _, p_value = stats.levene(self.method1_data, self.method2_data)
         return p_value > 0.05
@@ -27,6 +44,12 @@ class Ttest:
         """
         Check if the number of samples is sufficient to invoke the Central Limit Theorem.
         Returns True if the sample size in both methods is greater than or equal to the threshold, False otherwise.
+
+        Parameters:
+        threshold (int): The minimum number of samples required, default is 30.
+
+        Returns:
+        bool: True if sample size is sufficient, False otherwise.
         """
         return len(self.method1_data) >= threshold and len(self.method2_data) >= threshold
 
@@ -35,7 +58,6 @@ class Ttest:
         Run the appropriate t-test based on variance and normality,
         and output the result regarding the null hypothesis and
         implications for the two methods.
-        Note: The values tested by t-test must be metric.
         """
         # Check sample size
         if not self.sufficient_samples():
@@ -53,10 +75,8 @@ class Ttest:
         # Check variance and run t-test
         equal_variance = self.check_variance()
         if equal_variance:
-            # Equal variance
             t_stat, p_value_t_test = stats.ttest_ind(self.method1_data, self.method2_data)
         else:
-            # Unequal variance
             t_stat, p_value_t_test = stats.ttest_ind(self.method1_data, self.method2_data, equal_var=False)
 
         if p_value_t_test < 0.05:
@@ -70,8 +90,9 @@ class Ttest:
         """
         Calculate and return the mean and standard deviation of each method
         over the number of samples for each, and also print these statistics.
-        Returns a tuple of dictionaries, where each dictionary contains the mean
-        and standard deviation for a method.
+
+        Returns:
+        tuple: A tuple of dictionaries with the mean and std for each method.
         """
         method1_mean = np.mean(self.method1_data)
         method1_std = np.std(self.method1_data, ddof=1)
@@ -85,8 +106,6 @@ class Ttest:
                 {"mean": method2_mean, "std": method2_std})
 
 
-# Create Ttest object and run t-test
-# ttest_obj = Ttest(method1_data, method2_data)
-# ttest_obj.run_t_test()
-# Get mean and standard deviation
-# ttest_obj.get_means_stds()
+# To test the class, we need to create some dummy data.
+np.random.seed(0)  # Seed for reproducibility
+method1_data = np.random.normal(100, 15, 35)  # Method 1 data: normal distribution around
