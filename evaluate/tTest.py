@@ -5,7 +5,8 @@ import numpy as np
 class Ttest:
     """
     fill the tables comparing methods with mean and standard deviations
-    of each metrics for each methods over the selected number of samples (>30).
+    of each metrics for each methods over the selected number of samples (>30 for
+    invoking central limit theorem. If <30 then samples will be assumed gaussian).
     for the methods of higher interest or high uncertainty in comparisons,
     run the t-TEST
     """
