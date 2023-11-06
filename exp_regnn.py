@@ -19,7 +19,7 @@ os.environ['MLFLOW_TRACKING_PASSWORD'] = '0b7739bcc448e3336dcc7437b505c44cc1801f
 
 # Configure MLflow to connect to DagsHub
 mlflow.set_tracking_uri('https://dagshub.com/ERUD1T3/keras-functional-api.mlflow')
-mlflow.set_experiment("test")
+mlflow.set_experiment("ai_panthers")
 
 # SEEDING
 SEED = 42  # seed number

@@ -8,9 +8,18 @@ from dataload import seploader as sepl
 from evaluate.utils import count_above_threshold, plot_tsne_pds
 # types for type hinting
 from models import modeling
+import os
 
-# Set the tracking URI to a local directory
-mlflow.set_tracking_uri("http://127.0.0.1:5000/")
+# # Set the tracking URI to a local directory
+# mlflow.set_tracking_uri("http://127.0.0.1:5000/")
+# mlflow.set_experiment("Low_Batch_Experiments")
+
+# Set the DagsHub credentials programmatically
+os.environ['MLFLOW_TRACKING_USERNAME'] = 'ERUD1T3'
+os.environ['MLFLOW_TRACKING_PASSWORD'] = '0b7739bcc448e3336dcc7437b505c44cc1801f9c'
+
+# Configure MLflow to connect to DagsHub
+mlflow.set_tracking_uri('https://dagshub.com/ERUD1T3/keras-functional-api.mlflow')
 mlflow.set_experiment("Low_Batch_Experiments")
 
 # SEEDING

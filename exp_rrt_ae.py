@@ -1,6 +1,6 @@
 import random
 from datetime import datetime
-
+import os
 import mlflow
 import mlflow.tensorflow
 import numpy as np
@@ -12,6 +12,13 @@ from evaluate import evaluation as eval
 from evaluate.utils import count_above_threshold, plot_tsne_extended
 # types for type hinting
 from models import modeling
+# Set the DagsHub credentials programmatically
+os.environ['MLFLOW_TRACKING_USERNAME'] = 'ERUD1T3'
+os.environ['MLFLOW_TRACKING_PASSWORD'] = '0b7739bcc448e3336dcc7437b505c44cc1801f9c'
+
+# Configure MLflow to connect to DagsHub
+mlflow.set_tracking_uri('https://dagshub.com/ERUD1T3/keras-functional-api.mlflow')
+mlflow.set_experiment("ai_panthers")
 
 # SEEDING
 SEED = 42  # seed number
