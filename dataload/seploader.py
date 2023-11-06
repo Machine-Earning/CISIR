@@ -2,32 +2,54 @@ import os
 import pandas as pd
 import numpy as np
 from sklearn.utils import shuffle
-from typing import Tuple
+from typing import Tuple, Dict, Any, Optional
 
 class SEPLoader:
     def __init__(self):
         pass
 
-    def load(self, file_path: str, num_shuffles: int = 3, SEED: int = 42, outupt_dir: str = 'data'):
+    def load(self, file_path: str, num_folds: Optional[int] = None, num_shuffles: int = 3, SEED: int = 42,
+             output_dir: str = 'data'):
         """
         Load the data from a CSV file, split it, shuffle it, and save the shuffled sets to CSV files.
 
         :param file_path: Path to the CSV file to load.
+        :param num_folds: The number of folds to split the data into. If None, the data is not split into folds.
         :param num_shuffles: Number of times to shuffle each set.
         :param SEED: Optional random seed for reproducibility.
-        :param save_prefix: Optional prefix for the saved CSV filenames.
+        :param output_dir: Directory to save the output CSV files.
         :return: None
         """
-        # Read and split the data
-        train_x, train_y, val_x, val_y, test_x, test_y = self.read_data(file_path)
 
-        # Shuffle the data
-        shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y, shuffled_test_x, shuffled_test_y = \
-            self.shuffle_sets(train_x, train_y, val_x, val_y, test_x, test_y, num_shuffles, SEED)
+        # Set random seed for reproducibility
+        np.random.seed(SEED)
 
-        # Save the shuffled data to CSV files
-        self.save_shuffled_data_to_csv(shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y,
-                                       shuffled_test_x, shuffled_test_y, dir_name=outupt_dir)
+        # Get the split data
+        data_splits = self.read_data(file_path, num_folds)
+
+        if num_folds is None:
+            # Shuffle and save the single set of splits
+            shuffled_data = self.shuffle_sets(data_splits[0], data_splits[1],
+                                              data_splits[2], data_splits[3],
+                                              data_splits[4], data_splits[5],
+                                              num_shuffles, SEED)
+            self.save_shuffled_data_to_csv(*shuffled_data, dir_name=output_dir)
+        else:
+            # Iterate over each fold
+            for fold, data in data_splits.items():
+                # Create directory for the fold if it doesn't exist
+                fold_dir = os.path.join(output_dir, fold)
+                os.makedirs(fold_dir, exist_ok=True)
+                # Shuffle each fold's datasets the specified number of times
+                shuffled_data = self.shuffle_sets(data['train_x'], data['train_y'],
+                                                  data['val_x'], data['val_y'],
+                                                  data['test_x'], data['test_y'],
+                                                  num_shuffles, SEED)
+
+                # Save the shuffled data to CSV files inside the fold directory
+                self.save_shuffled_data_to_csv(*shuffled_data, dir_name=fold_dir)
+
+
 
     def load_from_dir(self, dir_path: str):
         """
@@ -61,7 +83,7 @@ class SEPLoader:
 
         return combined_x, combined_y
 
-    def read_data(self, file_path: str):
+    def read_data(self, file_path: str, num_folds=None):
         """
         Read data from a CSV file and split it into training, validation, and test sets.
 
@@ -70,8 +92,11 @@ class SEPLoader:
         """
         # Read the CSV file
         df = pd.read_csv(file_path)
-        # Split the data into training, validation, and test sets
-        return self.split_data(df)
+        if num_folds is None:
+            # Split the data into training, validation, and test sets
+            return self.split_data(df)
+        else:
+            return self.split_data_folds(df, num_folds)
 
     def split_data(self, df):
         """
@@ -119,6 +144,62 @@ class SEPLoader:
         test_y = target[test_indices]
 
         return train_x, train_y, val_x, val_y, test_x, test_y
+
+    def split_data_folds(self, df: pd.DataFrame, num_folds: int = 3) -> Dict[str, Any]:
+        """
+        Splits the data into training, validation, and test sets according to the specified number of folds.
+        Each fold's test set is picked sequentially rather than at random.
+
+        :param df: DataFrame containing the data. Assumes 'log_peak_intensity' is the target column.
+        :param num_folds: The number of folds to use for splitting the data.
+
+        :return: A dictionary containing the split data for each fold.
+        """
+        # Sort the DataFrame by 'log_peak_intensity' in descending order
+        df_sorted = df.sort_values(by='log_peak_intensity', ascending=False).reset_index(drop=True)
+
+        # Initialize the dictionary to hold the splits for each fold
+        fold_splits = {}
+
+        # Perform the split for each fold
+        for fold in range(num_folds):
+            train_indices = []
+            val_indices = []
+            test_indices = []
+
+            # Select test indices based on the current fold
+            for i in range(fold, len(df_sorted), num_folds):
+                test_indices.append(i)
+                # The remaining indices of the group go to training
+                train_indices.extend([i + offset for offset in range(1, num_folds) if i + offset < len(df_sorted)])
+
+            # Group every 4 rows for validation set selection from the training set
+            remaining_indices = list(set(range(len(df_sorted))) - set(test_indices))
+            for i in range(0, len(remaining_indices), 4):
+                group = remaining_indices[i: i + 4]
+                if len(group) == 0:
+                    continue
+                val_idx = np.random.choice(group, 1)[0]
+                val_indices.append(val_idx)
+                remaining_indices = [idx for idx in remaining_indices if idx != val_idx]
+
+            # Update the training indices after selecting validation indices
+            train_indices = list(set(train_indices) - set(val_indices))
+
+            # Extract the feature and target sets based on selected indices
+            features = df_sorted.drop(columns=['log_peak_intensity']).to_numpy()
+            target = df_sorted['log_peak_intensity'].to_numpy()
+
+            fold_splits[f"fold_{fold + 1}"] = {
+                'train_x': features[train_indices],
+                'train_y': target[train_indices],
+                'val_x': features[val_indices],
+                'val_y': target[val_indices],
+                'test_x': features[test_indices],
+                'test_y': target[test_indices]
+            }
+
+        return fold_splits
 
     def shuffle_sets(self, train_x, train_y, val_x, val_y, test_x, test_y, num_shuffles=1, SEED=None):
         """

@@ -298,10 +298,10 @@ class DenseReweights:
 
     def __init__(self, X, y,
                  alpha: float = .9,
-                 bw_factor: float = 1.8,
+                 bandwidth: float = 1.8,
                  min_norm_weight: Optional[float] = None,
                  tag: Optional[str] = None,
-                 runid: Optional[str] = None,
+                 runId: Optional[str] = None,
                  debug: bool = False) -> None:
         """
         Create a synthetic regression dataset.
@@ -322,6 +322,7 @@ class DenseReweights:
         self.alpha = alpha
         self.min_norm_weight = min_norm_weight
 
+
         # Create training data
         self.X_train = X
         self.y_train = y
@@ -329,15 +330,15 @@ class DenseReweights:
         self.min_y = np.min(self.y_train)
         self.max_y = np.max(self.y_train)
 
-        self.kde = gaussian_kde(self.y_train, bw_method='scott')
-        self.adjust_bandwidth(self.kde, bw_factor)
+        self.kde = gaussian_kde(self.y_train, bw_method=bandwidth)
+        # self.adjust_bandwidth(self.kde, bw_factor)
         self.reweights = self.preprocess_reweighting(self.y_train)  # for labels, order maintained
 
         if self.debug:
             print('X_train: ', self.X_train[:12])
             print('y_train: ', self.y_train[:12])
             print('reweights: ', self.reweights[:12])
-            self.plot_density_kde_reweights(tag, runid)
+            self.plot_density_kde_reweights(tag)
 
     def adjust_bandwidth(self, kde: gaussian_kde, factor: Union[float, int]) -> None:
         """
@@ -396,7 +397,7 @@ class DenseReweights:
         """
         return kde.evaluate(points)
 
-    def plot_density_kde_reweights(self, tag: Optional[str] = None, runID: Optional[str] = None):
+    def plot_density_kde_reweights(self, tag: Optional[str] = None):
         """
         Plot the label density, KDE, and reweights for the y_train dataset.
         """

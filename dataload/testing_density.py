@@ -8,6 +8,7 @@ import mlflow
 mlflow.set_tracking_uri("http://127.0.0.1:5000/")
 mlflow.set_experiment("KDE")
 
+
 def main():
     """
     Main to test dense reweighting
@@ -19,18 +20,18 @@ def main():
 
     concatenated_x, concatenated_y = loader.combine(train_x, train_y, val_x, val_y, test_x, test_y)
     # get validation sample weights based on dense weights
-    for factor in np.arange(0.1, 5, .1):
+    for bw in np.arange(0.1, 5, .1):
         # Initialize MLflow tracking
-        with mlflow.start_run(run_name="KDE_Analysis") as run:
-            existing_run_id = run.info.run_id
+        with mlflow.start_run(run_name="KDE_Scalar") as run:
 
             # Log the factor
-            mlflow.log_param("bandwidth_factor", factor)
+            mlflow.log_param("bandwidth", bw)
             # get the plot
             # Generate a filename in the local directory
-            local_filename = f"bandwidth_multiplier_{factor}.png"
-            _ = dr.DenseReweights(concatenated_x, concatenated_y, alpha=.9, bw_factor=factor, tag=local_filename,
-                                  runid=existing_run_id,
+            local_filename = f"bandwidth_{bw}.png"
+            _ = dr.DenseReweights(concatenated_x, concatenated_y,
+                                  alpha=.9, bandwidth=bw,
+                                  tag=local_filename,
                                   debug=True).reweights
             # Log the plot
             mlflow.log_artifact(local_filename)
