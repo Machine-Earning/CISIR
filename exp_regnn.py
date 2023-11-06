@@ -1,3 +1,4 @@
+import os
 import random
 from datetime import datetime
 
@@ -10,8 +11,15 @@ from dataload import DenseReweights as dr
 from dataload import seploader as sepl
 from evaluate import evaluation as eval
 from evaluate.utils import count_above_threshold, plot_tsne_extended
-# types for type hinting
 from models import modeling
+
+# Set the DagsHub credentials programmatically
+os.environ['MLFLOW_TRACKING_USERNAME'] = 'ERUD1T3'
+os.environ['MLFLOW_TRACKING_PASSWORD'] = '0b7739bcc448e3336dcc7437b505c44cc1801f9c'
+
+# Configure MLflow to connect to DagsHub
+mlflow.set_tracking_uri('https://dagshub.com/ERUD1T3/keras-functional-api.mlflow')
+mlflow.set_experiment("test")
 
 # SEEDING
 SEED = 42  # seed number
@@ -101,6 +109,9 @@ def main():
                               epochs=Options['epochs'],
                               batch_size=Options['batch_size'],
                               patience=Options['patience'], save_tag='reg_nn_' + timestamp)
+
+            # Log model to DagsHub
+            mlflow.tensorflow.log_model(model=regressor, artifact_path="regnn_model")
 
             file_path = plot_tsne_extended(regressor, combined_train_x, combined_train_y, title, 'reg_nn_training_',
                                            save_tag=timestamp)
