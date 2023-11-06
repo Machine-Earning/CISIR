@@ -5,7 +5,10 @@ import random
 from datetime import datetime
 from dataload import seploader as sepl
 from dataload import DenseReweights as dr
-from evaluate.utils import count_above_threshold, plot_tsne_extended, split_combined_joint_weights_indices
+from evaluate.utils import count_above_threshold, \
+    plot_tsne_extended, \
+    split_combined_joint_weights_indices, \
+    load_model_with_weights
 
 # import mlflow
 # import mlflow.tensorflow
@@ -76,7 +79,7 @@ def main():
     elevateds, seps = count_above_threshold(shuffled_test_y)
     print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
 
-    for batch_size in [292, len_train]:
+    for batch_size in [len_train]: # [292, len_train]:
         title = f'PDS, Dense Joint Loss, Regression, {"with" if batch_size == 292 else "without"} batches'
         print(title)
         # with mlflow.start_run(run_name=f"PDS_DL_REG_{batch_size}"):
@@ -86,9 +89,23 @@ def main():
         #     mlflow.log_param("batch_size", batch_size)
         mb = modeling.ModelBuilder()
 
-        # create my feature extractor
-        feature_extractor = mb.create_model_pds(
-            input_dim=19, feat_dim=9, hiddens=[18], output_dim=1, with_reg=True)
+        recovery = True
+
+        if recovery:
+            weight_path = "/home1/jmoukpe2016/keras-functional-api/best_model_weights_2023-11-02_02-32-32_features_reg.h5" 
+            print('recovering the weights')
+
+            feature_extractor = load_model_with_weights(
+                'features_reg',
+                weight_path
+            )
+            print(f'weights loaded successfully! at \n{weight_path}')
+
+        else:
+
+            # create my feature extractor
+            feature_extractor = mb.create_model_pds(
+                input_dim=19, feat_dim=9, hiddens=[18], output_dim=1, with_reg=True)
 
         # plot the model
         # mb.plot_model(feature_extractor, "pds_stage1")

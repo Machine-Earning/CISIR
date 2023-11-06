@@ -4,7 +4,7 @@
 #SBATCH --nodes=1                     # Number of nodes
 #SBATCH --ntasks=1                    # Number of tasks
 #SBATCH --mem=16GB                    # Memory per node
-#SBATCH --time=99:99:99               # Time limit
+#SBATCH --time=infinite              # Time limit
 #SBATCH --partition=eternity              # Partition, dynamically set
 #SBATCH --output=testjob.%J.out       # Output file
 #SBATCH --error=testjob.%J.err        # Error file

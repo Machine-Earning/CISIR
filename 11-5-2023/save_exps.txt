@@ -1,0 +1,52 @@
+PDS, Dense Joint Loss, Regression, AE, with batches (resumed)
+{'batch_size': 292, 'epochs': 10000, 'patience': 25, 'learning_rate': 0.09}
+Starting at date Mon 30 Oct 2023 10:37:50 PM EDT
+/home1/jmoukpe2016/keras-functional-api/best_model_weights_2023-10-30_22-39-20_features_reg_dec.h5
+
+
+PDS, Dense Joint Loss, Regression, with batches
+{'batch_size': 292, 'epochs': 10000, 'patience': 25, 'learning_rate': 0.09}
+Starting at date Mon 30 Oct 2023 10:37:33 PM EDT
+/home1/jmoukpe2016/keras-functional-api/final_model_weights_2023-10-30_22-39-04_features_reg.h5 (done)
+/home1/jmoukpe2016/keras-functional-api/testing_tsne_plot_2023-10-30_22-39-04.png
+
+{'batch_size': 1225, 'epochs': 10000, 'patience': 25, 'learning_rate': 0.09}
+/home1/jmoukpe2016/keras-functional-api/best_model_weights_2023-11-02_02-32-32_features_reg.h5
+
+
+PDS, Dense Joint Loss, with batches
+{'batch_size': 292, 'epochs': 10000, 'patience': 25, 'learning_rate': 0.06}
+Starting at date Mon 30 Oct 2023 09:22:44 PM EDT
+/home1/jmoukpe2016/keras-functional-api/best_model_weights_2023-10-30_21-24-14_features.h5
+
+
+PDS, Dense Joint Loss, AE, with batches (resumed)
+{'batch_size': 292, 'epochs': 10000, 'patience': 25, 'learning_rate': 0.06}
+Starting at date Mon 30 Oct 2023 09:21:11 PM EDT
+/home1/jmoukpe2016/keras-functional-api/best_model_weights_2023-10-30_21-22-35_features_dec.h5
+
+
+PDS, Dense Joint Loss, Regression, with batches
+{'batch_size': 292, 'epochs': 10000, 'patience': 25, 'learning_rate': 0.06}
+Starting at date Mon 30 Oct 2023 09:19:36 PM EDT
+/home1/jmoukpe2016/keras-functional-api/final_model_weights_2023-10-30_21-21-00_features_reg.h5 (done)
+/home1/jmoukpe2016/keras-functional-api/testing_tsne_plot_2023-10-30_21-21-00.png
+
+{'batch_size': 1225, 'epochs': 10000, 'patience': 25, 'learning_rate': 0.06}
+/home1/jmoukpe2016/keras-functional-api/best_model_weights_2023-11-01_15-33-05_features_reg.h5
+
+
+
+PDS, Dense Joint Loss, Regression, AE, with batches
+{'batch_size': 292, 'epochs': 10000, 'patience': 25, 'learning_rate': 0.06}
+Starting at date Mon 30 Oct 2023 09:16:03 PM EDT
+/home1/jmoukpe2016/keras-functional-api/best_model_weights_2023-10-30_21-17-28_features_reg_dec.h5
+
+
+PDS, Dense Joint Loss, with batches
+{'batch_size': 292, 'epochs': 10000, 'patience': 25, 'learning_rate': 0.06}
+Starting at date Mon 30 Oct 2023 09:14:39 PM EDT
+/home1/jmoukpe2016/keras-functional-api/best_model_weights_2023-10-30_21-16-06_features.h5
+
+
+multiple version will have the same result since they have the same seed so it doesn't matter to launch multiple of the sames

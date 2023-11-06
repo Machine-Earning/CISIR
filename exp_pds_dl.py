@@ -8,7 +8,10 @@ import tensorflow as tf
 
 from dataload import DenseReweights as dr
 from dataload import seploader as sepl
-from evaluate.utils import count_above_threshold, plot_tsne_pds, split_combined_joint_weights_indices
+from evaluate.utils import count_above_threshold, \
+    plot_tsne_pds, \
+    split_combined_joint_weights_indices, \
+    load_model_with_weights
 from models import modeling
 
 # SEEDING
@@ -83,8 +86,22 @@ def main():
 
         mb = modeling.ModelBuilder()
 
-        # create my feature extractor
-        feature_extractor = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
+        recovery = True
+
+        if recovery:
+            weight_path = "/home1/jmoukpe2016/keras-functional-api/best_model_weights_2023-10-30_21-24-14_features.h5" 
+            print('recovering the weights')
+
+            feature_extractor = load_model_with_weights(
+                'features',
+                weight_path
+            )
+            print(f'weights loaded successfully! at \n{weight_path}')
+
+        else:
+
+            # create my feature extractor
+            feature_extractor = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
 
         # plot the model
         # # mb.plot_model(feature_extractor, "pds_stage1")
