@@ -1,12 +1,14 @@
-from sklearn.manifold import TSNE
+from datetime import datetime
+from typing import List, Tuple, Optional
+
 import matplotlib.pyplot as plt
 import numpy as np
-from datetime import datetime
-from models import modeling
-from evaluate import evaluation as eval
-from dataload import seploader as sepl
 import tensorflow as tf
-from typing import List, Tuple, Optional
+from sklearn.manifold import TSNE
+
+from dataload import seploader as sepl
+from evaluate import evaluation as eval
+from models import modeling
 
 SEED = 42  # seed number
 
@@ -122,6 +124,87 @@ def plot_tsne_extended(model, X, y, title, prefix, model_type='features_reg', sa
 
     # Save the plot
     file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
+    plt.savefig(file_path)
+    plt.close()
+
+    return file_path
+
+
+def plot_2D_pds(model, X, y, title, prefix, save_tag=None):
+    """
+    If the feature dimension is 2, this function plots the features in a 2D space. If the feature dimension is not 2,
+    it extracts features using the given model and then applies t-SNE for visualization.
+
+    Parameters:
+    - model: The trained feature extractor model. If feature_dim is 2, this can be None.
+    - X: Input data (NumPy array or compatible)
+    - y: Target labels (NumPy array or compatible)
+    - title: Title for the plot
+    - prefix: Prefix for the file name
+    - save_tag: Optional tag to add to the saved filename
+
+    Returns:
+    - The path to the saved 2D plot file
+    """
+    # Define the thresholds
+    threshold = np.log(10 / np.exp(2)) + 1e-4
+    sep_threshold = np.log(10)
+
+    # Check if feature dimension is 2
+    if model is not None:
+        features = model.predict(X)
+    else:
+        features = X
+
+    if features.shape[1] != 2:
+        raise ValueError("Feature dimension is not 2, cannot plot directly without t-SNE.")
+
+    # Identify indices based on thresholds
+    above_sep_threshold_indices = np.where(y > sep_threshold)[0]
+    elevated_event_indices = np.where((y > threshold) & (y <= sep_threshold))[0]
+    below_threshold_indices = np.where(y <= threshold)[0]
+
+    plt.figure(figsize=(12, 8))
+
+    # Create scatter plot for below-threshold points (in gray)
+    plt.scatter(features[below_threshold_indices, 0], features[below_threshold_indices, 1], marker='o',
+                color='gray', alpha=0.6)
+
+    # Normalize y-values for better color mapping
+    norm = plt.Normalize(y.min(), y.max())
+
+    # Compute marker sizes based on y-values
+    marker_sizes_elevated = 50 * ((y[elevated_event_indices] - y.min()) / (y.max() - y.min())) ** 2 + 10
+    marker_sizes_sep = 50 * ((y[above_sep_threshold_indices] - y.min()) / (y.max() - y.min())) ** 2 + 10
+
+    # Create scatter plot for elevated events (circle marker)
+    plt.scatter(features[elevated_event_indices, 0], features[elevated_event_indices, 1],
+                c=y[elevated_event_indices], cmap='plasma', norm=norm, alpha=0.6, marker='o', s=marker_sizes_elevated)
+
+    # Create scatter plot for SEPs (diamond marker)
+    plt.scatter(features[above_sep_threshold_indices, 0], features[above_sep_threshold_indices, 1],
+                c=y[above_sep_threshold_indices], cmap='plasma', norm=norm, alpha=0.6, marker='d', s=marker_sizes_sep)
+
+    # Add a color bar
+    sm = plt.cm.ScalarMappable(cmap='plasma', norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm)
+    cbar.set_label('Label Value')
+
+    # Add a legend
+    legend_labels = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=10),
+                     plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='blue', markersize=10),
+                     plt.Line2D([0], [0], marker='d', color='w', markerfacecolor='red', markersize=10)]
+
+    plt.legend(legend_labels, ['Background', 'Elevated Events', 'SEPs'],
+               loc='upper left')
+
+    plt.title(f'{title}\n2D Feature Visualization')
+    plt.xlabel('Dimension 1')
+    plt.ylabel('Dimension 2')
+
+    # Save the plot
+    file_path = f"{prefix}_2d_features_plot_{save_tag}.png"
     plt.savefig(file_path)
     plt.close()
 

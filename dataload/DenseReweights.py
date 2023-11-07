@@ -298,10 +298,9 @@ class DenseReweights:
 
     def __init__(self, X, y,
                  alpha: float = .9,
-                 bandwidth: float = 1.8,
+                 bandwidth: float = 0.9,
                  min_norm_weight: Optional[float] = None,
                  tag: Optional[str] = None,
-                 runId: Optional[str] = None,
                  debug: bool = False) -> None:
         """
         Create a synthetic regression dataset.
