@@ -4,19 +4,17 @@
 # this module should be interchangeable with other modules (
 ##############################################################################################################
 import random
+from itertools import cycle
+# types for type hinting
+from typing import Tuple, List, Optional
 
+import matplotlib.pyplot as plt
+import numpy as np
 # imports
 import tensorflow as tf
-from tensorflow.keras import layers, callbacks, Model
-import datetime
-import numpy as np
-import matplotlib.pyplot as plt
-from itertools import cycle
-
-# types for type hinting
-from typing import Tuple, List, Optional, Callable
-from tensorflow import Tensor
 from numpy import ndarray
+from tensorflow import Tensor
+from tensorflow.keras import layers, callbacks, Model
 
 
 class ModelBuilder:
@@ -249,6 +247,101 @@ class ModelBuilder:
 
         # Include weighted_loss_cb in callbacks only if sample_joint_weights is not None
         callback_list = [early_stopping_cb, checkpoint_cb]
+
+        # Compile the model
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
+
+        # First train the model with a validation set to determine the best epoch
+        history = model.fit(X_subtrain, y_subtrain,
+                            epochs=epochs,
+                            batch_size=batch_size,
+                            validation_data=(X_val, y_val),
+                            callbacks=callback_list)
+
+        # Get the best epoch from early stopping
+        best_epoch = np.argmin(history.history['val_loss']) + 1
+
+        # Plot training loss and validation loss
+        plt.plot(history.history['loss'], label='Training Loss')
+        plt.plot(history.history['val_loss'], label='Validation Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Training and Validation Loss Over Epochs')
+        plt.legend()
+        file_path = f"training_plot_{str(save_tag)}.png"
+        plt.savefig(file_path)
+        plt.close()
+
+        # Retrain the model on the combined dataset (training + validation) to the best epoch found
+        # X_combined = np.concatenate((X_subtrain, X_val), axis=0)
+        # y_combined = np.concatenate((y_subtrain, y_val), axis=0)
+
+        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
+        model.fit(X_train, y_train, epochs=best_epoch, batch_size=batch_size,
+                  callbacks=[checkpoint_cb])
+
+        # Evaluate the model on the entire training set
+        # entire_training_loss = model.evaluate(X_train, y_train)
+
+        # save the model weights
+        model.save_weights(f"model_weights_{str(save_tag)}.h5")
+
+        return history  # , entire_training_loss
+
+    def investigate_pds(self,
+                        model: Model,
+                        X_subtrain: ndarray,
+                        y_subtrain: ndarray,
+                        X_val: ndarray,
+                        y_val: ndarray,
+                        X_train: ndarray,
+                        y_train: ndarray,
+                        learning_rate: float = 1e-3,
+                        epochs: int = 100,
+                        batch_size: int = 32,
+                        patience: int = 9,
+                        save_tag=None) -> callbacks.History:
+        """
+        Trains the model and returns the training history.
+
+        :param X_train:
+        :param y_train:
+        :param save_tag: tag to use for saving experiments
+        :param model: The TensorFlow model to train.
+        :param X_subtrain: The training feature set.
+        :param y_subtrain: The training labels.
+        :param X_val: Validation features.
+        :param y_val: Validation labels.
+        :param learning_rate: The learning rate for the Adam optimizer.
+        :param epochs: The maximum number of epochs for training.
+        :param batch_size: The batch size for training.
+        :param patience: The number of epochs with no improvement to wait before early stopping.
+        :return: The training history as a History object.
+        """
+
+        # Setup TensorBoard
+        # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        # tensorboard_cb = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+        #
+        # print("Run the command line:\n tensorboard --logdir logs/fit")
+
+        # Initialize the custom callback
+        investigate_cb = InvestigateCallback(model, X_train, y_train, save_tag)
+
+        # Setup early stopping
+        early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
+
+        # reduce learning rate on plateau
+        # Initialize the ReduceLROnPlateau callback
+        # reduce_lr_cb = callbacks.ReduceLROnPlateau(monitor='val_loss',
+        #                                            factor=0.1,
+        #                                            patience=5,
+        #                                            min_lr=1e-6)
+        # Setup model checkpointing
+        checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_{str(save_tag)}.h5", save_weights_only=True)
+
+        # Include weighted_loss_cb in callbacks only if sample_joint_weights is not None
+        callback_list = [early_stopping_cb, checkpoint_cb, investigate_cb]
 
         # Compile the model
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
@@ -1563,6 +1656,7 @@ class ModelBuilder:
                 z1, z2 = z_pred[i], z_pred[j]
                 # tf.print(z1, z2, sep=', ', end='\n')
                 label1, label2 = y_true[i], y_true[j]
+                # Update pair counts and check if it's a SEP-SEP pair
                 self.update_pair_counts(label1, label2)
                 # tf.print(label1, label2, sep=', ', end='\n')
                 err = self.error(z1, z2, label1, label2)
@@ -1647,6 +1741,152 @@ class NormalizeLayer(layers.Layer):
             "epsilon": self.epsilon,
         })
         return config
+
+
+class InvestigateCallback(callbacks.Callback):
+    """
+    Custom callback to evaluate the model on SEP samples at the end of each epoch.
+    """
+
+    def __init__(self,
+                 model: Model,
+                 X_train: ndarray,
+                 y_train: ndarray,
+                 model_builder: ModelBuilder,
+                 save_tag: Optional[str] = None):
+        super().__init__()
+        self.model = model
+        self.X_train = X_train
+        self.y_train = y_train
+        self.sep_threshold = np.log(10)
+        self.save_tag = save_tag
+        self.sep_losses = []
+        self.losses = []
+        self.epochs_10s = []
+
+    def on_epoch_end(self, epoch, logs=None):
+        # Find SEP samples
+
+        sep_indices = self.find_sep_samples(self.y_train, self.sep_threshold)
+        if len(sep_indices) > 0:
+            X_sep = self.X_train[sep_indices]
+            y_sep = self.y_train[sep_indices]
+            # Evaluate the model on SEP samples
+            sep_loss = self.model.evaluate(X_sep, y_sep, verbose=0)
+            self.sep_losses.append(sep_loss)
+            print(f" Epoch {epoch + 1}: SEP Loss: {sep_loss}")
+
+        if epoch % 10 == 9:  # every 10th epoch (considering the first epoch is 0)
+            loss = self.model.evaluate(self.X_train, self.y_train, verbose=0)
+            self.losses.append(loss)
+            self.epochs_10s.append(epoch + 1)
+            self._save_plot()
+
+    def on_train_end(self, logs=None):
+        # At the end of training, save the loss plot
+        self.save_loss_plot()
+        self._save_plot()
+
+    def find_sep_samples(self, y_train: ndarray, sep_threshold: float) -> ndarray:
+        """
+        Identifies the indices of SEP samples in the training labels.
+
+        :param y_train: The array of training labels.
+        :param sep_threshold: The threshold used to identify SEP labels.
+        :return: The indices of SEP samples.
+        """
+        is_sep = y_train > sep_threshold
+        return np.where(is_sep)[0]
+
+    def _save_plot(self):
+        plt.figure()
+        plt.plot(self.epochs_10s, self.losses, '-o', label='Training Loss')
+        plt.title('Training Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.grid(True)
+        file_path = f"./investigation/training_loss_plot_{str(self.save_tag)}.png"
+        plt.savefig(file_path)
+        plt.close()
+        print(f"Saved plot at {file_path}")
+
+    def save_loss_plot(self):
+        """
+        Saves a plot of the SEP loss at each epoch.
+        """
+        plt.figure()
+        plt.plot(range(1, len(self.sep_losses) + 1), self.sep_losses, '-o', label='SEP Loss')
+        plt.title('SEP Loss Over Epochs')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.grid(True)
+        if self.save_tag:
+            file_path = f"./investigation/sep_loss_plot_{self.save_tag}.png"
+        else:
+            file_path = "./investigation/sep_loss_plot.png"
+        plt.savefig(file_path)
+        plt.close()
+        print(f"Saved SEP loss plot at {file_path}")
+
+
+class PairCountingCallback(callbacks.Callback):
+    """
+    Custom callback to track and save the counts for SEP-SEP and the total count
+    from summing all pair types, as well as the number of batches for every epoch.
+    Additionally, calculates the percentage of SEP-SEP pairs per epoch.
+    """
+
+    def __init__(self, model_builder: ModelBuilder):
+        super().__init__()
+        self.model_builder = model_builder
+        self.sep_sep_counts = []
+        self.total_counts = []
+        self.batch_counts = []
+        self.sep_sep_percentages = []
+
+    def on_epoch_end(self, epoch, logs=None):
+        # Save the current counts
+        sep_sep_count = int(self.model_builder.sep_sep_count)
+        self.sep_sep_counts.append(sep_sep_count)
+        total_count = (
+                sep_sep_count +
+                int(self.model_builder.sep_elevated_count) +
+                int(self.model_builder.sep_background_count) +
+                int(self.model_builder.elevated_elevated_count) +
+                int(self.model_builder.elevated_background_count) +
+                int(self.model_builder.background_background_count)
+        )
+        self.total_counts.append(total_count)
+        self.batch_counts.append(int(self.model_builder.number_of_batches))
+
+        # Calculate and save the percentage of SEP-SEP pairs
+        if total_count > 0:
+            self.sep_sep_percentages.append((sep_sep_count / total_count) * 100)
+        else:
+            self.sep_sep_percentages.append(0)
+
+        # Reset the counts for the next epoch
+        self.model_builder.sep_sep_count.assign(0)
+        self.model_builder.sep_elevated_count.assign(0)
+        self.model_builder.sep_background_count.assign(0)
+        self.model_builder.elevated_elevated_count.assign(0)
+        self.model_builder.elevated_background_count.assign(0)
+        self.model_builder.background_background_count.assign(0)
+        self.model_builder.number_of_batches = 0
+
+    def on_train_end(self, logs=None):
+        # Plot the percentage of SEP-SEP pairs per epoch
+        epochs = list(range(1, len(self.sep_sep_percentages) + 1))
+        plt.figure()
+        plt.plot(epochs, self.sep_sep_percentages, '-o', label='Percentage of SEP-SEP Pairs')
+        plt.title('Percentage of SEP-SEP Pairs Per Epoch')
+        plt.xlabel('Epoch')
+        plt.ylabel('Percentage')
+        plt.legend()
+        plt.grid(True)
+        plt.show()  # or save the figure if preferred
 
 
 # def map_to_1D_idx(i, j, n):

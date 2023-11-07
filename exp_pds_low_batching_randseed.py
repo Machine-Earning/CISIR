@@ -25,7 +25,7 @@ os.environ['MLFLOW_TRACKING_PASSWORD'] = '0b7739bcc448e3336dcc7437b505c44cc1801f
 mlflow.set_experiment("Low_Batch_Experiments")
 
 # List of seeds for multiple runs
-seeds = [0, 42, 123, 456]
+seeds = [42]
 
 
 def main():
@@ -106,7 +106,7 @@ def main():
                 # mb.background_background_count = 0
                 # mb.number_of_batches = 0
 
-                _, entire_training_loss = mb.train_pds(feature_extractor,
+                _, entire_training_loss = mb.investigate_pds(feature_extractor,
                                                        shuffled_train_x, shuffled_train_y,
                                                        shuffled_val_x, shuffled_val_y,
                                                        combined_train_x, combined_train_y,
