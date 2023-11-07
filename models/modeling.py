@@ -341,7 +341,7 @@ class ModelBuilder:
         checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_{str(save_tag)}.h5", save_weights_only=True)
 
         # Include weighted_loss_cb in callbacks only if sample_joint_weights is not None
-        callback_list = [early_stopping_cb, checkpoint_cb, investigate_cb]
+        callback_list = [early_stopping_cb, checkpoint_cb]
 
         # Compile the model
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
@@ -373,7 +373,7 @@ class ModelBuilder:
 
         # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
         model.fit(X_train, y_train, epochs=best_epoch, batch_size=batch_size,
-                  callbacks=[checkpoint_cb])
+                  callbacks=[checkpoint_cb, investigate_cb])
 
         # Evaluate the model on the entire training set
         entire_training_loss = model.evaluate(X_train, y_train)
@@ -1823,18 +1823,6 @@ class InvestigateCallback(callbacks.Callback):
         self.save_sep_sep_loss_vs_frequency()
         self.save_slope_of_loss_vs_frequency()
 
-    def save_percent_plot(self):
-        # Plot the percentage of SEP-SEP pairs per epoch
-        epochs = list(range(1, len(self.sep_sep_percentages) + 1))
-        plt.figure()
-        plt.plot(epochs, self.sep_sep_percentages, '-o', label='Percentage of SEP-SEP Pairs')
-        plt.title('Percentage of SEP-SEP Pairs Per Epoch')
-        plt.xlabel('Epoch')
-        plt.ylabel('Percentage')
-        plt.legend()
-        plt.grid(True)
-        plt.show()  # or save the figure if preferred
-
     def find_sep_samples(self, y_train: ndarray, sep_threshold: float) -> ndarray:
         """
         Identifies the indices of SEP samples in the training labels.
@@ -1846,6 +1834,26 @@ class InvestigateCallback(callbacks.Callback):
         is_sep = y_train > sep_threshold
         return np.where(is_sep)[0]
 
+
+    def save_percent_plot(self):
+        # Plot the percentage of SEP-SEP pairs per epoch
+        epochs = list(range(1, len(self.sep_sep_percentages) + 1))
+        plt.figure()
+        plt.plot(epochs, self.sep_sep_percentages, '-o', label='Percentage of SEP-SEP Pairs')
+        plt.title('Percentage of SEP-SEP Pairs Per Epoch')
+        plt.xlabel('Epoch')
+        plt.ylabel('Percentage')
+        plt.legend()
+        plt.grid(True)
+        # plt.show()  # or save the figure if preferred
+        if self.save_tag:
+            file_path = f"./investigation/percent_sep_sep_plot_{str(self.save_tag)}.png"
+        else:
+            file_path = f"./investigation/percent_sep_sep_plot.png"
+        plt.savefig(file_path)
+        plt.close()
+        print(f"Saved plot at {file_path}")
+
     def _save_plot(self):
         plt.figure()
         plt.plot(self.epochs_10s, self.losses, '-o', label='Training Loss')
@@ -1854,7 +1862,10 @@ class InvestigateCallback(callbacks.Callback):
         plt.ylabel('Loss')
         plt.legend()
         plt.grid(True)
-        file_path = f"./investigation/training_loss_plot_{str(self.save_tag)}.png"
+        if self.save_tag:
+            file_path = f"./investigation/training_loss_plot_{str(self.save_tag)}.png"
+        else:
+            file_path = f"./investigation/training_loss_plot.png"
         plt.savefig(file_path)
         plt.close()
         print(f"Saved plot at {file_path}")

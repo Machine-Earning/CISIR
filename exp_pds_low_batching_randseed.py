@@ -13,7 +13,7 @@ from evaluate.utils import count_above_threshold, plot_tsne_pds
 from models import modeling
 
 # # Set the tracking URI to a local directory
-mlflow.set_tracking_uri("http://127.0.0.1:5000/")
+# mlflow.set_tracking_uri("http://127.0.0.1:5000/")
 # mlflow.set_experiment("Low_Batch_Experiments")
 
 # Set the DagsHub credentials programmatically
@@ -21,11 +21,11 @@ os.environ['MLFLOW_TRACKING_USERNAME'] = 'ERUD1T3'
 os.environ['MLFLOW_TRACKING_PASSWORD'] = '0b7739bcc448e3336dcc7437b505c44cc1801f9c'
 
 # Configure MLflow to connect to DagsHub
-# mlflow.set_tracking_uri('https://dagshub.com/ERUD1T3/keras-functional-api.mlflow')
-mlflow.set_experiment("Low_Batch_Experiments")
+mlflow.set_tracking_uri('https://dagshub.com/ERUD1T3/keras-functional-api.mlflow')
+mlflow.set_experiment("low_batch_exps_ai_panthers")
 
 # List of seeds for multiple runs
-seeds = [42]
+seeds = [42, 123]
 
 
 def main():
@@ -33,8 +33,8 @@ def main():
     Main function for testing the AI Panther
     :return: None
     """
-    # data_path = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'
-    data_path = './cme_and_electron/data'
+    data_path = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'
+    # data_path = './cme_and_electron/data'
 
     # check for gpus
     print(tf.config.list_physical_devices('GPU'))
@@ -63,7 +63,7 @@ def main():
         tf.random.set_seed(seed)
         random.seed(seed)
 
-        for batch_size in [4]:  # Replace with the batch sizes you're interested in
+        for batch_size in [4, train_length]:  # Replace with the batch sizes you're interested in
             title = f'PDS, batche size {batch_size}, seed {seed}'
             print(title)
             with mlflow.start_run(run_name=f"PDS_{batch_size}_Seed_{seed}"):
@@ -90,7 +90,7 @@ def main():
                 # training
                 Options = {
                     'batch_size': batch_size,
-                    'epochs': 10,
+                    'epochs': 10000,
                     'patience': 25,
                     'learning_rate': 9e-2,
                 }
@@ -107,14 +107,14 @@ def main():
                 # mb.number_of_batches = 0
 
                 _, entire_training_loss = mb.investigate_pds(feature_extractor,
-                                                       shuffled_train_x, shuffled_train_y,
-                                                       shuffled_val_x, shuffled_val_y,
-                                                       combined_train_x, combined_train_y,
-                                                       learning_rate=Options['learning_rate'],
-                                                       epochs=Options['epochs'],
-                                                       batch_size=Options['batch_size'],
-                                                       patience=Options['patience'],
-                                                       save_tag=timestamp + f"_features_{batch_size}")
+                                                             shuffled_train_x, shuffled_train_y,
+                                                             shuffled_val_x, shuffled_val_y,
+                                                             combined_train_x, combined_train_y,
+                                                             learning_rate=Options['learning_rate'],
+                                                             epochs=Options['epochs'],
+                                                             batch_size=Options['batch_size'],
+                                                             patience=Options['patience'],
+                                                             save_tag=timestamp + f"_features_{batch_size}")
 
                 # Log the training loss to MLflow
                 mlflow.log_metric("entire_train_loss", entire_training_loss)
