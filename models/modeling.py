@@ -326,7 +326,7 @@ class ModelBuilder:
         # print("Run the command line:\n tensorboard --logdir logs/fit")
 
         # Initialize the custom callback
-        investigate_cb = InvestigateCallback(model, X_train, y_train, save_tag)
+        investigate_cb = InvestigateCallback(model, X_train, y_train, self, save_tag)
 
         # Setup early stopping
         early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
@@ -1760,9 +1760,14 @@ class InvestigateCallback(callbacks.Callback):
         self.y_train = y_train
         self.sep_threshold = np.log(10)
         self.save_tag = save_tag
-        self.sep_losses = []
+        self.sep_sep_losses = []
         self.losses = []
         self.epochs_10s = []
+        self.model_builder = model_builder
+        self.sep_sep_counts = []
+        self.total_counts = []
+        self.batch_counts = []
+        self.sep_sep_percentages = []
 
     def on_epoch_end(self, epoch, logs=None):
         # Find SEP samples
@@ -1772,81 +1777,15 @@ class InvestigateCallback(callbacks.Callback):
             X_sep = self.X_train[sep_indices]
             y_sep = self.y_train[sep_indices]
             # Evaluate the model on SEP samples
-            sep_loss = self.model.evaluate(X_sep, y_sep, verbose=0)
-            self.sep_losses.append(sep_loss)
-            print(f" Epoch {epoch + 1}: SEP Loss: {sep_loss}")
+            sep_sep_loss = self.model.evaluate(X_sep, y_sep, verbose=0)
+            self.sep_sep_losses.append(sep_sep_loss)
+            print(f" Epoch {epoch + 1}: SEP-SEP Loss: {sep_sep_loss}")
 
         if epoch % 10 == 9:  # every 10th epoch (considering the first epoch is 0)
             loss = self.model.evaluate(self.X_train, self.y_train, verbose=0)
             self.losses.append(loss)
             self.epochs_10s.append(epoch + 1)
-            self._save_plot()
 
-    def on_train_end(self, logs=None):
-        # At the end of training, save the loss plot
-        self.save_loss_plot()
-        self._save_plot()
-
-    def find_sep_samples(self, y_train: ndarray, sep_threshold: float) -> ndarray:
-        """
-        Identifies the indices of SEP samples in the training labels.
-
-        :param y_train: The array of training labels.
-        :param sep_threshold: The threshold used to identify SEP labels.
-        :return: The indices of SEP samples.
-        """
-        is_sep = y_train > sep_threshold
-        return np.where(is_sep)[0]
-
-    def _save_plot(self):
-        plt.figure()
-        plt.plot(self.epochs_10s, self.losses, '-o', label='Training Loss')
-        plt.title('Training Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.legend()
-        plt.grid(True)
-        file_path = f"./investigation/training_loss_plot_{str(self.save_tag)}.png"
-        plt.savefig(file_path)
-        plt.close()
-        print(f"Saved plot at {file_path}")
-
-    def save_loss_plot(self):
-        """
-        Saves a plot of the SEP loss at each epoch.
-        """
-        plt.figure()
-        plt.plot(range(1, len(self.sep_losses) + 1), self.sep_losses, '-o', label='SEP Loss')
-        plt.title('SEP Loss Over Epochs')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.legend()
-        plt.grid(True)
-        if self.save_tag:
-            file_path = f"./investigation/sep_loss_plot_{self.save_tag}.png"
-        else:
-            file_path = "./investigation/sep_loss_plot.png"
-        plt.savefig(file_path)
-        plt.close()
-        print(f"Saved SEP loss plot at {file_path}")
-
-
-class PairCountingCallback(callbacks.Callback):
-    """
-    Custom callback to track and save the counts for SEP-SEP and the total count
-    from summing all pair types, as well as the number of batches for every epoch.
-    Additionally, calculates the percentage of SEP-SEP pairs per epoch.
-    """
-
-    def __init__(self, model_builder: ModelBuilder):
-        super().__init__()
-        self.model_builder = model_builder
-        self.sep_sep_counts = []
-        self.total_counts = []
-        self.batch_counts = []
-        self.sep_sep_percentages = []
-
-    def on_epoch_end(self, epoch, logs=None):
         # Save the current counts
         sep_sep_count = int(self.model_builder.sep_sep_count)
         self.sep_sep_counts.append(sep_sep_count)
@@ -1877,6 +1816,14 @@ class PairCountingCallback(callbacks.Callback):
         self.model_builder.number_of_batches = 0
 
     def on_train_end(self, logs=None):
+        # At the end of training, save the loss plot
+        self.save_loss_plot()
+        self._save_plot()
+        self.save_percent_plot()
+        self.save_sep_sep_loss_vs_frequency()
+        self.save_slope_of_loss_vs_frequency()
+
+    def save_percent_plot(self):
         # Plot the percentage of SEP-SEP pairs per epoch
         epochs = list(range(1, len(self.sep_sep_percentages) + 1))
         plt.figure()
@@ -1888,16 +1835,105 @@ class PairCountingCallback(callbacks.Callback):
         plt.grid(True)
         plt.show()  # or save the figure if preferred
 
+    def find_sep_samples(self, y_train: ndarray, sep_threshold: float) -> ndarray:
+        """
+        Identifies the indices of SEP samples in the training labels.
 
-# def map_to_1D_idx(i, j, n):
-#     """Map the 2D index (i, j) of an n x n upper triangular matrix to the
-#     corresponding 1D index of its flattened form.
-#     :param i: The row index.
-#     :param j: The column index.
-#     :param n: The number of rows in the upper triangular matrix.
-#     :return: The 1D index of the flattened form.
-#     """
-#     return n * i + j - ((i + 1) * (i + 2)) // 2
+        :param y_train: The array of training labels.
+        :param sep_threshold: The threshold used to identify SEP labels.
+        :return: The indices of SEP samples.
+        """
+        is_sep = y_train > sep_threshold
+        return np.where(is_sep)[0]
+
+    def _save_plot(self):
+        plt.figure()
+        plt.plot(self.epochs_10s, self.losses, '-o', label='Training Loss')
+        plt.title('Training Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.grid(True)
+        file_path = f"./investigation/training_loss_plot_{str(self.save_tag)}.png"
+        plt.savefig(file_path)
+        plt.close()
+        print(f"Saved plot at {file_path}")
+
+    def save_loss_plot(self):
+        """
+        Saves a plot of the SEP loss at each epoch.
+        """
+        plt.figure()
+        plt.plot(range(1, len(self.sep_sep_losses) + 1), self.sep_sep_losses, '-o', label='SEP Loss')
+        plt.title('SEP Loss Over Epochs')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.grid(True)
+        if self.save_tag:
+            file_path = f"./investigation/sep_loss_plot_{self.save_tag}.png"
+        else:
+            file_path = "./investigation/sep_loss_plot.png"
+        plt.savefig(file_path)
+        plt.close()
+        print(f"Saved SEP loss plot at {file_path}")
+
+    def save_sep_sep_loss_vs_frequency(self) -> None:
+        """
+        Plots the SEP-SEP loss against the SEP-SEP counts at the end of training.
+        """
+        plt.figure()
+        plt.scatter(self.sep_sep_counts, self.sep_sep_losses, c='blue', label='SEP-SEP Loss vs Frequency')
+        plt.title('SEP-SEP Loss vs Frequency')
+        plt.xlabel('SEP-SEP Frequency')
+        plt.ylabel('SEP-SEP Loss')
+        plt.legend()
+        plt.grid(True)
+
+        if self.save_tag:
+            file_path = f"./investigation/sep_sep_loss_vs_frequency_{self.save_tag}.png"
+        else:
+            file_path = "./investigation/sep_sep_loss_vs_frequency.png"
+
+        plt.savefig(file_path)
+        plt.close()
+        print(f"Saved SEP-SEP Loss vs Counts plot at {file_path}")
+
+    def save_slope_of_loss_vs_frequency(self) -> None:
+        """
+        Plots the slope of the change in SEP-SEP loss with respect to the change in SEP-SEP frequency vs epochs.
+        """
+        # Calculate the differences (delta) between consecutive losses and counts
+        delta_losses = np.diff(self.sep_sep_losses)
+        delta_counts = np.diff(self.sep_sep_counts)
+
+        # To avoid division by zero, we will replace zeros with a small value (epsilon)
+        epsilon = 1e-8
+        delta_counts = np.where(delta_counts == 0, epsilon, delta_counts)
+
+        # Calculate the slope (change in loss / change in frequency)
+        slopes = delta_losses / delta_counts
+
+        # Prepare the epochs for x-axis, which are one less than the number of losses due to diff operation
+        epochs = range(1, len(self.sep_sep_losses))
+
+        plt.figure()
+        plt.plot(epochs, slopes, '-o', label='Slope of SEP-SEP Loss vs Frequency')
+        plt.title('Slope of SEP-SEP Loss vs Frequency Change Per Epoch')
+        plt.xlabel('Epoch')
+        plt.ylabel('Slope')
+        plt.legend()
+        plt.grid(True)
+
+        if self.save_tag:
+            file_path = f"./investigation/slope_sep_sep_loss_vs_frequency_{self.save_tag}.png"
+        else:
+            file_path = "./investigation/slope_sep_sep_loss_vs_frequency.png"
+
+        plt.savefig(file_path)
+        plt.close()
+        print(f"Saved Slope of Loss vs Counts plot at {file_path}")
+
 
 # Helper function to map 2D indices to 1D indices (assuming it's defined elsewhere in your code)
 def map_to_1D_idx(i, j, n):
