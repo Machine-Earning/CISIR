@@ -329,7 +329,7 @@ class ModelBuilder:
         # print("Run the command line:\n tensorboard --logdir logs/fit")
 
         # Initialize the custom callback
-        investigate_cb = InvestigateCallback(model, X_train, y_train, self, save_tag)
+        investigate_cb = InvestigateCallback(model, X_train, y_train, batch_size, self, save_tag)
 
         # Setup early stopping
         early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
@@ -1774,12 +1774,14 @@ class InvestigateCallback(callbacks.Callback):
                  model: Model,
                  X_train: ndarray,
                  y_train: ndarray,
+                 batch_size: int,
                  model_builder: ModelBuilder,
                  save_tag: Optional[str] = None):
         super().__init__()
         self.model = model
         self.X_train = X_train
         self.y_train = y_train
+        self.batch_size = batch_size if batch_size > 0 else None
         self.sep_threshold = np.log(10)
         self.save_tag = save_tag
         self.sep_sep_losses = []
@@ -1861,7 +1863,7 @@ class InvestigateCallback(callbacks.Callback):
         epochs = list(range(1, len(self.sep_sep_percentages) + 1))
         plt.figure()
         plt.plot(epochs, self.sep_sep_percentages, '-o', label='Percentage of SEP-SEP Pairs')
-        plt.title('Percentage of SEP-SEP Pairs Per Epoch')
+        plt.title(f'Percentage of SEP-SEP Pairs Per Epoch, Batch Size {self.batch_size}')
         plt.xlabel('Epoch')
         plt.ylabel('Percentage')
         plt.legend()
@@ -1878,7 +1880,7 @@ class InvestigateCallback(callbacks.Callback):
     def _save_plot(self):
         plt.figure()
         plt.plot(self.epochs_10s, self.losses, '-o', label='Training Loss')
-        plt.title('Training Loss')
+        plt.title(f'Training Loss, Batch Size {self.batch_size}')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.legend()
@@ -1897,7 +1899,7 @@ class InvestigateCallback(callbacks.Callback):
         """
         plt.figure()
         plt.plot(range(1, len(self.sep_sep_losses) + 1), self.sep_sep_losses, '-o', label='SEP Loss')
-        plt.title('SEP Loss Over Epochs')
+        plt.title(f'SEP Loss Over Epochs, Batch Size {self.batch_size}')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.legend()
@@ -1916,7 +1918,7 @@ class InvestigateCallback(callbacks.Callback):
         """
         plt.figure()
         plt.scatter(self.sep_sep_counts, self.sep_sep_losses, c='blue', label='SEP-SEP Loss vs Frequency')
-        plt.title('SEP-SEP Loss vs Frequency')
+        plt.title(f'SEP-SEP Loss vs Frequency, Batch Size {self.batch_size}')
         plt.xlabel('SEP-SEP Frequency')
         plt.ylabel('SEP-SEP Loss')
         plt.legend()
@@ -1951,7 +1953,7 @@ class InvestigateCallback(callbacks.Callback):
 
         plt.figure()
         plt.plot(epochs, slopes, '-o', label='Slope of SEP-SEP Loss vs Frequency')
-        plt.title('Slope of SEP-SEP Loss vs Frequency Change Per Epoch')
+        plt.title(f'Slope of SEP-SEP Loss vs Frequency Change Per Epoch, Batch Size {self.batch_size}')
         plt.xlabel('Epoch')
         plt.ylabel('Slope')
         plt.legend()
