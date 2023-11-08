@@ -256,6 +256,7 @@ class ModelBuilder:
                             epochs=epochs,
                             batch_size=batch_size if batch_size > 0 else len(y_subtrain),
                             validation_data=(X_val, y_val),
+                            validation_batch_size=batch_size if batch_size > 0 else len(y_val),
                             callbacks=callback_list)
 
         # Get the best epoch from early stopping
@@ -351,8 +352,9 @@ class ModelBuilder:
         # First train the model with a validation set to determine the best epoch
         history = model.fit(X_subtrain, y_subtrain,
                             epochs=epochs,
-                            batch_size=batch_size,
+                            batch_size=batch_size if batch_size > 0 else len(y_subtrain),
                             validation_data=(X_val, y_val),
+                            validation_batch_size=batch_size if batch_size > 0 else len(y_val),
                             callbacks=callback_list)
 
         # Get the best epoch from early stopping
@@ -374,7 +376,9 @@ class ModelBuilder:
         # y_combined = np.concatenate((y_subtrain, y_val), axis=0)
 
         # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
-        model.fit(X_train, y_train, epochs=best_epoch, batch_size=batch_size,
+        model.fit(X_train, y_train,
+                  epochs=best_epoch,
+                  batch_size=batch_size if batch_size > 0 else len(y_train),
                   callbacks=[checkpoint_cb, investigate_cb])
 
         # Evaluate the model on the entire training set
@@ -645,13 +649,16 @@ class ModelBuilder:
 
         for epoch in range(epochs):
             train_loss = self.train_for_one_epoch(
-                model, optimizer, self.repr_loss_dl, X_subtrain, y_subtrain,
-                batch_size, joint_weights=sample_joint_weights,
+                model, optimizer, self.repr_loss_dl,
+                X_subtrain, y_subtrain,
+                batch_size=batch_size if batch_size > 0 else len(y_subtrain),
+                joint_weights=sample_joint_weights,
                 joint_weight_indices=sample_joint_weights_indices)
 
             val_loss = self.train_for_one_epoch(
                 model, optimizer, self.repr_loss_dl, X_val, y_val,
-                batch_size, joint_weights=val_sample_joint_weights,
+                batch_size=batch_size if batch_size > 0 else len(y_val),
+                joint_weights=val_sample_joint_weights,
                 joint_weight_indices=val_sample_joint_weights_indices, training=False)
 
             # Log and save epoch losses
@@ -695,7 +702,8 @@ class ModelBuilder:
                 model, optimizer,
                 self.repr_loss_dl,
                 X_train, y_train,
-                batch_size, joint_weights=train_sample_joint_weights,
+                batch_size=batch_size if batch_size > 0 else len(y_train),
+                joint_weights=train_sample_joint_weights,
                 joint_weight_indices=train_sample_joint_weights_indices)
 
             # Log the retrain loss
@@ -775,7 +783,7 @@ class ModelBuilder:
                 model, optimizer,
                 self.repr_loss_dl,
                 X_subtrain, y_subtrain,
-                batch_size,
+                batch_size=batch_size if batch_size > 0 else len(y_subtrain),
                 joint_weights=sample_joint_weights,
                 joint_weight_indices=sample_joint_weights_indices)
 
@@ -783,7 +791,8 @@ class ModelBuilder:
                 model, optimizer,
                 self.repr_loss_dl,
                 X_val, y_val,
-                batch_size, training=False,
+                batch_size=batch_size if batch_size > 0 else len(y_val),
+                training=False,
                 joint_weights=val_sample_joint_weights,
                 joint_weight_indices=val_sample_joint_weights_indices)
 
@@ -829,7 +838,8 @@ class ModelBuilder:
                 model, optimizer,
                 self.repr_loss_dl,
                 X_train, y_train,
-                batch_size, joint_weights=train_sample_joint_weights,
+                batch_size=batch_size if batch_size > 0 else len(y_train),
+                joint_weights=train_sample_joint_weights,
                 joint_weight_indices=train_sample_joint_weights_indices)
 
             # Log the retrain loss
@@ -904,7 +914,8 @@ class ModelBuilder:
         gamma_coeff, lambda_coeff = self.estimate_gamma_lambda_coeffs(
             model, X_subtrain, y_subtrain, self.repr_loss_dl,
             sample_weights, sample_joint_weights, sample_joint_weights_indices,
-            learning_rate=learning_rate, n_epochs=epochs_for_estimation, batch_size=batch_size,
+            learning_rate=learning_rate, n_epochs=epochs_for_estimation,
+            batch_size=batch_size if batch_size > 0 else len(y_subtrain),
             with_ae=with_ae, with_reg=with_reg)
 
         print(f'found gamma: {gamma_coeff}, lambda: {lambda_coeff}')
@@ -922,13 +933,15 @@ class ModelBuilder:
         for epoch in range(epochs):
             train_loss = self.train_for_one_epoch_mh(
                 model, optimizer, self.repr_loss_dl, X_subtrain, y_subtrain,
-                batch_size, gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
+                batch_size=batch_size if batch_size > 0 else len(y_subtrain)
+                , gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
                 sample_weights=sample_weights, joint_weights=sample_joint_weights,
                 joint_weight_indices=sample_joint_weights_indices, with_reg=with_reg, with_ae=with_ae)
 
             val_loss = self.train_for_one_epoch_mh(
                 model, optimizer, self.repr_loss_dl, X_val, y_val,
-                batch_size, gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
+                batch_size=batch_size if batch_size > 0 else len(y_val),
+                gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
                 sample_weights=val_sample_weights, joint_weights=val_sample_joint_weights,
                 joint_weight_indices=val_sample_joint_weights_indices, with_reg=with_reg, with_ae=with_ae,
                 training=False)
@@ -972,7 +985,8 @@ class ModelBuilder:
         for epoch in range(best_epoch):
             retrain_loss = self.train_for_one_epoch_mh(
                 model, optimizer, self.repr_loss_dl, X_train, y_train,
-                batch_size, gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
+                batch_size=batch_size if batch_size > 0 else len(y_train),
+                gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
                 sample_weights=train_sample_weights,
                 joint_weights=train_sample_joint_weights,
                 joint_weight_indices=train_sample_joint_weights_indices,
@@ -1034,6 +1048,8 @@ class ModelBuilder:
         """
         Trains the model and returns the training history. injection of rare examples
 
+        :param y_train:
+        :param X_train:
         :param model: The TensorFlow model to train.
         :param X_subtrain: The training feature set.
         :param y_subtrain: The training labels.
@@ -1079,7 +1095,8 @@ class ModelBuilder:
                             validation_data=val_gen,
                             validation_steps=val_steps,
                             epochs=epochs,
-                            batch_size=batch_size,
+                            batch_size=batch_size if batch_size > 0 else len(y_subtrain),
+                            validation_batch_size=batch_size if batch_size > 0 else len(y_val),
                             callbacks=callback_list)
 
         # Get the best epoch from early stopping
@@ -1106,7 +1123,7 @@ class ModelBuilder:
         model.fit(train_gen_comb,
                   steps_per_epoch=train_steps_comb,
                   epochs=best_epoch,
-                  batch_size=batch_size,
+                  batch_size=batch_size if batch_size > 0 else len(y_train),
                   callbacks=[checkpoint_cb])
 
         return history
@@ -1256,8 +1273,9 @@ class ModelBuilder:
         history = model.fit(X_subtrain, {'regression_head': y_subtrain},
                             sample_weight=sample_weights,
                             epochs=epochs,
-                            batch_size=batch_size,
+                            batch_size=batch_size if batch_size > 0 else len(y_subtrain),
                             validation_data=(X_val, {'regression_head': y_val}, sample_val_weights),
+                            validation_batch_size=batch_size if batch_size > 0 else len(y_val),
                             callbacks=[early_stopping_cb, checkpoint_cb])
 
         # Find the best epoch from early stopping
@@ -1278,7 +1296,7 @@ class ModelBuilder:
         model.fit(X_train, {'regression_head': y_train},
                   sample_weight=sample_train_weights,
                   epochs=best_epoch,
-                  batch_size=batch_size,
+                  batch_size=batch_size if batch_size > 0 else len(y_train),
                   callbacks=[checkpoint_cb])
 
         # save the model weights
@@ -1454,7 +1472,8 @@ class ModelBuilder:
 
         lambda_coef = self.estimate_lambda_coef(model, X_subtrain, y_subtrain,
                                                 sample_weights,
-                                                learning_rate, epochs_for_estimation, batch_size)
+                                                learning_rate, epochs_for_estimation,
+                                                batch_size=batch_size if batch_size > 0 else len(y_subtrain))
 
         print(f"Lambda coefficient found: {lambda_coef}")
 
@@ -1482,8 +1501,9 @@ class ModelBuilder:
         history = model.fit(X_subtrain, y_dict,
                             sample_weight=sample_weights,
                             epochs=epochs,
-                            batch_size=batch_size,
+                            batch_size=batch_size if batch_size > 0 else len(y_subtrain),
                             validation_data=(X_val, val_y_dict, sample_val_weights),
+                            validation_batch_size=batch_size if batch_size > 0 else len(y_val),
                             callbacks=[early_stopping_cb, checkpoint_cb])
 
         # Find the best epoch from early stopping
@@ -1504,7 +1524,7 @@ class ModelBuilder:
         model.fit(X_train, {'regression_head': y_train, 'decoder_head': X_train},
                   sample_weight=sample_train_weights,
                   epochs=best_epoch,
-                  batch_size=batch_size,
+                  batch_size=batch_size if batch_size > 0 else len(y_train),
                   callbacks=[checkpoint_cb])
 
         # Save the extended model weights
@@ -1835,7 +1855,6 @@ class InvestigateCallback(callbacks.Callback):
         """
         is_sep = y_train > sep_threshold
         return np.where(is_sep)[0]
-
 
     def save_percent_plot(self):
         # Plot the percentage of SEP-SEP pairs per epoch

@@ -49,7 +49,7 @@ def main():
     combined_train_x, combined_train_y = loader.combine(shuffled_train_x, shuffled_train_y, shuffled_val_x,
                                                         shuffled_val_y)
 
-    for batch_size in [32, 64, 128, 256, 300]:  # Replace with the batch sizes you're interested in
+    for batch_size in [32, 64, 128, 256, 300, -1]:  # Replace with the batch sizes you're interested in
         with mlflow.start_run(run_name=f"Batch_Size_{batch_size}"):
             # Automatic logging
             mlflow.tensorflow.autolog()

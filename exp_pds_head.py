@@ -134,8 +134,8 @@ def main():
 
     for model_type in ['features_reg']: #, 'features_reg', 'features_dec', 'features_reg_dec']:
         weight_path = "./10-29-2023/best_model_weights_2023-10-26_01-59-56.h5"
-        for batch_size, freeze in [(292, False), (292, True), (train_length, False), (train_length, True)]:
-            title = f'PDS head, {"with" if batch_size == 292 else "without"} batches,\
+        for batch_size, freeze in [(292, False), (292, True), (-1, False), (-1, True)]:
+            title = f'PDS head, {"with" if batch_size > 0 else "without"} batches,\
              {"frozen" if freeze else "fine-tuned"} features'
             print(title)
             with mlflow.start_run(run_name=f"PDS_DL_REG_128_Head_{batch_size}_freeze_{freeze}"):

@@ -64,7 +64,7 @@ def main():
     combined_train_x, combined_train_y = loader.combine(shuffled_train_x, shuffled_train_y, shuffled_val_x,
                                                         shuffled_val_y)
 
-    for batch_size in [300, train_length]:  # Replace with the batch sizes you're interested in
+    for batch_size in [300, -1]:  # Replace with the batch sizes you're interested in
         title = f'PDS, batche size {batch_size}'
         print(title)
         with mlflow.start_run(run_name=f"PDS_{batch_size}"):

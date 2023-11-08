@@ -25,7 +25,7 @@ mlflow.set_tracking_uri('https://dagshub.com/ERUD1T3/keras-functional-api.mlflow
 mlflow.set_experiment("low_batch_exps_ai_panthers")
 
 # List of seeds for multiple runs
-seeds = [42, 123]
+seeds = [0, 42, 123]
 
 
 def main():
@@ -63,7 +63,7 @@ def main():
         tf.random.set_seed(seed)
         random.seed(seed)
 
-        for batch_size in [4, train_length]:  # Replace with the batch sizes you're interested in
+        for batch_size in [4, -1]:  # Replace with the batch sizes you're interested in
             title = f'PDS, batche size {batch_size}, seed {seed}'
             print(title)
             with mlflow.start_run(run_name=f"PDS_{batch_size}_Seed_{seed}"):

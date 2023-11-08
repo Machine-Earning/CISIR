@@ -69,8 +69,8 @@ def main():
     elevateds, seps = count_above_threshold(shuffled_test_y)
     print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
 
-    for batch_size, freeze in [(292, False), (292, True), (train_length, False), (train_length, True)]:
-        title = f'rRT, {"with" if batch_size == 292 else "without"} batches, {"frozen" if freeze else "fine-tuned"} features'
+    for batch_size, freeze in [(292, False), (292, True), (-1, False), (-1, True)]:
+        title = f'rRT, {"with" if batch_size > 0 else "without"} batches, {"frozen" if freeze else "fine-tuned"} features'
         print(title)
         with mlflow.start_run(run_name=f"rRT_{batch_size}_freeze_{freeze}"):
             # Automatic logging

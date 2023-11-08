@@ -89,8 +89,8 @@ def main():
     elevateds, seps = count_above_threshold(shuffled_test_y)
     print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
 
-    for batch_size in [292, len_train]:
-        title = f'PDS, Dense Joint Loss, AE, {"with" if batch_size == 292 else "without"} batches'
+    for batch_size in [292, -1]:
+        title = f'PDS, Dense Joint Loss, AE, {"with" if batch_size > 0 else "without"} batches'
         print(title)
         with mlflow.start_run(run_name=f"PDS_DL_AE_{batch_size}"):
             # Automatic logging
