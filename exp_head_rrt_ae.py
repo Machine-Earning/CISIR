@@ -110,11 +110,11 @@ def main():
 
             file_path = plot_tsne_extended(feat_reg_ae, combined_train_x, combined_train_y, title,
                                            'rrtae_stage1_training_',
-                                           model_type='features_reg_dec', save_tag=timestamp)
+                                           model_type='features_reg_dec', save_tag=timestamp, seed=SEED)
             mlflow.log_artifact(file_path)
             file_path = plot_tsne_extended(feat_reg_ae, shuffled_test_x, shuffled_test_y, title,
                                            'rrtae_stage1_testing_',
-                                           model_type='features_reg_dec', save_tag=timestamp)
+                                           model_type='features_reg_dec', save_tag=timestamp, seed=SEED)
             mlflow.log_artifact(file_path)
             # add the regression head with dense weighting
             regressor = mb.add_reg_proj_head(feat_reg_ae, freeze_features=freeze)
@@ -143,10 +143,10 @@ def main():
 
             file_path = plot_tsne_extended(regressor, combined_train_x, combined_train_y, title,
                                            'rrtae_stage2_training_',
-                                           save_tag=timestamp)
+                                           save_tag=timestamp, seed=SEED)
             mlflow.log_artifact(file_path)
             file_path = plot_tsne_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'rrtae_stage2_testing_',
-                                           save_tag=timestamp)
+                                           save_tag=timestamp, seed=SEED)
             mlflow.log_artifact(file_path)
             ev = eval.Evaluator()
             metrics = ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, title, threshold=10,

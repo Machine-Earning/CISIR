@@ -37,7 +37,7 @@ class DenseJointReweights:
     def __init__(self,
                  X, y,
                  alpha: float = .9,
-                 bw_factor: float = 1.8,
+                 bw: float = .9,
                  min_norm_weight: Optional[float] = None,
                  debug: bool = False) -> None:
         """
@@ -66,8 +66,8 @@ class DenseJointReweights:
         self.min_y = np.min(self.y_train)
         self.max_y = np.max(self.y_train)
 
-        self.kde = gaussian_kde(self.y_train, bw_method='scott')
-        self.adjust_bandwidth(self.kde, bw_factor)
+        self.kde = gaussian_kde(self.y_train, bw_method=bw)
+        # self.adjust_bandwidth(self.kde, bw_factor)
         self.jreweights, self.jindices = self.preprocess_jreweighting(self.y_train)  # for pairs of labels
 
         if self.debug:
@@ -298,7 +298,7 @@ class DenseReweights:
 
     def __init__(self, X, y,
                  alpha: float = .9,
-                 bandwidth: float = 0.9,
+                 bw: float = .9,
                  min_norm_weight: Optional[float] = None,
                  tag: Optional[str] = None,
                  debug: bool = False) -> None:
@@ -329,7 +329,7 @@ class DenseReweights:
         self.min_y = np.min(self.y_train)
         self.max_y = np.max(self.y_train)
 
-        self.kde = gaussian_kde(self.y_train, bw_method=bandwidth)
+        self.kde = gaussian_kde(self.y_train, bw_method=bw)
         # self.adjust_bandwidth(self.kde, bw_factor)
         self.reweights = self.preprocess_reweighting(self.y_train)  # for labels, order maintained
 

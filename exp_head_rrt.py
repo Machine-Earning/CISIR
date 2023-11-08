@@ -1,16 +1,15 @@
-import os
 import random
 from datetime import datetime
-
+import os
 import mlflow
 import mlflow.tensorflow
 import numpy as np
 import tensorflow as tf
-
 from dataload import DenseReweights as dr
 from dataload import seploader as sepl
 from evaluate import evaluation as eval
 from evaluate.utils import count_above_threshold, plot_tsne_extended
+# types for type hinting
 from models import modeling
 
 # Set the DagsHub credentials programmatically
@@ -42,7 +41,6 @@ def main():
 
     # data_path = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'
     data_path = './cme_and_electron/data'
-
     # check for gpus
     print(tf.config.list_physical_devices('GPU'))
     # Read the CSV file
@@ -51,8 +49,8 @@ def main():
         shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir(data_path)
 
     # combine and get weights
-    combined_train_x, combined_train_y = loader.combine(shuffled_train_x, shuffled_train_y, shuffled_val_x,
-                                                        shuffled_val_y)
+    combined_train_x, combined_train_y = loader.combine(
+        shuffled_train_x, shuffled_train_y, shuffled_val_x, shuffled_val_y)
     min_norm_weight = 0.01 / len(combined_train_y)
 
     # get validation sample weights based on dense weights
@@ -71,26 +69,61 @@ def main():
     elevateds, seps = count_above_threshold(shuffled_test_y)
     print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
 
-    for batch_size in [292, -1]:  # Replace with the batch sizes you're interested in
-        title = f'DenseLoss, {"with" if batch_size > 0 else "without"} batches'
+    for batch_size, freeze in [(292, False), (292, True), (-1, False), (-1, True)]:
+        title = f'rRT, {"with" if batch_size > 0 else "without"} batches, {"frozen" if freeze else "fine-tuned"} features'
         print(title)
-        with mlflow.start_run(run_name=f"RegNN_Batch_Size_{batch_size}"):
+        with mlflow.start_run(run_name=f"rRT_{batch_size}_freeze_{freeze}"):
             # Automatic logging
             mlflow.tensorflow.autolog()
             # Log the batch size
             mlflow.log_param("batch_size", batch_size)
-
+            mlflow.log_param("freeze features", freeze)
             mb = modeling.ModelBuilder()
 
             # create my feature extractor
-            regressor = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18])
+            feature_extractor_plus_head = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18])
+
+            # load weights to continue training
+            # feature_extractor_plus_head.load_weights('model_weights_2023-09-28_18-10-52.h5')
+            # print('weights model_weights_2023-09-28_18-10-52.h5 loaded successfully!')
 
             # Generate a timestamp
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # training
+            Options = {
+                'batch_size': batch_size,  # 768,
+                'epochs': 100000,
+                'patience': 25,
+                'learning_rate': 6e-4,
+            }
+
+            # print options used
+            print(Options)
+            mb.train_reg_head(feature_extractor_plus_head,
+                              shuffled_train_x, shuffled_train_y,
+                              shuffled_val_x, shuffled_val_y,
+                              combined_train_x, combined_train_y,
+                              learning_rate=Options['learning_rate'],
+                              epochs=Options['epochs'],
+                              batch_size=Options['batch_size'],
+                              patience=Options['patience'], save_tag='rrt_stage_1_' + timestamp)
+
+            file_path = plot_tsne_extended(feature_extractor_plus_head, combined_train_x, combined_train_y, title,
+                                           'rrt_stage1_training_',
+                                           save_tag=timestamp, seed=SEED)
+            mlflow.log_artifact(file_path)
+
+            file_path = plot_tsne_extended(feature_extractor_plus_head, shuffled_test_x, shuffled_test_y, title,
+                                           'rrt_stage1_testing_',
+                                           save_tag=timestamp, seed=SEED)
+            mlflow.log_artifact(file_path)
+
+            # add the regression head with dense weighting
+            regressor = mb.add_reg_proj_head(feature_extractor_plus_head, freeze_features=freeze)
 
             # training
             Options = {
-                'batch_size': batch_size,
+                'batch_size': batch_size,  # 768,
                 'epochs': 100000,
                 'patience': 25,
                 'learning_rate': 9e-4,
@@ -108,21 +141,17 @@ def main():
                               learning_rate=Options['learning_rate'],
                               epochs=Options['epochs'],
                               batch_size=Options['batch_size'],
-                              patience=Options['patience'], save_tag='reg_nn_' + timestamp)
+                              patience=Options['patience'], save_tag='rrt_stage_2_' + timestamp)
 
-            # Log model to DagsHub
-            mlflow.tensorflow.log_model(model=regressor, artifact_path="regnn_model")
-
-            file_path = plot_tsne_extended(regressor, combined_train_x, combined_train_y, title, 'reg_nn_training_',
-                                           save_tag=timestamp)
+            file_path = plot_tsne_extended(regressor, combined_train_x, combined_train_y, title, 'rrt_stage2_training_',
+                                           save_tag=timestamp, seed=SEED)
             mlflow.log_artifact(file_path)
-            file_path = plot_tsne_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'reg_nn_testing_',
-                                           save_tag=timestamp)
+            file_path = plot_tsne_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'rrt_stage2_testing_',
+                                           save_tag=timestamp, seed=SEED)
             mlflow.log_artifact(file_path)
-
             ev = eval.Evaluator()
             metrics = ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, title, threshold=10,
-                                  save_tag='reg_nn_test_' + timestamp)
+                                  save_tag='test_' + timestamp)
             # Log each metric in the dictionary
             for key, value in metrics.items():
                 if key == 'plot':
@@ -130,7 +159,7 @@ def main():
                 else:
                     mlflow.log_metric(key, value)  # Log other items as metrics
             metrics = ev.evaluate(regressor, combined_train_x, combined_train_y, title, threshold=10,
-                                  save_tag='reg_nn_training_' + timestamp)
+                                  save_tag='training_' + timestamp)
             # Log each metric in the dictionary
             for key, value in metrics.items():
                 if key == 'plot':

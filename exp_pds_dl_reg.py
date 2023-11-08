@@ -161,13 +161,13 @@ def main():
             file_path = plot_tsne_extended(feature_extractor,
                                            combined_train_x, combined_train_y, title, 'training',
                                            model_type='features_reg',
-                                           save_tag=timestamp)
+                                           save_tag=timestamp, seed=SEED)
             mlflow.log_artifact(file_path)
             print('file_path' + file_path)
             file_path = plot_tsne_extended(feature_extractor,
                                            shuffled_test_x, shuffled_test_y, title, 'testing',
                                            model_type='features_reg',
-                                           save_tag=timestamp)
+                                           save_tag=timestamp, seed=SEED)
             mlflow.log_artifact(file_path)
             print('file_path' + file_path)
 

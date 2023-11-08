@@ -147,14 +147,16 @@ def main():
                                           combined_train_x,
                                           combined_train_y,
                                           title, 'training',
-                                          save_tag=timestamp)
+                                          save_tag=timestamp,
+                                          seed=seed)
                 mlflow.log_artifact(file_path)
                 print('file_path' + file_path)
                 file_path = plot_tsne_pds(feature_extractor,
                                           shuffled_test_x,
                                           shuffled_test_y,
                                           title, 'testing',
-                                          save_tag=timestamp)
+                                          save_tag=timestamp,
+                                          seed=seed)
                 # Log t-SNE plot
                 mlflow.log_artifact(file_path)
                 print('file_path' + file_path)

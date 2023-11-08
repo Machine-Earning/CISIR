@@ -10,8 +10,6 @@ from dataload import seploader as sepl
 from evaluate import evaluation as eval
 from models import modeling
 
-SEED = 42  # seed number
-
 
 def split_combined_joint_weights_indices(
         combined_weights: np.ndarray,
@@ -44,7 +42,7 @@ def split_combined_joint_weights_indices(
     return np.array(train_weights), train_indices, np.array(val_weights), val_indices
 
 
-def plot_tsne_extended(model, X, y, title, prefix, model_type='features_reg', save_tag=None):
+def plot_tsne_extended(model, X, y, title, prefix, model_type='features_reg', save_tag=None, seed=42):
     """
     Applies t-SNE to the features extracted by the given model and saves the plot in 2D with a timestamp.
     The color of the points is determined by their label values.
@@ -75,7 +73,7 @@ def plot_tsne_extended(model, X, y, title, prefix, model_type='features_reg', sa
         features = model.predict(X)
 
     # Apply t-SNE
-    tsne = TSNE(n_components=2, random_state=42)
+    tsne = TSNE(n_components=2, random_state=seed)
     tsne_result = tsne.fit_transform(features)
 
     # Identify indices based on thresholds
@@ -211,7 +209,7 @@ def plot_2D_pds(model, X, y, title, prefix, save_tag=None):
     return file_path
 
 
-def plot_tsne_pds(model, X, y, title, prefix, save_tag=None):
+def plot_tsne_pds(model, X, y, title, prefix, save_tag=None, seed=42):
     """
     Applies t-SNE to the features extracted by the given model and saves the plot in 2D with a timestamp.
     The color of the points is determined by their label values.
@@ -233,7 +231,7 @@ def plot_tsne_pds(model, X, y, title, prefix, save_tag=None):
     features = model.predict(X)
 
     # Apply t-SNE
-    tsne = TSNE(n_components=2, random_state=SEED)
+    tsne = TSNE(n_components=2, random_state=seed)
     tsne_result = tsne.fit_transform(features)
 
     # Identify indices based on thresholds

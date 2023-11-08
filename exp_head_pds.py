@@ -183,10 +183,10 @@ def main():
                                   patience=Options['patience'], save_tag=timestamp)
 
                 file_path = plot_tsne_extended(regressor, combined_train_x, combined_train_y, title, 'training',
-                                               save_tag=timestamp)
+                                               save_tag=timestamp, seed=SEED)
                 mlflow.log_artifact(file_path)
                 file_path = plot_tsne_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'testing',
-                                               save_tag=timestamp)
+                                               save_tag=timestamp, seed=SEED)
                 mlflow.log_artifact(file_path)
 
                 ev = eval.Evaluator()
