@@ -212,8 +212,8 @@ class ModelBuilder:
         """
         Trains the model and returns the training history.
 
-        :param X_train:
-        :param y_train:
+        :param X_train: training and validation sets together
+        :param y_train: labels of training and validation sets together
         :param save_tag: tag to use for saving experiments
         :param model: The TensorFlow model to train.
         :param X_subtrain: The training feature set.
@@ -254,7 +254,7 @@ class ModelBuilder:
         # First train the model with a validation set to determine the best epoch
         history = model.fit(X_subtrain, y_subtrain,
                             epochs=epochs,
-                            batch_size=batch_size,
+                            batch_size=batch_size if batch_size > 0 else len(y_subtrain),
                             validation_data=(X_val, y_val),
                             callbacks=callback_list)
 
@@ -277,7 +277,9 @@ class ModelBuilder:
         # y_combined = np.concatenate((y_subtrain, y_val), axis=0)
 
         # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
-        model.fit(X_train, y_train, epochs=best_epoch, batch_size=batch_size,
+        model.fit(X_train, y_train,
+                  epochs=best_epoch,
+                  batch_size=batch_size if batch_size > 0 else len(y_train),
                   callbacks=[checkpoint_cb])
 
         # Evaluate the model on the entire training set
@@ -1647,7 +1649,7 @@ class ModelBuilder:
         batch_size = tf.cast(int_batch_size, dtype=tf.float32)
         total_error = tf.constant(0.0, dtype=tf.float32)
 
-        # tf.print(" received batch size:", int_batch_size)
+        tf.print(" received batch size:", int_batch_size)
         self.number_of_batches += 1
 
         # Loop through all unique pairs of samples in the batch
