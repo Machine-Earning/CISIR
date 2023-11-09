@@ -52,6 +52,7 @@ def update_tracking(results_tracking: dict, batch_size: int, metrics: dict) -> N
     results_tracking[batch_size].append(metrics)
 
 
+# Define the function to calculate statistics
 def calculate_statistics(results_tracking: dict) -> dict:
     """
     Calculate the mean and standard deviation for each metric across all runs.

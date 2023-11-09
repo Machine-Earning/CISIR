@@ -190,7 +190,10 @@ def main():
 
     print(test_results)
     test_stats = calculate_statistics(test_results)
+    print(test_stats)
+    print(training_results)
     training_stats = calculate_statistics(training_results)
+    print(training_stats)
 
     print('Testing Stats: ')
     print_statistics(test_stats)
