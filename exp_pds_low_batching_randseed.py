@@ -25,7 +25,7 @@ mlflow.set_tracking_uri('https://dagshub.com/ERUD1T3/keras-functional-api.mlflow
 mlflow.set_experiment("low_batch_exps_ai_panthers")
 
 # List of seeds for multiple runs
-seeds = [0] #, 42, 1000]
+seeds = [42, 1000]
 
 
 def main():
@@ -90,9 +90,9 @@ def main():
                 # training
                 Options = {
                     'batch_size': batch_size,
-                    'epochs': 2, #0000,
+                    'epochs': 10000,
                     'patience': 25,
-                    'learning_rate': 0.07,
+                    'learning_rate': 0.05,
                     'timestamp': timestamp
                 }
 

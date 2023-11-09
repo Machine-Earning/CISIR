@@ -1812,7 +1812,7 @@ class InvestigateCallback(callbacks.Callback):
             self.sep_sep_losses.append(sep_sep_loss)
 
         # Add the SEP-SEP count for the current batch to the cumulative count
-        sep_sep_count = int(self.model_builder.sep_sep_count)
+        sep_sep_count = int(self.model_builder.sep_sep_count.numpy())
         self.sep_sep_count += sep_sep_count
         self.cumulative_sep_sep_count += sep_sep_count
         self.cumulative_sep_sep_counts.append(self.cumulative_sep_sep_count)
@@ -1839,12 +1839,12 @@ class InvestigateCallback(callbacks.Callback):
         # Save the current counts
         self.sep_sep_counts.append(self.sep_sep_count)
         total_count = (
-                self.sep_sep_count +
-                int(self.model_builder.sep_elevated_count) +
-                int(self.model_builder.sep_background_count) +
-                int(self.model_builder.elevated_elevated_count) +
-                int(self.model_builder.elevated_background_count) +
-                int(self.model_builder.background_background_count)
+            self.sep_sep_count +
+            int(self.model_builder.sep_elevated_count.numpy()) +
+            int(self.model_builder.sep_background_count.numpy()) +
+            int(self.model_builder.elevated_elevated_count.numpy()) +
+            int(self.model_builder.elevated_background_count.numpy()) +
+            int(self.model_builder.background_background_count.numpy())
         )
         self.total_counts.append(total_count)
         self.batch_counts.append(int(self.model_builder.number_of_batches))
@@ -1864,6 +1864,7 @@ class InvestigateCallback(callbacks.Callback):
         self.model_builder.background_background_count.assign(0)
         self.sep_sep_count = 0
         self.model_builder.number_of_batches = 0
+        total_count = 0
 
     def on_train_end(self, logs=None):
         # At the end of training, save the loss plot
