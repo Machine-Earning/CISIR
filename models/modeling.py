@@ -1788,14 +1788,21 @@ class InvestigateCallback(callbacks.Callback):
         self.losses = []
         self.epochs_10s = []
         self.model_builder = model_builder
+        self.sep_sep_count = 0
         self.sep_sep_counts = []
+        self.cumulative_sep_sep_count = 0  # Initialize cumulative count
+        self.cumulative_sep_sep_counts = []
         self.total_counts = []
         self.batch_counts = []
         self.sep_sep_percentages = []
 
-    def on_epoch_end(self, epoch, logs=None):
-        # Find SEP samples
+    def on_batch_end(self, batch, logs=None):
+        """
+        Actions to be taken at the end of each batch.
 
+        :param batch: the index of the batch within the current epoch.
+        :param logs: the logs containing the metrics results.
+        """
         sep_indices = self.find_sep_samples(self.y_train, self.sep_threshold)
         if len(sep_indices) > 0:
             X_sep = self.X_train[sep_indices]
@@ -1803,7 +1810,26 @@ class InvestigateCallback(callbacks.Callback):
             # Evaluate the model on SEP samples
             sep_sep_loss = self.model.evaluate(X_sep, y_sep, verbose=0)
             self.sep_sep_losses.append(sep_sep_loss)
-            print(f" Epoch {epoch + 1}: SEP-SEP Loss: {sep_sep_loss}")
+
+        # Add the SEP-SEP count for the current batch to the cumulative count
+        sep_sep_count = int(self.model_builder.sep_sep_count)
+        self.sep_sep_count += sep_sep_count
+        self.cumulative_sep_sep_count += sep_sep_count
+        self.cumulative_sep_sep_counts.append(self.cumulative_sep_sep_count)
+        # Reset for next batch
+        self.model_builder.sep_sep_count.assign(0)
+
+    def on_epoch_end(self, epoch, logs=None):
+        # Find SEP samples
+
+        # sep_indices = self.find_sep_samples(self.y_train, self.sep_threshold)
+        # if len(sep_indices) > 0:
+        #     X_sep = self.X_train[sep_indices]
+        #     y_sep = self.y_train[sep_indices]
+        #     # Evaluate the model on SEP samples
+        #     sep_sep_loss = self.model.evaluate(X_sep, y_sep, verbose=0)
+        #     self.sep_sep_losses.append(sep_sep_loss)
+        #     print(f" Epoch {epoch + 1}: SEP-SEP Loss: {sep_sep_loss}")
 
         if epoch % 10 == 9:  # every 10th epoch (considering the first epoch is 0)
             loss = self.model.evaluate(self.X_train, self.y_train, verbose=0)
@@ -1811,10 +1837,9 @@ class InvestigateCallback(callbacks.Callback):
             self.epochs_10s.append(epoch + 1)
 
         # Save the current counts
-        sep_sep_count = int(self.model_builder.sep_sep_count)
-        self.sep_sep_counts.append(sep_sep_count)
+        self.sep_sep_counts.append(self.sep_sep_count)
         total_count = (
-                sep_sep_count +
+                self.sep_sep_count +
                 int(self.model_builder.sep_elevated_count) +
                 int(self.model_builder.sep_background_count) +
                 int(self.model_builder.elevated_elevated_count) +
@@ -1826,17 +1851,18 @@ class InvestigateCallback(callbacks.Callback):
 
         # Calculate and save the percentage of SEP-SEP pairs
         if total_count > 0:
-            self.sep_sep_percentages.append((sep_sep_count / total_count) * 100)
+            self.sep_sep_percentages.append((self.sep_sep_count / total_count) * 100)
         else:
             self.sep_sep_percentages.append(0)
 
         # Reset the counts for the next epoch
-        self.model_builder.sep_sep_count.assign(0)
+        # self.model_builder.sep_sep_count.assign(0)
         self.model_builder.sep_elevated_count.assign(0)
         self.model_builder.sep_background_count.assign(0)
         self.model_builder.elevated_elevated_count.assign(0)
         self.model_builder.elevated_background_count.assign(0)
         self.model_builder.background_background_count.assign(0)
+        self.sep_sep_count = 0
         self.model_builder.number_of_batches = 0
 
     def on_train_end(self, logs=None):
@@ -1899,8 +1925,8 @@ class InvestigateCallback(callbacks.Callback):
         """
         plt.figure()
         plt.plot(range(1, len(self.sep_sep_losses) + 1), self.sep_sep_losses, '-o', label='SEP Loss')
-        plt.title(f'SEP Loss Over Epochs, Batch Size {self.batch_size}')
-        plt.xlabel('Epoch')
+        plt.title(f'SEP Loss vs Batches, Batch Size {self.batch_size}')
+        plt.xlabel('batches')
         plt.ylabel('Loss')
         plt.legend()
         plt.grid(True)
@@ -1917,7 +1943,7 @@ class InvestigateCallback(callbacks.Callback):
         Plots the SEP-SEP loss against the SEP-SEP counts at the end of training.
         """
         plt.figure()
-        plt.scatter(self.sep_sep_counts, self.sep_sep_losses, c='blue', label='SEP-SEP Loss vs Frequency')
+        plt.scatter(self.cumulative_sep_sep_counts, self.sep_sep_losses, c='blue', label='SEP-SEP Loss vs Frequency')
         plt.title(f'SEP-SEP Loss vs Frequency, Batch Size {self.batch_size}')
         plt.xlabel('SEP-SEP Frequency')
         plt.ylabel('SEP-SEP Loss')
@@ -1939,7 +1965,7 @@ class InvestigateCallback(callbacks.Callback):
         """
         # Calculate the differences (delta) between consecutive losses and counts
         delta_losses = np.diff(self.sep_sep_losses)
-        delta_counts = np.diff(self.sep_sep_counts)
+        delta_counts = np.diff(self.cumulative_sep_sep_counts)
 
         # To avoid division by zero, we will replace zeros with a small value (epsilon)
         epsilon = 1e-8

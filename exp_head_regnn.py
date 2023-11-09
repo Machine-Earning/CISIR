@@ -158,6 +158,7 @@ def main():
                             mlflow.log_metric(key, value)  # Log other items as metrics
 
                     update_tracking(training_results, batch_size, metrics)
+
     print(test_results)
     test_stats = calculate_statistics(test_results)
     print(test_stats)
