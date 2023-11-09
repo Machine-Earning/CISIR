@@ -7,7 +7,11 @@ import mlflow.tensorflow
 from dataload import DenseReweights as dr
 from dataload import seploader as sepl
 from evaluate import evaluation as eval
-from evaluate.utils import count_above_threshold, plot_tsne_extended
+from evaluate.utils import count_above_threshold, \
+    plot_tsne_extended, \
+    update_tracking, \
+    calculate_statistics, \
+    print_statistics
 from models import modeling
 from typing import Optional, List
 import os
@@ -22,20 +26,13 @@ os.environ['MLFLOW_TRACKING_USERNAME'] = 'ERUD1T3'
 os.environ['MLFLOW_TRACKING_PASSWORD'] = '0b7739bcc448e3336dcc7437b505c44cc1801f9c'
 
 # Configure MLflow to connect to DagsHub
-mlflow.set_tracking_uri('https://dagshub.com/ERUD1T3/keras-functional-api.mlflow')
-mlflow.set_experiment("ai_panthers")
+mlflow.set_tracking_uri("http://127.0.0.1:5000/")
+mlflow.set_experiment("pds_exps")
 
-# SEEDING
-SEED = 42  # seed number 
-
-# Set NumPy seed
-np.random.seed(SEED)
-
-# Set TensorFlow seed
-tf.random.set_seed(SEED)
-
-# Set random seed
-random.seed(SEED)
+# trial seeds
+seeds = [0, 42, 69, 123, 1000]
+# folds
+folds = [1, 2, 3]
 
 
 def load_model_with_weights(model_type: str,
@@ -103,110 +100,140 @@ def main():
     """
 
     # data_path = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'
-    data_path = './cme_and_electron/data'
+    data_path = './cme_and_electron/folds'
     # check for gpus
     print(tf.config.list_physical_devices('GPU'))
     # Read the CSV file
     loader = sepl.SEPLoader()
-    shuffled_train_x, shuffled_train_y, shuffled_val_x, \
-        shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir(data_path)
+    # Initialize a nested dictionary to store the metrics
+    test_results = {}
+    training_results = {}
 
-    # combine and get weights
-    combined_train_x, combined_train_y = loader.combine(shuffled_train_x, shuffled_train_y, shuffled_val_x,
-                                                        shuffled_val_y)
-    min_norm_weight = 0.01 / len(combined_train_y)
+    for fold in folds:
+        shuffled_data = loader.load_fold_from_dir(data_path, fold)
+        shuffled_train_x = shuffled_data[0]
+        shuffled_train_y = shuffled_data[1]
+        shuffled_val_x = shuffled_data[2]
+        shuffled_val_y = shuffled_data[3]
+        shuffled_test_x = shuffled_data[4]
+        shuffled_test_y = shuffled_data[5]
 
-    # get validation sample weights based on dense weights
-    combined_sample_weights = dr.DenseReweights(
-        combined_train_x, combined_train_y, alpha=.9, min_norm_weight=min_norm_weight, debug=False).reweights
-    train_length = len(shuffled_train_y)
-    val_length = len(shuffled_val_y)
+        # combine and get weights
+        combined_train_x, combined_train_y = loader.combine(shuffled_train_x, shuffled_train_y, shuffled_val_x,
+                                                            shuffled_val_y)
+        min_norm_weight = 0.01 / len(combined_train_y)
 
-    sample_weights = combined_sample_weights[:train_length]
-    val_sample_weights = combined_sample_weights[train_length:train_length + val_length]
+        # get validation sample weights based on dense weights
+        combined_sample_weights = dr.DenseReweights(
+            combined_train_x, combined_train_y, alpha=.9, min_norm_weight=min_norm_weight, debug=False).reweights
+        train_length = len(shuffled_train_y)
+        val_length = len(shuffled_val_y)
 
-    elevateds, seps = count_above_threshold(shuffled_train_y)
-    print(f'Sub-Training set: elevated events: {elevateds}  and sep events: {seps}')
-    elevateds, seps = count_above_threshold(shuffled_val_y)
-    print(f'Validation set: elevated events: {elevateds}  and sep events: {seps}')
-    elevateds, seps = count_above_threshold(shuffled_test_y)
-    print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
+        sample_weights = combined_sample_weights[:train_length]
+        val_sample_weights = combined_sample_weights[train_length:train_length + val_length]
 
-    for model_type in ['features_reg']: #, 'features_reg', 'features_dec', 'features_reg_dec']:
-        weight_path = "./10-29-2023/best_model_weights_2023-10-26_01-59-56.h5"
-        for batch_size, freeze in [(292, False), (292, True), (-1, False), (-1, True)]:
-            title = f'PDS head, {"with" if batch_size > 0 else "without"} batches,\
-             {"frozen" if freeze else "fine-tuned"} features'
-            print(title)
-            with mlflow.start_run(run_name=f"PDS_DL_REG_128_Head_{batch_size}_freeze_{freeze}"):
-                # Automatic logging
-                mlflow.tensorflow.autolog()
-                # Log the batch size
-                mlflow.log_param("batch_size", batch_size)
-                mlflow.log_param("freeze features", freeze)
-                mlflow.log_param("model_type", model_type)
+        elevateds, seps = count_above_threshold(shuffled_train_y)
+        print(f'Sub-Training set: elevated events: {elevateds}  and sep events: {seps}')
+        elevateds, seps = count_above_threshold(shuffled_val_y)
+        print(f'Validation set: elevated events: {elevateds}  and sep events: {seps}')
+        elevateds, seps = count_above_threshold(shuffled_test_y)
+        print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
 
-                mb = modeling.ModelBuilder()
-                # load weights to continue training
-                feature_extractor = load_model_with_weights(
-                    model_type,
-                    weight_path,
-                )
-                # add the regression head with dense weighting
-                regressor = mb.add_reg_proj_head(feature_extractor, freeze_features=freeze, pds=True)
+        for seed in seeds:
+            # Set the seeds for reproducibility
+            np.random.seed(seed)
+            tf.random.set_seed(seed)
+            random.seed(seed)
 
-                # plot the model
-                mb.plot_model(regressor, 'pds_stage2')
+            for model_type in ['features_reg']:  # , 'features_reg', 'features_dec', 'features_reg_dec']:
+                weight_path = "./10-29-2023/best_model_weights_2023-10-26_01-59-56.h5"
+                for batch_size, freeze in [(292, False), (292, True), (-1, False), (-1, True)]:
+                    title = f'PDS head, {"with" if batch_size > 0 else "without"} batches,\
+                     {"frozen" if freeze else "fine-tuned"} features'
+                    print(title)
+                    with mlflow.start_run(
+                            run_name=f"PDS_DL_REG_128_Head_bs{batch_size}_freeze{freeze}_seed{seed}_fold{fold}"):
+                        # Automatic logging
+                        # mlflow.tensorflow.autolog()
+                        # Log the batch size
+                        mlflow.log_param("batch_size", batch_size)
+                        mlflow.log_param("freeze features", freeze)
+                        mlflow.log_param("model_type", model_type)
 
-                # Generate a timestamp
-                timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                # training
-                Options = {
-                    'batch_size': batch_size,  # len(shuffled_train_x), #768,
-                    'epochs': 100000,
-                    'patience': 25,
-                    'learning_rate': 6e-4,
-                }
+                        mb = modeling.ModelBuilder()
+                        # load weights to continue training
+                        feature_extractor = load_model_with_weights(
+                            model_type,
+                            weight_path,
+                        )
+                        # add the regression head with dense weighting
+                        regressor = mb.add_reg_proj_head(feature_extractor, freeze_features=freeze, pds=True)
 
-                # print options used
-                print(Options)
-                mb.train_reg_head(regressor,
-                                  shuffled_train_x, shuffled_train_y,
-                                  shuffled_val_x, shuffled_val_y,
-                                  combined_train_x, combined_train_y,
-                                  sample_weights=sample_weights,
-                                  sample_val_weights=val_sample_weights,
-                                  sample_train_weights=combined_sample_weights,
-                                  learning_rate=Options['learning_rate'],
-                                  epochs=Options['epochs'],
-                                  batch_size=Options['batch_size'],
-                                  patience=Options['patience'], save_tag=timestamp)
+                        # plot the model
+                        # mb.plot_model(regressor, 'pds_stage2')
 
-                file_path = plot_tsne_extended(regressor, combined_train_x, combined_train_y, title, 'training',
-                                               save_tag=timestamp, seed=SEED)
-                mlflow.log_artifact(file_path)
-                file_path = plot_tsne_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'testing',
-                                               save_tag=timestamp, seed=SEED)
-                mlflow.log_artifact(file_path)
+                        # Generate a timestamp
+                        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                        # training
+                        Options = {
+                            'batch_size': batch_size,  # len(shuffled_train_x), #768,
+                            'epochs': 100000,
+                            'patience': 25,
+                            'learning_rate': 9e-4,
+                            'timestamp': timestamp
+                        }
 
-                ev = eval.Evaluator()
-                metrics = ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, title, threshold=10,
-                                      save_tag='test_' + timestamp)
-                # Log each metric in the dictionary
-                for key, value in metrics.items():
-                    if key == 'plot':
-                        mlflow.log_artifact(value)  # Log the plot as an artifact
-                    else:
-                        mlflow.log_metric(key, value)  # Log other items as metrics
+                        # print options used
+                        print(Options)
+                        mlflow.log_params(Options)
+                        mb.train_reg_head(regressor,
+                                          shuffled_train_x, shuffled_train_y,
+                                          shuffled_val_x, shuffled_val_y,
+                                          combined_train_x, combined_train_y,
+                                          sample_weights=sample_weights,
+                                          sample_val_weights=val_sample_weights,
+                                          sample_train_weights=combined_sample_weights,
+                                          learning_rate=Options['learning_rate'],
+                                          epochs=Options['epochs'],
+                                          batch_size=Options['batch_size'],
+                                          patience=Options['patience'], save_tag=timestamp)
 
-                metrics = ev.evaluate(regressor, combined_train_x, combined_train_y, title, threshold=10,
-                                      save_tag='training_' + timestamp)
-                # Log each metric in the dictionary
-                for key, value in metrics.items():
-                    if key == 'plot':
-                        mlflow.log_artifact(value)  # Log the plot as an artifact
-                    else:
-                        mlflow.log_metric(key, value)  # Log other items as metrics
+                        file_path = plot_tsne_extended(regressor, combined_train_x, combined_train_y, title, 'training',
+                                                       save_tag=timestamp, seed=seed)
+                        mlflow.log_artifact(file_path)
+                        file_path = plot_tsne_extended(regressor, shuffled_test_x, shuffled_test_y, title, 'testing',
+                                                       save_tag=timestamp, seed=seed)
+                        mlflow.log_artifact(file_path)
+
+                        ev = eval.Evaluator()
+                        metrics = ev.evaluate(regressor, shuffled_test_x, shuffled_test_y, title, threshold=10,
+                                              save_tag='test_' + timestamp)
+                        # Log each metric in the dictionary
+                        for key, value in metrics.items():
+                            if key == 'plot':
+                                mlflow.log_artifact(value)  # Log the plot as an artifact
+                            else:
+                                mlflow.log_metric(key, value)  # Log other items as metrics
+                        update_tracking(test_results, batch_size, metrics)
+
+                        metrics = ev.evaluate(regressor, combined_train_x, combined_train_y, title, threshold=10,
+                                              save_tag='training_' + timestamp)
+                        # Log each metric in the dictionary
+                        for key, value in metrics.items():
+                            if key == 'plot':
+                                mlflow.log_artifact(value)  # Log the plot as an artifact
+                            else:
+                                mlflow.log_metric(key, value)  # Log other items as metrics
+                        update_tracking(training_results, batch_size, metrics)
+
+    print(test_results)
+    test_stats = calculate_statistics(test_results)
+    training_stats = calculate_statistics(training_results)
+
+    print('Testing Stats: ')
+    print_statistics(test_stats)
+    print('Training Stats: ')
+    print_statistics(training_stats)
 
 
 if __name__ == '__main__':

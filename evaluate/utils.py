@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,6 +9,75 @@ from sklearn.manifold import TSNE
 from dataload import seploader as sepl
 from evaluate import evaluation as eval
 from models import modeling
+
+
+def print_statistics(statistics: dict) -> None:
+    """
+    Prints the statistics for each metric and batch size in a formatted table with values rounded to three decimal places.
+
+    :param statistics: A dictionary containing the statistics for each batch size.
+    """
+    # Find all unique metrics across batch sizes
+    all_metrics = set()
+    for stats in statistics.values():
+        all_metrics.update(stats.keys())
+
+    # Print header
+    header = "Batch Size".ljust(15) + "".join(metric.ljust(20) for metric in sorted(all_metrics))
+    print(header)
+    print("-" * len(header))
+
+    # Print stats for each batch size
+    for batch_size, metrics in sorted(statistics.items()):
+        stats_str = f"{str(batch_size).ljust(15)}"
+        for metric in sorted(all_metrics):
+            mean = f"{metrics[metric]['mean']:.3f}" if metric in metrics else 'N/A'
+            std = f"{metrics[metric]['std']:.3f}" if metric in metrics else 'N/A'
+            stats_str += f"{f'{mean} (±{std})'.ljust(20)}"
+        print(stats_str)
+
+
+def update_tracking(results_tracking: dict, batch_size: int, metrics: dict) -> None:
+    """
+    Update the results tracking dictionary with the new metrics from a model run.
+
+    :param results_tracking: A dictionary to track the metrics for each method (batch size).
+    :param batch_size: The batch size used in the model run.
+    :param metrics: A dictionary containing the metrics from the model run.
+    """
+    if batch_size not in results_tracking:
+        results_tracking[batch_size] = []
+
+    # Append the metrics to the list for this batch size
+    results_tracking[batch_size].append(metrics)
+
+
+def calculate_statistics(results_tracking: dict) -> dict:
+    """
+    Calculate the mean and standard deviation for each metric across all runs.
+
+    :param results_tracking: A dictionary with batch size keys and lists of metric dictionaries as values.
+    :return: A dictionary with the calculated statistics for each metric.
+    """
+    statistics = {}
+    for batch_size, runs in results_tracking.items():
+        # Initialize a dictionary for this batch size
+        stats_for_batch = {}
+        # Exclude non-numeric metrics like 'plot'
+        numeric_metrics = {metric for metric in runs[0] if isinstance(runs[0][metric], (int, float))}
+
+        # Calculate mean and standard deviation for each numeric metric
+        for metric in numeric_metrics:
+            values = [run[metric] for run in runs]
+            stats_for_batch[metric] = {
+                'mean': np.mean(values),
+                'std': np.std(values)
+            }
+
+        # Assign the stats to the corresponding batch size
+        statistics[batch_size] = stats_for_batch
+
+    return statistics
 
 
 def split_combined_joint_weights_indices(

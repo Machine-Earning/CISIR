@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.utils import shuffle
 from typing import Tuple, Dict, Any, Optional
 
+
 class SEPLoader:
     def __init__(self):
         pass
@@ -49,23 +50,36 @@ class SEPLoader:
                 # Save the shuffled data to CSV files inside the fold directory
                 self.save_shuffled_data_to_csv(*shuffled_data, dir_name=fold_dir)
 
-
-
     def load_from_dir(self, dir_path: str):
         """
         Load the shuffled data sets from CSV files in a specified directory.
 
         :param dir_path: Directory path containing the shuffled CSV files.
-        :return: train_x, train_y, val_x, val_y, test_x, test_y
+        :return: data = (train_x, train_y, val_x, val_y, test_x, test_y)
         """
         train_file = os.path.join(dir_path, 'shuffled_train.csv')
         val_file = os.path.join(dir_path, 'shuffled_val.csv')
         test_file = os.path.join(dir_path, 'shuffled_test.csv')
 
-        train_x, train_y, val_x, val_y, test_x, test_y = self.read_shuffled_data_from_csv(train_file, val_file,
-                                                                                          test_file)
+        data = self.read_shuffled_data_from_csv(train_file, val_file, test_file)
 
-        return train_x, train_y, val_x, val_y, test_x, test_y
+        return data
+
+    def load_fold_from_dir(self, dir_path: str, fold_id: int):
+        """
+        Load the shuffled data sets from CSV files in a specified directory.
+
+        :param fold_id: the fold to load data from
+        :param dir_path: Directory path containing the shuffled CSV files.
+        :return: fold(train_x, train_y, val_x, val_y, test_x, test_y)
+        """
+        train_file = os.path.join(dir_path + f'/fold_{fold_id}', 'shuffled_train.csv')
+        val_file = os.path.join(dir_path + f'/fold_{fold_id}', 'shuffled_val.csv')
+        test_file = os.path.join(dir_path + f'/fold_{fold_id}', 'shuffled_test.csv')
+
+        fold_data = self.read_shuffled_data_from_csv(train_file, val_file, test_file)
+
+        return fold_data
 
     def combine(self, *data: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
