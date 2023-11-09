@@ -1,14 +1,14 @@
 #!/bin/bash
 
-#SBATCH --job-name=TestJob            # Job name
+#SBATCH --job-name=inves            # Job name
 #SBATCH --nodes=1                     # Number of nodes
 #SBATCH --ntasks=1                    # Number of tasks
-#SBATCH --mem=16GB                    # Memory per node
+#SBATCH --mem=32GB                    # Memory per node
 #SBATCH --time=infinite              # Time limit
 #SBATCH --partition=gpu2              # Partition, dynamically set
 #SBATCH --gres=gpu:1                  # Number of GPUs per node
-#SBATCH --output=testjob.%J.out       # Output file
-#SBATCH --error=testjob.%J.err        # Error file
+#SBATCH --output=inves.%J.out       # Output file
+#SBATCH --error=inves.%J.err        # Error file
 
 echo "Starting at date $(date)"
 

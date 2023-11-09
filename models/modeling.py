@@ -382,7 +382,7 @@ class ModelBuilder:
                   callbacks=[checkpoint_cb, investigate_cb])
 
         # Evaluate the model on the entire training set
-        entire_training_loss = model.evaluate(X_train, y_train)
+        entire_training_loss = model.evaluate(X_train, y_train, batch_size=len(y_train))
 
         # save the model weights
         model.save_weights(f"model_weights_{str(save_tag)}.h5")
@@ -1808,7 +1808,7 @@ class InvestigateCallback(callbacks.Callback):
             X_sep = self.X_train[sep_indices]
             y_sep = self.y_train[sep_indices]
             # Evaluate the model on SEP samples
-            sep_sep_loss = self.model.evaluate(X_sep, y_sep, verbose=0)
+            sep_sep_loss = self.model.evaluate(X_sep, y_sep,batch_size=len(self.y_train), verbose=0)
             self.sep_sep_losses.append(sep_sep_loss)
 
         # Add the SEP-SEP count for the current batch to the cumulative count
@@ -1832,7 +1832,7 @@ class InvestigateCallback(callbacks.Callback):
         #     print(f" Epoch {epoch + 1}: SEP-SEP Loss: {sep_sep_loss}")
 
         if epoch % 10 == 9:  # every 10th epoch (considering the first epoch is 0)
-            loss = self.model.evaluate(self.X_train, self.y_train, verbose=0)
+            loss = self.model.evaluate(self.X_train, self.y_train, batch_size=len(self.y_train), verbose=0)
             self.losses.append(loss)
             self.epochs_10s.append(epoch + 1)
 
@@ -1888,7 +1888,7 @@ class InvestigateCallback(callbacks.Callback):
         # Plot the percentage of SEP-SEP pairs per epoch
         epochs = list(range(1, len(self.sep_sep_percentages) + 1))
         plt.figure()
-        plt.plot(epochs, self.sep_sep_percentages, '-o', label='Percentage of SEP-SEP Pairs')
+        plt.plot(epochs, self.sep_sep_percentages, '-o', label='Percentage of SEP-SEP Pairs', markersize=3)
         plt.title(f'Percentage of SEP-SEP Pairs Per Epoch, Batch Size {self.batch_size}')
         plt.xlabel('Epoch')
         plt.ylabel('Percentage')
@@ -1905,7 +1905,7 @@ class InvestigateCallback(callbacks.Callback):
 
     def _save_plot(self):
         plt.figure()
-        plt.plot(self.epochs_10s, self.losses, '-o', label='Training Loss')
+        plt.plot(self.epochs_10s, self.losses, '-o', label='Training Loss', markersize=3)
         plt.title(f'Training Loss, Batch Size {self.batch_size}')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
@@ -1924,7 +1924,7 @@ class InvestigateCallback(callbacks.Callback):
         Saves a plot of the SEP loss at each epoch.
         """
         plt.figure()
-        plt.plot(range(1, len(self.sep_sep_losses) + 1), self.sep_sep_losses, '-o', label='SEP Loss')
+        plt.plot(range(1, len(self.sep_sep_losses) + 1), self.sep_sep_losses, '-o', label='SEP Loss', markersize=3)
         plt.title(f'SEP Loss vs Batches, Batch Size {self.batch_size}')
         plt.xlabel('batches')
         plt.ylabel('Loss')
@@ -1943,7 +1943,7 @@ class InvestigateCallback(callbacks.Callback):
         Plots the SEP-SEP loss against the SEP-SEP counts at the end of training.
         """
         plt.figure()
-        plt.scatter(self.cumulative_sep_sep_counts, self.sep_sep_losses, c='blue', label='SEP-SEP Loss vs Frequency')
+        plt.scatter(self.cumulative_sep_sep_counts, self.sep_sep_losses, c='blue', label='SEP-SEP Loss vs Frequency', s=9)
         plt.title(f'SEP-SEP Loss vs Frequency, Batch Size {self.batch_size}')
         plt.xlabel('SEP-SEP Frequency')
         plt.ylabel('SEP-SEP Loss')
@@ -1978,7 +1978,7 @@ class InvestigateCallback(callbacks.Callback):
         epochs = range(1, len(self.sep_sep_losses))
 
         plt.figure()
-        plt.plot(epochs, slopes, '-o', label='Slope of SEP-SEP Loss vs Frequency')
+        plt.plot(epochs, slopes, '-o', label='Slope of SEP-SEP Loss vs Frequency', markersize=3)
         plt.title(f'Slope of SEP-SEP Loss vs Frequency Change Per Epoch, Batch Size {self.batch_size}')
         plt.xlabel('Epoch')
         plt.ylabel('Slope')
