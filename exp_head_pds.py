@@ -27,7 +27,7 @@ os.environ['MLFLOW_TRACKING_PASSWORD'] = '0b7739bcc448e3336dcc7437b505c44cc1801f
 
 # Configure MLflow to connect to DagsHub
 mlflow.set_tracking_uri("http://127.0.0.1:5000/")
-mlflow.set_experiment("pds_exps")
+mlflow.set_experiment("pds_nobs_exps")
 
 # trial seeds
 seeds = [0, 42, 69, 123, 1000]
@@ -145,14 +145,15 @@ def main():
             tf.random.set_seed(seed)
             random.seed(seed)
 
-            for model_type in ['features_reg']:  # , 'features_reg', 'features_dec', 'features_reg_dec']:
-                weight_path = "./10-29-2023/best_model_weights_2023-10-26_01-59-56.h5"
+            for model_type in ['features']:  # , 'features_reg', 'features_dec', 'features_reg_dec']:
+                # weight_path = "model_weights_2023-11-09_02-36-09_features_4.h5"
+                weight_path = "model_weights_2023-11-09_02-43-36_features_-1.h5"
                 for batch_size, freeze in [(292, False), (292, True), (-1, False), (-1, True)]:
-                    title = f'PDS head, {"with" if batch_size > 0 else "without"} batches,\
+                    title = f'PDS No BS head, {"with" if batch_size > 0 else "without"} batches,\
                      {"frozen" if freeze else "fine-tuned"} features'
                     print(title)
                     with mlflow.start_run(
-                            run_name=f"PDS_DL_REG_128_Head_bs{batch_size}_freeze{freeze}_seed{seed}_fold{fold}"):
+                            run_name=f"PDS_nobs_Head_bs{batch_size}_freeze{freeze}_seed{seed}_fold{fold}"):
                         # Automatic logging
                         # mlflow.tensorflow.autolog()
                         # Log the batch size
