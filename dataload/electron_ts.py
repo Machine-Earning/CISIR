@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import os
+import matplotlib.dates as mdates
 
 
 # Define a function to load and preprocess the electron and proton fluxes data
@@ -107,9 +108,29 @@ def plot_fluxes(df_flux: pd.DataFrame, cme_time: datetime, start_hours_before: i
         axs[i].set_title(f'{column}')
         axs[i].grid(True)
 
+    # Define the date format you want, e.g., 'Hour:Minute'
+    date_format = mdates.DateFormatter('%H:%M')
+
+    # Format the CME date and time into a string
+    cme_date_str = cme_time.strftime('%m/%d/%Y')
+    cme_time_str = cme_time.strftime('%H:%M')
+
     # Add a red vertical line for the CME time in each subplot before hiding the last one
-    for ax in axs[:-1]:  # Exclude the last ax that will be hidden
-        ax.axvline(x=cme_time, color='r', linestyle='--', label='CME Time')
+    for i, ax in enumerate(axs[:-1]):  # Exclude the last ax that will be hidden
+        ax.xaxis.set_major_formatter(date_format)
+        # Update the title to include the date
+        if i < len(electron_flux_columns):
+            ax.set_title(f'Electron Flux: {electron_flux_columns[i]} on {cme_date_str}')
+        elif i < len(proton_flux_columns) + len(electron_flux_columns):
+            ax.set_title(f'Proton Flux: {proton_flux_columns[i - len(electron_flux_columns)]} on {cme_date_str}')
+        else:
+            ax.axis('off')
+            ax.text(0.5, 0.5, 'No Data', horizontalalignment='center', verticalalignment='center',
+                    transform=ax.transAxes, fontsize=14, color='gray')
+
+        # Plot and label the CME time with exact time
+        ax.axvline(x=cme_time, color='r', linestyle='--', label=f'CME Time: {cme_time_str}')
+        ax.legend()
 
     # Hide the last subplot (empty one) after plotting the red vertical lines
     axs[-1].axis('off')
@@ -117,7 +138,7 @@ def plot_fluxes(df_flux: pd.DataFrame, cme_time: datetime, start_hours_before: i
                     visible=False)  # Explicitly hide the line in the last subplot
 
     # Save the figure with a formatted filename based on the CME time and hours before/after
-    filename = f"{cme_time.strftime('%Y%m%d_%H%M')}_{start_hours_before}hbefore_{end_hours_after}hafter.png"
+    filename = f"{cme_time.strftime('%m_%d_%Y_%H_%M')}_{start_hours_before}hbefore_{end_hours_after}hafter.png"
     save_path = os.path.join(save_folder, filename)
     plt.savefig(save_path)
 
@@ -129,15 +150,20 @@ def plot_fluxes(df_flux: pd.DataFrame, cme_time: datetime, start_hours_before: i
 def main():
     # Load the data
     flux_data_path = 'D:/College/Fall2023/new_data/ephin5m.dat'
-    # cme_time_str = '4/18/2014 13:09'
-    cme_time_str = '8/14/2010 10:12'
+    cme_time_str = '4/18/2014 13:09'  # 59.031 pfu	1	4/18/2014 13:09
+    # cme_time_str = '8/14/2010 10:12'  # 14.608 pfu	1	8/14/2010 10:12 barely
+    # cme_time_str = '6/21/2015 2:48'  # 961.13 pfu	6/21/2015 2:48
+    # cme_time_str = '1/1/2016 23:12'  # 20.623	1	1/1/2016 23:12
+    # cme_time_str = '11/1/2014 5:12'  # 10.584	1	11/1/2014 5:12
+    # cme_time_str = '1/23/2012 4:00'  # 6198.6	1	1/23/2012 4:00
+
     # Convert CME_DONKI_time to datetime
     cme_time = datetime.strptime(cme_time_str, '%m/%d/%Y %H:%M')
 
     df_flux = load_flux_data(flux_data_path)
 
     # Define save folder path
-    save_folder = 'D:/College/Fall2023/New folder'
+    save_folder = 'D:/College/Fall2023/New folder/'
 
     # Ensure the save folder exists
     os.makedirs(save_folder, exist_ok=True)
