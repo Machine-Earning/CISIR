@@ -69,7 +69,7 @@ def plot_electron_flux(df_flux: pd.DataFrame, cme_time: datetime, start_hours_be
 
 
 def plot_fluxes(df_flux: pd.DataFrame, cme_time: datetime, start_hours_before: int, end_hours_after: int,
-                save_folder: str) -> None:
+                save_folder: str, title_suffix: str = '') -> None:
     """
     Plot the electron and proton flux data for a specific time range around a CME event in subplots and save the plots.
 
@@ -78,6 +78,7 @@ def plot_fluxes(df_flux: pd.DataFrame, cme_time: datetime, start_hours_before: i
     :param start_hours_before: How many hours before the CME to start plotting.
     :param end_hours_after: How many hours after the CME to end plotting.
     :param save_folder: The folder path where the plots will be saved.
+    :param title_suffix: Additional title information to be appended.
     """
 
     start_time = cme_time - timedelta(hours=start_hours_before)
@@ -85,91 +86,107 @@ def plot_fluxes(df_flux: pd.DataFrame, cme_time: datetime, start_hours_before: i
     df_selected = df_flux.loc[start_time:end_time]
 
     # Create a 4x3 grid of subplots
-    fig, axs = plt.subplots(4, 3, figsize=(20, 15))
+    fig, axs = plt.subplots(4, 3, figsize=(24, 18))
     axs = axs.flatten()  # Flatten the 4x3 array to easily iterate over it
 
-    # Plot electron fluxes in the first 4 subplots
+    # Define the electron and proton flux columns
     electron_flux_columns = [col for col in df_selected.columns if 'Electron_Flux' in col]
-    for i, column in enumerate(electron_flux_columns):
-        axs[i].plot(df_selected.index, df_selected[column], label=column)
-        axs[i].legend()
-        axs[i].set_xlabel('Time')
-        axs[i].set_ylabel('Flux (1/(cm^2 s sr MeV))')
-        axs[i].set_title(f'{column}')
-        axs[i].grid(True)
-
-    # Plot proton fluxes in the next 7 subplots
     proton_flux_columns = [col for col in df_selected.columns if 'Proton_Flux' in col]
-    for i, column in enumerate(proton_flux_columns, start=len(electron_flux_columns)):
-        axs[i].plot(df_selected.index, df_selected[column], label=column, color='orange')
-        axs[i].legend()
-        axs[i].set_xlabel('Time')
-        axs[i].set_ylabel('Flux (1/(cm^2 s sr MeV))')
-        axs[i].set_title(f'{column}')
-        axs[i].grid(True)
-
-    # Define the date format you want, e.g., 'Hour:Minute'
-    date_format = mdates.DateFormatter('%H:%M')
 
     # Format the CME date and time into a string
     cme_date_str = cme_time.strftime('%m/%d/%Y')
     cme_time_str = cme_time.strftime('%H:%M')
 
-    # Add a red vertical line for the CME time in each subplot before hiding the last one
-    for i, ax in enumerate(axs[:-1]):  # Exclude the last ax that will be hidden
+    # Define the date format for the x-axis labels
+    date_format = mdates.DateFormatter('%H:%M')
+
+    # Iterate over subplots to set titles, date format, and handle no data cases
+    for i, ax in enumerate(axs):
         ax.xaxis.set_major_formatter(date_format)
-        # Update the title to include the date
+        ax.grid(True)  # Enable grid
+        ax.set_xlabel('Time')
+        ax.set_ylabel('Flux (1/(cm^2 s sr MeV))')
+
+        # Determine whether to plot data or display 'No Data'
         if i < len(electron_flux_columns):
-            ax.set_title(f'Electron Flux: {electron_flux_columns[i]} on {cme_date_str}')
+            column = electron_flux_columns[i]
+            ax.set_title(f'Electron Flux: {column} on {cme_date_str}{title_suffix}', fontsize=10)
+            plot_color = 'blue'
         elif i < len(proton_flux_columns) + len(electron_flux_columns):
-            ax.set_title(f'Proton Flux: {proton_flux_columns[i - len(electron_flux_columns)]} on {cme_date_str}')
+            column = proton_flux_columns[i - len(electron_flux_columns)]
+            ax.set_title(f'Proton Flux: {column} on {cme_date_str}{title_suffix}', fontsize=10)
+            plot_color = 'orange'  # Different color for proton flux
         else:
             ax.axis('off')
+            continue  # Skip the rest of the loop for this ax
+
+        # Check for valid data
+        if df_selected[column].notna().any():
+            ax.plot(df_selected.index, df_selected[column], label=column, color=plot_color)
+            ax.axvline(x=cme_time, color='r', linestyle='--', label=f'CME Time: {cme_time_str}')
+            ax.legend()
+        else:
             ax.text(0.5, 0.5, 'No Data', horizontalalignment='center', verticalalignment='center',
                     transform=ax.transAxes, fontsize=14, color='gray')
 
-        # Plot and label the CME time with exact time
-        ax.axvline(x=cme_time, color='r', linestyle='--', label=f'CME Time: {cme_time_str}')
-        ax.legend()
+    # Use tight_layout with padding, or subplots_adjust for more control
+    plt.tight_layout(pad=1.8)  # Adjust padding as needed
+    # For more control, you can use:
+    # plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=None)
 
-    # Hide the last subplot (empty one) after plotting the red vertical lines
-    axs[-1].axis('off')
-    axs[-1].axvline(x=cme_time, color='r', linestyle='--', label='CME Time',
-                    visible=False)  # Explicitly hide the line in the last subplot
-
+    # Save the figure with adjusted layout
     # Save the figure with a formatted filename based on the CME time and hours before/after
-    filename = f"{cme_time.strftime('%m_%d_%Y_%H_%M')}_{start_hours_before}hbefore_{end_hours_after}hafter.png"
+    filename = f"{cme_time.strftime('%m_%d_%Y_%H_%M')}_{start_hours_before}hbefore_{end_hours_after}hafter{title_suffix.replace(' ', '_').replace(':', '_')}.png"
     save_path = os.path.join(save_folder, filename)
     plt.savefig(save_path)
 
-    plt.tight_layout()
-    plt.show()
+    # Close the figure after saving
+    plt.close(fig)
+
+
+def plot_high_intensity_events(data_path: str, threshold: float, flux_data: pd.DataFrame, save_folder: str):
+    # Read the CSV file
+    sep_data = pd.read_csv(data_path, usecols=['peak_intensity', 'CME_DONKI_time'])
+
+    # Filter events based on the threshold
+    high_intensity_events = sep_data[sep_data['peak_intensity'] > threshold]
+
+    # Iterate over each event and plot
+    for index, event in high_intensity_events.iterrows():
+        # Parse the CME time
+        cme_time = datetime.strptime(event['CME_DONKI_time'], '%m/%d/%Y %H:%M')
+
+        # Update filename and title with peak intensity
+        peak_intensity_str = str(event['peak_intensity'])
+        filename_suffix = f"_intensity_{peak_intensity_str.replace('.', '_')}"
+        plot_title_suffix = f" - Peak Intensity: {peak_intensity_str}"
+
+        # Call the plot_fluxes function with modified title and filename
+        # modified_save_folder = os.path.join(save_folder, filename_suffix)
+        # os.makedirs(modified_save_folder, exist_ok=True)
+        plot_fluxes(flux_data, cme_time, 6, 6, save_folder, plot_title_suffix)
 
 
 # Define main function to execute the workflow
 def main():
     # Load the data
     flux_data_path = 'D:/College/Fall2023/new_data/ephin5m.dat'
-    cme_time_str = '4/18/2014 13:09'  # 59.031 pfu	1	4/18/2014 13:09
+    # cme_time_str = '4/18/2014 13:09'  # 59.031 pfu	1	4/18/2014 13:09
     # cme_time_str = '8/14/2010 10:12'  # 14.608 pfu	1	8/14/2010 10:12 barely
     # cme_time_str = '6/21/2015 2:48'  # 961.13 pfu	6/21/2015 2:48
     # cme_time_str = '1/1/2016 23:12'  # 20.623	1	1/1/2016 23:12
     # cme_time_str = '11/1/2014 5:12'  # 10.584	1	11/1/2014 5:12
     # cme_time_str = '1/23/2012 4:00'  # 6198.6	1	1/23/2012 4:00
+    # cme_time_str = '3/7/2012 0:36'  # 5919.2	1	3/7/2012 0:36
 
-    # Convert CME_DONKI_time to datetime
-    cme_time = datetime.strptime(cme_time_str, '%m/%d/%Y %H:%M')
-
-    df_flux = load_flux_data(flux_data_path)
-
-    # Define save folder path
-    save_folder = 'D:/College/Fall2023/New folder/'
-
+    data_path = 'D:/College/Fall2023/new_data/SEP10MeV_Features.csv'
+    threshold = 10  # pfu so SEPs only
+    flux_data_path = 'D:/College/Fall2023/new_data/ephin5m.dat'
+    save_folder = 'D:/College/Fall2023/High_Intensity_Events/'
     # Ensure the save folder exists
     os.makedirs(save_folder, exist_ok=True)
-
-    # Call plot_fluxes with the save folder path
-    plot_fluxes(df_flux, cme_time, start_hours_before=6, end_hours_after=6, save_folder=save_folder)
+    df_flux = load_flux_data(flux_data_path)
+    plot_high_intensity_events(data_path, threshold, df_flux, save_folder)
 
 
 # Call the main function
