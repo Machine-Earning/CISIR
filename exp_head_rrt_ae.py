@@ -37,7 +37,7 @@ def main():
     Main function for testing the AI Panther
     :return: None
     """
-    # data_path = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'
+    # data_path = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/folds/fold_1'
     data_path = './cme_and_electron/folds'
 
     # check for gpus

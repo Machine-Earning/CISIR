@@ -42,11 +42,11 @@ def main():
     :return: None
     """
 
-    data_path = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'
-    # data_path = './cme_and_electron/data'
+    data_path = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/fold/fold_1'
+    # data_path = './cme_and_electron/fold/fold_1'
     # check for gpus
     print(tf.config.list_physical_devices('GPU'))
-    # data_path = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'
+    # data_path = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/fold/fold_1'
     # Read the CSV file
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \

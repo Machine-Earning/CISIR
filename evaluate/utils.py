@@ -440,7 +440,7 @@ def load_and_plot_tsne(
         model_path,
         model_type,
         title,
-        data_dir='/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data',
+        data_dir='/home1/jmoukpe2016/keras-functional-api/cme_and_electron/fold/fold_1',
         with_head=False):
     """
     Load a trained model and plot its t-SNE visualization.
@@ -518,7 +518,7 @@ def load_and_plot_tsne(
 
 
 def load_and_test(model_path, model_type, title, threshold=10,
-                  data_dir='/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'):
+                  data_dir='/home1/jmoukpe2016/keras-functional-api/cme_and_electron/fold/fold_1'):
     """
     Load a trained model and evaluate its performance.
 

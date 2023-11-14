@@ -38,7 +38,7 @@ def main():
     loader = sepl.SEPLoader()
     shuffled_train_x, shuffled_train_y, shuffled_val_x, \
         shuffled_val_y, shuffled_test_x, shuffled_test_y = loader.load_from_dir(
-        './cme_and_electron/data')
+        './cme_and_electron/fold/fold_1')
 
     # combine training and validation
     combined_train_x, combined_train_y = loader.combine(

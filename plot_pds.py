@@ -40,7 +40,7 @@ def main():
     # model_type = "features_reg_dec"
     # model_type = "features_reg"
     model_type = "features_dec"
-    data_dir = root + '/cme_and_electron/data'
+    data_dir = root + '/cme_and_electron/fold/fold_1'
 
     with mlflow.start_run(run_name=f"PDS_Stage1_DL_{model_type}"):
         # Automatic logging

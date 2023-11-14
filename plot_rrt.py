@@ -26,7 +26,7 @@ def main():
 
     model_path = "/home1/jmoukpe2016/keras-functional-api/10-4-2023/extended_model_weights_rrt_stage_2_2023-10-04_00-37-17.h5"
     model_type = "features_reg"
-    data_dir = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/data'
+    data_dir = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/fold/fold_1'
 
     load_and_plot_tsne(model_path, model_type, title, data_dir)
 
