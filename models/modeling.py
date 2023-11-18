@@ -418,6 +418,7 @@ class ModelBuilder:
                   epochs=best_epoch,
                   batch_size=batch_size if batch_size > 0 else len(y_train),
                   callbacks=[checkpoint_cb, investigate_cb])
+        # only investigates on the main training, not subtraining
 
         # Evaluate the model on the entire training set
         entire_training_loss = model.evaluate(X_train, y_train, batch_size=len(y_train))
@@ -1672,7 +1673,7 @@ class ModelBuilder:
         batch_size = tf.cast(int_batch_size, dtype=tf.float32)
         total_error = tf.constant(0.0, dtype=tf.float32)
 
-        tf.print(" received batch size:", int_batch_size)
+        # tf.print(" received batch size:", int_batch_size)
         self.number_of_batches += 1
 
         # Loop through all unique pairs of samples in the batch
@@ -1827,9 +1828,10 @@ class InvestigateCallback(callbacks.Callback):
             self.sep_sep_losses.append(sep_sep_loss)
 
         # Add the SEP-SEP count for the current batch to the cumulative count
-        sep_sep_count = int(self.model_builder.sep_sep_count.numpy())
-        self.sep_sep_count += sep_sep_count
-        self.cumulative_sep_sep_count += sep_sep_count
+        batch_sep_sep_count = int(self.model_builder.sep_sep_count.numpy())
+        print(f'end of batch: {batch}, sep_sep_count: {batch_sep_sep_count} in')
+        self.sep_sep_count += batch_sep_sep_count
+        self.cumulative_sep_sep_count += batch_sep_sep_count
         self.cumulative_sep_sep_counts.append(self.cumulative_sep_sep_count)
         # Reset for next batch
         self.model_builder.sep_sep_count.assign(0)
@@ -1858,7 +1860,7 @@ class InvestigateCallback(callbacks.Callback):
                 int(self.model_builder.background_background_count.numpy())
         )
         self.total_counts.append(total_count)
-        self.batch_counts.append(int(self.model_builder.number_of_batches))
+        self.batch_counts.append(self.model_builder.number_of_batches)
 
         # Calculate and save the percentage of SEP-SEP pairs
         if total_count > 0:
@@ -1875,7 +1877,6 @@ class InvestigateCallback(callbacks.Callback):
         self.model_builder.background_background_count.assign(0)
         self.sep_sep_count = 0
         self.model_builder.number_of_batches = 0
-        total_count = 0
 
         # if epoch % 10 == 9:  # every 10th epoch (considering the first epoch is 0)
         #     loss = self.model.evaluate(self.X_train, self.y_train, batch_size=len(self.y_train), verbose=0)
