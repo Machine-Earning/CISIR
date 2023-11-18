@@ -17,6 +17,44 @@ from tensorflow import Tensor
 from tensorflow.keras import layers, callbacks, Model
 
 
+def ydist(val1: float, val2: float) -> float:
+    """
+    Computes the squared distance between two label values.
+
+    :param val1: The first label value.
+    :param val2: The second label value.
+    :return: The squared distance.
+    """
+    return (val1 - val2) ** 2
+
+
+def zdist(vec1: Tensor, vec2: Tensor) -> float:
+    """
+    Computes the squared L2 norm distance between two input feature vectors.
+
+    :param vec1: The first input feature vector.
+    :param vec2: The second input feature vector.
+    :return: The squared L2 norm distance.
+    """
+    return tf.reduce_sum(tf.square(vec1 - vec2))
+
+
+def error(z1: Tensor, z2: Tensor, label1: float, label2: float) -> float:
+    """
+    Computes the error between the zdist of two input predicted z values and their ydist.
+    Range of the error is [0, 8].
+
+    :param z1: The predicted z value for the first input sample.
+    :param z2: The predicted z value for the second input sample.
+    :param label1: The label of the first input sample.
+    :param label2: The label of the second input sample.
+    :return: The squared difference between the zdist and ydist.
+    """
+    squared_difference = .5 * (zdist(z1, z2) - ydist(label1, label2)) ** 2
+    # added multiplication by .5 to reduce the error range to 0-8
+    return tf.reduce_sum(squared_difference)
+
+
 class ModelBuilder:
     """
     Class for building a neural network model.
@@ -1541,41 +1579,6 @@ class ModelBuilder:
         """
         tf.keras.utils.plot_model(model, to_file=f'./{name}.png', show_shapes=True, show_layer_names=True)
 
-    def zdist(self, vec1: Tensor, vec2: Tensor) -> float:
-        """
-        Computes the squared L2 norm distance between two input feature vectors.
-
-        :param vec1: The first input feature vector.
-        :param vec2: The second input feature vector.
-        :return: The squared L2 norm distance.
-        """
-        return tf.reduce_sum(tf.square(vec1 - vec2))
-
-    def ydist(self, val1: float, val2: float) -> float:
-        """
-        Computes the squared distance between two label values.
-
-        :param val1: The first label value.
-        :param val2: The second label value.
-        :return: The squared distance.
-        """
-        return (val1 - val2) ** 2
-
-    def error(self, z1: Tensor, z2: Tensor, label1: float, label2: float) -> float:
-        """
-        Computes the error between the zdist of two input predicted z values and their ydist.
-        Range of the error is [0, 8].
-
-        :param z1: The predicted z value for the first input sample.
-        :param z2: The predicted z value for the second input sample.
-        :param label1: The label of the first input sample.
-        :param label2: The label of the second input sample.
-        :return: The squared difference between the zdist and ydist.
-        """
-        squared_difference = .5 * (self.zdist(z1, z2) - self.ydist(label1, label2)) ** 2
-        # added multiplication by .5 to reduce the error range to 0-8
-        return tf.reduce_sum(squared_difference)
-
     def error_vectorized(self, z1: tf.Tensor, z2: tf.Tensor, label1: tf.Tensor, label2: tf.Tensor) -> tf.Tensor:
         """
         Vectorized function to compute the error between the zdist of two batches of input predicted z values
@@ -1615,7 +1618,7 @@ class ModelBuilder:
             for j in tf.range(i + 1, int_batch_size):
                 z1, z2 = z_pred[i], z_pred[j]
                 label1, label2 = y_true[i], y_true[j]
-                err = self.error(z1, z2, label1, label2)  # Assuming `error` is defined elsewhere in your code
+                err = error(z1, z2, label1, label2)  # Assuming `error` is defined elsewhere in your code
 
                 # Apply sample weights if provided
                 if sample_weights is not None:
@@ -1681,7 +1684,7 @@ class ModelBuilder:
                 # Update pair counts and check if it's a SEP-SEP pair
                 self.update_pair_counts(label1, label2)
                 # tf.print(label1, label2, sep=', ', end='\n')
-                err = self.error(z1, z2, label1, label2)
+                err = error(z1, z2, label1, label2)
                 # tf.print(err, end='\n\n')
                 total_error += tf.cast(err, dtype=tf.float32)
 
@@ -1783,10 +1786,11 @@ class InvestigateCallback(callbacks.Callback):
         self.y_train = y_train
         self.batch_size = batch_size if batch_size > 0 else None
         self.sep_threshold = np.log(10)
+        self.threshold = np.log(10.0 / np.exp(2))
         self.save_tag = save_tag
         self.sep_sep_losses = []
-        self.losses = []
-        self.epochs_10s = []
+        # self.losses = []
+        # self.epochs_10s = []
         self.model_builder = model_builder
         self.sep_sep_count = 0
         self.sep_sep_counts = []
@@ -1795,6 +1799,16 @@ class InvestigateCallback(callbacks.Callback):
         self.total_counts = []
         self.batch_counts = []
         self.sep_sep_percentages = []
+        # the losses
+        self.pair_type_losses = {  # Store losses for each pair type
+            'sep_sep': [],
+            'sep_elevated': [],
+            'sep_background': [],
+            'elevated_elevated': [],
+            'elevated_background': [],
+            'background_background': []
+        }
+        self.overall_losses = []  # Store overall losses
 
     def on_batch_end(self, batch, logs=None):
         """
@@ -1808,7 +1822,7 @@ class InvestigateCallback(callbacks.Callback):
             X_sep = self.X_train[sep_indices]
             y_sep = self.y_train[sep_indices]
             # Evaluate the model on SEP samples
-            sep_sep_loss = self.model.evaluate(X_sep, y_sep,batch_size=len(self.y_train), verbose=0)
+            sep_sep_loss = self.model.evaluate(X_sep, y_sep, batch_size=len(self.y_train), verbose=0)
             self.sep_sep_losses.append(sep_sep_loss)
 
         # Add the SEP-SEP count for the current batch to the cumulative count
@@ -1821,7 +1835,6 @@ class InvestigateCallback(callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         # Find SEP samples
-
         # sep_indices = self.find_sep_samples(self.y_train, self.sep_threshold)
         # if len(sep_indices) > 0:
         #     X_sep = self.X_train[sep_indices]
@@ -1831,10 +1844,7 @@ class InvestigateCallback(callbacks.Callback):
         #     self.sep_sep_losses.append(sep_sep_loss)
         #     print(f" Epoch {epoch + 1}: SEP-SEP Loss: {sep_sep_loss}")
 
-        if epoch % 10 == 9:  # every 10th epoch (considering the first epoch is 0)
-            loss = self.model.evaluate(self.X_train, self.y_train, batch_size=len(self.y_train), verbose=0)
-            self.losses.append(loss)
-            self.epochs_10s.append(epoch + 1)
+        self.collect_losses(epoch)
 
         # Save the current counts
         self.sep_sep_counts.append(self.sep_sep_count)
@@ -1866,24 +1876,77 @@ class InvestigateCallback(callbacks.Callback):
         self.model_builder.number_of_batches = 0
         total_count = 0
 
+        # if epoch % 10 == 9:  # every 10th epoch (considering the first epoch is 0)
+        #     loss = self.model.evaluate(self.X_train, self.y_train, batch_size=len(self.y_train), verbose=0)
+        #     self.losses.append(loss)
+        #     self.epochs_10s.append(epoch + 1)
+
     def on_train_end(self, logs=None):
         # At the end of training, save the loss plot
-        self.save_loss_plot()
-        self._save_plot()
+        # self.save_loss_plot()
+        # self._save_plot()
         self.save_percent_plot()
         self.save_sep_sep_loss_vs_frequency()
         self.save_slope_of_loss_vs_frequency()
+        self.save_combined_loss_plot()
 
-    def find_sep_samples(self, y_train: ndarray, sep_threshold: float) -> ndarray:
+    # def find_sep_samples(self, y_train: ndarray, sep_threshold: float) -> ndarray:
+    #     """
+    #     Identifies the indices of SEP samples in the training labels.
+    #
+    #     :param y_train: The array of training labels.
+    #     :param sep_threshold: The threshold used to identify SEP labels.
+    #     :return: The indices of SEP samples.
+    #     """
+    #     is_sep = y_train > sep_threshold
+    #     return np.where(is_sep)[0]
+
+    def find_sample_indices(self, y_train: ndarray) -> Tuple[ndarray, ndarray, ndarray]:
         """
-        Identifies the indices of SEP samples in the training labels.
+        Identifies the indices of SEP, elevated, and background samples in the training labels.
 
         :param y_train: The array of training labels.
-        :param sep_threshold: The threshold used to identify SEP labels.
-        :return: The indices of SEP samples.
+        :return: Three arrays containing the indices of SEP, elevated, and background samples respectively.
         """
-        is_sep = y_train > sep_threshold
-        return np.where(is_sep)[0]
+        is_sep = y_train > self.sep_threshold
+        is_elevated = (y_train > self.threshold) & (y_train <= self.sep_threshold)
+        is_background = y_train <= self.threshold
+
+        sep_indices = np.where(is_sep)[0]
+        elevated_indices = np.where(is_elevated)[0]
+        background_indices = np.where(is_background)[0]
+
+        return sep_indices, elevated_indices, background_indices
+
+    def save_combined_loss_plot(self):
+        """
+        Saves a combined plot of the losses for each pair type and the overall loss.
+        """
+        epochs = range(1, len(self.overall_losses) + 1)
+        plt.figure()
+        colors = ['blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black']  # Different colors for different curves
+        pair_types = list(self.pair_type_losses.keys()) + ['overall']
+
+        for i, pair_type in enumerate(pair_types):
+            if pair_type == 'overall':
+                losses = self.overall_losses
+            else:
+                losses = self.pair_type_losses[pair_type]
+            plt.plot(epochs, losses, '-o', label=f'{pair_type} Loss', color=colors[i], markersize=3)
+
+        plt.title(f'Losses per Pair Type and Overall Loss Per Epoch, Batch Size {self.batch_size}')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.grid(True)
+
+        if self.save_tag:
+            file_path = f"./investigation/combined_loss_plot_{self.save_tag}.png"
+        else:
+            file_path = "./investigation/combined_loss_plot.png"
+        plt.savefig(file_path)
+        plt.close()
+        print(f"Saved combined loss plot at {file_path}")
 
     def save_percent_plot(self):
         # Plot the percentage of SEP-SEP pairs per epoch
@@ -1903,41 +1966,6 @@ class InvestigateCallback(callbacks.Callback):
         plt.savefig(file_path)
         plt.close()
         print(f"Saved plot at {file_path}")
-
-    def _save_plot(self):
-        plt.figure()
-        plt.plot(self.epochs_10s, self.losses, '-o', label='Training Loss', markersize=3)
-        plt.title(f'Training Loss, Batch Size {self.batch_size}')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.legend()
-        plt.grid(True)
-        if self.save_tag:
-            file_path = f"./investigation/training_loss_plot_{str(self.save_tag)}.png"
-        else:
-            file_path = f"./investigation/training_loss_plot.png"
-        plt.savefig(file_path)
-        plt.close()
-        print(f"Saved plot at {file_path}")
-
-    def save_loss_plot(self):
-        """
-        Saves a plot of the SEP loss at each epoch.
-        """
-        plt.figure()
-        plt.plot(range(1, len(self.sep_sep_losses) + 1), self.sep_sep_losses, '-o', label='SEP Loss', markersize=3)
-        plt.title(f'SEP Loss vs Batches, Batch Size {self.batch_size}')
-        plt.xlabel('batches')
-        plt.ylabel('Loss')
-        plt.legend()
-        plt.grid(True)
-        if self.save_tag:
-            file_path = f"./investigation/sep_loss_plot_{self.save_tag}.png"
-        else:
-            file_path = "./investigation/sep_loss_plot.png"
-        plt.savefig(file_path)
-        plt.close()
-        print(f"Saved SEP loss plot at {file_path}")
 
     def save_sep_sep_loss_vs_frequency(self) -> None:
         """
@@ -1994,6 +2022,43 @@ class InvestigateCallback(callbacks.Callback):
         plt.savefig(file_path)
         plt.close()
         print(f"Saved Slope of Loss vs Counts plot at {file_path}")
+
+
+
+    # def _save_plot(self):
+    #     plt.figure()
+    #     plt.plot(self.epochs_10s, self.losses, '-o', label='Training Loss', markersize=3)
+    #     plt.title(f'Training Loss, Batch Size {self.batch_size}')
+    #     plt.xlabel('Epoch')
+    #     plt.ylabel('Loss')
+    #     plt.legend()
+    #     plt.grid(True)
+    #     if self.save_tag:
+    #         file_path = f"./investigation/training_loss_plot_{str(self.save_tag)}.png"
+    #     else:
+    #         file_path = f"./investigation/training_loss_plot.png"
+    #     plt.savefig(file_path)
+    #     plt.close()
+    #     print(f"Saved plot at {file_path}")
+
+    # def save_loss_plot(self):
+    #     """
+    #     Saves a plot of the SEP loss at each epoch.
+    #     """
+    #     plt.figure()
+    #     plt.plot(range(1, len(self.sep_sep_losses) + 1), self.sep_sep_losses, '-o', label='SEP Loss', markersize=3)
+    #     plt.title(f'SEP Loss vs Batches, Batch Size {self.batch_size}')
+    #     plt.xlabel('batches')
+    #     plt.ylabel('Loss')
+    #     plt.legend()
+    #     plt.grid(True)
+    #     if self.save_tag:
+    #         file_path = f"./investigation/sep_loss_plot_{self.save_tag}.png"
+    #     else:
+    #         file_path = "./investigation/sep_loss_plot.png"
+    #     plt.savefig(file_path)
+    #     plt.close()
+    #     print(f"Saved SEP loss plot at {file_path}")
 
 
 # Helper function to map 2D indices to 1D indices (assuming it's defined elsewhere in your code)
