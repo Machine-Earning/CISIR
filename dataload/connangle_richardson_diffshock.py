@@ -92,7 +92,7 @@ def calculate_diffusive_shock(df: pd.DataFrame, mev: int = 10) -> None:
         raise ValueError("Unsupported MeV value")
 
     # Calculate the v value based on MeV
-    #  v (Particle speed for 100 MeV protons): (3 * raw_v_in_km/s) * sqrt(1 - (1/((mev MeV + 938 MeV) / 938 MeV))^2)
+    #  v (Particle speed for mev MeV protons): (3 * raw_v_in_km/s) * sqrt(1 - (1/((mev MeV + 938 MeV) / 938 MeV))^2)
     #     Particle speed for 100 MeV protons: 138425 km/s
     #     Particle speed for 10 MeV protons: 43774 km/s
     raw_v = 138425 if mev == 100 else 43774

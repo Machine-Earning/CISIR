@@ -167,10 +167,111 @@ def plot_high_intensity_events(data_path: str, threshold: float, flux_data: pd.D
         plot_fluxes(flux_data, cme_time, 6, 6, save_folder, plot_title_suffix)
 
 
+# def add_electron_flux_features_to_SEP(df_flux: pd.DataFrame, sep_df: pd.DataFrame, channels: list,
+#                                       output_filepath: str):
+#     # Iterate over each row in the SEP DataFrame
+#     for index, row in sep_df.iterrows():
+#         cme_time_str = row['CME_DONKI_time']
+#         cme_time = datetime.strptime(cme_time_str, '%m/%d/%Y %H:%M')
+#         start_time = cme_time - timedelta(hours=2)
+#
+#         # Extract the relevant time range for this event
+#         df_selected = df_flux.loc[start_time:cme_time]
+#
+#         # Loop through each channel and add the columns to sep_df
+#         for channel in channels:
+#             # Resample the data to 5-minute intervals
+#             resampled_data = df_selected[channel].resample('5T').mean()
+#
+#             # Create column names based on time offset from CME and add them to sep_df
+#             for i, value in enumerate(resampled_data):
+#                 time_offset = (cme_time - resampled_data.index[i]).total_seconds() / 60  # minutes
+#                 col_name = f'{channel}_{int(time_offset)}min'
+#                 sep_df.at[index, col_name] = value
+#
+#     # Save the updated DataFrame to a file
+#     sep_df.to_csv(output_filepath, index=False)
+
+# def add_electron_flux_features_to_SEP(df_flux: pd.DataFrame, sep_df: pd.DataFrame, channels: list, output_filepath: str):
+#     # Initialize a list to hold temporary DataFrames
+#     temp_dfs = []
+#
+#     # Iterate over each row in the SEP DataFrame
+#     for index, row in sep_df.iterrows():
+#         cme_time_str = row['CME_DONKI_time']
+#         cme_time = datetime.strptime(cme_time_str, '%m/%d/%Y %H:%M')
+#         start_time = cme_time - timedelta(hours=2)
+#
+#         # Extract the relevant time range for this event
+#         df_selected = df_flux.loc[start_time:cme_time]
+#
+#         # Create a dictionary to hold features for this event
+#         temp_features = {}
+#
+#         # Loop through each channel and add the features to the dictionary
+#         for channel in channels:
+#             # Resample the data to 5-minute intervals
+#             resampled_data = df_selected[channel].resample('5T').mean()
+#
+#             # Create column names and add them to the dictionary
+#             for i, value in enumerate(resampled_data):
+#                 time_offset = (cme_time - resampled_data.index[i]).total_seconds() / 60  # minutes
+#                 col_name = f'{channel}_{int(time_offset)}min'
+#                 temp_features[col_name] = value
+#
+#         # Convert the dictionary to a DataFrame and append it to the list
+#         temp_df = pd.DataFrame(temp_features, index=[index])
+#         temp_dfs.append(temp_df)
+#
+#     # Concatenate all temporary DataFrames with the original sep_df
+#     features_df = pd.concat(temp_dfs, axis=0)
+#     updated_df = pd.concat([sep_df, features_df], axis=1)
+#
+#     # Save the updated DataFrame to a file
+#     updated_df.to_csv(output_filepath, index=False)
+
+def add_electron_flux_features_to_SEP(df_flux: pd.DataFrame, sep_df: pd.DataFrame, channels: list, output_filepath: str):
+    # Initialize a list to hold temporary DataFrames
+    temp_dfs = []
+
+    # Iterate over each row in the SEP DataFrame
+    for index, row in sep_df.iterrows():
+        cme_time_str = row['CME_DONKI_time']
+        cme_time = datetime.strptime(cme_time_str, '%m/%d/%Y %H:%M')
+        start_time = cme_time - timedelta(hours=2)
+
+        # Extract the relevant time range for this event
+        df_selected = df_flux.loc[start_time:cme_time]
+
+        # Create a dictionary to hold features for this event
+        temp_features = {}
+
+        # Loop through each channel and add the features to the dictionary
+        for channel in channels:
+            # Resample the data to 5-minute intervals
+            resampled_data = df_selected[channel].resample('5T').mean()
+
+            # Create column names and add them to the dictionary
+            for i, value in enumerate(resampled_data):
+                col_name = f'{channel}_t-{24-i}'  # "t-x" format
+                temp_features[col_name] = value
+
+        # Convert the dictionary to a DataFrame and append it to the list
+        temp_df = pd.DataFrame(temp_features, index=[index])
+        temp_dfs.append(temp_df)
+
+    # Concatenate all temporary DataFrames with the original sep_df
+    features_df = pd.concat(temp_dfs, axis=0)
+    updated_df = pd.concat([sep_df, features_df], axis=1)
+
+    # Save the updated DataFrame to a file
+    updated_df.to_csv(output_filepath, index=False)
+
+
 # Define main function to execute the workflow
 def main():
     # Load the data
-    flux_data_path = 'D:/College/Fall2023/new_data/ephin5m.dat'
+    # flux_data_path = 'D:/College/Fall2023/new_data/ephin5m.dat'
     # cme_time_str = '4/18/2014 13:09'  # 59.031 pfu	1	4/18/2014 13:09
     # cme_time_str = '8/14/2010 10:12'  # 14.608 pfu	1	8/14/2010 10:12 barely
     # cme_time_str = '6/21/2015 2:48'  # 961.13 pfu	6/21/2015 2:48
@@ -182,11 +283,18 @@ def main():
     data_path = 'D:/College/Fall2023/new_data/SEP10MeV_Features.csv'
     threshold = 10  # pfu so SEPs only
     flux_data_path = 'D:/College/Fall2023/new_data/ephin5m.dat'
-    save_folder = 'D:/College/Fall2023/High_Intensity_Events/'
-    # Ensure the save folder exists
-    os.makedirs(save_folder, exist_ok=True)
+    # save_folder = 'D:/College/Fall2023/High_Intensity_Events/'
+    # # Ensure the save folder exists
+    # os.makedirs(save_folder, exist_ok=True)
+    # df_flux = load_flux_data(flux_data_path)
+    # plot_high_intensity_events(data_path, threshold, df_flux, save_folder)
+
     df_flux = load_flux_data(flux_data_path)
-    plot_high_intensity_events(data_path, threshold, df_flux, save_folder)
+    sep_df = pd.read_csv(data_path)
+    channels = ['Electron_Flux_0.5MeV', 'Electron_Flux_1.8MeV', 'Electron_Flux_4.4MeV']
+    output_filepath = 'D:/College/Fall2023/new_data/Updated_SEP10MeV_Features2.csv'
+
+    add_electron_flux_features_to_SEP(df_flux, sep_df, channels, output_filepath)
 
 
 # Call the main function

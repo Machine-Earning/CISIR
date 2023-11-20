@@ -1836,6 +1836,24 @@ class InvestigateCallback(callbacks.Callback):
         # Reset for next batch
         self.model_builder.sep_sep_count.assign(0)
 
+    def on_epoch_begin(self, epoch, logs=None):
+        """
+        Actions to be taken at the beginning of each epoch.
+
+        :param epoch: the index of the epoch.
+        :param logs: the logs containing the metrics results.
+        """
+        # Resetting the counts
+        self.sep_sep_count = 0
+        self.cumulative_sep_sep_count = 0
+        self.model_builder.sep_sep_count.assign(0)
+        self.model_builder.sep_elevated_count.assign(0)
+        self.model_builder.sep_background_count.assign(0)
+        self.model_builder.elevated_elevated_count.assign(0)
+        self.model_builder.elevated_background_count.assign(0)
+        self.model_builder.background_background_count.assign(0)
+        self.model_builder.number_of_batches = 0
+
     def on_epoch_end(self, epoch, logs=None):
         # Find SEP samples
         # sep_indices = self.find_sep_samples(self.y_train, self.sep_threshold)
@@ -1939,32 +1957,60 @@ class InvestigateCallback(callbacks.Callback):
 
         return sep_indices, elevated_indices, background_indices
 
+    # def save_combined_loss_plot(self):
+    #     """
+    #     Saves a combined plot of the losses for each pair type and the overall loss.
+    #     """
+    #     epochs = range(1, len(self.overall_losses) + 1)
+    #     plt.figure()
+    #     colors = ['blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black']  # Different colors for different curves
+    #     pair_types = list(self.pair_type_losses.keys()) + ['overall']
+    #
+    #     for i, pair_type in enumerate(pair_types):
+    #         if pair_type == 'overall':
+    #             losses = self.overall_losses
+    #         else:
+    #             losses = self.pair_type_losses[pair_type]
+    #         plt.plot(epochs, losses, '-o', label=f'{pair_type} Loss', color=colors[i], markersize=3)
+    #
+    #     plt.title(f'Losses per Pair Type and Overall Loss Per Epoch, Batch Size {self.batch_size}')
+    #     plt.xlabel('Epoch')
+    #     plt.ylabel('Loss')
+    #     plt.legend()
+    #     plt.grid(True)
+    #
+    #     if self.save_tag:
+    #         file_path = f"./investigation/combined_loss_plot_{self.save_tag}.png"
+    #     else:
+    #         file_path = "./investigation/combined_loss_plot.png"
+    #     plt.savefig(file_path)
+    #     plt.close()
+    #     print(f"Saved combined loss plot at {file_path}")
+
     def save_combined_loss_plot(self):
         """
-        Saves a combined plot of the losses for each pair type and the overall loss.
+        Saves a combined plot of the losses for each pair type and the overall loss as separate subplots.
         """
         epochs = range(1, len(self.overall_losses) + 1)
-        plt.figure()
-        colors = ['blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black']  # Different colors for different curves
         pair_types = list(self.pair_type_losses.keys()) + ['overall']
+        num_subplots = len(pair_types)
+        colors = ['blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black']  # Different colors for each subplot
 
+        plt.figure(figsize=(15, 10))  # Adjust the figure size as needed
         for i, pair_type in enumerate(pair_types):
-            if pair_type == 'overall':
-                losses = self.overall_losses
-            else:
-                losses = self.pair_type_losses[pair_type]
+            plt.subplot(num_subplots, 1, i + 1)
+            losses = self.pair_type_losses[pair_type] if pair_type != 'overall' else self.overall_losses
             plt.plot(epochs, losses, '-o', label=f'{pair_type} Loss', color=colors[i], markersize=3)
+            plt.title(f'{pair_type} Loss')
+            plt.xlabel('Epoch')
+            plt.ylabel('Loss')
+            plt.legend()
+            plt.grid(True)
 
-        plt.title(f'Losses per Pair Type and Overall Loss Per Epoch, Batch Size {self.batch_size}')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.legend()
-        plt.grid(True)
+        plt.tight_layout()  # Adjust subplots to fit into the figure area.
 
-        if self.save_tag:
-            file_path = f"./investigation/combined_loss_plot_{self.save_tag}.png"
-        else:
-            file_path = "./investigation/combined_loss_plot.png"
+        file_name = f"combined_loss_plot_{self.save_tag}.png" if self.save_tag else "combined_loss_plot.png"
+        file_path = f"./investigation/{file_name}"
         plt.savefig(file_path)
         plt.close()
         print(f"Saved combined loss plot at {file_path}")
@@ -2151,17 +2197,15 @@ def repr_loss_eval_pairs(y_true, z_pred, reduction='none'):
             pair_counts[pair_type] += 1
             total_error += err
 
-    # Calculate average error for each pair type and overall
-    avg_pair_errors = {}
-    for pair_type, error_sum in pair_errors.items():
-        count = pair_counts[pair_type]
-        avg_pair_errors[pair_type] = (error_sum / count) if count > 0 else 0
-
+    # Apply reduction
     if reduction == 'sum':
-        avg_pair_errors['overall'] = total_error  # total loss
+        avg_pair_errors = {key: error_sum for key, error_sum in pair_errors.items()}
+        avg_pair_errors['overall'] = total_error
     elif reduction == 'none' or reduction == 'mean':
+        avg_pair_errors = {key: pair_errors[key] / pair_counts[key] if pair_counts[key] > 0 else 0 for key in
+                           pair_errors}
         denom = int_batch_size * (int_batch_size - 1) / 2 + 1e-9
-        avg_pair_errors['overall'] = total_error / denom  # average loss
+        avg_pair_errors['overall'] = total_error / denom
     else:
         raise ValueError(f"Unsupported reduction type: {reduction}.")
 
@@ -2215,8 +2259,7 @@ def evaluate(model, X, y, batch_size=-1, pairs=False):
     """
     if batch_size <= 0:
         z_pred = model.predict(X)
-        return repr_loss_eval_pairs(y, z_pred, reduction='none') if pairs else repr_loss_eval(y, z_pred,
-                                                                                              reduction='none')
+        return repr_loss_eval_pairs(y, z_pred) if pairs else repr_loss_eval(y, z_pred)
 
     total_loss = 0
     pair_losses = {key: 0.0 for key in
@@ -2231,12 +2274,12 @@ def evaluate(model, X, y, batch_size=-1, pairs=False):
         z_pred = model.predict(X_batch)
 
         if pairs:
-            batch_pair_losses = repr_loss_eval_pairs(y_batch, z_pred, reduction='none')
+            batch_pair_losses = repr_loss_eval_pairs(y_batch, z_pred)
             for key in batch_pair_losses:
                 pair_losses[key] += batch_pair_losses[key]
                 pair_counts[key] += 1  # Count each batch for each pair type
         else:
-            total_loss += repr_loss_eval(y_batch, z_pred, reduction='none')
+            total_loss += repr_loss_eval(y_batch, z_pred)
 
         total_batches += 1
 
