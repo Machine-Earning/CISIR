@@ -22,11 +22,11 @@ os.environ['MLFLOW_TRACKING_PASSWORD'] = '0b7739bcc448e3336dcc7437b505c44cc1801f
 
 # Configure MLflow to connect to DagsHub
 mlflow.set_tracking_uri('https://dagshub.com/ERUD1T3/keras-functional-api.mlflow')
-mlflow.set_experiment("low_batch_exps")
+mlflow.set_experiment("low_batch_exps_aip")
 
 # List of seeds for multiple runs
-# seeds = [42, 1000]
-seeds = [42]
+seeds = [42, 1000]
+# seeds = [42]
 
 
 def main():
@@ -34,8 +34,8 @@ def main():
     Main function for testing the AI Panther
     :return: None
     """
-    # data_path = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/fold/fold_1'
-    data_path = './cme_and_electron/folds/fold_1'
+    data_path = '/home1/jmoukpe2016/keras-functional-api/cme_and_electron/folds/fold_1'
+    # data_path = './cme_and_electron/folds/fold_1'
 
     # check for gpus
     print(tf.config.list_physical_devices('GPU'))
@@ -64,7 +64,7 @@ def main():
         tf.random.set_seed(seed)
         random.seed(seed)
 
-        for batch_size in [4]: #, -1]:  # Replace with the batch sizes you're interested in
+        for batch_size in [4, -1]:  # Replace with the batch sizes you're interested in
             title = f'PDS, batche size {batch_size}, seed {seed}'
             print(title)
             with mlflow.start_run(run_name=f"PDS_{batch_size}_Seed_{seed}"):
@@ -91,7 +91,7 @@ def main():
                 # training
                 Options = {
                     'batch_size': batch_size,
-                    'epochs': 10, #10000,
+                    'epochs': 10000,
                     'patience': 25,
                     'learning_rate': 0.05,
                     'timestamp': timestamp

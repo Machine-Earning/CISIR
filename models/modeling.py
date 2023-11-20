@@ -2093,7 +2093,7 @@ def repr_loss_eval(y_true, z_pred, reduction='none'):
     int_batch_size = len(z_pred)
     total_error = 0.0
 
-    print("received batch size in custom eval:", int_batch_size)
+    # print("received batch size in custom eval:", int_batch_size)
 
     # Loop through all unique pairs of samples in the batch
     for i in range(int_batch_size):
@@ -2136,7 +2136,7 @@ def repr_loss_eval_pairs(y_true, z_pred, reduction='none'):
     }
     pair_counts = {key: 0 for key in pair_errors.keys()}
 
-    print("Received batch size in custom eval:", int_batch_size)
+    # print("Received batch size in custom eval:", int_batch_size)
 
     # Loop through all unique pairs of samples in the batch
     for i in range(int_batch_size):
