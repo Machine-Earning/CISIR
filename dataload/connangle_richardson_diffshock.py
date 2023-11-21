@@ -95,10 +95,15 @@ def calculate_diffusive_shock(df: pd.DataFrame, mev: int = 10) -> None:
     #  v (Particle speed for mev MeV protons): (3 * raw_v_in_km/s) * sqrt(1 - (1/((mev MeV + 938 MeV) / 938 MeV))^2)
     #     Particle speed for 100 MeV protons: 138425 km/s
     #     Particle speed for 10 MeV protons: 43774 km/s
+    # raw_v is calculated using kinetic energy equation
+    # raw_v = sqrt ( 2* mev / (1.67 * 10^-27)  ) and converted from m/s to km/s
     raw_v = 138425 if mev == 100 else 43774
-    v_c = 3 * raw_v
-    v_gamma = (mev + 938.0) / 938.0
-    v = v_c * math.sqrt(1 - math.pow((1.0 / v_gamma), 2))
+
+    # v_c = 3 * raw_v
+    # v_gamma = (mev + 938.0) / 938.0
+    # v = v_c * math.sqrt(1 - math.pow((1.0 / v_gamma), 2))
+
+    v = raw_v  # according to Peter Tarsoly's thesis https://cs.fit.edu/~pkc/theses/tarsoly21.pdf
 
     # diffusive_shock = term_1 * term_2 * term_3 * term_4 * term_5
     # term_1 = N

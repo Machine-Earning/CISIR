@@ -1957,14 +1957,10 @@ class InvestigateCallback(callbacks.Callback):
 
         return sep_indices, elevated_indices, background_indices
 
-    # def save_combined_loss_plot(self):
-    #     """
-    #     Saves a combined plot of the losses for each pair type and the overall loss.
-    #     """
-    #     epochs = range(1, len(self.overall_losses) + 1)
-    #     plt.figure()
-    #     colors = ['blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black']  # Different colors for different curves
-    #     pair_types = list(self.pair_type_losses.keys()) + ['overall']
+    # def save_combined_loss_plot(self): """ Saves a combined plot of the losses for each pair type and the overall
+    # loss. """ epochs = range(1, len(self.overall_losses) + 1) plt.figure() colors = ['blue', 'green', 'red',
+    # 'cyan', 'magenta', 'yellow', 'black']  # Different colors for different curves pair_types = list(
+    # self.pair_type_losses.keys()) + ['overall']
     #
     #     for i, pair_type in enumerate(pair_types):
     #         if pair_type == 'overall':
