@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import os
 import matplotlib.dates as mdates
+from typing import List
 
 
 # Define a function to load and preprocess the electron and proton fluxes data
@@ -230,7 +231,25 @@ def plot_high_intensity_events(data_path: str, threshold: float, flux_data: pd.D
 #     # Save the updated DataFrame to a file
 #     updated_df.to_csv(output_filepath, index=False)
 
-def add_electron_flux_features_to_SEP(df_flux: pd.DataFrame, sep_df: pd.DataFrame, channels: list, output_filepath: str):
+def add_electron_flux_features_to_SEP(df_flux: pd.DataFrame, sep_df: pd.DataFrame,
+                                      channels: List[str], output_filepath: str) -> None:
+    """
+    Adds electron flux features to the SEP events DataFrame.
+
+    For each CME event in the SEP DataFrame, this function extracts electron flux data
+    for the specified channels for two hours leading up to the CME. The data is sampled
+    in 5-minute intervals. This information is then added as new columns to the SEP DataFrame.
+
+    Args:
+        df_flux (pd.DataFrame): DataFrame containing electron and proton flux data.
+        sep_df (pd.DataFrame): DataFrame containing SEP events data.
+        channels (List[str]): List of electron flux channels to include (e.g., 'Electron_Flux_0.5MeV').
+        output_filepath (str): File path where the updated DataFrame will be saved.
+
+    Returns:
+        None: The function saves the updated DataFrame to the specified filepath.
+    """
+
     # Initialize a list to hold temporary DataFrames
     temp_dfs = []
 
@@ -253,7 +272,7 @@ def add_electron_flux_features_to_SEP(df_flux: pd.DataFrame, sep_df: pd.DataFram
 
             # Create column names and add them to the dictionary
             for i, value in enumerate(resampled_data):
-                col_name = f'{channel}_t-{24-i}'  # "t-x" format
+                col_name = f'{channel}_t-{24 - i}'  # "t-x" format
                 temp_features[col_name] = value
 
         # Convert the dictionary to a DataFrame and append it to the list
