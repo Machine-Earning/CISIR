@@ -138,4 +138,4 @@ def calculate_average_duration(df: pd.DataFrame,
         plt.grid(True)
         plt.show()
 
-    return avg_duration
+    return avg_duration, len(durations)

@@ -168,69 +168,6 @@ def plot_high_intensity_events(data_path: str, threshold: float, flux_data: pd.D
         plot_fluxes(flux_data, cme_time, 6, 6, save_folder, plot_title_suffix)
 
 
-# def add_electron_flux_features_to_SEP(df_flux: pd.DataFrame, sep_df: pd.DataFrame, channels: list,
-#                                       output_filepath: str):
-#     # Iterate over each row in the SEP DataFrame
-#     for index, row in sep_df.iterrows():
-#         cme_time_str = row['CME_DONKI_time']
-#         cme_time = datetime.strptime(cme_time_str, '%m/%d/%Y %H:%M')
-#         start_time = cme_time - timedelta(hours=2)
-#
-#         # Extract the relevant time range for this event
-#         df_selected = df_flux.loc[start_time:cme_time]
-#
-#         # Loop through each channel and add the columns to sep_df
-#         for channel in channels:
-#             # Resample the data to 5-minute intervals
-#             resampled_data = df_selected[channel].resample('5T').mean()
-#
-#             # Create column names based on time offset from CME and add them to sep_df
-#             for i, value in enumerate(resampled_data):
-#                 time_offset = (cme_time - resampled_data.index[i]).total_seconds() / 60  # minutes
-#                 col_name = f'{channel}_{int(time_offset)}min'
-#                 sep_df.at[index, col_name] = value
-#
-#     # Save the updated DataFrame to a file
-#     sep_df.to_csv(output_filepath, index=False)
-
-# def add_electron_flux_features_to_SEP(df_flux: pd.DataFrame, sep_df: pd.DataFrame, channels: list, output_filepath: str):
-#     # Initialize a list to hold temporary DataFrames
-#     temp_dfs = []
-#
-#     # Iterate over each row in the SEP DataFrame
-#     for index, row in sep_df.iterrows():
-#         cme_time_str = row['CME_DONKI_time']
-#         cme_time = datetime.strptime(cme_time_str, '%m/%d/%Y %H:%M')
-#         start_time = cme_time - timedelta(hours=2)
-#
-#         # Extract the relevant time range for this event
-#         df_selected = df_flux.loc[start_time:cme_time]
-#
-#         # Create a dictionary to hold features for this event
-#         temp_features = {}
-#
-#         # Loop through each channel and add the features to the dictionary
-#         for channel in channels:
-#             # Resample the data to 5-minute intervals
-#             resampled_data = df_selected[channel].resample('5T').mean()
-#
-#             # Create column names and add them to the dictionary
-#             for i, value in enumerate(resampled_data):
-#                 time_offset = (cme_time - resampled_data.index[i]).total_seconds() / 60  # minutes
-#                 col_name = f'{channel}_{int(time_offset)}min'
-#                 temp_features[col_name] = value
-#
-#         # Convert the dictionary to a DataFrame and append it to the list
-#         temp_df = pd.DataFrame(temp_features, index=[index])
-#         temp_dfs.append(temp_df)
-#
-#     # Concatenate all temporary DataFrames with the original sep_df
-#     features_df = pd.concat(temp_dfs, axis=0)
-#     updated_df = pd.concat([sep_df, features_df], axis=1)
-#
-#     # Save the updated DataFrame to a file
-#     updated_df.to_csv(output_filepath, index=False)
-
 def add_electron_flux_features_to_SEP(df_flux: pd.DataFrame, sep_df: pd.DataFrame,
                                       channels: List[str], output_filepath: str) -> None:
     """
