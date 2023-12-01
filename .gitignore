@@ -183,3 +183,5 @@ mlartifacts/
 
 #dataset file
 cme_and_electron/
+dataload/conn_angle_diffusive_shock_features_og.py
+dataload/code_snippet.py
