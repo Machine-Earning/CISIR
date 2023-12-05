@@ -112,7 +112,13 @@ def split_combined_joint_weights_indices(
     return np.array(train_weights), train_indices, np.array(val_weights), val_indices
 
 
-def plot_tsne_extended(model, X, y, title, prefix, model_type='features_reg', save_tag=None, seed=42):
+def plot_tsne_extended(
+        model, X, y,
+        title, prefix,
+        model_type='features_reg',
+        threshold: float = None, sep_threshold: float = None,
+        show_plot=False,
+        save_tag=None, seed=42):
     """
     Applies t-SNE to the features extracted by the given model and saves the plot in 2D with a timestamp.
     The color of the points is determined by their label values.
@@ -125,14 +131,23 @@ def plot_tsne_extended(model, X, y, title, prefix, model_type='features_reg', sa
     - prefix: Prefix for the file name
     - sep_shape: The shape of the marker to use for SEP events (above threshold).
     - model_type: The type of model to use (feature, feature_reg, features_reg_dec)
+    - threshold: Threshold for elevated events
+    - sep_threshold: Threshold for SEP events
     - save_tag: Optional tag to add to the saved file name
+    - seed: Random seed for t-SNE
+
 
     Returns:
     - Saves a 2D t-SNE plot to a file with a timestamp
     """
     # Define the thresholds
-    threshold = np.log(10 / np.exp(2)) + 1e-4
-    sep_threshold = np.log(10)
+    if threshold is None:
+        threshold = np.log(10 / np.exp(2)) + 1e-4
+    if sep_threshold is None:
+        sep_threshold = np.log(10)
+
+    # threshold = np.log(10 / np.exp(2)) + 1e-4
+    # sep_threshold = np.log(10)
 
     # Extract features using the trained extended model
     if model_type == 'features_reg_dec':
@@ -193,6 +208,10 @@ def plot_tsne_extended(model, X, y, title, prefix, model_type='features_reg', sa
     # Save the plot
     file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
     plt.savefig(file_path)
+
+    if show_plot:
+        plt.show()
+
     plt.close()
 
     return file_path
