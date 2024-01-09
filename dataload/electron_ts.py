@@ -160,7 +160,7 @@ def plot_high_intensity_events(data_path: str, threshold: float, flux_data: pd.D
         # Update filename and title with peak intensity
         peak_intensity_str = str(event['peak_intensity'])
         filename_suffix = f"_intensity_{peak_intensity_str.replace('.', '_')}"
-        plot_title_suffix = f" - Peak Intensity: {peak_intensity_str}"
+        plot_title_suffix = f" - Peak Intensity: {peak_intensity_str} -#{index}"
 
         # Call the plot_fluxes function with modified title and filename
         # modified_save_folder = os.path.join(save_folder, filename_suffix)
@@ -238,19 +238,19 @@ def main():
 
     data_path = 'D:/College/Fall2023/new_data/SEP10MeV_Features.csv'
     threshold = 10  # pfu so SEPs only
-    flux_data_path = 'D:/College/Fall2023/new_data/ephin5m.dat'
-    # save_folder = 'D:/College/Fall2023/High_Intensity_Events/'
+    flux_data_path = 'D:/College/Fall2023/new_data/ephin5m_v2.dat'
+    save_folder = 'D:/College/Fall2023/electron_cme_v4/flux_plots'
     # # Ensure the save folder exists
-    # os.makedirs(save_folder, exist_ok=True)
-    # df_flux = load_flux_data(flux_data_path)
-    # plot_high_intensity_events(data_path, threshold, df_flux, save_folder)
-
+    os.makedirs(save_folder, exist_ok=True)
     df_flux = load_flux_data(flux_data_path)
-    sep_df = pd.read_csv(data_path)
-    channels = ['Electron_Flux_0.5MeV', 'Electron_Flux_1.8MeV', 'Electron_Flux_4.4MeV']
-    output_filepath = 'D:/College/Fall2023/new_data/Updated_SEP10MeV_Features2.csv'
+    plot_high_intensity_events(data_path, threshold, df_flux, save_folder)
 
-    add_electron_flux_features_to_SEP(df_flux, sep_df, channels, output_filepath)
+    # df_flux = load_flux_data(flux_data_path)
+    # sep_df = pd.read_csv(data_path)
+    # channels = ['Electron_Flux_0.5MeV', 'Electron_Flux_1.8MeV', 'Electron_Flux_4.4MeV']
+    # output_filepath = 'D:/College/Fall2023/new_data/Updated_SEP10MeV_Features2.csv'
+    #
+    # add_electron_flux_features_to_SEP(df_flux, sep_df, channels, output_filepath)
 
 
 # Call the main function
