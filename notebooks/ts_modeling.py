@@ -317,7 +317,7 @@ def build_dataset(directory_path: str, shuffle_data: bool = True, apply_log: boo
         - apply_log (bool): Whether to apply a logarithmic transformation before normalization.
         - norm_target (bool): Whether to normalize the target data. False by default.
         - inputs_to_use (List[str]): List of input types to include in the dataset. Default is ['e0.5', 'e1.8', 'p'].
-        - add_slope (bool): If True, adds slope features to the dataset. Not implemented yet.
+        - add_slope (bool): If True, adds slope features to the dataset.
 
 
 
@@ -356,6 +356,19 @@ def build_dataset(directory_path: str, shuffle_data: bool = True, apply_log: boo
             input_data = data[input_columns]
             input_data_normalized = (input_data - input_data.min()) / (input_data.max() - input_data.min())
 
+            # Compute and add slopes (if specified)
+            if add_slope:
+                for input_type in inputs_to_use:
+                    # print(f"Computing slopes for {input_type}...")
+                    slope_column_names = generate_slope_column_names([input_type])  # Generate for current input type
+                    slope_values = compute_slope(input_data_normalized, input_type)
+                    for slope_column, slope_index in zip(slope_column_names, range(slope_values.shape[1])):
+                        # print(f"Adding {slope_column} to input data...")
+                        input_data_normalized[slope_column] = slope_values[:, slope_index]
+                    # input_columns.extend(slope_column_names)
+
+            print(input_data_normalized.columns)
+
             # Normalize targets between 0 and 1
             target_data = data[[target_column]]
             if norm_target:
@@ -365,7 +378,7 @@ def build_dataset(directory_path: str, shuffle_data: bool = True, apply_log: boo
 
             # Reshape inputs to be in the format [samples, time steps, features]
             # X = input_data_normalized.values.reshape((input_data_normalized.shape[0], 75, 1))
-            X = input_data_normalized.values.reshape((input_data_normalized.shape[0], 25 * len(inputs_to_use), 1))
+            X = input_data_normalized.values.reshape((input_data_normalized.shape[0], -1, 1))
 
             # Flatten targets to 1D array
             y = target_data_normalized.values.flatten()
@@ -383,6 +396,47 @@ def build_dataset(directory_path: str, shuffle_data: bool = True, apply_log: boo
         X_combined, y_combined = shuffle(X_combined, y_combined, random_state=seed_value)
 
     return X_combined, y_combined
+
+
+def generate_slope_column_names(inputs_to_use: List[str]) -> List[str]:
+    """
+    Generate slope column names for each input type based on the specified time steps.
+
+    For each input type, this function generates column names for slopes calculated between
+    consecutive time steps. It includes slopes from 'tminus24' to 'tminus2', and a special case
+    for the slope from 'tminus1' to 't'.
+
+    Parameters:
+    - inputs_to_use (List[str]): A list of input types for which to generate slope column names.
+
+    Returns:
+    - List[str]: A list of slope column names for all specified input types.
+    """
+    slope_column_names = []
+    for input_type in inputs_to_use:
+        # Slopes from tminus24 to tminus2
+        for i in range(24, 1, -1):
+            slope_column_names.append(f'{input_type}_slope_tminus{i}_to_tminus{i - 1}')
+        # Slope from tminus1 to t
+        slope_column_names.append(f'{input_type}_slope_tminus1_to_t')
+    return slope_column_names
+
+
+def compute_slope(data: pd.DataFrame, input_type: str) -> np.ndarray:
+    """
+    Compute the slope for a given input type across its time-series columns.
+
+    Parameters:
+    - data (pd.DataFrame): The DataFrame containing the data.
+    - input_type (str): The input type for which to compute the slope (e.g., 'e0.5').
+
+    Returns:
+    - np.ndarray: Array of slopes for the specified input type.
+    """
+    columns = [f'{input_type}_tminus{i}' for i in range(24, 0, -1)] + [f'{input_type}_t']
+    input_values = data[columns].values
+    slopes = np.diff(input_values, axis=1)  # /1 for 1 unit
+    return slopes
 
 
 def check_nan_in_dataset(dataset: np.ndarray, dataset_name: str) -> None:
@@ -497,6 +551,8 @@ def build_full_dataset(directory_path: str, shuffle_data: bool = True, apply_log
     Reads SEP event files from the specified directory, processes them to extract
     input and target data including cme features, normalizes the values between 0 and 1 for the columns
     of interest, excludes rows where proton intensity is -9999, and optionally shuffles the data.
+
+    TODO: needs to be updated
 
     Parameters:
     - directory_path (str): Path to the directory containing the sep_event_X files.
