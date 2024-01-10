@@ -367,7 +367,10 @@ def build_dataset(directory_path: str, shuffle_data: bool = True, apply_log: boo
                         input_data_normalized[slope_column] = slope_values[:, slope_index]
                     # input_columns.extend(slope_column_names)
 
-            # print(input_data_normalized.columns)
+            # print the columns one by one
+            # for col in input_data_normalized.columns:
+            #     print(col)
+            # order - e0.5, e1.8, p, e0.5 slope, e1.8 slope, p slope
 
             # Normalize targets between 0 and 1
             target_data = data[[target_column]]
@@ -831,8 +834,8 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
                                 model: tf.keras.Model, input_columns: List[str], target_column: str,
                                 normalize_target: bool = False,
                                 using_cme: bool = False, using_cnns: bool = False, using_y_model: bool = True,
-                                title: str = None, n_features: int = 25, inputs_to_use: List[str] = None,
-                                add_slope: bool = True) -> float:
+                                title: str = None, inputs_to_use: List[str] = None,
+                                add_slope: bool = True) -> [float, str]:
     """
     Plots the SEP event data with actual and predicted proton intensities, electron intensity,
     and evaluates the model's performance using MAE.
@@ -852,7 +855,14 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
     - title (str): The title of the plot. Default is None.
     - inputs_to_use (List[str]): The list of input types to use. Default is None.
     - add_slope (bool): Whether to add slope features. Default is True.
+
+    Returns:
+    - Tuple[float, str]: A tuple containing the MAE loss and the plot title.
     """
+    if add_slope:
+        n_features = len(inputs_to_use) * (25 + 24)
+    else:
+        n_features = len(inputs_to_use) * 25
 
     # Extract and adjust the timestamp for plotting
     timestamps = pd.to_datetime(df['Timestamp']) + pd.Timedelta(minutes=30)
@@ -956,7 +966,7 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
     # Return the file location
     file_location = os.path.abspath(file_name)
     print(f"Saved plot to: {file_location}")
-    return mae_loss
+    return mae_loss, file_name
 
 
 def process_sep_events(
@@ -966,9 +976,8 @@ def process_sep_events(
         using_cnns: bool = False,
         using_y_model: bool = False,
         title: str = None,
-        n_features: int = 25,
         inputs_to_use: List[str] = None,
-        add_slope: bool = True) -> None:
+        add_slope: bool = True) -> str:
     """
     Processes SEP event files in the specified directory, normalizes flux intensities, predicts proton intensities,
     plots the results, and calculates the MAE for each file.
@@ -981,6 +990,9 @@ def process_sep_events(
     - title (str): The title of the plot. Default is None.
     - inputs_to_use (List[str]): List of input types to include in the dataset. Default is ['e0.5', 'e1.8', 'p'].
     - add_slope (bool): If True, adds slope features to the dataset.
+
+    Returns:
+    - str: The name of the plot file.
 
     The function assumes that the SEP event files are named in the format 'sep_event_X_filled_ie.csv',
     where 'X' is the event ID. It skips files where the proton intensity is -9999.
@@ -1024,14 +1036,15 @@ def process_sep_events(
                 # model_inputs = df[input_columns]
 
                 # Plot and evaluate the SEP event
-                mae_loss = plot_and_evaluate_sep_event(
+                mae_loss, plotname = plot_and_evaluate_sep_event(
                     df, cme_start_times, event_id, model,
                     input_columns, target_column, using_cme=using_cme,
                     using_cnns=using_cnns, using_y_model=using_y_model, title=title,
-                    n_features=n_features,
                     inputs_to_use=inputs_to_use, add_slope=add_slope)
 
                 print(f"Processed file: {file_name} with MAE: {mae_loss}")
+
+                return plotname
             except Exception as e:
                 print(f"Error processing file: {file_name}")
                 print(e)
@@ -1196,3 +1209,45 @@ def prepare_inputs_for_y_model(data: np.ndarray, cnn_input_dims=None, mlp_input_
     mlp_input = data[:, mlp_input_start:mlp_input_start + mlp_input_dim]
 
     return cnn_input_1, cnn_input_2, cnn_input_3, mlp_input
+
+
+def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_slope: bool = False) -> Tuple:
+    """
+    Splits the input data into parts for the CNN branches of the Y-shaped model,
+    dynamically based on the cnn_input_dims list. If with_slope is True,
+    additional inputs for slopes are added.
+
+    Parameters:
+    - data (np.ndarray): The combined input data array.
+    - cnn_input_dims (List[int]): The dimensions for each CNN input.
+    - with_slope (bool): Whether to add additional inputs for slopes.
+
+    Returns:
+    - Tuple: Tuple of arrays, each for CNN inputs.
+    """
+    if cnn_input_dims is None:
+        cnn_input_dims = [25]  # Default dimensions for each CNN input
+
+    # Initialize a list to store CNN inputs
+    cnn_inputs = []
+
+    # Calculate the total number of non-slope inputs
+    total_non_slope_dims = sum(cnn_input_dims)
+
+    # Generate CNN inputs based on cnn_input_dims for non-slope data
+    start_index = 0
+    for dim in cnn_input_dims:
+        end_index = start_index + dim
+        cnn_input = data[:, start_index:end_index].reshape((-1, dim, 1))
+        cnn_inputs.append(cnn_input)
+        start_index = end_index
+
+    if with_slope:
+        # Generate CNN inputs for slope data
+        for dim in cnn_input_dims:
+            slope_input_dim = dim - 1  # Slope input dimension is one less
+            slope_input = data[:, start_index:start_index + slope_input_dim].reshape((-1, slope_input_dim, 1))
+            cnn_inputs.append(slope_input)
+            start_index += slope_input_dim
+
+    return tuple(cnn_inputs)

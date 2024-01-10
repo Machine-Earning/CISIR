@@ -1,4 +1,4 @@
-from ts_modeling import build_dataset, create_mlp, evaluate_model, process_sep_events
+from ts_modeling import build_dataset, create_cnns, evaluate_model, process_sep_events, prepare_cnn_inputs
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 import matplotlib.pyplot as plt
@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 def main():
     """
-    Main function to run the E-MLP model
+    Main function to run the E-CNN model
     :return:
     """
 
@@ -16,7 +16,7 @@ def main():
     inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
     # Construct the title
-    title = f'MLP_{inputs_str}_add_slope_{str(add_slope)}'
+    title = f'CNN_{inputs_str}_add_slope_{str(add_slope)}'
 
     # Replace any other characters that are not suitable for filenames (if any)
     title = title.replace(' ', '_').replace(':', '_')
@@ -43,15 +43,16 @@ def main():
     print(f'X_train[0]: {X_train[0]}')
     print(f'y_train[0]: {y_train[0]}')
 
+    # x = S / 49
     # get the number of features
-    n_features = X_train.shape[1]
-    n_test_features = X_test.shape[1]
+    n_features = [25 * len(inputs_to_use)] + [24 * (len(inputs_to_use) - 1)]
+    n_test_features = [25 * len(inputs_to_use)] + [24 * (len(inputs_to_use) - 1)]
     print(f'n_features: {n_features}')
     print(f'n_test_features: {n_test_features}')
 
     # create the model
-    mlp_model_sep = create_mlp(input_dim=n_features, hiddens=[200, 200, 100])
-    mlp_model_sep.summary()
+    cnn_model_sep = create_cnns(input_dims=n_features)
+    cnn_model_sep.summary()
 
     # Set the early stopping patience and learning rate as variables
     patience = 50
@@ -62,13 +63,19 @@ def main():
                                    restore_best_weights=True)
 
     # Compile the model with the specified learning rate
-    mlp_model_sep.compile(optimizer=Adam(learning_rate=learning_rate), loss={'forecast_head': 'mse'})
+    cnn_model_sep.compile(optimizer=Adam(learning_rate=learning_rate), loss={'forecast_head': 'mse'})
+
+    # prepare cnn inputs
+    X_subtrain_cnn = prepare_cnn_inputs(X_subtrain, n_features, add_slope)
+    X_val_cnn = prepare_cnn_inputs(X_val, n_features, add_slope)
+    X_train_cnn = prepare_cnn_inputs(X_train, n_features, add_slope)
+    X_test_cnn = prepare_cnn_inputs(X_test, n_features, add_slope)
 
     # Train the model with the callback
-    history = mlp_model_sep.fit(X_subtrain,
+    history = cnn_model_sep.fit(X_subtrain_cnn,
                                 {'forecast_head': y_subtrain},
                                 epochs=1000, batch_size=32,
-                                validation_data=(X_val, {'forecast_head': y_val}),
+                                validation_data=(X_val_cnn, {'forecast_head': y_val}),
                                 callbacks=[early_stopping])
 
     # Plot the training and validation loss
@@ -80,28 +87,27 @@ def main():
     plt.ylabel('Loss')
     plt.legend()
     # save the plot
-    plt.savefig(f'mlp_loss_{title}.png')
+    plt.savefig(f'cnn_loss_{title}.png')
 
     # Determine the optimal number of epochs from early stopping
     optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
-    final_mlp_model_sep = create_mlp(input_dim=n_features, hiddens=[200, 200, 100])  # Recreate the model architecture
-    final_mlp_model_sep.compile(optimizer=Adam(learning_rate=learning_rate),
+    final_cnn_model_sep = create_cnns(input_dims=n_features)  # Recreate the model architecture
+    final_cnn_model_sep.compile(optimizer=Adam(learning_rate=learning_rate),
                                 loss={'forecast_head': 'mse'})  # Compile the model just like before
     # Train on the full dataset
-    final_mlp_model_sep.fit(X_train, {'forecast_head': y_train}, epochs=optimal_epochs, batch_size=32, verbose=1)
+    final_cnn_model_sep.fit(X_train_cnn, {'forecast_head': y_train}, epochs=optimal_epochs, batch_size=32, verbose=1)
 
     # evaluate the model on test data
-    error_mae = evaluate_model(final_mlp_model_sep, X_test, y_test)
+    error_mae = evaluate_model(final_cnn_model_sep, X_test_cnn, y_test)
     print(f'mae error: {error_mae}')
 
     # Process SEP event files in the specified directory
     test_directory = root_dir + '/testing'
     process_sep_events(
         test_directory,
-        mlp_model_sep,
+        final_cnn_model_sep,
         using_y_model=False,
         title=title,
-        n_features=n_test_features,
         inputs_to_use=inputs_to_use,
         add_slope=add_slope)
 
