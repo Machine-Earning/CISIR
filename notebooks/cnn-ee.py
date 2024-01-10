@@ -9,12 +9,26 @@ def main():
     Main function to run the E-MLP model
     :return:
     """
+
+    inputs_to_use = ['e0.5', 'e1.8']
+    add_slope = True
+    title = f'MLP-{inputs_to_use}-add_slope-{add_slope}'
+    # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
+    inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
+
+    # Construct the title
+    title = f'MLP_{inputs_str}_add_slope_{str(add_slope)}'
+
+    # Replace any other characters that are not suitable for filenames (if any)
+    title = title.replace(' ', '_').replace(':', '_')
+
+    # set the root directory
     root_dir = 'D:/College/Fall2023/electron_cme_v4/electron_cme_data_split'
     # build the dataset
-    X_train, y_train = build_dataset(root_dir + '/training')
-    X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining')
-    X_test, y_test = build_dataset(root_dir + '/testing')
-    X_val, y_val = build_dataset(root_dir + '/validation')
+    X_train, y_train = build_dataset(root_dir + '/training', inputs_to_use=inputs_to_use, add_slope=add_slope)
+    X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining', inputs_to_use=inputs_to_use, add_slope=add_slope)
+    X_test, y_test = build_dataset(root_dir + '/testing', inputs_to_use=inputs_to_use, add_slope=add_slope)
+    X_val, y_val = build_dataset(root_dir + '/validation', inputs_to_use=inputs_to_use, add_slope=add_slope)
 
     # print all data shapes
     print(f'X_train.shape: {X_train.shape}')
@@ -30,8 +44,14 @@ def main():
     print(f'X_train[0]: {X_train[0]}')
     print(f'y_train[0]: {y_train[0]}')
 
+    # get the number of features
+    n_features = X_train.shape[1]
+    n_test_features = X_test.shape[1]
+    print(f'n_features: {n_features}')
+    print(f'n_test_features: {n_test_features}')
+
     # create the model
-    mlp_model_sep = create_mlp(input_dim=75, hiddens=[100, 100, 50])
+    mlp_model_sep = create_mlp(input_dim=n_features, hiddens=[100, 100, 50])
     mlp_model_sep.summary()
 
     # Set the early stopping patience and learning rate as variables
@@ -61,11 +81,11 @@ def main():
     plt.ylabel('Loss')
     plt.legend()
     # save the plot
-    plt.savefig('mlp_loss.png')
+    plt.savefig(f'mlp_loss_{title}.png')
 
     # Determine the optimal number of epochs from early stopping
     optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
-    final_mlp_model_sep = create_mlp(input_dim=75, hiddens=[100, 100, 50])  # Recreate the model architecture
+    final_mlp_model_sep = create_mlp(input_dim=n_features, hiddens=[100, 100, 50])  # Recreate the model architecture
     final_mlp_model_sep.compile(optimizer=Adam(learning_rate=learning_rate),
                                 loss={'forecast_head': 'mse'})  # Compile the model just like before
     # Train on the full dataset
@@ -76,9 +96,15 @@ def main():
     print(f'mae error: {error_mae}')
 
     # Process SEP event files in the specified directory
-    test_directory = 'D:/College/Fall2023/electron_cme_v4/electron_cme_data_split/testing'
-    title = 'E-MLP'
-    process_sep_events(test_directory, final_mlp_model_sep, using_y_model=False, title=title)
+    test_directory = root_dir + '/testing'
+    process_sep_events(
+        test_directory,
+        mlp_model_sep,
+        using_y_model=False,
+        title=title,
+        n_features=n_test_features,
+        inputs_to_use=inputs_to_use,
+        add_slope=add_slope)
 
 
 if __name__ == '__main__':

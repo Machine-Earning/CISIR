@@ -367,7 +367,7 @@ def build_dataset(directory_path: str, shuffle_data: bool = True, apply_log: boo
                         input_data_normalized[slope_column] = slope_values[:, slope_index]
                     # input_columns.extend(slope_column_names)
 
-            print(input_data_normalized.columns)
+            # print(input_data_normalized.columns)
 
             # Normalize targets between 0 and 1
             target_data = data[[target_column]]
@@ -831,7 +831,8 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
                                 model: tf.keras.Model, input_columns: List[str], target_column: str,
                                 normalize_target: bool = False,
                                 using_cme: bool = False, using_cnns: bool = False, using_y_model: bool = True,
-                                title: str = None) -> float:
+                                title: str = None, n_features: int = 25, inputs_to_use: List[str] = None,
+                                add_slope: bool = True) -> float:
     """
     Plots the SEP event data with actual and predicted proton intensities, electron intensity,
     and evaluates the model's performance using MAE.
@@ -849,16 +850,29 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
     - using_cnns (bool): Whether the model uses CNNs. Default is False.
     - using_y_model (bool): Whether the model is a Y-shaped model. Default is False.
     - title (str): The title of the plot. Default is None.
+    - inputs_to_use (List[str]): The list of input types to use. Default is None.
+    - add_slope (bool): Whether to add slope features. Default is True.
     """
+
     # Extract and adjust the timestamp for plotting
     timestamps = pd.to_datetime(df['Timestamp']) + pd.Timedelta(minutes=30)
     t_timestamps = pd.to_datetime(df['Timestamp'])
     # Transform 't' column to log scale and plot
     e05_intensity_log = np.log1p(df['e0.5_t'])  # Using log1p for numerical stability
-    e18_intensity_log = np.log1p(df['e1.8_t'])  # Using log1p for numerical stability
+    if 'e1.8' in inputs_to_use:
+        e18_intensity_log = np.log1p(df['e1.8_t'])  # Using log1p for numerical stability
     # Normalize the flux intensities
     df_norm = normalize_flux(df, input_columns, apply_log=True)
-    X = df_norm[input_columns].values
+    # X = df_norm[input_columns].values
+    # slope_column_names = []
+    if add_slope:
+        for input_type in inputs_to_use:
+            slope_values = compute_slope(df_norm, input_type)
+            slope_column_names = generate_slope_column_names([input_type])
+            for slope_column, slope_index in zip(slope_column_names, range(slope_values.shape[1])):
+                df_norm[slope_column] = slope_values[:, slope_index]
+
+    X = df_norm[input_columns + generate_slope_column_names(inputs_to_use)].values
 
     if normalize_target:
         df_norm[target_column] = normalize_flux(df, [target_column], apply_log=True)[target_column]
@@ -872,17 +886,19 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
         cme_features = preprocess_cme_features(df)
         X_reshaped = np.concatenate([X, cme_features.values], axis=1)
     else:
-        # Reshape X to match the input shape expected by the model
-        # X_reshaped = X.reshape(-1, 75, 1)
-        X_reshaped = X.reshape(-1, 75, 1)
+        # Reshape X accordingly
+        # The '-1' in reshape indicates that the number of samples is automatically determined
+        # 'num_features' is the actual number of features in X
+        # '1' is for the third dimension, typically used for models expecting 3D input (like CNNs)
+        X_reshaped = X.reshape(-1, n_features, 1)
 
-    if using_y_model:
-        cnn_input1, cnn_input2, cnn_input3, mlp_input = prepare_inputs_for_y_model(X_reshaped)
-        X_reshaped = [cnn_input1, cnn_input2, cnn_input3, mlp_input]
-
-    if using_cnns:
-        cnn_input1, cnn_input2, cnn_input3 = prepare_cnn_inputs(X_reshaped)
-        X_reshaped = [cnn_input1, cnn_input2, cnn_input3]
+    # if using_y_model:
+    #     cnn_input1, cnn_input2, cnn_input3, mlp_input = prepare_inputs_for_y_model(X_reshaped)
+    #     X_reshaped = [cnn_input1, cnn_input2, cnn_input3, mlp_input]
+    #
+    # if using_cnns:
+    #     # cnn_input1, cnn_input2, cnn_input3 = prepare_cnn_inputs(X_reshaped)
+    #     X_reshaped = [cnn_input1, cnn_input2, cnn_input3]
 
     # Evaluate the model
     _, predictions = model.predict(X_reshaped)
@@ -898,9 +914,10 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
     plt.plot(timestamps, predictions.flatten(), label='Predicted Proton ln(Intensity)', color='red', linewidth=tlw)
     # electron_line, = plt.plot(t_timestamps, df['t'], label='Electron Intensity', color='blue')
     plt.plot(t_timestamps, e05_intensity_log, label='E 0.5 ln(Intensity)', color='orange', linewidth=lw)
-    plt.plot(t_timestamps, e18_intensity_log, label='E 1.8 ln(Intensity)', color='yellow', linewidth=lw)
+    if 'e1.8' in inputs_to_use:
+        plt.plot(t_timestamps, e18_intensity_log, label='E 1.8 ln(Intensity)', color='yellow', linewidth=lw)
     # Add a black horizontal line at log(0.05) on the y-axis and create a handle for the legend
-    threshold_value = 0.1
+    # threshold_value = 0.1
     # threshold_line = plt.axhline(y=threshold_value, color='black', linestyle='--', linewidth=lw, label='Threshold')
 
     # Create a custom legend handle for the CME start times
@@ -932,7 +949,7 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
     file_name = f'{title}_SEP_Event_{event_id}_MAE_{mae_loss:.4f}.png'
     plt.savefig(file_name)
 
-    plt.show()
+    # plt.show()
     # Close the plot
     plt.close()
 
@@ -942,8 +959,16 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
     return mae_loss
 
 
-def process_sep_events(directory: str, model: tf.keras.Model, using_cme: bool = False, using_cnns: bool = False,
-                       using_y_model: bool = False, title: str = None) -> None:
+def process_sep_events(
+        directory: str,
+        model: tf.keras.Model,
+        using_cme: bool = False,
+        using_cnns: bool = False,
+        using_y_model: bool = False,
+        title: str = None,
+        n_features: int = 25,
+        inputs_to_use: List[str] = None,
+        add_slope: bool = True) -> None:
     """
     Processes SEP event files in the specified directory, normalizes flux intensities, predicts proton intensities,
     plots the results, and calculates the MAE for each file.
@@ -954,18 +979,22 @@ def process_sep_events(directory: str, model: tf.keras.Model, using_cme: bool = 
     - using_cme (bool): Whether to use CME features. Default is False.
     - using_y_model (bool): Whether the model is a Y-shaped model. Default is False.
     - title (str): The title of the plot. Default is None.
+    - inputs_to_use (List[str]): List of input types to include in the dataset. Default is ['e0.5', 'e1.8', 'p'].
+    - add_slope (bool): If True, adds slope features to the dataset.
 
     The function assumes that the SEP event files are named in the format 'sep_event_X_filled_ie.csv',
     where 'X' is the event ID. It skips files where the proton intensity is -9999.
     Each file will be processed to plot actual vs predicted proton intensity and electron intensity.
     A MAE score will be printed for each file.
     """
-    # Define input columns for e0.5, e1.8, and proton intensities
-    input_columns = [f'e0.5_tminus{i}' for i in range(24, 0, -1)] + [f'e1.8_tminus{i}' for i in range(24, 0, -1)] + [
-        f'p_tminus{i}' for i in range(24, 0, -1)] + ['e0.5_t', 'e1.8_t', 'p_t']
-    #
 
-    #
+    if inputs_to_use is None:
+        inputs_to_use = ['e0.5', 'e1.8', 'p']
+
+        # Generate input columns based on inputs_to_use and add slope columns if add_slope is True
+    input_columns = []
+    for input_type in inputs_to_use:
+        input_columns += [f'{input_type}_tminus{i}' for i in range(24, 0, -1)] + [f'{input_type}_t']
 
     target_column = 'Proton Intensity'
     # additional_columns = ['Timestamp', 'cme_donki_time']
@@ -995,9 +1024,12 @@ def process_sep_events(directory: str, model: tf.keras.Model, using_cme: bool = 
                 # model_inputs = df[input_columns]
 
                 # Plot and evaluate the SEP event
-                mae_loss = plot_and_evaluate_sep_event(df, cme_start_times, event_id, model, input_columns,
-                                                       target_column, using_cme=using_cme, using_cnns=using_cnns,
-                                                       using_y_model=using_y_model, title=title)
+                mae_loss = plot_and_evaluate_sep_event(
+                    df, cme_start_times, event_id, model,
+                    input_columns, target_column, using_cme=using_cme,
+                    using_cnns=using_cnns, using_y_model=using_y_model, title=title,
+                    n_features=n_features,
+                    inputs_to_use=inputs_to_use, add_slope=add_slope)
 
                 print(f"Processed file: {file_name} with MAE: {mae_loss}")
             except Exception as e:
