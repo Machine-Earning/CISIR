@@ -1277,7 +1277,7 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
     """
     Splits the input data into parts for the CNN branches of the Y-shaped model,
     dynamically based on the cnn_input_dims list. If with_slope is True,
-    additional inputs for slopes are added.
+    the first half of cnn_input_dims are for regular inputs, and the second half are for slopes.
 
     Parameters:
     - data (np.ndarray): The combined input data array.
@@ -1288,38 +1288,44 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
     - Tuple: Tuple of arrays, each for CNN inputs.
     """
     if cnn_input_dims is None:
-        cnn_input_dims = [25]  # Default dimensions for each CNN input
+        cnn_input_dims = [25, 24]  # Default dimensions for regular and slope inputs
 
     # Initialize a list to store CNN inputs
     cnn_inputs = []
 
-    # Calculate the total number of non-slope inputs
-    total_non_slope_dims = sum(cnn_input_dims)
+    # Split input dimensions into regular and slope inputs if with_slope is True
+    if with_slope:
+        half_len = len(cnn_input_dims) // 2
+        regular_dims = cnn_input_dims[:half_len]
+        slope_dims = cnn_input_dims[half_len:]
+    else:
+        regular_dims = cnn_input_dims
+        slope_dims = []
 
-    # Generate CNN inputs based on cnn_input_dims for non-slope data
+    # Generate CNN inputs for regular data
     start_index = 0
-    for dim in cnn_input_dims:
+    for dim in regular_dims:
         end_index = start_index + dim
         cnn_input = data[:, start_index:end_index].reshape((-1, dim, 1))
         cnn_inputs.append(cnn_input)
         start_index = end_index
 
-    if with_slope:
-        # Generate CNN inputs for slope data
-        for dim in cnn_input_dims:
-            slope_input_dim = dim - 1  # Slope input dimension is one less
-            slope_input = data[:, start_index:start_index + slope_input_dim].reshape((-1, slope_input_dim, 1))
-            cnn_inputs.append(slope_input)
-            start_index += slope_input_dim
+    # Generate CNN inputs for slope data if with_slope is True
+    for dim in slope_dims:
+        end_index = start_index + dim
+        slope_input = data[:, start_index:end_index].reshape((-1, dim, 1))
+        cnn_inputs.append(slope_input)
+        start_index = end_index
 
     return tuple(cnn_inputs)
+
 
 
 def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_slope: bool = False) -> Tuple:
     """
     Splits the input data into parts for the RNN branches of the model,
     dynamically based on the rnn_input_dims list. If with_slope is True,
-    additional inputs for slopes are added.
+    the first half of rnn_input_dims are for regular inputs, and the second half are for slopes.
 
     Parameters:
     - data (np.ndarray): The combined input data array.
@@ -1330,25 +1336,34 @@ def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_
     - Tuple: Tuple of arrays, each for RNN inputs.
     """
     if rnn_input_dims is None:
-        rnn_input_dims = [25]  # Default dimensions for each RNN input
+        rnn_input_dims = [25, 24]  # Default dimensions for regular and slope inputs
 
     # Initialize a list to store RNN inputs
     rnn_inputs = []
 
-    # Generate RNN inputs based on rnn_input_dims for non-slope data
+    # Split input dimensions into regular and slope inputs if with_slope is True
+    if with_slope:
+        half_len = len(rnn_input_dims) // 2
+        regular_dims = rnn_input_dims[:half_len]
+        slope_dims = rnn_input_dims[half_len:]
+    else:
+        regular_dims = rnn_input_dims
+        slope_dims = []
+
+    # Generate RNN inputs for regular data
     start_index = 0
-    for dim in rnn_input_dims:
+    for dim in regular_dims:
         end_index = start_index + dim
         rnn_input = data[:, start_index:end_index, :]  # Assuming data is already 3D (samples, timesteps, features)
         rnn_inputs.append(rnn_input)
         start_index = end_index
 
-    if with_slope:
-        # Generate RNN inputs for slope data
-        for dim in rnn_input_dims:
-            slope_input_dim = dim - 1  # Slope input dimension is one less
-            slope_input = data[:, start_index:start_index + slope_input_dim, :]
-            rnn_inputs.append(slope_input)
-            start_index += slope_input_dim
+    # Generate RNN inputs for slope data if with_slope is True
+    for dim in slope_dims:
+        end_index = start_index + dim
+        slope_input = data[:, start_index:end_index, :]
+        rnn_inputs.append(slope_input)
+        start_index = end_index
 
     return tuple(rnn_inputs)
+
