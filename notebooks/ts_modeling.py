@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from matplotlib.lines import Line2D
+import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error
 from sklearn.utils import shuffle
 from tensorflow.keras.layers import Input, Conv1D, Flatten, Dense, LeakyReLU, Concatenate, GRU
@@ -25,47 +26,6 @@ np.random.seed(seed_value)
 
 # 4. Set `tensorflow` pseudo-random generator at a fixed value
 tf.random.set_seed(seed_value)
-
-
-def create_cnn(input_dim: int = 25, output_dim: int = 1, filters: int = 32, kernel_size: int = 10,
-               repr_dim: int = 50) -> Model:
-    """
-    Create a CNN model with 1D convolutional layers and a fully connected layer.
-
-    Parameters:
-    input_dim (int): The number of timesteps in the input data. Default is 25.
-    output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
-    filters (int): The number of filters in each convolutional layer. Default is 9.
-    kernel_size (int): The size of the kernel in the convolutional layers. Default is 10.
-    repr_dim (int): The number of units in the fully connected layer. Default is 50.
-
-    Returns:
-    Model: A Keras model instance.
-    """
-
-    # Define the input layer
-    input_layer = Input(shape=(input_dim, 1))
-
-    # Add convolutional layers with LeakyReLU activation
-    conv1 = Conv1D(filters=filters, kernel_size=kernel_size, padding='same')(input_layer)
-    conv1 = LeakyReLU()(conv1)
-    conv2 = Conv1D(filters=filters, kernel_size=kernel_size, padding='same')(conv1)
-    conv2 = LeakyReLU()(conv2)
-
-    # Flatten the output for the fully connected layer
-    flattened = Flatten()(conv2)
-
-    # Add a fully connected layer with LeakyReLU activation
-    dense = Dense(repr_dim)(flattened)
-    repr_output = LeakyReLU(name='repr_layer')(dense)
-
-    # Output layer
-    output_layer = Dense(output_dim, name='forecast_head')(repr_output)
-
-    # Create the model
-    model = Model(inputs=input_layer, outputs=[repr_output, output_layer])
-
-    return model
 
 
 def create_cnns(input_dims: list = None, output_dim: int = 1, filters: int = 32, kernel_size: int = 10,
@@ -210,72 +170,72 @@ def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim:
     return model
 
 
-def create_y_shaped_model(cnn_input_dim: int = 25, mlp_input_dim: int = 23, output_dim: int = 1, repr_dim: int = 10,
-                          cnn_filters: int = 32, cnn_kernel_size: int = 10, cnn_repr_dim: int = 50,
-                          mlp_repr_dim: int = 9, mlp_hiddens=None, final_hiddens=None) -> Model:
-    """
-    Create a Y-shaped neural network model with a CNN branch and an MLP branch, using Leaky ReLU activations.
-    The model outputs both the final predicted value and the final representation vector.
-
-    Parameters:
-    - cnn_input_dim (int): The number of timesteps for the CNN branch.
-    - mlp_input_dim (int): The number of features for the MLP branch.
-    - output_dim (int): The dimension of the output layer.
-    - repr_dim (int): The number of features in the final representation vector.
-    - cnn_filters (int): The number of filters in the CNN layers.
-    - cnn_kernel_size (int): The size of the kernel in the CNN layers.
-    - cnn_repr_dim (int): The number of features in the representation vector after the CNN branch.
-    - mlp_repr_dim (int): The number of features in the representation vector after the MLP branch.
-    - mlp_hiddens (List[int]): List of integers for the MLP hidden layers.
-    - final_hiddens (List[int]): List of integers representing the number of units in each hidden layer after concatenation.
-
-    Returns:
-    - Model: A Keras model instance.
-    """
-
-    # CNN Branch
-    if final_hiddens is None:
-        final_hiddens = [12]
-    if mlp_hiddens is None:
-        mlp_hiddens = [18]
-    cnn_input = Input(shape=(cnn_input_dim, 1))
-    x_cnn = Conv1D(filters=cnn_filters, kernel_size=cnn_kernel_size, padding='same')(cnn_input)
-    x_cnn = LeakyReLU()(x_cnn)
-    x_cnn = Conv1D(filters=cnn_filters, kernel_size=cnn_kernel_size, padding='same')(x_cnn)
-    x_cnn = LeakyReLU()(x_cnn)
-    x_cnn = Flatten()(x_cnn)
-    x_cnn = Dense(cnn_repr_dim)(x_cnn)
-    cnn_repr = LeakyReLU()(x_cnn)
-
-    # MLP Branch
-    mlp_input = Input(shape=(mlp_input_dim,))
-    x_mlp = mlp_input
-    for units in mlp_hiddens:
-        x_mlp = Dense(units)(x_mlp)
-        x_mlp = LeakyReLU()(x_mlp)
-    x_mlp = Dense(mlp_repr_dim)(x_mlp)
-    mlp_repr = LeakyReLU()(x_mlp)
-
-    # Concatenate the output of CNN and MLP branches
-    concatenated = Concatenate()([cnn_repr, mlp_repr])
-
-    # Additional MLP Layer(s) after concatenation
-    x_combined = concatenated
-    for units in final_hiddens:
-        x_combined = Dense(units)(x_combined)
-        x_combined = LeakyReLU()(x_combined)
-
-    # Final representation layer
-    final_repr = Dense(repr_dim)(x_combined)
-    final_repr = LeakyReLU(name='repr_layer')(final_repr)
-
-    # Final output layer
-    forecast_head = Dense(output_dim, activation='linear', name='forecast_head')(final_repr)
-
-    # Create the model with two outputs: final predicted value and final representation vector
-    model = Model(inputs=[cnn_input, mlp_input], outputs=[final_repr, forecast_head])
-
-    return model
+# def create_y_shaped_model(cnn_input_dim: int = 25, mlp_input_dim: int = 23, output_dim: int = 1, repr_dim: int = 10,
+#                           cnn_filters: int = 32, cnn_kernel_size: int = 10, cnn_repr_dim: int = 50,
+#                           mlp_repr_dim: int = 9, mlp_hiddens=None, final_hiddens=None) -> Model:
+#     """
+#     Create a Y-shaped neural network model with a CNN branch and an MLP branch, using Leaky ReLU activations.
+#     The model outputs both the final predicted value and the final representation vector.
+#
+#     Parameters:
+#     - cnn_input_dim (int): The number of timesteps for the CNN branch.
+#     - mlp_input_dim (int): The number of features for the MLP branch.
+#     - output_dim (int): The dimension of the output layer.
+#     - repr_dim (int): The number of features in the final representation vector.
+#     - cnn_filters (int): The number of filters in the CNN layers.
+#     - cnn_kernel_size (int): The size of the kernel in the CNN layers.
+#     - cnn_repr_dim (int): The number of features in the representation vector after the CNN branch.
+#     - mlp_repr_dim (int): The number of features in the representation vector after the MLP branch.
+#     - mlp_hiddens (List[int]): List of integers for the MLP hidden layers.
+#     - final_hiddens (List[int]): List of integers representing the number of units in each hidden layer after concatenation.
+#
+#     Returns:
+#     - Model: A Keras model instance.
+#     """
+#
+#     # CNN Branch
+#     if final_hiddens is None:
+#         final_hiddens = [12]
+#     if mlp_hiddens is None:
+#         mlp_hiddens = [18]
+#     cnn_input = Input(shape=(cnn_input_dim, 1))
+#     x_cnn = Conv1D(filters=cnn_filters, kernel_size=cnn_kernel_size, padding='same')(cnn_input)
+#     x_cnn = LeakyReLU()(x_cnn)
+#     x_cnn = Conv1D(filters=cnn_filters, kernel_size=cnn_kernel_size, padding='same')(x_cnn)
+#     x_cnn = LeakyReLU()(x_cnn)
+#     x_cnn = Flatten()(x_cnn)
+#     x_cnn = Dense(cnn_repr_dim)(x_cnn)
+#     cnn_repr = LeakyReLU()(x_cnn)
+#
+#     # MLP Branch
+#     mlp_input = Input(shape=(mlp_input_dim,))
+#     x_mlp = mlp_input
+#     for units in mlp_hiddens:
+#         x_mlp = Dense(units)(x_mlp)
+#         x_mlp = LeakyReLU()(x_mlp)
+#     x_mlp = Dense(mlp_repr_dim)(x_mlp)
+#     mlp_repr = LeakyReLU()(x_mlp)
+#
+#     # Concatenate the output of CNN and MLP branches
+#     concatenated = Concatenate()([cnn_repr, mlp_repr])
+#
+#     # Additional MLP Layer(s) after concatenation
+#     x_combined = concatenated
+#     for units in final_hiddens:
+#         x_combined = Dense(units)(x_combined)
+#         x_combined = LeakyReLU()(x_combined)
+#
+#     # Final representation layer
+#     final_repr = Dense(repr_dim)(x_combined)
+#     final_repr = LeakyReLU(name='repr_layer')(final_repr)
+#
+#     # Final output layer
+#     forecast_head = Dense(output_dim, activation='linear', name='forecast_head')(final_repr)
+#
+#     # Create the model with two outputs: final predicted value and final representation vector
+#     model = Model(inputs=[cnn_input, mlp_input], outputs=[final_repr, forecast_head])
+#
+#     return model
 
 
 def create_fork_model(cnn_input_dims=None, mlp_input_dim: int = 23, output_dim: int = 1, repr_dim: int = 10,
@@ -543,12 +503,13 @@ def min_max_norm(data: pd.DataFrame or pd.Series) -> pd.DataFrame or pd.Series:
         raise TypeError("Input must be a pandas DataFrame or Series")
 
 
-def preprocess_cme_features(df: pd.DataFrame) -> pd.DataFrame:
+def preprocess_cme_features(df: pd.DataFrame, inputs_to_use: List[str]) -> pd.DataFrame:
     """
-    Apply efficient preprocessing steps to the given dataframe based on the specified scheme table.
+    Apply efficient preprocessing steps to the given dataframe based on the specified scheme table and inputs_to_use.
 
     Parameters:
     - df (pd.DataFrame): The dataframe to preprocess.
+    - inputs_to_use (List[str]): List of input types to include in the dataset.
 
     Returns:
     - pd.DataFrame: The preprocessed dataframe.
@@ -557,9 +518,24 @@ def preprocess_cme_features(df: pd.DataFrame) -> pd.DataFrame:
     # Preallocate a dictionary to store preprocessed data
     preprocessed_data = {}
 
-    # Natural Log Transformations
-    for intensity in ['e0.5_max_intensity', 'e1.8_max_intensity', 'p_max_intensity']:
-        preprocessed_data[f'log_{intensity}'] = np.log1p(df[intensity])
+    # Define a mapping for intensity columns based on inputs_to_use
+    intensity_mapping = {
+        'e0.5': 'e0.5_max_intensity',
+        'e1.8': 'e1.8_max_intensity',
+        'p': 'p_max_intensity'
+    }
+
+    # Natural Log Transformations for selected intensity columns
+    for input_type in inputs_to_use:
+        intensity_column = intensity_mapping.get(input_type)
+        if intensity_column:
+            log_intensity_column = f'log_{intensity_column}'
+            preprocessed_data[f'log_{intensity_column}'] = np.log1p(df[intensity_column])
+            # Apply Min-Max normalization on log-transformed features
+            preprocessed_data[f'{log_intensity_column}_norm'] = min_max_norm(preprocessed_data[log_intensity_column])
+            # Drop the original log-transformed column as it's not needed after normalization
+            preprocessed_data.pop(log_intensity_column)
+
     preprocessed_data['log_half_richardson_value'] = np.log1p(-df['half_richardson_value'])
     preprocessed_data['log_diffusive_shock'] = np.log1p(df['diffusive_shock'])
     preprocessed_data['log_Type2_Viz_Area'] = df['Type2_Viz_Area'].apply(lambda x: np.log(x) if x != 0 else np.log(1))
@@ -577,10 +553,6 @@ def preprocess_cme_features(df: pd.DataFrame) -> pd.DataFrame:
                                  'CPA': 'CPA', 'CMEs_in_past_9hours': 'CMEs Past 9 Hours'}.items():
         preprocessed_data[f"{feature}_norm"] = min_max_norm(df[proper_name])
 
-    # Apply min-max normalization to log-transformed features
-    preprocessed_data['log_e0.5_max_intensity_norm'] = min_max_norm(preprocessed_data['log_e0.5_max_intensity'])
-    preprocessed_data['log_e1.8_max_intensity_norm'] = min_max_norm(preprocessed_data['log_e1.8_max_intensity'])
-    preprocessed_data['log_p_max_intensity_norm'] = min_max_norm(preprocessed_data['log_p_max_intensity'])
     preprocessed_data['log_richardson_value_norm'] = min_max_norm(preprocessed_data['log_half_richardson_value'])
     preprocessed_data['log_diffusive_shock_norm'] = min_max_norm(preprocessed_data['log_diffusive_shock'])
     preprocessed_data['log_Type2_Viz_Area_norm'] = min_max_norm(preprocessed_data['log_Type2_Viz_Area'])
@@ -589,8 +561,6 @@ def preprocess_cme_features(df: pd.DataFrame) -> pd.DataFrame:
     preprocessed_data['Halo'] = df['Halo']
 
     # drop log_richardson_formula_1.0_c, diffusive shock, log_Type_2_Area because they are not needed anymore
-    for intensity in ['e0.5_max_intensity', 'e1.8_max_intensity', 'p_max_intensity']:
-        preprocessed_data.pop(f'log_{intensity}')
     preprocessed_data.pop('log_half_richardson_value')
     preprocessed_data.pop('log_diffusive_shock')
     preprocessed_data.pop('log_Type2_Viz_Area')
@@ -598,34 +568,69 @@ def preprocess_cme_features(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(preprocessed_data)
 
 
-def build_full_dataset(directory_path: str, shuffle_data: bool = True, apply_log: bool = True,
-                       norm_target: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+def zero_out_cme_below_threshold(df: pd.DataFrame, threshold: float, cme_columns: List[str]) -> pd.DataFrame:
+    """
+    Zeroes out the values of specified CME columns in rows where the CME speed is below the threshold.
+
+    Parameters:
+    - df (pd.DataFrame): The DataFrame containing the data.
+    - threshold (float): The CME speed threshold.
+    - cme_columns (List[str]): List of CME column names to zero out.
+
+    Returns:
+    - pd.DataFrame: The DataFrame with updated CME columns.
+    """
+    mask = df['CME_DONKI_speed'] < threshold
+    for column in cme_columns:
+        df.loc[mask, column] = 0
+    return df
+
+
+def build_full_dataset(
+        directory_path: str,
+        shuffle_data: bool = True,
+        apply_log: bool = True,
+        norm_target: bool = False,
+        inputs_to_use: List[str] = None,
+        add_slope: bool = True,
+        cme_speed_threshold: float = 500) -> Tuple[np.ndarray, np.ndarray]:
     """
     Reads SEP event files from the specified directory, processes them to extract
     input and target data including cme features, normalizes the values between 0 and 1 for the columns
     of interest, excludes rows where proton intensity is -9999, and optionally shuffles the data.
 
-    TODO: needs to be updated
-
     Parameters:
     - directory_path (str): Path to the directory containing the sep_event_X files.
     - shuffle_data (bool): If True, shuffle the data before returning.
     - apply_log (bool): Whether to apply a logarithmic transformation before normalization.
-    - norm_target (bool): Whether to normalize the target data. False by default.
-
+    - norm_target (bool): Whether to normalize the target data.
+    - inputs_to_use (List[str]): List of input types to include in the dataset.
+    - add_slope (bool): If True, adds slope features to the dataset.
+    - cme_speed_threshold (float): The threshold for CME speed. CMEs with speeds below (<) this threshold will be excluded.
 
     Returns:
     - Tuple[np.ndarray, np.ndarray]: A tuple containing the normalized input data (X) and target data (y).
     """
+
+    if inputs_to_use is None:
+        inputs_to_use = ['e0.5', 'e1.8', 'p']
+
     all_inputs = []
     all_targets = []
 
-    # Define input and target columns
-    # input_columns = [f'tminus{i}' for i in range(24, 0, -1)] + ['t']  # Columns from tminus24 to t
-    # Define input columns for e0.5, e1.8, and proton intensities
-    input_columns = [f'e0.5_tminus{i}' for i in range(24, 0, -1)] + [f'e1.8_tminus{i}' for i in range(24, 0, -1)] + [
-        f'p_tminus{i}' for i in range(24, 0, -1)] + ['e0.5_t', 'e1.8_t', 'p_t']
+    # Dynamically define input columns based on inputs_to_use
+    input_columns = []
+    for input_type in inputs_to_use:
+        input_columns += [f'{input_type}_tminus{i}' for i in range(24, 0, -1)] + [f'{input_type}_t']
+
     target_column = 'Proton Intensity'
+
+    cme_columns_to_zero_out = [
+        'CME_DONKI_latitude', 'CME_DONKI_longitude', 'CME_DONKI_speed', 'CME_CDAW_MPA',
+        'CME_CDAW_LinearSpeed', 'VlogV', 'DONKI_half_width', 'Accelaration',
+        '2nd_order_speed_final', '2nd_order_speed_20R', 'CPA', 'Halo', 'Type2_Viz_Area',
+        'solar_wind_speed', 'diffusive_shock', 'half_richardson_value'
+    ]
 
     # Loop through each file in the directory
     for file_name in os.listdir(directory_path):
@@ -636,6 +641,9 @@ def build_full_dataset(directory_path: str, shuffle_data: bool = True, apply_log
             # Exclude rows where proton intensity is -9999
             data = data[data[target_column] != -9999]
 
+            # Zero out CME values for rows with speed below threshold
+            data = zero_out_cme_below_threshold(data, cme_speed_threshold, cme_columns_to_zero_out)
+
             # Apply logarithmic transformation (if specified)
             if apply_log:
                 data[input_columns] = np.log1p(data[input_columns])  # Adding 1 to avoid log(0)
@@ -645,6 +653,22 @@ def build_full_dataset(directory_path: str, shuffle_data: bool = True, apply_log
             input_data = data[input_columns]
             input_data_normalized = min_max_norm(input_data)
 
+            # Compute and add slopes (if specified)
+            if add_slope:
+                for input_type in inputs_to_use:
+                    # print(f"Computing slopes for {input_type}...")
+                    slope_column_names = generate_slope_column_names([input_type])  # Generate for current input type
+                    slope_values = compute_slope(input_data_normalized, input_type)
+                    for slope_column, slope_index in zip(slope_column_names, range(slope_values.shape[1])):
+                        # print(f"Adding {slope_column} to input data...")
+                        input_data_normalized[slope_column] = slope_values[:, slope_index]
+                    # input_columns.extend(slope_column_names)
+
+            # print the columns one by one
+            # for col in input_data_normalized.columns:
+            #     print(col)
+            # order - e0.5, e1.8, p, e0.5 slope, e1.8 slope, p slope
+
             # Normalize targets between 0 and 1
             target_data = data[[target_column]]
             if norm_target:
@@ -653,7 +677,7 @@ def build_full_dataset(directory_path: str, shuffle_data: bool = True, apply_log
                 target_data_normalized = target_data
 
             # Process and append CME features
-            cme_features = preprocess_cme_features(data)
+            cme_features = preprocess_cme_features(data, inputs_to_use)
             combined_input = pd.concat([input_data_normalized, cme_features], axis=1)
 
             # # Get the order of the CME features
@@ -662,8 +686,7 @@ def build_full_dataset(directory_path: str, shuffle_data: bool = True, apply_log
             # # Now, cme_feature_order contains the names of the CME features in the order they appear
             # print("Order of CME features:", cme_feature_order)
 
-            # Reshape inputs to be in the format [samples, time steps, features]
-            # X = input_data_normalized.values.reshape((input_data_normalized.shape[0], 25, 1))
+            X = combined_input.values  # TODO: check if X needs to be reshaped
 
             # Flatten targets to 1D array
             y = target_data_normalized.values.flatten()
@@ -674,7 +697,7 @@ def build_full_dataset(directory_path: str, shuffle_data: bool = True, apply_log
             # combined_input.to_csv(f"combined_input_{file_name}.csv")
 
             # Append to list
-            all_inputs.append(combined_input.values)
+            all_inputs.append(X)
             all_targets.append(y)
 
     # Combine all input and target data
@@ -810,13 +833,6 @@ def plot_sample(data: np.ndarray, sample_index: int = None) -> None:
     plt.ylabel('Value')
     plt.grid(True)
     plt.show()
-
-
-# plot the actual vs predicted
-import pandas as pd
-import numpy as np
-from matplotlib import pyplot as plt
-from typing import Tuple, List
 
 
 def exponential_formatter(x, pos):
@@ -1320,7 +1336,6 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
     return tuple(cnn_inputs)
 
 
-
 def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_slope: bool = False) -> Tuple:
     """
     Splits the input data into parts for the RNN branches of the model,
@@ -1366,4 +1381,3 @@ def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_
         start_index = end_index
 
     return tuple(rnn_inputs)
-
