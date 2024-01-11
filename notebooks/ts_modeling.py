@@ -122,7 +122,7 @@ def create_cnns(input_dims: list = None, output_dim: int = 1, filters: int = 32,
     return model
 
 
-def create_rnns(input_dims: list = None, output_dim: int = 1, gru_units: int = 32, repr_dim: int = 50) -> Model:
+def create_rnns(input_dims: list = None, output_dim: int = 1, gru_units: int = 64, repr_dim: int = 50) -> Model:
     """
     Create a model with multiple RNN (GRU) branches, each processing a different input dimension.
     The outputs of these branches are concatenated before being passed to dense layers.

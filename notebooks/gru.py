@@ -24,7 +24,7 @@ def main():
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
             # Construct the title
-            title = f'CNN_{inputs_str}_add_slope_{str(add_slope)}'
+            title = f'RNN_{inputs_str}_add_slope_{str(add_slope)}'
 
             # Replace any other characters that are not suitable for filenames (if any)
             title = title.replace(' ', '_').replace(':', '_')
