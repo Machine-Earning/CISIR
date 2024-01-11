@@ -1,13 +1,13 @@
 import random
 import traceback
-from typing import Tuple, List
+from typing import Tuple, List, Any
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from matplotlib.lines import Line2D
 from sklearn.metrics import mean_absolute_error
 from sklearn.utils import shuffle
-from tensorflow.keras.layers import Input, Conv1D, Flatten, Dense, LeakyReLU, Concatenate
+from tensorflow.keras.layers import Input, Conv1D, Flatten, Dense, LeakyReLU, Concatenate, GRU
 from tensorflow.keras.models import Model
 import os
 
@@ -118,6 +118,56 @@ def create_cnns(input_dims: list = None, output_dim: int = 1, filters: int = 32,
 
     # Create the model
     model = Model(inputs=cnn_inputs, outputs=[repr_output, output_layer])
+
+    return model
+
+
+def create_rnns(input_dims: list = None, output_dim: int = 1, gru_units: int = 32, repr_dim: int = 50) -> Model:
+    """
+    Create a model with multiple RNN (GRU) branches, each processing a different input dimension.
+    The outputs of these branches are concatenated before being passed to dense layers.
+
+    Parameters:
+    - input_dims (list): List of input dimensions, one for each RNN branch. Default is [25, 25, 25].
+    - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
+    - gru_units (int): The number of units in each GRU layer. Default is 32.
+    - repr_dim (int): The number of units in the fully connected layer. Default is 50.
+
+    Returns:
+    - Model: A Keras model instance.
+    """
+
+    if input_dims is None:
+        input_dims = [25, 25, 25]
+
+    rnn_branches = []
+    rnn_inputs = []
+
+    for i, dim in enumerate(input_dims):
+        # Define the input layer for this branch
+        input_layer = Input(shape=(dim, 1), name=f'input_{i}')
+
+        # Add GRU layer followed by LeakyReLU activation
+        gru = GRU(units=gru_units, return_sequences=False)(input_layer)
+        gru = LeakyReLU()(gru)
+        # Flatten the output for concatenation
+        flattened = Flatten()(gru)
+
+        rnn_branches.append(flattened)
+        rnn_inputs.append(input_layer)
+
+    # Concatenate the outputs of all branches
+    concatenated = Concatenate()(rnn_branches) if len(rnn_branches) > 1 else rnn_branches[0]
+
+    # Add a fully connected layer with LeakyReLU activation
+    dense = Dense(repr_dim)(concatenated)
+    repr_output = LeakyReLU(name='repr_layer')(dense)
+
+    # Output layer
+    output_layer = Dense(output_dim, name='forecast_head')(repr_output)
+
+    # Create the model
+    model = Model(inputs=rnn_inputs, outputs=[repr_output, output_layer])
 
     return model
 
@@ -833,7 +883,7 @@ def extract_cme_start_times(df: pd.DataFrame) -> List[pd.Timestamp]:
 def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Timestamp], event_id: str,
                                 model: tf.keras.Model, input_columns: List[str], target_column: str,
                                 normalize_target: bool = False,
-                                using_cme: bool = False, using_cnns: bool = False, using_y_model: bool = True,
+                                using_cme: bool = False, model_type: str = "cnn",
                                 title: str = None, inputs_to_use: List[str] = None,
                                 add_slope: bool = True) -> [float, str]:
     """
@@ -850,8 +900,7 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
     - target_column (str): The column name of the target variable.
     - normalize_target (bool): Whether to normalize the target column. Default is False.
     - using_cme (bool): Whether to use CME features. Default is False.
-    - using_cnns (bool): Whether the model uses CNNs. Default is False.
-    - using_y_model (bool): Whether the model is a Y-shaped model. Default is False.
+    - model_type (str): The type of model used. Default is 'cnn'.
     - title (str): The title of the plot. Default is None.
     - inputs_to_use (List[str]): The list of input types to use. Default is None.
     - add_slope (bool): Whether to add slope features. Default is True.
@@ -859,6 +908,8 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
     Returns:
     - Tuple[float, str]: A tuple containing the MAE loss and the plot title.
     """
+    e18_intensity_log = None
+
     if add_slope:
         n_features = len(inputs_to_use) * (25 + 24)
     else:
@@ -874,15 +925,16 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
     # Normalize the flux intensities
     df_norm = normalize_flux(df, input_columns, apply_log=True)
     # X = df_norm[input_columns].values
-    # slope_column_names = []
+    added_columns = []
     if add_slope:
+        added_columns = generate_slope_column_names(inputs_to_use)
         for input_type in inputs_to_use:
             slope_values = compute_slope(df_norm, input_type)
             slope_column_names = generate_slope_column_names([input_type])
             for slope_column, slope_index in zip(slope_column_names, range(slope_values.shape[1])):
                 df_norm[slope_column] = slope_values[:, slope_index]
 
-    X = df_norm[input_columns + generate_slope_column_names(inputs_to_use)].values
+    X = df_norm[input_columns + added_columns].values
 
     if normalize_target:
         df_norm[target_column] = normalize_flux(df, [target_column], apply_log=True)[target_column]
@@ -906,9 +958,18 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
     #     cnn_input1, cnn_input2, cnn_input3, mlp_input = prepare_inputs_for_y_model(X_reshaped)
     #     X_reshaped = [cnn_input1, cnn_input2, cnn_input3, mlp_input]
     #
-    # if using_cnns:
-    #     # cnn_input1, cnn_input2, cnn_input3 = prepare_cnn_inputs(X_reshaped)
-    #     X_reshaped = [cnn_input1, cnn_input2, cnn_input3]
+
+    if add_slope:
+        n_features_list = [25] * len(inputs_to_use) + [24] * (len(inputs_to_use) - 1)
+    else:
+        n_features_list = [25] * len(inputs_to_use)
+
+    if model_type == "cnn":
+        X_reshaped = prepare_cnn_inputs(X_reshaped, n_features_list, add_slope)
+    elif model_type == "rnn":
+        X_reshaped = prepare_rnn_inputs(X_reshaped, n_features_list, add_slope)
+
+
 
     # Evaluate the model
     _, predictions = model.predict(X_reshaped)
@@ -973,11 +1034,10 @@ def process_sep_events(
         directory: str,
         model: tf.keras.Model,
         using_cme: bool = False,
-        using_cnns: bool = False,
-        using_y_model: bool = False,
+        model_type: str = "cnn",
         title: str = None,
         inputs_to_use: List[str] = None,
-        add_slope: bool = True) -> str:
+        add_slope: bool = True) -> List[str]:
     """
     Processes SEP event files in the specified directory, normalizes flux intensities, predicts proton intensities,
     plots the results, and calculates the MAE for each file.
@@ -986,7 +1046,7 @@ def process_sep_events(
     - directory (str): Path to the directory containing the SEP event files.
     - model (tf.keras.Model): The trained machine learning model for predicting proton intensity.
     - using_cme (bool): Whether to use CME features. Default is False.
-    - using_y_model (bool): Whether the model is a Y-shaped model. Default is False.
+    - model_type (str): The type of model used. Default is "cnn".
     - title (str): The title of the plot. Default is None.
     - inputs_to_use (List[str]): List of input types to include in the dataset. Default is ['e0.5', 'e1.8', 'p'].
     - add_slope (bool): If True, adds slope features to the dataset.
@@ -1010,6 +1070,8 @@ def process_sep_events(
 
     target_column = 'Proton Intensity'
     # additional_columns = ['Timestamp', 'cme_donki_time']
+
+    plot_names = []
 
     # Iterate over files in the directory
     for file_name in os.listdir(directory):
@@ -1039,17 +1101,19 @@ def process_sep_events(
                 mae_loss, plotname = plot_and_evaluate_sep_event(
                     df, cme_start_times, event_id, model,
                     input_columns, target_column, using_cme=using_cme,
-                    using_cnns=using_cnns, using_y_model=using_y_model, title=title,
+                    model_type=model_type, title=title,
                     inputs_to_use=inputs_to_use, add_slope=add_slope)
 
                 print(f"Processed file: {file_name} with MAE: {mae_loss}")
 
-                return plotname
+                plot_names.append(plotname)
             except Exception as e:
                 print(f"Error processing file: {file_name}")
                 print(e)
                 traceback.print_exc()
                 continue
+
+    return plot_names
 
 
 def plot_sample_with_cme(data: np.ndarray, cme_features_names: list = None, sample_index: int = None) -> None:
@@ -1251,3 +1315,42 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
             start_index += slope_input_dim
 
     return tuple(cnn_inputs)
+
+
+def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_slope: bool = False) -> Tuple:
+    """
+    Splits the input data into parts for the RNN branches of the model,
+    dynamically based on the rnn_input_dims list. If with_slope is True,
+    additional inputs for slopes are added.
+
+    Parameters:
+    - data (np.ndarray): The combined input data array.
+    - rnn_input_dims (List[int]): The dimensions for each RNN input.
+    - with_slope (bool): Whether to add additional inputs for slopes.
+
+    Returns:
+    - Tuple: Tuple of arrays, each for RNN inputs.
+    """
+    if rnn_input_dims is None:
+        rnn_input_dims = [25]  # Default dimensions for each RNN input
+
+    # Initialize a list to store RNN inputs
+    rnn_inputs = []
+
+    # Generate RNN inputs based on rnn_input_dims for non-slope data
+    start_index = 0
+    for dim in rnn_input_dims:
+        end_index = start_index + dim
+        rnn_input = data[:, start_index:end_index, :]  # Assuming data is already 3D (samples, timesteps, features)
+        rnn_inputs.append(rnn_input)
+        start_index = end_index
+
+    if with_slope:
+        # Generate RNN inputs for slope data
+        for dim in rnn_input_dims:
+            slope_input_dim = dim - 1  # Slope input dimension is one less
+            slope_input = data[:, start_index:start_index + slope_input_dim, :]
+            rnn_inputs.append(slope_input)
+            start_index += slope_input_dim
+
+    return tuple(rnn_inputs)
