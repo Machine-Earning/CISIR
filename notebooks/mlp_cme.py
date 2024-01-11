@@ -1,4 +1,4 @@
-from ts_modeling import build_dataset, create_mlp, evaluate_model, process_sep_events
+from ts_modeling import build_full_dataset, create_mlp, evaluate_model, process_sep_events
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 import matplotlib.pyplot as plt
@@ -13,7 +13,7 @@ def main():
     :return:
     """
 
-    for inputs_to_use in [['e0.5'], ['e0.5', 'e1.8'], ['e0.5', 'p'], ['e0.5', 'e1.8', 'p']]:
+    for inputs_to_use in [['e0.5'], ['e0.5', 'p']]:
         for add_slope in [True, False]:
             # PARAMS
             # inputs_to_use = ['e0.5']
@@ -23,7 +23,7 @@ def main():
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
             # Construct the title
-            title = f'MLP_{inputs_str}_add_slope_{str(add_slope)}'
+            title = f'MLP_withCME_{inputs_str}_add_slope_{str(add_slope)}'
 
             # Replace any other characters that are not suitable for filenames (if any)
             title = title.replace(' ', '_').replace(':', '_')
@@ -33,7 +33,7 @@ def main():
             experiment_name = f'{title}_{current_time}'
 
             # Initialize wandb
-            wandb.init(project="mlp-ts", name=experiment_name, config={
+            wandb.init(project="mlp-ts-cme", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
             })
@@ -41,11 +41,13 @@ def main():
             # set the root directory
             root_dir = 'D:/College/Fall2023/electron_cme_v4/electron_cme_data_split'
             # build the dataset
-            X_train, y_train = build_dataset(root_dir + '/training', inputs_to_use=inputs_to_use, add_slope=add_slope)
-            X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining', inputs_to_use=inputs_to_use,
-                                                   add_slope=add_slope)
-            X_test, y_test = build_dataset(root_dir + '/testing', inputs_to_use=inputs_to_use, add_slope=add_slope)
-            X_val, y_val = build_dataset(root_dir + '/validation', inputs_to_use=inputs_to_use, add_slope=add_slope)
+            X_train, y_train = build_full_dataset(root_dir + '/training', inputs_to_use=inputs_to_use,
+                                                  add_slope=add_slope)
+            X_subtrain, y_subtrain = build_full_dataset(root_dir + '/subtraining', inputs_to_use=inputs_to_use,
+                                                        add_slope=add_slope)
+            X_test, y_test = build_full_dataset(root_dir + '/testing', inputs_to_use=inputs_to_use, add_slope=add_slope)
+            X_val, y_val = build_full_dataset(root_dir + '/validation', inputs_to_use=inputs_to_use,
+                                              add_slope=add_slope)
 
             # print all data shapes
             print(f'X_train.shape: {X_train.shape}')
@@ -121,6 +123,7 @@ def main():
                 test_directory,
                 final_mlp_model_sep,
                 model_type='mlp',
+                using_cme=True,
                 title=title,
                 inputs_to_use=inputs_to_use,
                 add_slope=add_slope)

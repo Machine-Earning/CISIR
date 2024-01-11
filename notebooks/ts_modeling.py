@@ -28,21 +28,28 @@ np.random.seed(seed_value)
 tf.random.set_seed(seed_value)
 
 
-def create_cnns(input_dims: list = None, output_dim: int = 1, filters: int = 32, kernel_size: int = 10,
-                repr_dim: int = 50) -> Model:
+def create_cnns(
+        input_dims: list = None,
+        filters: int = 32,
+        kernel_size: int = 10,
+        conv_layers: int = 2,
+        repr_dim: int = 50,
+        output_dim: int = 1
+) -> Model:
     """
     Create a model with multiple CNN branches, each processing a different input dimension.
     The outputs of these branches are concatenated before being passed to dense layers.
 
     Parameters:
-    input_dims (list): List of input dimensions, one for each CNN branch. Default is [25, 25, 25].
-    output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
-    filters (int): The number of filters in each convolutional layer. Default is 32.
-    kernel_size (int): The size of the kernel in the convolutional layers. Default is 10.
-    repr_dim (int): The number of units in the fully connected layer. Default is 50.
+    - input_dims (list): List of input dimensions, one for each CNN branch. Default is [25, 25, 25].
+    - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
+    - filters (int): The number of filters in each convolutional layer. Default is 32.
+    - kernel_size (int): The size of the kernel in the convolutional layers. Default is 10.
+    - repr_dim (int): The number of units in the fully connected layer. Default is 50.
+    - conv_layers (int): The number of convolutional layers in each branch. Default is 2.
 
     Returns:
-    Model: A Keras model instance.
+    - Model: A Keras model instance.
     """
 
     if input_dims is None:
@@ -54,14 +61,15 @@ def create_cnns(input_dims: list = None, output_dim: int = 1, filters: int = 32,
     for i, dim in enumerate(input_dims):
         # Define the input layer for this branch
         input_layer = Input(shape=(dim, 1), name=f'input_{i}')
+        x = input_layer
 
         # Add convolutional layers with LeakyReLU activation
-        conv1 = Conv1D(filters=filters, kernel_size=kernel_size, padding='same')(input_layer)
-        conv1 = LeakyReLU()(conv1)
-        conv2 = Conv1D(filters=filters, kernel_size=kernel_size, padding='same')(conv1)
-        conv2 = LeakyReLU()(conv2)
+        for _ in range(conv_layers):
+            x = Conv1D(filters=filters, kernel_size=kernel_size, padding='same')(x)
+            x = LeakyReLU()(x)
+
         # Flatten the output for concatenation
-        flattened = Flatten()(conv2)
+        flattened = Flatten()(x)
 
         cnn_branches.append(flattened)
         cnn_inputs.append(input_layer)
@@ -82,16 +90,22 @@ def create_cnns(input_dims: list = None, output_dim: int = 1, filters: int = 32,
     return model
 
 
-def create_rnns(input_dims: list = None, output_dim: int = 1, gru_units: int = 64, repr_dim: int = 50) -> Model:
+def create_rnns(
+        input_dims: list = None,
+        gru_units: int = 64,
+        rnn_layers: int = 2,
+        repr_dim: int = 50,
+        output_dim: int = 1) -> Model:
     """
     Create a model with multiple RNN (GRU) branches, each processing a different input dimension.
     The outputs of these branches are concatenated before being passed to dense layers.
 
     Parameters:
     - input_dims (list): List of input dimensions, one for each RNN branch. Default is [25, 25, 25].
-    - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
-    - gru_units (int): The number of units in each GRU layer. Default is 32.
+    - gru_units (int): The number of units in each GRU layer. Default is 64.
     - repr_dim (int): The number of units in the fully connected layer. Default is 50.
+    - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
+    - rnn_layers (int): The number of RNN layers in each branch. Default is 2.
 
     Returns:
     - Model: A Keras model instance.
@@ -106,12 +120,15 @@ def create_rnns(input_dims: list = None, output_dim: int = 1, gru_units: int = 6
     for i, dim in enumerate(input_dims):
         # Define the input layer for this branch
         input_layer = Input(shape=(dim, 1), name=f'input_{i}')
+        x = input_layer
 
-        # Add GRU layer followed by LeakyReLU activation
-        gru = GRU(units=gru_units, return_sequences=False)(input_layer)
-        gru = LeakyReLU()(gru)
+        # Add GRU layers with LeakyReLU activation
+        for _ in range(rnn_layers):
+            x = GRU(units=gru_units, return_sequences=True if _ < rnn_layers - 1 else False)(x)
+            x = LeakyReLU()(x)
+
         # Flatten the output for concatenation
-        flattened = Flatten()(gru)
+        flattened = Flatten()(x)
 
         rnn_branches.append(flattened)
         rnn_inputs.append(input_layer)
@@ -170,45 +187,53 @@ def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim:
     return model
 
 
-# def create_y_shaped_model(cnn_input_dim: int = 25, mlp_input_dim: int = 23, output_dim: int = 1, repr_dim: int = 10,
-#                           cnn_filters: int = 32, cnn_kernel_size: int = 10, cnn_repr_dim: int = 50,
-#                           mlp_repr_dim: int = 9, mlp_hiddens=None, final_hiddens=None) -> Model:
+# def create_fork_model(cnn_input_dims=None, mlp_input_dim: int = 23, output_dim: int = 1, repr_dim: int = 10,
+#                       cnn_filters: int = 32, cnn_kernel_size: int = 10, cnn_repr_dim: int = 50, mlp_repr_dim: int = 9,
+#                       mlp_hiddens=None, final_hiddens=None) -> Model:
 #     """
-#     Create a Y-shaped neural network model with a CNN branch and an MLP branch, using Leaky ReLU activations.
-#     The model outputs both the final predicted value and the final representation vector.
+#     Create a fork-like neural network model with multiple CNN branches and an MLP branch.
 #
 #     Parameters:
-#     - cnn_input_dim (int): The number of timesteps for the CNN branch.
+#     - cnn_input_dims (list[int]): List of input dimensions for each CNN branch.
 #     - mlp_input_dim (int): The number of features for the MLP branch.
 #     - output_dim (int): The dimension of the output layer.
 #     - repr_dim (int): The number of features in the final representation vector.
 #     - cnn_filters (int): The number of filters in the CNN layers.
 #     - cnn_kernel_size (int): The size of the kernel in the CNN layers.
-#     - cnn_repr_dim (int): The number of features in the representation vector after the CNN branch.
+#     - cnn_repr_dim (int): The number of features in the representation vector after the CNN branches.
 #     - mlp_repr_dim (int): The number of features in the representation vector after the MLP branch.
 #     - mlp_hiddens (List[int]): List of integers for the MLP hidden layers.
-#     - final_hiddens (List[int]): List of integers representing the number of units in each hidden layer after concatenation.
+#     - final_hiddens (List[int]): List of integers for the hidden layers after concatenation.
 #
 #     Returns:
 #     - Model: A Keras model instance.
 #     """
 #
-#     # CNN Branch
+#     if cnn_input_dims is None:
+#         cnn_input_dims = [25, 25, 25]
 #     if final_hiddens is None:
 #         final_hiddens = [12]
 #     if mlp_hiddens is None:
 #         mlp_hiddens = [18]
-#     cnn_input = Input(shape=(cnn_input_dim, 1))
-#     x_cnn = Conv1D(filters=cnn_filters, kernel_size=cnn_kernel_size, padding='same')(cnn_input)
-#     x_cnn = LeakyReLU()(x_cnn)
-#     x_cnn = Conv1D(filters=cnn_filters, kernel_size=cnn_kernel_size, padding='same')(x_cnn)
-#     x_cnn = LeakyReLU()(x_cnn)
-#     x_cnn = Flatten()(x_cnn)
-#     x_cnn = Dense(cnn_repr_dim)(x_cnn)
-#     cnn_repr = LeakyReLU()(x_cnn)
+#
+#     cnn_branches = []
+#     cnn_inputs = []
+#
+#     # Create CNN branches
+#     for i, dim in enumerate(cnn_input_dims):
+#         cnn_input = Input(shape=(dim, 1), name=f'cnn_input_{i}')
+#         x_cnn = Conv1D(filters=cnn_filters, kernel_size=cnn_kernel_size, padding='same')(cnn_input)
+#         x_cnn = LeakyReLU()(x_cnn)
+#         x_cnn = Conv1D(filters=cnn_filters, kernel_size=cnn_kernel_size, padding='same')(x_cnn)
+#         x_cnn = LeakyReLU()(x_cnn)
+#         x_cnn = Flatten()(x_cnn)
+#         x_cnn = Dense(cnn_repr_dim)(x_cnn)
+#         cnn_repr = LeakyReLU()(x_cnn)
+#         cnn_branches.append(cnn_repr)
+#         cnn_inputs.append(cnn_input)
 #
 #     # MLP Branch
-#     mlp_input = Input(shape=(mlp_input_dim,))
+#     mlp_input = Input(shape=(mlp_input_dim,), name='mlp_input')
 #     x_mlp = mlp_input
 #     for units in mlp_hiddens:
 #         x_mlp = Dense(units)(x_mlp)
@@ -216,8 +241,8 @@ def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim:
 #     x_mlp = Dense(mlp_repr_dim)(x_mlp)
 #     mlp_repr = LeakyReLU()(x_mlp)
 #
-#     # Concatenate the output of CNN and MLP branches
-#     concatenated = Concatenate()([cnn_repr, mlp_repr])
+#     # Concatenate the outputs of CNN and MLP branches
+#     concatenated = Concatenate()(cnn_branches + [mlp_repr])
 #
 #     # Additional MLP Layer(s) after concatenation
 #     x_combined = concatenated
@@ -232,26 +257,31 @@ def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim:
 #     # Final output layer
 #     forecast_head = Dense(output_dim, activation='linear', name='forecast_head')(final_repr)
 #
-#     # Create the model with two outputs: final predicted value and final representation vector
-#     model = Model(inputs=[cnn_input, mlp_input], outputs=[final_repr, forecast_head])
+#     # Create the model
+#     model = Model(inputs=cnn_inputs + [mlp_input], outputs=[final_repr, forecast_head])
 #
 #     return model
 
 
-def create_fork_model(cnn_input_dims=None, mlp_input_dim: int = 23, output_dim: int = 1, repr_dim: int = 10,
-                      cnn_filters: int = 32, cnn_kernel_size: int = 10, cnn_repr_dim: int = 50, mlp_repr_dim: int = 9,
-                      mlp_hiddens=None, final_hiddens=None) -> Model:
+def create_hybrid_model(
+        tsf_extractor: Model,
+        mlp_input_dim: int = 23,
+        mlp_hiddens=None,
+        mlp_repr_dim: int = 9,
+        final_hiddens=None,
+        repr_dim: int = 10,
+        output_dim: int = 1
+
+) -> Model:
     """
-    Create a fork-like neural network model with multiple CNN branches and an MLP branch.
+    Create a hybrid neural network model with a time series feature extraction branch (CNN or RNN)
+    and an MLP branch.
 
     Parameters:
-    - cnn_input_dims (list[int]): List of input dimensions for each CNN branch.
+    - tsf_extractor (Model): A pre-built model for time series feature extraction (CNN or RNN).
     - mlp_input_dim (int): The number of features for the MLP branch.
     - output_dim (int): The dimension of the output layer.
     - repr_dim (int): The number of features in the final representation vector.
-    - cnn_filters (int): The number of filters in the CNN layers.
-    - cnn_kernel_size (int): The size of the kernel in the CNN layers.
-    - cnn_repr_dim (int): The number of features in the representation vector after the CNN branches.
     - mlp_repr_dim (int): The number of features in the representation vector after the MLP branch.
     - mlp_hiddens (List[int]): List of integers for the MLP hidden layers.
     - final_hiddens (List[int]): List of integers for the hidden layers after concatenation.
@@ -260,28 +290,10 @@ def create_fork_model(cnn_input_dims=None, mlp_input_dim: int = 23, output_dim: 
     - Model: A Keras model instance.
     """
 
-    if cnn_input_dims is None:
-        cnn_input_dims = [25, 25, 25]
     if final_hiddens is None:
         final_hiddens = [12]
     if mlp_hiddens is None:
         mlp_hiddens = [18]
-
-    cnn_branches = []
-    cnn_inputs = []
-
-    # Create CNN branches
-    for i, dim in enumerate(cnn_input_dims):
-        cnn_input = Input(shape=(dim, 1), name=f'cnn_input_{i}')
-        x_cnn = Conv1D(filters=cnn_filters, kernel_size=cnn_kernel_size, padding='same')(cnn_input)
-        x_cnn = LeakyReLU()(x_cnn)
-        x_cnn = Conv1D(filters=cnn_filters, kernel_size=cnn_kernel_size, padding='same')(x_cnn)
-        x_cnn = LeakyReLU()(x_cnn)
-        x_cnn = Flatten()(x_cnn)
-        x_cnn = Dense(cnn_repr_dim)(x_cnn)
-        cnn_repr = LeakyReLU()(x_cnn)
-        cnn_branches.append(cnn_repr)
-        cnn_inputs.append(cnn_input)
 
     # MLP Branch
     mlp_input = Input(shape=(mlp_input_dim,), name='mlp_input')
@@ -292,8 +304,8 @@ def create_fork_model(cnn_input_dims=None, mlp_input_dim: int = 23, output_dim: 
     x_mlp = Dense(mlp_repr_dim)(x_mlp)
     mlp_repr = LeakyReLU()(x_mlp)
 
-    # Concatenate the outputs of CNN and MLP branches
-    concatenated = Concatenate()(cnn_branches + [mlp_repr])
+    # Concatenate the outputs of TSF Extractor and MLP branch
+    concatenated = Concatenate()([tsf_extractor.output, mlp_repr])
 
     # Additional MLP Layer(s) after concatenation
     x_combined = concatenated
@@ -309,7 +321,7 @@ def create_fork_model(cnn_input_dims=None, mlp_input_dim: int = 23, output_dim: 
     forecast_head = Dense(output_dim, activation='linear', name='forecast_head')(final_repr)
 
     # Create the model
-    model = Model(inputs=cnn_inputs + [mlp_input], outputs=[final_repr, forecast_head])
+    model = Model(inputs=[tsf_extractor.input, mlp_input], outputs=[final_repr, forecast_head])
 
     return model
 
@@ -593,7 +605,7 @@ def build_full_dataset(
         norm_target: bool = False,
         inputs_to_use: List[str] = None,
         add_slope: bool = True,
-        cme_speed_threshold: float = 500) -> Tuple[np.ndarray, np.ndarray]:
+        cme_speed_threshold: float = 0) -> Tuple[np.ndarray, np.ndarray]:
     """
     Reads SEP event files from the specified directory, processes them to extract
     input and target data including cme features, normalizes the values between 0 and 1 for the columns
@@ -896,12 +908,19 @@ def extract_cme_start_times(df: pd.DataFrame) -> List[pd.Timestamp]:
     return valid_times
 
 
-def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Timestamp], event_id: str,
-                                model: tf.keras.Model, input_columns: List[str], target_column: str,
-                                normalize_target: bool = False,
-                                using_cme: bool = False, model_type: str = "cnn",
-                                title: str = None, inputs_to_use: List[str] = None,
-                                add_slope: bool = True) -> [float, str]:
+def plot_and_evaluate_sep_event(
+        df: pd.DataFrame,
+        cme_start_times: List[pd.Timestamp],
+        event_id: str,
+        model: tf.keras.Model,
+        input_columns: List[str],
+        target_column: str,
+        normalize_target: bool = False,
+        using_cme: bool = False,
+        model_type: str = "cnn",
+        title: str = None,
+        inputs_to_use: List[str] = None,
+        add_slope: bool = True) -> [float, str]:
     """
     Plots the SEP event data with actual and predicted proton intensities, electron intensity,
     and evaluates the model's performance using MAE.
@@ -961,7 +980,7 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
 
     if using_cme:
         # process cme features
-        cme_features = preprocess_cme_features(df)
+        cme_features = preprocess_cme_features(df, inputs_to_use)
         X_reshaped = np.concatenate([X, cme_features.values], axis=1)
     else:
         # Reshape X accordingly
@@ -1051,7 +1070,9 @@ def process_sep_events(
         model_type: str = "cnn",
         title: str = None,
         inputs_to_use: List[str] = None,
-        add_slope: bool = True) -> List[str]:
+        add_slope: bool = True,
+        cme_speed_threshold: float = 0
+) -> List[str]:
     """
     Processes SEP event files in the specified directory, normalizes flux intensities, predicts proton intensities,
     plots the results, and calculates the MAE for each file.
@@ -1064,6 +1085,7 @@ def process_sep_events(
     - title (str): The title of the plot. Default is None.
     - inputs_to_use (List[str]): List of input types to include in the dataset. Default is ['e0.5', 'e1.8', 'p'].
     - add_slope (bool): If True, adds slope features to the dataset.
+     - cme_speed_threshold (float): The threshold for CME speed. CMEs with speeds below this threshold will be excluded.
 
     Returns:
     - str: The name of the plot file.
@@ -1087,6 +1109,13 @@ def process_sep_events(
 
     plot_names = []
 
+    cme_columns_to_zero_out = [
+        'CME_DONKI_latitude', 'CME_DONKI_longitude', 'CME_DONKI_speed', 'CME_CDAW_MPA',
+        'CME_CDAW_LinearSpeed', 'VlogV', 'DONKI_half_width', 'Accelaration',
+        '2nd_order_speed_final', '2nd_order_speed_20R', 'CPA', 'Halo', 'Type2_Viz_Area',
+        'solar_wind_speed', 'diffusive_shock', 'half_richardson_value'
+    ]
+
     # Iterate over files in the directory
     for file_name in os.listdir(directory):
         if file_name.endswith('_ie.csv'):
@@ -1099,6 +1128,8 @@ def process_sep_events(
                 # Skip files where proton intensity is -9999
                 if (df[target_column] == -9999).any():
                     continue
+
+                df = zero_out_cme_below_threshold(df, cme_speed_threshold, cme_columns_to_zero_out)
 
                 # # Apply time offset to align the proton and electron intensities
                 # offset = pd.Timedelta(minutes=30)
