@@ -960,7 +960,7 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
     #
 
     if add_slope:
-        n_features_list = [25] * len(inputs_to_use) + [24] * (len(inputs_to_use) - 1)
+        n_features_list = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
     else:
         n_features_list = [25] * len(inputs_to_use)
 
@@ -968,8 +968,6 @@ def plot_and_evaluate_sep_event(df: pd.DataFrame, cme_start_times: List[pd.Times
         X_reshaped = prepare_cnn_inputs(X_reshaped, n_features_list, add_slope)
     elif model_type == "rnn":
         X_reshaped = prepare_rnn_inputs(X_reshaped, n_features_list, add_slope)
-
-
 
     # Evaluate the model
     _, predictions = model.predict(X_reshaped)

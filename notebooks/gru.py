@@ -18,8 +18,8 @@ def main():
     """
     for inputs_to_use in [['e0.5'], ['e0.5', 'e1.8'], ['e0.5', 'p'], ['e0.5', 'e1.8', 'p']]:
         for add_slope in [True, False]:
-            inputs_to_use = ['e0.5']
-            add_slope = True
+            # inputs_to_use = ['e0.5']
+            # add_slope = True
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
@@ -43,7 +43,8 @@ def main():
             root_dir = 'D:/College/Fall2023/electron_cme_v4/electron_cme_data_split'
             # build the dataset
             X_train, y_train = build_dataset(root_dir + '/training', inputs_to_use=inputs_to_use, add_slope=add_slope)
-            X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining', inputs_to_use=inputs_to_use, add_slope=add_slope)
+            X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining', inputs_to_use=inputs_to_use,
+                                                   add_slope=add_slope)
             X_test, y_test = build_dataset(root_dir + '/testing', inputs_to_use=inputs_to_use, add_slope=add_slope)
             X_val, y_val = build_dataset(root_dir + '/validation', inputs_to_use=inputs_to_use, add_slope=add_slope)
 
@@ -64,7 +65,7 @@ def main():
             # x = S / 49
             # get the number of features
             if add_slope:
-                n_features = [25] * len(inputs_to_use) + [24] * (len(inputs_to_use) - 1)
+                n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
             else:
                 n_features = [25] * len(inputs_to_use)
             print(f'n_features: {n_features}')

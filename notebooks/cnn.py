@@ -14,8 +14,8 @@ def main():
     """
     for inputs_to_use in [['e0.5'], ['e0.5', 'e1.8'], ['e0.5', 'p'], ['e0.5', 'e1.8', 'p']]:
         for add_slope in [True, False]:
-            inputs_to_use = ['e0.5']
-            add_slope = True
+            # inputs_to_use = ['e0.5']
+            # add_slope = True
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
@@ -60,7 +60,7 @@ def main():
             # x = S / 49
             # get the number of features
             if add_slope:
-                n_features = [25] * len(inputs_to_use) + [24] * (len(inputs_to_use) - 1)
+                n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
             else:
                 n_features = [25] * len(inputs_to_use)
             print(f'n_features: {n_features}')
