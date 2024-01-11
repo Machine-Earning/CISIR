@@ -33,7 +33,7 @@ def main():
             experiment_name = f'{title}_{current_time}'
 
             # Initialize wandb
-            wandb.init(project="mlp-ts", name=experiment_name, config={
+            wandb.init(project="mlp-ts-lowerlr", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
             })
@@ -72,7 +72,7 @@ def main():
 
             # Set the early stopping patience and learning rate as variables
             patience = 50
-            learning_rate = 3e-3
+            learning_rate = 3e-4
 
             # Define the EarlyStopping callback
             early_stopping = EarlyStopping(monitor='val_forecast_head_loss', patience=patience, verbose=1,

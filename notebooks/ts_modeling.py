@@ -81,11 +81,17 @@ def create_cnns(
     dense = Dense(repr_dim)(concatenated)
     repr_output = LeakyReLU(name='repr_layer')(dense)
 
-    # Output layer
-    output_layer = Dense(output_dim, name='forecast_head')(repr_output)
+    # Determine the model's output based on output_dim
+    if output_dim > 0:
+        # Output layer for regression or classification tasks
+        output_layer = Dense(output_dim, name='forecast_head')(repr_output)
+        model_output = [repr_output, output_layer]
+    else:
+        # Only output the representation layer
+        model_output = repr_output
 
     # Create the model
-    model = Model(inputs=cnn_inputs, outputs=[repr_output, output_layer])
+    model = Model(inputs=cnn_inputs, outputs=model_output)
 
     return model
 
@@ -140,11 +146,17 @@ def create_rnns(
     dense = Dense(repr_dim)(concatenated)
     repr_output = LeakyReLU(name='repr_layer')(dense)
 
-    # Output layer
-    output_layer = Dense(output_dim, name='forecast_head')(repr_output)
+    # Determine the model's output based on output_dim
+    if output_dim > 0:
+        # Output layer for regression or classification tasks
+        output_layer = Dense(output_dim, name='forecast_head')(repr_output)
+        model_output = [repr_output, output_layer]
+    else:
+        # Only output the representation layer
+        model_output = repr_output
 
     # Create the model
-    model = Model(inputs=rnn_inputs, outputs=[repr_output, output_layer])
+    model = Model(inputs=rnn_inputs, outputs=model_output)
 
     return model
 
@@ -989,11 +1001,6 @@ def plot_and_evaluate_sep_event(
         # '1' is for the third dimension, typically used for models expecting 3D input (like CNNs)
         X_reshaped = X.reshape(-1, n_features, 1)
 
-    # if using_y_model:
-    #     cnn_input1, cnn_input2, cnn_input3, mlp_input = prepare_inputs_for_y_model(X_reshaped)
-    #     X_reshaped = [cnn_input1, cnn_input2, cnn_input3, mlp_input]
-    #
-
     if add_slope:
         n_features_list = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
     else:
@@ -1003,6 +1010,18 @@ def plot_and_evaluate_sep_event(
         X_reshaped = prepare_cnn_inputs(X_reshaped, n_features_list, add_slope)
     elif model_type == "rnn":
         X_reshaped = prepare_rnn_inputs(X_reshaped, n_features_list, add_slope)
+    elif model_type == "cnn-hybrid":
+        X_reshaped = prepare_hybrid_inputs(X_reshaped,
+                                           tsf_extractor_type='cnn',
+                                           tsf_input_dims=n_features_list,
+                                           with_slope=add_slope,
+                                           mlp_input_dim=20 + len(inputs_to_use))
+    elif model_type == "rnn-hybrid":
+        X_reshaped = prepare_hybrid_inputs(X_reshaped,
+                                           tsf_extractor_type='rnn',
+                                           tsf_input_dims=n_features_list,
+                                           with_slope=add_slope,
+                                           mlp_input_dim=20 + len(inputs_to_use))
 
     # Evaluate the model
     _, predictions = model.predict(X_reshaped)
@@ -1286,38 +1305,41 @@ def evaluate_model(model: tf.keras.Model, X_test: np.ndarray or List[np.ndarray]
     return mae_loss
 
 
-def prepare_inputs_for_y_model(data: np.ndarray, cnn_input_dims=None, mlp_input_dim: int = 23) -> Tuple[
-    np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def prepare_hybrid_inputs(
+        data: np.ndarray,
+        tsf_extractor_type: str = 'cnn',
+        tsf_input_dims=None,
+        with_slope: bool = False,
+        mlp_input_dim: int = 23) -> Tuple[np.ndarray, ...]:
     """
-    Splits the input data into three parts for the CNN branches and one part for the MLP branch of the Y-shaped model.
+    Splits the input data into parts for the TSF extractor branches (CNN or RNN) and a part for the MLP branch
+    of the hybrid model.
 
     Parameters:
     - data (np.ndarray): The combined input data array.
-    - cnn_input_dims (List[int]): The dimensions for each CNN input.
-    - mlp_input_dim (int): The number of features for the MLP input.
+    - tsf_extractor_type (str): The type of time series feature extractor ('cnn' or 'rnn').
+    - tsf_input_dims (List[int]): The dimensions for each TSF extractor input.
+    - with_slope (bool): Whether to add additional inputs for slopes.
+    - mlp_input_dim (int): The number of features for the MLP branch.
 
     Returns:
-    - Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Four arrays, three for CNN inputs and one for MLP input.
+    - Tuple: A tuple containing arrays for TSF extractor inputs and MLP input.
     """
 
-    if cnn_input_dims is None:
-        cnn_input_dims = [25, 25, 25]  # Default dimensions for each CNN input
+    # Prepare inputs for the TSF extractor
+    if tsf_extractor_type == 'cnn':
+        tsf_inputs = prepare_cnn_inputs(data, tsf_input_dims, with_slope)
+    elif tsf_extractor_type == 'rnn':
+        tsf_inputs = prepare_rnn_inputs(data, tsf_input_dims, with_slope)
+    else:
+        raise ValueError("Invalid tsf_extractor_type. Must be 'cnn' or 'rnn'.")
 
-    # Extract CNN inputs
-    cnn_input_1 = data[:, :cnn_input_dims[0]]
-    cnn_input_2 = data[:, cnn_input_dims[0]:sum(cnn_input_dims[:2])]
-    cnn_input_3 = data[:, sum(cnn_input_dims[:2]):sum(cnn_input_dims)]
+    # Prepare inputs for the MLP branch
+    # Assuming that the MLP input is located after the TSF input data
+    start_index = sum(tsf_input_dims)
+    mlp_input = data[:, start_index:start_index + mlp_input_dim]
 
-    # Reshape CNN inputs for each CNN branch
-    cnn_input_1 = cnn_input_1.reshape((-1, cnn_input_dims[0], 1))
-    cnn_input_2 = cnn_input_2.reshape((-1, cnn_input_dims[1], 1))
-    cnn_input_3 = cnn_input_3.reshape((-1, cnn_input_dims[2], 1))
-
-    # Extract MLP input
-    mlp_input_start = sum(cnn_input_dims)
-    mlp_input = data[:, mlp_input_start:mlp_input_start + mlp_input_dim]
-
-    return cnn_input_1, cnn_input_2, cnn_input_3, mlp_input
+    return *tsf_inputs, mlp_input
 
 
 def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_slope: bool = False) -> Tuple:
