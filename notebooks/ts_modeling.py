@@ -327,7 +327,7 @@ def create_hybrid_model(
 
     # Final representation layer
     final_repr = Dense(repr_dim)(x_combined)
-    final_repr = LeakyReLU(name='repr_layer')(final_repr)
+    final_repr = LeakyReLU(name='final_repr_layer')(final_repr)
 
     # Final output layer
     forecast_head = Dense(output_dim, activation='linear', name='forecast_head')(final_repr)
