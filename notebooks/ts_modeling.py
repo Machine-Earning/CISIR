@@ -1389,53 +1389,6 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
     return tuple(cnn_inputs)
 
 
-# def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_slope: bool = False) -> Tuple:
-#     """
-#     Splits the input data into parts for the RNN branches of the model,
-#     dynamically based on the rnn_input_dims list. If with_slope is True,
-#     the first half of rnn_input_dims are for regular inputs, and the second half are for slopes.
-#
-#     Parameters:
-#     - data (np.ndarray): The combined input data array.
-#     - rnn_input_dims (List[int]): The dimensions for each RNN input.
-#     - with_slope (bool): Whether to add additional inputs for slopes.
-#
-#     Returns:
-#     - Tuple: Tuple of arrays, each for RNN inputs.
-#     """
-#     if rnn_input_dims is None:
-#         rnn_input_dims = [25, 24]  # Default dimensions for regular and slope inputs
-#
-#     # Initialize a list to store RNN inputs
-#     rnn_inputs = []
-#
-#     # Split input dimensions into regular and slope inputs if with_slope is True
-#     if with_slope:
-#         half_len = len(rnn_input_dims) // 2
-#         regular_dims = rnn_input_dims[:half_len]
-#         slope_dims = rnn_input_dims[half_len:]
-#     else:
-#         regular_dims = rnn_input_dims
-#         slope_dims = []
-#
-#     # Generate RNN inputs for regular data
-#     start_index = 0
-#     for dim in regular_dims:
-#         end_index = start_index + dim
-#         rnn_input = data[:, start_index:end_index, :]  # Assuming data is already 3D (samples, timesteps, features)
-#         rnn_inputs.append(rnn_input)
-#         start_index = end_index
-#
-#     # Generate RNN inputs for slope data if with_slope is True
-#     for dim in slope_dims:
-#         end_index = start_index + dim
-#         slope_input = data[:, start_index:end_index, :]
-#         rnn_inputs.append(slope_input)
-#         start_index = end_index
-#
-#     return tuple(rnn_inputs)
-
-
 def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_slope: bool = False) -> Tuple:
     """
     Splits the input data into parts for the RNN branches of the model,
@@ -1453,11 +1406,7 @@ def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_
     if rnn_input_dims is None:
         rnn_input_dims = [25, 24]  # Default dimensions for regular and slope inputs
 
-    # Reshape data to 3D if it's 2D ([samples, features] -> [samples, timesteps=1, features])
-    if data.ndim == 2:
-        data = np.expand_dims(data, axis=1)
-
-    # Initialize a list to store RNN inputs
+    # Initialize a list to store rnn inputs
     rnn_inputs = []
 
     # Split input dimensions into regular and slope inputs if with_slope is True
@@ -1469,18 +1418,18 @@ def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_
         regular_dims = rnn_input_dims
         slope_dims = []
 
-    # Generate RNN inputs for regular data
+    # Generate rnn inputs for regular data
     start_index = 0
     for dim in regular_dims:
         end_index = start_index + dim
-        rnn_input = data[:, :, start_index:end_index]
+        rnn_input = data[:, start_index:end_index].reshape((-1, dim, 1))
         rnn_inputs.append(rnn_input)
         start_index = end_index
 
-    # Generate RNN inputs for slope data if with_slope is True
+    # Generate rnn inputs for slope data if with_slope is True
     for dim in slope_dims:
         end_index = start_index + dim
-        slope_input = data[:, :, start_index:end_index]
+        slope_input = data[:, start_index:end_index].reshape((-1, dim, 1))
         rnn_inputs.append(slope_input)
         start_index = end_index
 
