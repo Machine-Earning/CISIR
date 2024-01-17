@@ -1,5 +1,6 @@
 from ts_modeling import build_dataset, create_mlp, evaluate_model, process_sep_events
 from tensorflow.keras.optimizers import Adam
+from tensorflow_addons.optimizers import AdamW
 from tensorflow.keras.callbacks import EarlyStopping
 import matplotlib.pyplot as plt
 import wandb
@@ -13,8 +14,8 @@ def main():
     :return:
     """
 
-    for inputs_to_use in [['e0.5'], ['e0.5', 'e1.8'], ['e0.5', 'p'], ['e0.5', 'e1.8', 'p']]:
-        for add_slope in [True, False]:
+    for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
+        for add_slope in [False]:
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
@@ -72,14 +73,19 @@ def main():
 
             # Set the early stopping patience and learning rate as variables
             patience = 50
-            learning_rate = 3e-4
+            learning_rate = 3e-5
+            weight_decay = 0 # higher weight decay
+            momentum_beta1 = 0.9 # higher momentum beta1
 
             # Define the EarlyStopping callback
             early_stopping = EarlyStopping(monitor='val_forecast_head_loss', patience=patience, verbose=1,
                                            restore_best_weights=True)
 
             # Compile the model with the specified learning rate
-            mlp_model_sep.compile(optimizer=Adam(learning_rate=learning_rate), loss={'forecast_head': 'mse'})
+            mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
+                                                  weight_decay=weight_decay,
+                                                  beta_1=momentum_beta1),
+                                  loss={'forecast_head': 'mse'})
 
             # Train the model with the callback
             history = mlp_model_sep.fit(X_subtrain,
@@ -103,7 +109,9 @@ def main():
             optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
             final_mlp_model_sep = create_mlp(input_dim=n_features,
                                              hiddens=hiddens)  # Recreate the model architecture
-            final_mlp_model_sep.compile(optimizer=Adam(learning_rate=learning_rate),
+            final_mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
+                                                        weight_decay=weight_decay,
+                                                        beta_1=momentum_beta1),
                                         loss={'forecast_head': 'mse'})  # Compile the model just like before
             # Train on the full dataset
             final_mlp_model_sep.fit(X_train, {'forecast_head': y_train}, epochs=optimal_epochs, batch_size=32,

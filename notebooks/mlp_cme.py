@@ -13,7 +13,7 @@ def main():
     :return:
     """
 
-    for inputs_to_use in [['e0.5'], ['e0.5', 'p']]:
+    for inputs_to_use in [['e0.5', 'e1.8'], ['e0.5', 'e1.8', 'p']]:
         for add_slope in [True, False]:
             for cme_speed_threshold in [0, 500]:
                 # PARAMS

@@ -10,6 +10,7 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.utils import shuffle
 from tensorflow.keras.layers import Input, Conv1D, Flatten, Dense, LeakyReLU, Concatenate, GRU
 from tensorflow.keras.models import Model
+from tensorflow.keras.regularizers import l2
 import os
 
 # Seeds for reproducibility
@@ -161,7 +162,7 @@ def create_rnns(
     return model
 
 
-def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim: int = 9) -> Model:
+def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim: int = 9, l2_reg: float = None) -> Model:
     """
     Create an MLP model with fully connected dense layers.
 
@@ -170,6 +171,7 @@ def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim:
     - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
     - hiddens (list): A list of integers where each integer is the number of units in a hidden layer.
     - repr_dim (int): The number of features in the final representation vector.
+    - l2_reg (float): L2 regularization factor. Default is None (no regularization).
 
     Returns:
     - Model: A Keras model instance.
@@ -183,7 +185,10 @@ def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim:
     # Create hidden layers with LeakyReLU activation
     x = input_layer
     for units in hiddens:
-        x = Dense(units)(x)
+        if l2_reg:
+            x = Dense(units, kernel_regularizer=l2(l2_reg))(x)
+        else:
+            x = Dense(units)(x)
         x = LeakyReLU()(x)
 
     # Final representation layer

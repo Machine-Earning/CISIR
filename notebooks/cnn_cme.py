@@ -17,9 +17,9 @@ def main():
     Main function to run the E-CNN model
     :return:
     """
-    for inputs_to_use in [['e0.5'], ['e0.5', 'p']]:
-        for add_slope in [True, False]:
-            for cme_speed_threshold in [0, 500]:
+    for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
+        for add_slope in [False]:
+            for cme_speed_threshold in [500]:
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
