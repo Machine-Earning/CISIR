@@ -1,11 +1,41 @@
-from ts_modeling import build_dataset, create_mlp, evaluate_model, process_sep_events
-from tensorflow.keras.optimizers import Adam
-from tensorflow_addons.optimizers import AdamW
-from tensorflow.keras.callbacks import EarlyStopping
-import matplotlib.pyplot as plt
-import wandb
 from datetime import datetime
+
+import matplotlib.pyplot as plt
+import tensorflow as tf
+import wandb
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
+
+from ts_modeling import build_dataset, create_mlp, evaluate_model, process_sep_events
+
+
+def weighted_mse_loss(y_true: tf.Tensor, y_pred: tf.Tensor, gamma: float, epsilon: float = 1e-8) -> tf.Tensor:
+    """
+    Compute the Mean Squared Error weighted by a factor of (target_value / divisor)^gamma.
+
+    Parameters:
+    - y_true (tf.Tensor): True values.
+    - y_pred (tf.Tensor): Predicted values.
+    - gamma (float): Exponent to which the weights are raised.
+    - epsilon (float, optional): A small value to avoid division by zero. Defaults to 1e-6.
+
+    Returns:
+    - tf.Tensor: The computed weighted MSE loss.
+    """
+    divisor = 5.86  # The maximum value of the target variable in the training set
+    # Calculate the weights (target_value / divisor)^gamma for each instance
+    # Adding epsilon to avoid division by zero
+    weights = tf.pow((y_true / divisor) + epsilon, gamma)
+
+    # Calculate MSE
+    mse = tf.reduce_mean(tf.square(y_true - y_pred), axis=-1)
+
+    # Apply the weights
+    weighted_mse = weights * mse
+
+    # Return the mean of weighted MSE
+    return tf.reduce_mean(weighted_mse)
 
 
 def main():
@@ -13,8 +43,8 @@ def main():
     Main function to run the E-MLP model
     :return:
     """
-    learning_rates = [3e-6, 3e-7]
-    for learning_rate in learning_rates:
+    gammas = [1, 2, 3]
+    for gamma in gammas:
         for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
             for add_slope in [False]:
                 # PARAMS
@@ -32,19 +62,20 @@ def main():
 
                 # Create a unique experiment name with a timestamp
                 current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-                experiment_name = f'{title}_lr{learning_rate}_{current_time}'
+                experiment_name = f'{title}_gamma{gamma}_{current_time}'
 
                 # Initialize wandb
-                wandb.init(project="mlp-ts-lowerlr", name=experiment_name, config={
+                wandb.init(project="mlp-ts-gamma", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
                     "add_slope": add_slope,
-                    "learning_rate": learning_rate
+                    "gamma": gamma
                 })
 
                 # set the root directory
                 root_dir = 'D:/College/Fall2023/electron_cme_v4/electron_cme_data_split'
                 # build the dataset
-                X_train, y_train = build_dataset(root_dir + '/training', inputs_to_use=inputs_to_use, add_slope=add_slope)
+                X_train, y_train = build_dataset(root_dir + '/training', inputs_to_use=inputs_to_use,
+                                                 add_slope=add_slope)
                 X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining', inputs_to_use=inputs_to_use,
                                                        add_slope=add_slope)
                 X_test, y_test = build_dataset(root_dir + '/testing', inputs_to_use=inputs_to_use, add_slope=add_slope)
@@ -75,8 +106,9 @@ def main():
 
                 # Set the early stopping patience and learning rate as variables
                 patience = 50
-                weight_decay = 0 # higher weight decay
-                momentum_beta1 = 0.9 # higher momentum beta1
+                weight_decay = 0  # higher weight decay
+                momentum_beta1 = 0.9  # higher momentum beta1
+                learning_rate = 3e-3  # higher learning rate
 
                 # Define the EarlyStopping callback
                 early_stopping = EarlyStopping(monitor='val_forecast_head_loss', patience=patience, verbose=1,
@@ -86,7 +118,9 @@ def main():
                 mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
                                                       weight_decay=weight_decay,
                                                       beta_1=momentum_beta1),
-                                      loss={'forecast_head': 'mse'})
+                                      loss={'forecast_head':
+                                                lambda y_true, y_pred: weighted_mse_loss(y_true, y_pred, gamma)
+                                            })
 
                 # Train the model with the callback
                 history = mlp_model_sep.fit(X_subtrain,
@@ -113,7 +147,9 @@ def main():
                 final_mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
                                                             weight_decay=weight_decay,
                                                             beta_1=momentum_beta1),
-                                            loss={'forecast_head': 'mse'})  # Compile the model just like before
+                                            loss={'forecast_head':
+                                                      lambda y_true, y_pred: weighted_mse_loss(y_true, y_pred, gamma)
+                                                  })
                 # Train on the full dataset
                 final_mlp_model_sep.fit(X_train, {'forecast_head': y_train}, epochs=optimal_epochs, batch_size=32,
                                         verbose=1)
