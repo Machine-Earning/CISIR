@@ -1,6 +1,9 @@
+import os
+import random
 from datetime import datetime
 
 import matplotlib.pyplot as plt
+import numpy as np
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping
@@ -9,8 +12,27 @@ from wandb.keras import WandbCallback
 
 from ts_modeling import build_dataset, create_mlp, evaluate_model, process_sep_events
 
+# Seeds for reproducibility
+seed_value = 42
 
-def weighted_mse_loss(y_true: tf.Tensor, y_pred: tf.Tensor, gamma: float, epsilon: float = 1e-8) -> tf.Tensor:
+
+def set_seeds(seed_value):
+    """
+    Set the random seeds for reproducibility
+    :param seed_value:  The seed value to set
+    :return:        None
+    """
+    # 1. Set `PYTHONHASHSEED` environment variable at a fixed value
+    os.environ['PYTHONHASHSEED'] = str(seed_value)
+    # 2. Set `python` built-in pseudo-random generator at a fixed value
+    random.seed(seed_value)
+    # 3. Set `numpy` pseudo-random generator at a fixed value
+    np.random.seed(seed_value)
+    # 4. Set `tensorflow` pseudo-random generator at a fixed value
+    tf.random.set_seed(seed_value)
+
+
+def weighted_mse_loss(y_true: tf.Tensor, y_pred: tf.Tensor, gamma: float, epsilon: float = 1e-20) -> tf.Tensor:
     """
     Compute the Mean Squared Error weighted by a factor of (target_value / divisor)^gamma.
 
@@ -23,7 +45,9 @@ def weighted_mse_loss(y_true: tf.Tensor, y_pred: tf.Tensor, gamma: float, epsilo
     Returns:
     - tf.Tensor: The computed weighted MSE loss.
     """
-    divisor = 5.86  # The maximum value of the target variable in the training set
+    # divisor = 5.86  # The maximum value of the target variable in the training set
+    # changing it to 4 would emphasize higher values more
+    divisor = 4
     # Calculate the weights (target_value / divisor)^gamma for each instance
     # Adding epsilon to avoid division by zero
     weights = tf.pow((y_true / divisor) + epsilon, gamma)
@@ -43,19 +67,19 @@ def main():
     Main function to run the E-MLP model
     :return:
     """
-    gammas = [1, 2, 3]
+    gammas = [7, 8, 9]
     for gamma in gammas:
         for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
             for add_slope in [False]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
-
+                set_seeds(seed_value)
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'MLP_{inputs_str}_add_slope_{str(add_slope)}'
+                title = f'MLP_{inputs_str}_add_slope_{str(add_slope)}_d4'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -82,18 +106,18 @@ def main():
                 X_val, y_val = build_dataset(root_dir + '/validation', inputs_to_use=inputs_to_use, add_slope=add_slope)
 
                 # print all data shapes
-                print(f'X_train.shape: {X_train.shape}')
-                print(f'y_train.shape: {y_train.shape}')
-                print(f'X_subtrain.shape: {X_subtrain.shape}')
-                print(f'y_subtrain.shape: {y_subtrain.shape}')
-                print(f'X_test.shape: {X_test.shape}')
-                print(f'y_test.shape: {y_test.shape}')
-                print(f'X_val.shape: {X_val.shape}')
-                print(f'y_val.shape: {y_val.shape}')
-
-                # print a sample of the training data
-                print(f'X_train[0]: {X_train[0]}')
-                print(f'y_train[0]: {y_train[0]}')
+                # print(f'X_train.shape: {X_train.shape}')
+                # print(f'y_train.shape: {y_train.shape}')
+                # print(f'X_subtrain.shape: {X_subtrain.shape}')
+                # print(f'y_subtrain.shape: {y_subtrain.shape}')
+                # print(f'X_test.shape: {X_test.shape}')
+                # print(f'y_test.shape: {y_test.shape}')
+                # print(f'X_val.shape: {X_val.shape}')
+                # print(f'y_val.shape: {y_val.shape}')
+                # 
+                # # print a sample of the training data
+                # print(f'X_train[0]: {X_train[0]}')
+                # print(f'y_train[0]: {y_train[0]}')
 
                 # get the number of features
                 n_features = X_train.shape[1]

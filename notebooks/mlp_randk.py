@@ -20,7 +20,7 @@ def main():
 
             for i in range(k):
 
-                tf.random.set_seed(i)
+                tf.random.set_seed(i*1000)
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
