@@ -45,9 +45,9 @@ def weighted_mse_loss(y_true: tf.Tensor, y_pred: tf.Tensor, gamma: float, epsilo
     Returns:
     - tf.Tensor: The computed weighted MSE loss.
     """
-    # divisor = 5.86  # The maximum value of the target variable in the training set
+    divisor = 5.86  # The maximum value of the target variable in the training set
     # changing it to 4 would emphasize higher values more
-    divisor = 4
+    # divisor = 4
     # Calculate the weights (target_value / divisor)^gamma for each instance
     # Adding epsilon to avoid division by zero
     weights = tf.pow((y_true / divisor) + epsilon, gamma)
@@ -67,7 +67,7 @@ def main():
     Main function to run the E-MLP model
     :return:
     """
-    gammas = [7, 8, 9]
+    gammas = [.5]
     for gamma in gammas:
         for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
             for add_slope in [False]:
@@ -79,14 +79,14 @@ def main():
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'MLP_{inputs_str}_add_slope_{str(add_slope)}_d4'
+                title = f'MLP_{inputs_str}_add_slope_{str(add_slope)}_gamma{gamma}'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
 
                 # Create a unique experiment name with a timestamp
                 current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-                experiment_name = f'{title}_gamma{gamma}_{current_time}'
+                experiment_name = f'{title}_{current_time}'
 
                 # Initialize wandb
                 wandb.init(project="mlp-ts-gamma", name=experiment_name, config={

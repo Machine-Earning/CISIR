@@ -16,17 +16,17 @@ def main():
     """
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for add_slope in [False]:
-            k = 6 # number of initializations
+            k = 4  # number of initializations
 
             for i in range(k):
 
-                tf.random.set_seed(i*1000)
+                tf.random.set_seed(i*10000)
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'MLP_{inputs_str}_add_slope_{str(add_slope)}_k{i}'
+                title = f'MLP_{inputs_str}_add_slope_{str(add_slope)}_kp{i}'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
