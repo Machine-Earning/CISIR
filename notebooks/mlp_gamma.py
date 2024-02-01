@@ -67,7 +67,7 @@ def main():
     Main function to run the E-MLP model
     :return:
     """
-    gammas = [.5]
+    gammas = [.7744]
     for gamma in gammas:
         for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
             for add_slope in [False]:

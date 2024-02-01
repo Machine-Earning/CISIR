@@ -1,17 +1,19 @@
+import os
 import random
 import traceback
-from typing import Tuple, List, Any
+from collections import Counter
+from typing import Tuple, List
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from matplotlib.lines import Line2D
-import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error
 from sklearn.utils import shuffle
 from tensorflow.keras.layers import Input, Conv1D, Flatten, Dense, LeakyReLU, Concatenate, GRU
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
-import os
 
 # Seeds for reproducibility
 seed_value = 42
@@ -97,6 +99,74 @@ def create_cnns(
     return model
 
 
+def create_cnns_ch(
+        input_dims: list,
+        filters: int = 32,
+        kernel_size: int = 10,
+        conv_layers: int = 2,
+        repr_dim: int = 50,
+        output_dim: int = 1
+) -> Model:
+    """
+    Create a CNN model with multiple input branches, each processing inputs stacked across the channel dimension.
+
+    Parameters:
+    - input_dims (list): List of input dimensions. Groups of similar dimensions represent separate channels.
+    - filters (int): The number of filters in each convolutional layer. Default is 32.
+    - kernel_size (int): The size of the kernel in the convolutional layers. Default is 10.
+    - repr_dim (int): The number of units in the fully connected layer. Default is 50.
+    - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
+    - conv_layers (int): The number of convolutional layers. Default is 2.
+
+    Returns:
+    - Model: A Keras model instance.
+    """
+
+    if input_dims is None:
+        input_dims = [25, 25, 25]
+
+    # Group the input dimensions to find the number of channels for each branch
+    dim_counts = Counter(input_dims)
+    branches = []
+    cnn_inputs = []
+
+    for dim, count in dim_counts.items():
+        # Define the input layer for this set of channels
+        input_layer = Input(shape=(dim, count), name=f'input_{dim}x{count}')
+        x = input_layer
+
+        # Add convolutional layers with LeakyReLU activation
+        for _ in range(conv_layers):
+            x = Conv1D(filters=filters, kernel_size=kernel_size, padding='same')(x)
+            x = LeakyReLU()(x)
+
+        # Flatten the output for concatenation
+        flattened = Flatten()(x)
+        branches.append(flattened)
+        cnn_inputs.append(input_layer)
+
+    # Concatenate the outputs of all branches
+    concatenated = Concatenate()(branches) if len(branches) > 1 else branches[0]
+
+    # Add a fully connected layer with LeakyReLU activation
+    dense = Dense(repr_dim)(concatenated)
+    repr_output = LeakyReLU(name='repr_layer')(dense)
+
+    # Determine the model's output based on output_dim
+    if output_dim > 0:
+        # Output layer for regression or classification tasks
+        output_layer = Dense(output_dim, name='forecast_head')(repr_output)
+        model_output = [repr_output, output_layer]
+    else:
+        # Only output the representation layer
+        model_output = repr_output
+
+    # Create the model
+    model = Model(inputs=cnn_inputs, outputs=model_output)
+
+    return model
+
+
 def create_rnns(
         input_dims: list = None,
         gru_units: int = 64,
@@ -162,7 +232,8 @@ def create_rnns(
     return model
 
 
-def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim: int = 9, l2_reg: float = None) -> Model:
+def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim: int = 9,
+               l2_reg: float = None) -> Model:
     """
     Create an MLP model with fully connected dense layers.
 
@@ -1013,6 +1084,8 @@ def plot_and_evaluate_sep_event(
 
     if model_type == "cnn":
         X_reshaped = prepare_cnn_inputs(X_reshaped, n_features_list, add_slope)
+    elif model_type == "cnn-ch":
+        X_reshaped = prepare_cnn_inputs(X_reshaped, n_features_list, add_slope, use_ch=True)
     elif model_type == "rnn":
         X_reshaped = prepare_rnn_inputs(X_reshaped, n_features_list, add_slope)
     elif model_type == "cnn-hybrid":
@@ -1347,7 +1420,8 @@ def prepare_hybrid_inputs(
     return *tsf_inputs, mlp_input
 
 
-def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_slope: bool = False) -> Tuple:
+def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_slope: bool = False,
+                       use_ch: bool = False) -> Tuple:
     """
     Splits the input data into parts for the CNN branches of the Y-shaped model,
     dynamically based on the cnn_input_dims list. If with_slope is True,
@@ -1357,6 +1431,8 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
     - data (np.ndarray): The combined input data array.
     - cnn_input_dims (List[int]): The dimensions for each CNN input.
     - with_slope (bool): Whether to add additional inputs for slopes.
+    - use_ch (bool): Whether to use channel-wise concatenation.
+
 
     Returns:
     - Tuple: Tuple of arrays, each for CNN inputs.
@@ -1376,22 +1452,44 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
         regular_dims = cnn_input_dims
         slope_dims = []
 
-    # Generate CNN inputs for regular data
-    start_index = 0
-    for dim in regular_dims:
-        end_index = start_index + dim
-        cnn_input = data[:, start_index:end_index].reshape((-1, dim, 1))
-        cnn_inputs.append(cnn_input)
-        start_index = end_index
+    if use_ch:
+        # Handle channel-wise concatenation
+        # For regular data
+        regular_channels = [data[:, start:start + dim].reshape(-1, dim, 1) for start, dim in
+                            zip(range(0, sum(regular_dims), regular_dims[0]), regular_dims)]
+        cnn_input_regular = np.concatenate(regular_channels, axis=-1) if regular_channels else None
+        # Add regular channels to inputs
+        if cnn_input_regular is not None:
+            cnn_inputs.append(cnn_input_regular)
+        # For slope data, if with_slope is True
+        if with_slope:
+            slope_channels = [data[:, start:start + dim].reshape(-1, dim, 1) for start, dim in
+                              zip(range(sum(regular_dims), sum(regular_dims) + sum(slope_dims), slope_dims[0]),
+                                  slope_dims)]
+            cnn_input_slope = np.concatenate(slope_channels, axis=-1) if slope_channels else None
 
-    # Generate CNN inputs for slope data if with_slope is True
-    for dim in slope_dims:
-        end_index = start_index + dim
-        slope_input = data[:, start_index:end_index].reshape((-1, dim, 1))
-        cnn_inputs.append(slope_input)
-        start_index = end_index
+            # Add slope channels to inputs
+            if cnn_input_slope is not None:
+                cnn_inputs.append(cnn_input_slope)
 
-    return tuple(cnn_inputs)
+        return tuple(cnn_inputs)
+    else:
+        # Generate CNN inputs for regular data
+        start_index = 0
+        for dim in regular_dims:
+            end_index = start_index + dim
+            cnn_input = data[:, start_index:end_index].reshape((-1, dim, 1))
+            cnn_inputs.append(cnn_input)
+            start_index = end_index
+
+        # Generate CNN inputs for slope data if with_slope is True
+        for dim in slope_dims:
+            end_index = start_index + dim
+            slope_input = data[:, start_index:end_index].reshape((-1, dim, 1))
+            cnn_inputs.append(slope_input)
+            start_index = end_index
+
+        return tuple(cnn_inputs)
 
 
 def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_slope: bool = False) -> Tuple:
@@ -1439,4 +1537,3 @@ def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_
         start_index = end_index
 
     return tuple(rnn_inputs)
-

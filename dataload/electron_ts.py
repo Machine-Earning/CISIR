@@ -98,12 +98,16 @@ def plot_fluxes(df_flux: pd.DataFrame, cme_time: datetime, start_hours_before: i
     cme_date_str = cme_time.strftime('%m/%d/%Y')
     cme_time_str = cme_time.strftime('%H:%M')
 
-    # Define the date format for the x-axis labels
-    date_format = mdates.DateFormatter('%H:%M')
+    # Adjust the date format based on the time range
+    if start_hours_before + end_hours_after > 24:
+        date_format = mdates.DateFormatter('%m/%d %H:%M')
+    else:
+        date_format = mdates.DateFormatter('%H:%M')
 
     # Iterate over subplots to set titles, date format, and handle no data cases
     for i, ax in enumerate(axs):
         ax.xaxis.set_major_formatter(date_format)
+        plt.setp(ax.get_xticklabels(), rotation=45, ha='right')  # Rotate the x-axis labels
         ax.grid(True)  # Enable grid
         ax.set_xlabel('Time')
         ax.set_ylabel('Flux (1/(cm^2 s sr MeV))')
@@ -165,7 +169,7 @@ def plot_high_intensity_events(data_path: str, threshold: float, flux_data: pd.D
         # Call the plot_fluxes function with modified title and filename
         # modified_save_folder = os.path.join(save_folder, filename_suffix)
         # os.makedirs(modified_save_folder, exist_ok=True)
-        plot_fluxes(flux_data, cme_time, 6, 6, save_folder, plot_title_suffix)
+        plot_fluxes(flux_data, cme_time, 164, 164, save_folder, plot_title_suffix)
 
 
 def add_electron_flux_features_to_SEP(df_flux: pd.DataFrame, sep_df: pd.DataFrame,
@@ -239,7 +243,7 @@ def main():
     data_path = 'D:/College/Fall2023/new_data/SEP10MeV_Features.csv'
     threshold = 10  # pfu so SEPs only
     flux_data_path = 'D:/College/Fall2023/new_data/ephin5m_v2.dat'
-    save_folder = 'D:/College/Fall2023/electron_cme_v4/flux_plots'
+    save_folder = 'D:/College/Fall2023/electron_cme_v5/flux_plots_164'
     # # Ensure the save folder exists
     os.makedirs(save_folder, exist_ok=True)
     df_flux = load_flux_data(flux_data_path)
