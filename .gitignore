@@ -159,7 +159,7 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# models
+# weights
 weights/
 
 
@@ -178,13 +178,13 @@ fit/
 *.png
 
 #MLFlow stuffs
-mlruns/
-mlartifacts/
+logs/mlruns/
+logs/mlartifacts/
 
 #dataset file
-cme_and_electron/
-dataload/conn_angle_diffusive_shock_features_og.py
-dataload/code_snippet.py
+data/
+modules/training/conn_angle_diffusive_shock_features_og.py
+modules/training/code_snippet.py
 
 
 #wandb

@@ -3,7 +3,7 @@ repo for projects with keras-functional-api
 
 ### Install dependencies
 ```bash
-pip install -r requirements/requirements.txt
+pip install -r setup/setup.txt
 ```
 
 ### Running on AI-Panther
