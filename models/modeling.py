@@ -249,6 +249,7 @@ class ModelBuilder:
                   save_tag=None) -> callbacks.History:
         """
         Trains the model and returns the training history.
+        TODO: add callbacks to PDS so wandb can be used
 
         :param X_train: training and validation sets together
         :param y_train: labels of training and validation sets together
