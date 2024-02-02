@@ -80,7 +80,7 @@ class ModelBuilder:
 
     def create_model(self,
                      input_dim: int,
-                     feat_dim: int,
+                     repr_dim: int,
                      output_dim: int,
                      hiddens: List[int],
                      with_ae: bool = False) -> Model:
@@ -88,7 +88,7 @@ class ModelBuilder:
         Create a neural network model with options for multiple heads using the Keras functional API.
 
         :param input_dim: Integer representing the number of input features.
-        :param feat_dim: Integer representing the dimensionality of the feature (representation layer).
+        :param repr_dim: Integer representing the dimensionality of the feature (representation layer).
         :param output_dim: Integer representing the dimensionality of the output.
         :param hiddens: List of integers representing the number of nodes in each hidden layer.
         :param with_ae: Boolean flag to indicate whether to include an AutoEncoder (AE) head for input reconstruction.
@@ -105,7 +105,7 @@ class ModelBuilder:
             x = layers.LeakyReLU()(x)
 
         # Define the representation layer (Z features)
-        repr_layer = layers.Dense(feat_dim)(x)
+        repr_layer = layers.Dense(repr_dim)(x)
         repr_layer = layers.LeakyReLU(name='repr_layer')(repr_layer)
 
         # Add a regression head
@@ -130,7 +130,7 @@ class ModelBuilder:
 
     def create_model_pds(self,
                          input_dim: int,
-                         feat_dim: int,
+                         repr_dim: int,
                          hiddens: List[int],
                          output_dim: Optional[int] = 1,
                          with_reg: bool = False, with_ae: bool = False) -> Model:
@@ -139,7 +139,7 @@ class ModelBuilder:
         The base model is used for feature extraction.
 
         :param input_dim: Integer representing the number of input features.
-        :param feat_dim: Integer representing the dimensionality of the feature (representation layer).
+        :param repr_dim: Integer representing the dimensionality of the feature (representation layer).
         :param hiddens: List of integers representing the number of nodes in each hidden layer of the encoder.
         :param output_dim: Integer representing the dimensionality of the regression output. Default is 1.
         :param with_reg: Boolean flag to add a regression head to the model. Default is False.
@@ -153,7 +153,7 @@ class ModelBuilder:
             x = layers.Dense(nodes)(x)
             x = layers.LeakyReLU()(x)
 
-        x = layers.Dense(feat_dim)(x)
+        x = layers.Dense(repr_dim)(x)
         x = layers.LeakyReLU()(x)
         repr_layer = NormalizeLayer(name='normalize_layer')(x)
 
