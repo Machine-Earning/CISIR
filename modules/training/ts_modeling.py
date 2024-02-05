@@ -15,6 +15,8 @@ from tensorflow.keras.layers import Input, Conv1D, Flatten, Dense, LeakyReLU, Co
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
 
+from cme_modeling import NormalizeLayer
+
 # Seeds for reproducibility
 seed_value = 42
 
@@ -37,7 +39,8 @@ def create_cnns(
         kernel_size: int = 10,
         conv_layers: int = 2,
         repr_dim: int = 50,
-        output_dim: int = 1
+        output_dim: int = 1,
+        pds: bool = False
 ) -> Model:
     """
     Create a model with multiple CNN branches, each processing a different input dimension.
@@ -50,6 +53,7 @@ def create_cnns(
     - kernel_size (int): The size of the kernel in the convolutional layers. Default is 10.
     - repr_dim (int): The number of units in the fully connected layer. Default is 50.
     - conv_layers (int): The number of convolutional layers in each branch. Default is 2.
+    - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
 
     Returns:
     - Model: A Keras model instance.
@@ -80,18 +84,25 @@ def create_cnns(
     # Concatenate the outputs of all branches
     concatenated = Concatenate()(cnn_branches) if len(cnn_branches) > 1 else cnn_branches[0]
 
-    # Add a fully connected layer with LeakyReLU activation
+    # Proceed with the representation layer
     dense = Dense(repr_dim)(concatenated)
-    repr_output = LeakyReLU(name='repr_layer')(dense)
+    if pds:
+        # Apply normalization if PDS is enabled
+        repr_layer = LeakyReLU()(dense)
+        normalized_repr_layer = NormalizeLayer(name='normalize_layer')(repr_layer)
+        final_repr_output = normalized_repr_layer
+    else:
+        # Regular processing without PDS
+        final_repr_output = LeakyReLU(name='repr_layer')(dense)
 
     # Determine the model's output based on output_dim
     if output_dim > 0:
         # Output layer for regression or classification tasks
-        output_layer = Dense(output_dim, name='forecast_head')(repr_output)
-        model_output = [repr_output, output_layer]
+        output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+        model_output = [final_repr_output, output_layer] if pds else output_layer
     else:
-        # Only output the representation layer
-        model_output = repr_output
+        # Only output the representation layer if output_dim is not greater than 0
+        model_output = final_repr_output
 
     # Create the model
     model = Model(inputs=cnn_inputs, outputs=model_output)
@@ -105,7 +116,8 @@ def create_cnns_ch(
         kernel_size: int = 10,
         conv_layers: int = 2,
         repr_dim: int = 50,
-        output_dim: int = 1
+        output_dim: int = 1,
+        pds: bool = False
 ) -> Model:
     """
     Create a CNN model with multiple input branches, each processing inputs stacked across the channel dimension.
@@ -117,6 +129,7 @@ def create_cnns_ch(
     - repr_dim (int): The number of units in the fully connected layer. Default is 50.
     - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
     - conv_layers (int): The number of convolutional layers. Default is 2.
+    - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
 
     Returns:
     - Model: A Keras model instance.
@@ -148,18 +161,25 @@ def create_cnns_ch(
     # Concatenate the outputs of all branches
     concatenated = Concatenate()(branches) if len(branches) > 1 else branches[0]
 
-    # Add a fully connected layer with LeakyReLU activation
+    # Proceed with the representation layer
     dense = Dense(repr_dim)(concatenated)
-    repr_output = LeakyReLU(name='repr_layer')(dense)
+    if pds:
+        # Apply normalization if PDS is enabled
+        repr_layer = LeakyReLU()(dense)
+        normalized_repr_layer = NormalizeLayer(name='normalize_layer')(repr_layer)
+        final_repr_output = normalized_repr_layer
+    else:
+        # Regular processing without PDS
+        final_repr_output = LeakyReLU(name='repr_layer')(dense)
 
     # Determine the model's output based on output_dim
     if output_dim > 0:
         # Output layer for regression or classification tasks
-        output_layer = Dense(output_dim, name='forecast_head')(repr_output)
-        model_output = [repr_output, output_layer]
+        output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+        model_output = [final_repr_output, output_layer] if pds else output_layer
     else:
-        # Only output the representation layer
-        model_output = repr_output
+        # Only output the representation layer if output_dim is not greater than 0
+        model_output = final_repr_output
 
     # Create the model
     model = Model(inputs=cnn_inputs, outputs=model_output)
@@ -172,7 +192,9 @@ def create_rnns(
         gru_units: int = 64,
         rnn_layers: int = 2,
         repr_dim: int = 50,
-        output_dim: int = 1) -> Model:
+        output_dim: int = 1,
+        pds: bool = False
+) -> Model:
     """
     Create a model with multiple RNN (GRU) branches, each processing a different input dimension.
     The outputs of these branches are concatenated before being passed to dense layers.
@@ -183,6 +205,7 @@ def create_rnns(
     - repr_dim (int): The number of units in the fully connected layer. Default is 50.
     - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
     - rnn_layers (int): The number of RNN layers in each branch. Default is 2.
+    - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
 
     Returns:
     - Model: A Keras model instance.
@@ -213,18 +236,25 @@ def create_rnns(
     # Concatenate the outputs of all branches
     concatenated = Concatenate()(rnn_branches) if len(rnn_branches) > 1 else rnn_branches[0]
 
-    # Add a fully connected layer with LeakyReLU activation
+    # Proceed with the representation layer
     dense = Dense(repr_dim)(concatenated)
-    repr_output = LeakyReLU(name='repr_layer')(dense)
+    if pds:
+        # Apply normalization if PDS is enabled
+        repr_layer = LeakyReLU()(dense)
+        normalized_repr_layer = NormalizeLayer(name='normalize_layer')(repr_layer)
+        final_repr_output = normalized_repr_layer
+    else:
+        # Regular processing without PDS
+        final_repr_output = LeakyReLU(name='repr_layer')(dense)
 
     # Determine the model's output based on output_dim
     if output_dim > 0:
         # Output layer for regression or classification tasks
-        output_layer = Dense(output_dim, name='forecast_head')(repr_output)
-        model_output = [repr_output, output_layer]
+        output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+        model_output = [final_repr_output, output_layer] if pds else output_layer
     else:
-        # Only output the representation layer
-        model_output = repr_output
+        # Only output the representation layer if output_dim is not greater than 0
+        model_output = final_repr_output
 
     # Create the model
     model = Model(inputs=rnn_inputs, outputs=model_output)
@@ -232,7 +262,7 @@ def create_rnns(
     return model
 
 
-def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim: int = 9,
+def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim: int = 9, pds: bool = False,
                l2_reg: float = None) -> Model:
     """
     Create an MLP model with fully connected dense layers.
@@ -242,6 +272,7 @@ def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim:
     - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
     - hiddens (list): A list of integers where each integer is the number of units in a hidden layer.
     - repr_dim (int): The number of features in the final representation vector.
+    - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
     - l2_reg (float): L2 regularization factor. Default is None (no regularization).
 
     Returns:
@@ -262,93 +293,30 @@ def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim:
             x = Dense(units)(x)
         x = LeakyReLU()(x)
 
-    # Final representation layer
-    repr_output = Dense(repr_dim)(x)
-    repr_output = LeakyReLU(name='repr_layer')(repr_output)
+    # Proceed with the representation layer
+    dense = Dense(repr_dim)(x)
+    if pds:
+        # Apply normalization if PDS is enabled
+        repr_layer = LeakyReLU()(dense)
+        normalized_repr_layer = NormalizeLayer(name='normalize_layer')(repr_layer)
+        final_repr_output = normalized_repr_layer
+    else:
+        # Regular processing without PDS
+        final_repr_output = LeakyReLU(name='repr_layer')(dense)
 
-    # Output layer
-    output_layer = Dense(output_dim, name='forecast_head')(repr_output)
+    # Determine the model's output based on output_dim
+    if output_dim > 0:
+        # Output layer for regression or classification tasks
+        output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+        model_output = [final_repr_output, output_layer] if pds else output_layer
+    else:
+        # Only output the representation layer if output_dim is not greater than 0
+        model_output = final_repr_output
 
     # Create the model
-    model = Model(inputs=input_layer, outputs=[repr_output, output_layer])
+    model = Model(inputs=input_layer, outputs=model_output)
 
     return model
-
-
-# def create_fork_model(cnn_input_dims=None, mlp_input_dim: int = 23, output_dim: int = 1, repr_dim: int = 10,
-#                       cnn_filters: int = 32, cnn_kernel_size: int = 10, cnn_repr_dim: int = 50, mlp_repr_dim: int = 9,
-#                       mlp_hiddens=None, final_hiddens=None) -> Model:
-#     """
-#     Create a fork-like neural network model with multiple CNN branches and an MLP branch.
-#
-#     Parameters:
-#     - cnn_input_dims (list[int]): List of input dimensions for each CNN branch.
-#     - mlp_input_dim (int): The number of features for the MLP branch.
-#     - output_dim (int): The dimension of the output layer.
-#     - repr_dim (int): The number of features in the final representation vector.
-#     - cnn_filters (int): The number of filters in the CNN layers.
-#     - cnn_kernel_size (int): The size of the kernel in the CNN layers.
-#     - cnn_repr_dim (int): The number of features in the representation vector after the CNN branches.
-#     - mlp_repr_dim (int): The number of features in the representation vector after the MLP branch.
-#     - mlp_hiddens (List[int]): List of integers for the MLP hidden layers.
-#     - final_hiddens (List[int]): List of integers for the hidden layers after concatenation.
-#
-#     Returns:
-#     - Model: A Keras model instance.
-#     """
-#
-#     if cnn_input_dims is None:
-#         cnn_input_dims = [25, 25, 25]
-#     if final_hiddens is None:
-#         final_hiddens = [12]
-#     if mlp_hiddens is None:
-#         mlp_hiddens = [18]
-#
-#     cnn_branches = []
-#     cnn_inputs = []
-#
-#     # Create CNN branches
-#     for i, dim in enumerate(cnn_input_dims):
-#         cnn_input = Input(shape=(dim, 1), name=f'cnn_input_{i}')
-#         x_cnn = Conv1D(filters=cnn_filters, kernel_size=cnn_kernel_size, padding='same')(cnn_input)
-#         x_cnn = LeakyReLU()(x_cnn)
-#         x_cnn = Conv1D(filters=cnn_filters, kernel_size=cnn_kernel_size, padding='same')(x_cnn)
-#         x_cnn = LeakyReLU()(x_cnn)
-#         x_cnn = Flatten()(x_cnn)
-#         x_cnn = Dense(cnn_repr_dim)(x_cnn)
-#         cnn_repr = LeakyReLU()(x_cnn)
-#         cnn_branches.append(cnn_repr)
-#         cnn_inputs.append(cnn_input)
-#
-#     # MLP Branch
-#     mlp_input = Input(shape=(mlp_input_dim,), name='mlp_input')
-#     x_mlp = mlp_input
-#     for units in mlp_hiddens:
-#         x_mlp = Dense(units)(x_mlp)
-#         x_mlp = LeakyReLU()(x_mlp)
-#     x_mlp = Dense(mlp_repr_dim)(x_mlp)
-#     mlp_repr = LeakyReLU()(x_mlp)
-#
-#     # Concatenate the outputs of CNN and MLP branches
-#     concatenated = Concatenate()(cnn_branches + [mlp_repr])
-#
-#     # Additional MLP Layer(s) after concatenation
-#     x_combined = concatenated
-#     for units in final_hiddens:
-#         x_combined = Dense(units)(x_combined)
-#         x_combined = LeakyReLU()(x_combined)
-#
-#     # Final representation layer
-#     final_repr = Dense(repr_dim)(x_combined)
-#     final_repr = LeakyReLU(name='repr_layer')(final_repr)
-#
-#     # Final output layer
-#     forecast_head = Dense(output_dim, activation='linear', name='forecast_head')(final_repr)
-#
-#     # Create the model
-#     model = Model(inputs=cnn_inputs + [mlp_input], outputs=[final_repr, forecast_head])
-#
-#     return model
 
 
 def create_hybrid_model(
@@ -358,7 +326,8 @@ def create_hybrid_model(
         mlp_repr_dim: int = 9,
         final_hiddens=None,
         repr_dim: int = 10,
-        output_dim: int = 1
+        output_dim: int = 1,
+        pds: bool = False
 
 ) -> Model:
     """
@@ -373,6 +342,7 @@ def create_hybrid_model(
     - mlp_repr_dim (int): The number of features in the representation vector after the MLP branch.
     - mlp_hiddens (List[int]): List of integers for the MLP hidden layers.
     - final_hiddens (List[int]): List of integers for the hidden layers after concatenation.
+    - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
 
     Returns:
     - Model: A Keras model instance.
@@ -403,13 +373,17 @@ def create_hybrid_model(
 
     # Final representation layer
     final_repr = Dense(repr_dim)(x_combined)
-    final_repr = LeakyReLU(name='final_repr_layer')(final_repr)
+    if pds:
+        # Normalize the final representation if PDS is enabled
+        final_repr = NormalizeLayer(name='normalize_layer')(LeakyReLU()(final_repr))
+    else:
+        final_repr = LeakyReLU(name='final_repr_layer')(final_repr)
 
     # Final output layer
     forecast_head = Dense(output_dim, activation='linear', name='forecast_head')(final_repr)
 
     # Create the model
-    model = Model(inputs=[tsf_extractor.input, mlp_input], outputs=[final_repr, forecast_head])
+    model = Model(inputs=[tsf_extractor.input, mlp_input], outputs=forecast_head)
 
     return model
 

@@ -246,10 +246,10 @@ class ModelBuilder:
                   epochs: int = 100,
                   batch_size: int = 32,
                   patience: int = 9,
-                  save_tag=None) -> callbacks.History:
+                  save_tag=None,
+                  callbacks_list=None) -> callbacks.History:
         """
         Trains the model and returns the training history.
-        TODO: add callbacks to PDS so wandb can be used
 
         :param X_train: training and validation sets together
         :param y_train: labels of training and validation sets together
@@ -263,29 +263,25 @@ class ModelBuilder:
         :param epochs: The maximum number of epochs for training.
         :param batch_size: The batch size for training.
         :param patience: The number of epochs with no improvement to wait before early stopping.
+        :param callbacks_list: List of callback instances to apply during training.
+
+
         :return: The training history as a History object.
         """
 
-        # Setup TensorBoard
-        # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        # tensorboard_cb = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
-        #
-        # print("Run the command line:\n tensorboard --logdir logs/fit")
+        if callbacks_list is None:
+            callbacks_list = []
 
-        # Setup early stopping
-        early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
-
-        # reduce learning rate on plateau
-        # Initialize the ReduceLROnPlateau callback
-        # reduce_lr_cb = callbacks.ReduceLROnPlateau(monitor='val_loss',
-        #                                            factor=0.1,
-        #                                            patience=5,
-        #                                            min_lr=1e-6)
-        # Setup model checkpointing
+        # Initialize early stopping and model checkpointing
+        early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience,
+                                                    restore_best_weights=True)
         checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_{str(save_tag)}.h5", save_weights_only=True)
 
-        # Include weighted_loss_cb in callbacks only if sample_joint_weights is not None
-        callback_list = [early_stopping_cb, checkpoint_cb]
+        # Append the early stopping and checkpoint callbacks to the custom callbacks list
+        callbacks_list.extend([early_stopping_cb, checkpoint_cb])
+
+        # Save initial weights for retraining on full training set after best epoch found
+        initial_weights = model.get_weights()
 
         # Compile the model
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
@@ -296,7 +292,7 @@ class ModelBuilder:
                             batch_size=batch_size if batch_size > 0 else len(y_subtrain),
                             validation_data=(X_val, y_val),
                             validation_batch_size=batch_size if batch_size > 0 else len(y_val),
-                            callbacks=callback_list)
+                            callbacks=callbacks_list)
 
         # Get the best epoch from early stopping
         best_epoch = np.argmin(history.history['val_loss']) + 1
@@ -312,9 +308,8 @@ class ModelBuilder:
         plt.savefig(file_path)
         plt.close()
 
-        # Retrain the model on the combined dataset (training + validation) to the best epoch found
-        # X_combined = np.concatenate((X_subtrain, X_val), axis=0)
-        # y_combined = np.concatenate((y_subtrain, y_val), axis=0)
+        # Reset model weights to initial state before retraining
+        model.set_weights(initial_weights)
 
         # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
         model.fit(X_train, y_train,
