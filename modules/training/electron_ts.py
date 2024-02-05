@@ -240,7 +240,7 @@ def main():
     # cme_time_str = '1/23/2012 4:00'  # 6198.6	1	1/23/2012 4:00
     # cme_time_str = '3/7/2012 0:36'  # 5919.2	1	3/7/2012 0:36
 
-    data_path = 'D:/College/Fall2023/new_data/SEP10MeV_Features.csv'
+    data_path = 'D:/College/Fall2023/new_data/SEP10MeV_Features_v2.csv'
     threshold = 10  # pfu so SEPs only
     flux_data_path = 'D:/College/Fall2023/new_data/ephin5m_v2.dat'
     save_folder = 'D:/College/Fall2023/electron_cme_v5/flux_plots_164'
