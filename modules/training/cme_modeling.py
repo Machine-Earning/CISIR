@@ -247,7 +247,8 @@ class ModelBuilder:
                   batch_size: int = 32,
                   patience: int = 9,
                   save_tag=None,
-                  callbacks_list=None) -> callbacks.History:
+                  callbacks_list=None,
+                  verbose: int = 1) -> callbacks.History:
         """
         Trains the model and returns the training history.
 
@@ -264,6 +265,7 @@ class ModelBuilder:
         :param batch_size: The batch size for training.
         :param patience: The number of epochs with no improvement to wait before early stopping.
         :param callbacks_list: List of callback instances to apply during training.
+        :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
 
 
         :return: The training history as a History object.
@@ -292,7 +294,8 @@ class ModelBuilder:
                             batch_size=batch_size if batch_size > 0 else len(y_subtrain),
                             validation_data=(X_val, y_val),
                             validation_batch_size=batch_size if batch_size > 0 else len(y_val),
-                            callbacks=callbacks_list)
+                            callbacks=callbacks_list,
+                            verbose=verbose)
 
         # Get the best epoch from early stopping
         best_epoch = np.argmin(history.history['val_loss']) + 1
@@ -315,7 +318,8 @@ class ModelBuilder:
         model.fit(X_train, y_train,
                   epochs=best_epoch,
                   batch_size=batch_size if batch_size > 0 else len(y_train),
-                  callbacks=[checkpoint_cb])
+                  callbacks=[checkpoint_cb],
+                  verbose=verbose)
 
         # Evaluate the model on the entire training set
         # entire_training_loss = model.evaluate(X_train, y_train)
