@@ -15,7 +15,7 @@ from tensorflow.keras.layers import Input, Conv1D, Flatten, Dense, LeakyReLU, Co
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
 
-from cme_modeling import NormalizeLayer
+from modules.training.cme_modeling import NormalizeLayer
 
 # Seeds for reproducibility
 seed_value = 42

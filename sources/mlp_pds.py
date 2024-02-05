@@ -1,11 +1,12 @@
-from modules.dataload.ts_modeling import build_dataset
+from modules.training.ts_modeling import build_dataset, create_mlp
 import wandb
 from datetime import datetime
 from modules.evaluate.utils import plot_tsne_pds
-from modules.dataload import modeling
+from modules.training import cme_modeling
 import numpy as np
 import random
 import tensorflow as tf
+from wandb.keras import WandbCallback
 
 # SEEDING
 SEED = 42  # seed number
@@ -19,7 +20,7 @@ tf.random.set_seed(SEED)
 # Set random seed
 random.seed(SEED)
 
-mb = modeling.ModelBuilder()
+mb = cme_modeling.ModelBuilder()
 
 
 def main():
@@ -37,7 +38,7 @@ def main():
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
             # Construct the title
-            title = f'MLP_{inputs_str}_add_slope_{str(add_slope)}'
+            title = f'MLP_{inputs_str}_slope_{str(add_slope)}'
 
             # Replace any other characters that are not suitable for filenames (if any)
             title = title.replace(' ', '_').replace(':', '_')
@@ -53,7 +54,8 @@ def main():
             })
 
             # set the root directory
-            root_dir = 'D:/College/Fall2023/electron_cme_v4/electron_cme_data_split'
+            # root_dir = 'D:/College/Fall2023/electron_cme_v5/electron_cme_data_split'
+            root_dir = "data/electron_cme_data_split"
             # build the dataset
             X_train, y_train = build_dataset(root_dir + '/training', inputs_to_use=inputs_to_use, add_slope=add_slope)
             X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining', inputs_to_use=inputs_to_use,
@@ -72,8 +74,8 @@ def main():
             print(f'y_val.shape: {y_val.shape}')
 
             # print a sample of the training cme_files
-            print(f'X_train[0]: {X_train[0]}')
-            print(f'y_train[0]: {y_train[0]}')
+            # print(f'X_train[0]: {X_train[0]}')
+            # print(f'y_train[0]: {y_train[0]}')
 
             # get the number of features
             n_features = X_train.shape[1]
@@ -81,79 +83,18 @@ def main():
             hiddens = [100, 100, 50]
 
             # create the model
-            # mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens)
-            mlp_model_sep = mb.create_model_pds(input_dim=n_features, hiddens=hiddens, feat_dim=9)
+            mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=True)
             mlp_model_sep.summary()
 
             # Set the early stopping patience and learning rate as variables
             Options = {
                 'batch_size': 16,  # Assuming batch_size is defined elsewhere
-                'epochs': 1000,
+                'epochs': 2,
                 'patience': 50,  # Updated to 50
                 'learning_rate': 3e-4,  # Updated to 3e-4
                 'weight_decay': 0,  # Added weight decay
                 'momentum_beta1': 0.9,  # Added momentum beta1
             }
-
-            # Define the EarlyStopping callback
-            # early_stopping = EarlyStopping(monitor='val_forecast_head_loss', patience=patience, verbose=1,
-            #                                restore_best_weights=True)
-
-            # Compile the model with the specified learning rate
-            # mlp_model_sep.compile(optimizer=Adam(learning_rate=learning_rate,
-            #                                       weight_decay=weight_decay,
-            #                                       beta_1=momentum_beta1),
-            #                       loss={'forecast_head': 'mse'})
-
-            # Train the model with the callback
-            # history = mlp_model_sep.fit(X_subtrain,
-            #                             {'forecast_head': y_subtrain},
-            #                             epochs=1000, batch_size=32,
-            #                             validation_data=(X_val, {'forecast_head': y_val}),
-            #                             callbacks=[early_stopping, WandbCallback()])
-
-            # Plot the training and validation loss
-            # plt.figure(figsize=(12, 6))
-            # plt.plot(history.history['loss'], label='Training Loss')
-            # plt.plot(history.history['val_loss'], label='Validation Loss')
-            # plt.title('Training and Validation Loss')
-            # plt.xlabel('Epochs')
-            # plt.ylabel('Loss')
-            # plt.legend()
-            # # save the plot
-            # plt.savefig(f'mlp_loss_{title}.png')
-
-            # Determine the optimal number of epochs from early stopping
-            # optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
-            # final_mlp_model_sep = create_mlp(input_dim=n_features,
-            #                                  hiddens=hiddens)  # Recreate the model architecture
-            # final_mlp_model_sep.compile(optimizer=Adam(learning_rate=learning_rate,
-            #                                             weight_decay=weight_decay,
-            #                                             beta_1=momentum_beta1),
-            #                             loss={'forecast_head': 'mse'})  # Compile the model just like before
-            # # Train on the full dataset
-            # final_mlp_model_sep.fit(X_train, {'forecast_head': y_train}, epochs=optimal_epochs, batch_size=32,
-            #                         verbose=1)
-
-            # evaluate the model on test cme_files
-            # error_mae = evaluate_model(final_mlp_model_sep, X_test, y_test)
-            # print(f'mae error: {error_mae}')
-            # # Log the MAE error to wandb
-            # wandb.log({"mae_error": error_mae})
-
-            # Process SEP event files in the specified directory
-            # test_directory = root_dir + '/testing'
-            # filenames = process_sep_events(
-            #     test_directory,
-            #     final_mlp_model_sep,
-            #     model_type='mlp',
-            #     title=title,
-            #     inputs_to_use=inputs_to_use,
-            #     add_slope=add_slope)
-
-            # Log the plot to wandb
-            # for filename in filenames:
-            #     wandb.log({f'{filename}': wandb.Image(filename)})
 
             mb.train_pds(mlp_model_sep,
                          X_subtrain, y_subtrain,
@@ -162,10 +103,8 @@ def main():
                          learning_rate=Options['learning_rate'],
                          epochs=Options['epochs'],
                          batch_size=Options['batch_size'],
-                         patience=Options['patience'], save_tag=current_time + "_features")
-
-            # Log model to Weights & Biases
-            # wandb.log_artifact('path/to/model', type='model', name='pds_model')
+                         patience=Options['patience'], save_tag=current_time + "_features",
+                         callbacks_list=[WandbCallback()])
 
             file_path = plot_tsne_pds(mlp_model_sep,
                                       X_train,

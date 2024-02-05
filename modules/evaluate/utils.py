@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 from sklearn.manifold import TSNE
 
-from modules.dataload import seploader as sepl, modeling
+from modules.training import seploader as sepl, cme_modeling
 from modules.evaluate import evaluation as eval
 
 
@@ -201,8 +201,8 @@ def plot_tsne_extended(
                loc='upper left')
 
     plt.title(f'{title}\n2D t-SNE Visualization')
-    plt.xlabel('Dimension 1')
-    plt.ylabel('Dimension 2')
+    # plt.xlabel('Dimension 1')
+    # plt.ylabel('Dimension 2')
 
     # Save the plot
     file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
@@ -363,9 +363,9 @@ def plot_tsne_pds(model, X, y, title, prefix, save_tag=None, seed=42):
     plt.legend(legend_labels, ['Background', 'Elevated Events (darker colors)', 'SEPs (lighter colors)'],
                loc='upper left')
 
-    plt.title(f'{title}\n2D t-SNE Visualization')
-    plt.xlabel('Dimension 1')
-    plt.ylabel('Dimension 2')
+    plt.title(f'{title}\nT-SNE Visualization')
+    # plt.xlabel('Dimension 1')
+    # plt.ylabel('Dimension 2')
 
     # Save the plot
     file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
