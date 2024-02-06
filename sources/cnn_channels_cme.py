@@ -49,7 +49,7 @@ def main():
                 })
 
                 # set the root directory
-                root_dir = 'D:/College/Fall2023/electron_cme_v4/electron_cme_data_split'
+                root_dir = 'data/electron_cme_data_split'
                 # build the dataset
                 X_train, y_train = build_full_dataset(root_dir + '/training', inputs_to_use=inputs_to_use,
                                                       add_slope=add_slope, cme_speed_threshold=cme_speed_threshold)
