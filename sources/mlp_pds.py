@@ -38,7 +38,7 @@ def main():
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
             # Construct the title
-            title = f'MLP_{inputs_str}_slope_{str(add_slope)}'
+            title = f'MLP_{inputs_str}_slope_{str(add_slope)}_PDS_bs_500'
 
             # Replace any other characters that are not suitable for filenames (if any)
             title = title.replace(' ', '_').replace(':', '_')
@@ -88,8 +88,8 @@ def main():
 
             # Set the early stopping patience and learning rate as variables
             Options = {
-                'batch_size': 16,  # Assuming batch_size is defined elsewhere
-                'epochs': 2,
+                'batch_size': 1542,  # Assuming batch_size is defined elsewhere
+                'epochs': 1000,
                 'patience': 50,  # Updated to 50
                 'learning_rate': 3e-4,  # Updated to 3e-4
                 'weight_decay': 0,  # Added weight decay
