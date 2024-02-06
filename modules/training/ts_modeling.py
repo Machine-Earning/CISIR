@@ -1454,8 +1454,8 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
         regular_dims = cnn_input_dims[:half_len]
         slope_dims = cnn_input_dims[half_len:]
 
-        print(f"Regular dims: {regular_dims}")
-        print(f"Slope dims: {slope_dims}")
+        # print(f"Regular dims: {regular_dims}")
+        # print(f"Slope dims: {slope_dims}")
     else:
         regular_dims = cnn_input_dims
         slope_dims = []
