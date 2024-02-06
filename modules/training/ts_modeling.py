@@ -1426,7 +1426,7 @@ def prepare_hybrid_inputs(
 
 
 def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_slope: bool = False,
-                       use_ch: bool = False) -> Tuple:
+                       use_ch: bool = True) -> Tuple:
     """
     Splits the input cme_files into parts for the CNN branches of the Y-shaped model,
     dynamically based on the cnn_input_dims list. If with_slope is True,
