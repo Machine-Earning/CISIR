@@ -308,7 +308,7 @@ def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim:
     if output_dim > 0:
         # Output layer for regression or classification tasks
         output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
-        model_output = [final_repr_output, output_layer] if pds else output_layer
+        model_output = [final_repr_output, output_layer]
     else:
         # Only output the representation layer if output_dim is not greater than 0
         model_output = final_repr_output

@@ -179,11 +179,11 @@ class ModelBuilder:
 
         return model
 
-    def add_reg_proj_head(self,
-                          model: Model,
-                          output_dim: int = 1,
-                          hiddens: Optional[List[int]] = None,
-                          freeze_features: bool = True, pds: bool = False) -> Model:
+    def add_proj_head(self,
+                      model: Model,
+                      output_dim: int = 1,
+                      hiddens: Optional[List[int]] = None,
+                      freeze_features: bool = True, pds: bool = False) -> Model:
         """
         Add a regression head with one output unit and a projection layer to an existing model,
         replacing the existing prediction layer and optionally the decoder layer.
@@ -222,10 +222,10 @@ class ModelBuilder:
             x_proj = layers.LeakyReLU(name=f"projection_activation_{i + 1}")(x_proj)
 
         # Add a Dense layer with one output unit for regression
-        regression_head = layers.Dense(output_dim, activation='linear', name="regression_head")(x_proj)
+        output_layer = layers.Dense(output_dim, activation='linear', name="forecast_head")(x_proj)
 
         # Create the new extended model
-        extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, regression_head])
+        extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer])
 
         # If freeze_features is False, make all layers trainable
         if not freeze_features:
