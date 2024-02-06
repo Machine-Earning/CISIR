@@ -1,14 +1,16 @@
+from datetime import datetime
+
+import matplotlib.pyplot as plt
+import wandb
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.optimizers import Adam
+from wandb.keras import WandbCallback
+
 from modules.training.ts_modeling import (build_dataset,
                                           create_rnns,
                                           evaluate_model,
                                           process_sep_events,
                                           prepare_rnn_inputs)
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping
-import matplotlib.pyplot as plt
-import wandb
-from datetime import datetime
-from wandb.keras import WandbCallback
 
 
 def main():

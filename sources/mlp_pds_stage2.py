@@ -18,8 +18,8 @@ def main():
     :return:
     """
 
-    for inputs_to_use in [['e0.5', 'e1.8', 'p'], ['e0.5', 'e1.8'], ['e0.5', 'p'], ['e0.5']]:
-        for add_slope in [False, True]:
+    for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
+        for add_slope in [False]:
             for freeze in [False, True]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
@@ -46,7 +46,7 @@ def main():
                 })
 
                 # set the root directory
-                root_dir = 'D:/College/Fall2023/electron_cme_v4/electron_cme_data_split'
+                root_dir = 'data/electron_cme_data_split'
                 # build the dataset
                 X_train, y_train = build_dataset(root_dir + '/training', inputs_to_use=inputs_to_use,
                                                  add_slope=add_slope)
@@ -81,7 +81,7 @@ def main():
                 weight_path = 'D:/College/Fall2023/sep-forecasting-research/model_weights_20240205-231633_features.h5'
                 mlp_model_sep_stage1.load_weights(weight_path)
 
-                mlp_model_sep = mb.add_proj_head(mlp_model_sep_stage1, output_dim=1, freeze_features=freeze)
+                mlp_model_sep = mb.add_proj_head(mlp_model_sep_stage1, output_dim=1, freeze_features=freeze, pds=True)
                 mlp_model_sep.summary()
 
                 # Set the early stopping patience and learning rate as variables
@@ -91,7 +91,7 @@ def main():
                 momentum_beta1 = 0.9  # higher momentum beta1
 
                 # Define the EarlyStopping callback
-                early_stopping = EarlyStopping(monitor='val_forecast_head_loss', patience=patience, verbose=1,
+                early_stopping = EarlyStopping(monitor='val_loss', patience=patience, verbose=1,
                                                restore_best_weights=True)
 
                 # Compile the model with the specified learning rate
@@ -121,10 +121,11 @@ def main():
                 # Determine the optimal number of epochs from early stopping
                 optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
 
+                final_mlp_model_sep_stage1 = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=True)
+                final_mlp_model_sep_stage1.load_weights(weight_path)
+
                 # Recreate the model architecture for final_mlp_model_sep
-                final_mlp_model_sep = mb.add_proj_head(
-                    create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=True).load_weights(weight_path),
-                    output_dim=1, freeze_features=freeze)
+                final_mlp_model_sep = mb.add_proj_head(final_mlp_model_sep_stage1, output_dim=1, freeze_features=freeze, pds=True)
 
                 final_mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
                                                             weight_decay=weight_decay,
@@ -141,7 +142,7 @@ def main():
                 wandb.log({"mae_error": error_mae})
 
                 # Process SEP event files in the specified directory
-                test_directory = 'D:/College/Fall2023/electron_cme_v4/electron_cme_data_filled'
+                test_directory = root_dir + '/testing'
                 filenames = process_sep_events(
                     test_directory,
                     final_mlp_model_sep,

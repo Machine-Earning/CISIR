@@ -1093,6 +1093,8 @@ def plot_and_evaluate_sep_event(
         X_reshaped = prepare_cnn_inputs(X_reshaped, n_features_list, add_slope, use_ch=True)
     elif model_type == "rnn":
         X_reshaped = prepare_rnn_inputs(X_reshaped, n_features_list, add_slope)
+    elif model_type == "rnn-ch":
+        X_reshaped = prepare_rnn_inputs(X_reshaped, n_features_list, add_slope, use_ch=True)
     elif model_type == "cnn-hybrid":
         X_reshaped = prepare_hybrid_inputs(X_reshaped,
                                            tsf_extractor_type='cnn',
