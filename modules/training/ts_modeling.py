@@ -176,7 +176,7 @@ def create_cnns_ch(
     if output_dim > 0:
         # Output layer for regression or classification tasks
         output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
-        model_output = [final_repr_output, output_layer] if pds else output_layer
+        model_output = [final_repr_output, output_layer]
     else:
         # Only output the representation layer if output_dim is not greater than 0
         model_output = final_repr_output
@@ -490,31 +490,37 @@ def build_dataset(
     return X_combined, y_combined
 
 
-def generate_slope_column_names(inputs_to_use: List[str]) -> List[str]:
+def generate_slope_column_names(inputs_to_use: List[str], padding: bool = True) -> List[str]:
     """
-    Generate slope column names for each input type based on the specified time steps.
+    Generate slope column names for each input type based on the specified time steps, optionally including padding.
 
     For each input type, this function generates column names for slopes calculated between
-    consecutive time steps. It includes slopes from 'tminus24' to 'tminus2', and a special case
-    for the slope from 'tminus1' to 't'.
+    consecutive time steps. It includes slopes from 'tminus24' to 'tminus2', a special case
+    for the slope from 'tminus1' to 't', and optionally a padding slope at the beginning.
 
     Parameters:
     - inputs_to_use (List[str]): A list of input types for which to generate slope column names.
+    - padding (bool): Whether to include an additional column name for padding at the beginning.
 
     Returns:
-    - List[str]: A list of slope column names for all specified input types.
+    - List[str]: A list of slope column names for all specified input types, including padding if specified.
     """
+
     slope_column_names = []
     for input_type in inputs_to_use:
+        # Optionally add padding slope column name
+        if padding:
+            slope_column_names.append(f'{input_type}_slope_padding_to_tminus24')
         # Slopes from tminus24 to tminus2
         for i in range(24, 1, -1):
             slope_column_names.append(f'{input_type}_slope_tminus{i}_to_tminus{i - 1}')
         # Slope from tminus1 to t
         slope_column_names.append(f'{input_type}_slope_tminus1_to_t')
+
     return slope_column_names
 
 
-def compute_slope(data: pd.DataFrame, input_type: str, padding: bool = False) -> np.ndarray:
+def compute_slope(data: pd.DataFrame, input_type: str, padding: bool = True) -> np.ndarray:
     """
     Compute the slope for a given input type across its time-series columns and optionally
     pad the slope series to match the original time series length by duplicating the first slope.
@@ -536,10 +542,16 @@ def compute_slope(data: pd.DataFrame, input_type: str, padding: bool = False) ->
     # Compute the slope between consecutive columns
     slopes = np.diff(input_values, axis=1)
 
+    # print shape of slopes
+    # print(slopes.shape)
+
     if padding:
         # Duplicate the first slope value if padding is True
         first_slope = slopes[:, 0].reshape(-1, 1)
         slopes = np.hstack([first_slope, slopes])
+
+        # print shape of slopes
+        # print(slopes.shape)
 
     return slopes
 
@@ -1440,6 +1452,9 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
         half_len = len(cnn_input_dims) // 2
         regular_dims = cnn_input_dims[:half_len]
         slope_dims = cnn_input_dims[half_len:]
+
+        print(f"Regular dims: {regular_dims}")
+        print(f"Slope dims: {slope_dims}")
     else:
         regular_dims = cnn_input_dims
         slope_dims = []
@@ -1450,6 +1465,10 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
         regular_channels = [data[:, start:start + dim].reshape(-1, dim, 1) for start, dim in
                             zip(range(0, sum(regular_dims), regular_dims[0]), regular_dims)]
         cnn_input_regular = np.concatenate(regular_channels, axis=-1) if regular_channels else None
+
+        # print(f"Regular channels: {cnn_input_regular}")
+        # print(f"Regular channels shape: {cnn_input_regular.shape}")
+
         # Add regular channels to inputs
         if cnn_input_regular is not None:
             cnn_inputs.append(cnn_input_regular)
@@ -1458,13 +1477,28 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
             slope_channels = [data[:, start:start + dim].reshape(-1, dim, 1) for start, dim in
                               zip(range(sum(regular_dims), sum(regular_dims) + sum(slope_dims), slope_dims[0]),
                                   slope_dims)]
+
+            # print(f"Slope channels: {slope_channels}")
+
             cnn_input_slope = np.concatenate(slope_channels, axis=-1) if slope_channels else None
+
+            # print(f"Slope channels: {cnn_input_slope}")
+            # print(f"Slope channels shape: {cnn_input_slope.shape}")
 
             # Add slope channels to inputs
             if cnn_input_slope is not None:
                 cnn_inputs.append(cnn_input_slope)
 
-        return tuple(cnn_inputs)
+        print(f"Final CNN inputs: {cnn_inputs}")
+
+        # Check if all cnn_inputs have the same shape
+        if all(cnn_input.shape == cnn_inputs[0].shape for cnn_input in cnn_inputs):
+            # All inputs have the same shape, concatenate them along the second axis
+            concatenate_cnn_inputs = np.concatenate(cnn_inputs, axis=-1)
+            return (concatenate_cnn_inputs,)
+        else:
+            # The inputs do not all have the same shape, return the tuple of original inputs
+            return tuple(cnn_inputs)
     else:
         # Generate CNN inputs for regular cme_files
         start_index = 0

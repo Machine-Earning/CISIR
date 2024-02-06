@@ -6,7 +6,12 @@ from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.optimizers import Adam
 from wandb.keras import WandbCallback
 
-from modules.dataload.ts_modeling import build_dataset, create_cnns_ch, evaluate_model, process_sep_events, prepare_cnn_inputs
+from modules.training.ts_modeling import (
+    build_dataset,
+    create_cnns_ch,
+    evaluate_model,
+    process_sep_events,
+    prepare_cnn_inputs)
 
 
 def main():
@@ -16,13 +21,14 @@ def main():
     """
     for inputs_to_use in [['e0.5'], ['e0.5', 'e1.8'], ['e0.5', 'p'], ['e0.5', 'e1.8', 'p']]:
         for add_slope in [True, False]:
+            padded = True
             # inputs_to_use = ['e0.5']
             # add_slope = True
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
             # Construct the title
-            title = f'CNN_ch_{inputs_str}_add_slope_{str(add_slope)}'
+            title = f'CNN_ch_{inputs_str}_slope_{str(add_slope)}'
 
             # Replace any other characters that are not suitable for filenames (if any)
             title = title.replace(' ', '_').replace(':', '_')
@@ -35,6 +41,7 @@ def main():
             wandb.init(project="cnn-ch-ts", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
+                "padded": padded,
             })
 
             # set the root directory
@@ -57,13 +64,16 @@ def main():
             print(f'y_val.shape: {y_val.shape}')
 
             # print a sample of the training cme_files
-            print(f'X_train[0]: {X_train[0]}')
-            print(f'y_train[0]: {y_train[0]}')
+            # print(f'X_train[0]: {X_train[0]}')
+            # print(f'y_train[0]: {y_train[0]}')
 
             # x = S / 49
             # get the number of features
             if add_slope:
-                n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
+                if padded:
+                    n_features = [25] * len(inputs_to_use) * 2
+                else:
+                    n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
             else:
                 n_features = [25] * len(inputs_to_use)
             print(f'n_features: {n_features}')
