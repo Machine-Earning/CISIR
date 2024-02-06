@@ -383,7 +383,7 @@ def create_hybrid_model(
     forecast_head = Dense(output_dim, activation='linear', name='forecast_head')(final_repr)
 
     # Create the model
-    model = Model(inputs=[tsf_extractor.input, mlp_input], outputs=forecast_head)
+    model = Model(inputs=[tsf_extractor.input, mlp_input], outputs=[final_repr, forecast_head])
 
     return model
 
