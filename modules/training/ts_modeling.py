@@ -388,8 +388,13 @@ def create_hybrid_model(
     return model
 
 
-def build_dataset(directory_path: str, shuffle_data: bool = True, apply_log: bool = True, norm_target: bool = False,
-                  inputs_to_use: List[str] = None, add_slope: bool = True) -> Tuple[np.ndarray, np.ndarray]:
+def build_dataset(
+        directory_path: str,
+        shuffle_data: bool = True,
+        apply_log: bool = True,
+        norm_target: bool = False,
+        inputs_to_use: List[str] = None,
+        add_slope: bool = True) -> Tuple[np.ndarray, np.ndarray]:
     """
     Reads SEP event files from the specified directory, processes them to extract
     input and target cme_files, normalizes the values between 0 and 1 for the columns
@@ -509,20 +514,33 @@ def generate_slope_column_names(inputs_to_use: List[str]) -> List[str]:
     return slope_column_names
 
 
-def compute_slope(data: pd.DataFrame, input_type: str) -> np.ndarray:
+def compute_slope(data: pd.DataFrame, input_type: str, padding: bool = False) -> np.ndarray:
     """
-    Compute the slope for a given input type across its time-series columns.
+    Compute the slope for a given input type across its time-series columns and optionally
+    pad the slope series to match the original time series length by duplicating the first slope.
 
     Parameters:
-    - cme_files (pd.DataFrame): The DataFrame containing the cme_files.
+    - data (pd.DataFrame): The DataFrame containing the time series data.
     - input_type (str): The input type for which to compute the slope (e.g., 'e0.5').
+    - padding (bool, optional): If True, duplicate the first slope to match the original time series length.
+      Defaults to False.
 
     Returns:
-    - np.ndarray: Array of slopes for the specified input type.
+    - np.ndarray: Array of slopes for the specified input type. If padding is True, the length of this
+      array matches the length of the original time series.
     """
+    # Define the column names based on the input_type
     columns = [f'{input_type}_tminus{i}' for i in range(24, 0, -1)] + [f'{input_type}_t']
     input_values = data[columns].values
-    slopes = np.diff(input_values, axis=1)  # /1 for 1 unit
+
+    # Compute the slope between consecutive columns
+    slopes = np.diff(input_values, axis=1)
+
+    if padding:
+        # Duplicate the first slope value if padding is True
+        first_slope = slopes[:, 0].reshape(-1, 1)
+        slopes = np.hstack([first_slope, slopes])
+
     return slopes
 
 
