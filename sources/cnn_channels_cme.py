@@ -107,7 +107,7 @@ def main():
                 use_ch = True
 
                 # Define the EarlyStopping callback
-                early_stopping = EarlyStopping(monitor='val_forecast_head_loss', patience=patience, verbose=1,
+                early_stopping = EarlyStopping(monitor='val_loss', patience=patience, verbose=1,
                                                restore_best_weights=True)
 
                 # Compile the model with the specified learning rate
