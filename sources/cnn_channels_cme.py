@@ -1,15 +1,20 @@
-from modules.dataload.ts_modeling import (build_full_dataset,
-                                          create_cnns,
-                                          create_hybrid_model,
-                                          evaluate_model,
-                                          process_sep_events,
-                                          prepare_hybrid_inputs)
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping
+from datetime import datetime
+
 import matplotlib.pyplot as plt
 import wandb
-from datetime import datetime
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.optimizers import Adam
 from wandb.keras import WandbCallback
+
+from modules.training.ts_modeling import (
+    build_dataset,
+build_full_dataset,
+    create_cnns_ch,
+    create_hybrid_model,
+    evaluate_model,
+    process_sep_events,
+    prepare_cnn_inputs,
+    prepare_hybrid_inputs)
 
 
 def main():
@@ -17,16 +22,17 @@ def main():
     Main function to run the E-CNN model
     :return:
     """
-    for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [False]:
+    for inputs_to_use in [['e0.5'], ['e0.5', 'e1.8'], ['e0.5', 'p'], ['e0.5', 'e1.8', 'p']]:
+        for add_slope in [True, False]:
             for cme_speed_threshold in [0, 500]:
+                padded = True
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'CNN_withCME_{inputs_str}_add_slope_{str(add_slope)}_cme_speed_{cme_speed_threshold}'
+                title = f'CNN_ch_withCME_{inputs_str}_slope_{str(add_slope)}_cmeSpeed{cme_speed_threshold}'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -36,14 +42,14 @@ def main():
                 experiment_name = f'{title}_{current_time}'
 
                 # Initialize wandb
-                wandb.init(project="cnn-ts-cme", name=experiment_name, config={
+                wandb.init(project="cnn-ch-ts", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
                     "add_slope": add_slope,
+                    "padded": padded,
                 })
 
                 # set the root directory
                 root_dir = 'D:/College/Fall2023/electron_cme_v4/electron_cme_data_split'
-                # build the dataset
                 # build the dataset
                 X_train, y_train = build_full_dataset(root_dir + '/training', inputs_to_use=inputs_to_use,
                                                       add_slope=add_slope, cme_speed_threshold=cme_speed_threshold)
@@ -72,7 +78,10 @@ def main():
                 # x = S / 49
                 # get the number of features
                 if add_slope:
-                    n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
+                    if padded:
+                        n_features = [25] * len(inputs_to_use) * 2
+                    else:
+                        n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
                 else:
                     n_features = [25] * len(inputs_to_use)
                 print(f'n_features: {n_features}')
@@ -82,7 +91,7 @@ def main():
 
                 # create the model
                 print('creating cnn model')
-                cnn_tsf_extractor = create_cnns(input_dims=n_features, output_dim=0)
+                cnn_tsf_extractor = create_cnns_ch(input_dims=n_features, output_dim=0)
                 cnn_tsf_extractor.summary()
 
                 # create the hybrid model
@@ -95,6 +104,7 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 patience = 50
                 learning_rate = 3e-3
+                use_ch = True
 
                 # Define the EarlyStopping callback
                 early_stopping = EarlyStopping(monitor='val_forecast_head_loss', patience=patience, verbose=1,
@@ -142,12 +152,10 @@ def main():
 
                 # Determine the optimal number of epochs from early stopping
                 optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
-
-                final_cnn_tsf_extractor = create_cnns(input_dims=n_features, output_dim=0)
+                final_cnn_tsf_extractor = create_cnns_ch(input_dims=n_features, output_dim=0)
                 final_cnn_model_sep = create_hybrid_model(
                     tsf_extractor=final_cnn_tsf_extractor,
                     mlp_input_dim=n_cme_features)
-
                 final_cnn_model_sep.compile(optimizer=Adam(learning_rate=learning_rate),
                                             loss={'forecast_head': 'mse'})  # Compile the model just like before
                 # Train on the full dataset

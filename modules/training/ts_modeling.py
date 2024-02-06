@@ -1038,7 +1038,8 @@ def plot_and_evaluate_sep_event(
     e18_intensity_log = None
 
     if add_slope:
-        n_features = len(inputs_to_use) * (25 + 24)
+        # n_features = len(inputs_to_use) * (25 + 24)
+        n_features = len(inputs_to_use) * 25 * 2
     else:
         n_features = len(inputs_to_use) * 25
 
@@ -1082,7 +1083,7 @@ def plot_and_evaluate_sep_event(
         X_reshaped = X.reshape(-1, n_features, 1)
 
     if add_slope:
-        n_features_list = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
+        n_features_list = [25] * len(inputs_to_use) * 2
     else:
         n_features_list = [25] * len(inputs_to_use)
 
@@ -1409,7 +1410,7 @@ def prepare_hybrid_inputs(
     """
 
     # Prepare inputs for the TSF extractor
-    if tsf_extractor_type == 'cnn':
+    if tsf_extractor_type == 'cnn' or tsf_extractor_type == 'cnn-ch':
         tsf_inputs = prepare_cnn_inputs(data, tsf_input_dims, with_slope)
     elif tsf_extractor_type == 'rnn':
         tsf_inputs = prepare_rnn_inputs(data, tsf_input_dims, with_slope)
@@ -1489,7 +1490,7 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
             if cnn_input_slope is not None:
                 cnn_inputs.append(cnn_input_slope)
 
-        print(f"Final CNN inputs: {cnn_inputs}")
+        # print(f"Final CNN inputs: {cnn_inputs}")
 
         # Check if all cnn_inputs have the same shape
         if all(cnn_input.shape == cnn_inputs[0].shape for cnn_input in cnn_inputs):
