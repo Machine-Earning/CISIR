@@ -21,7 +21,7 @@ def main():
     """
     for inputs_to_use in [['e0.5'], ['e0.5', 'e1.8'], ['e0.5', 'p'], ['e0.5', 'e1.8', 'p']]:
         for add_slope in [True, False]:
-            padded = True
+            # padded = True
             # inputs_to_use = ['e0.5']
             # add_slope = True
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -41,7 +41,7 @@ def main():
             wandb.init(project="cnn-ch-ts", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
-                "padded": padded,
+                # "padded": padded,
             })
 
             # set the root directory
@@ -70,10 +70,8 @@ def main():
             # x = S / 49
             # get the number of features
             if add_slope:
-                if padded:
-                    n_features = [25] * len(inputs_to_use) * 2
-                else:
-                    n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
+                # n_features = [25] * len(inputs_to_use) * 2
+                n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
             else:
                 n_features = [25] * len(inputs_to_use)
             print(f'n_features: {n_features}')

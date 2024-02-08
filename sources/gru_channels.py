@@ -7,7 +7,7 @@ from tensorflow.keras.optimizers import Adam
 from wandb.keras import WandbCallback
 
 from modules.training.ts_modeling import (build_dataset,
-                                          create_rnns,
+                                          create_rnns_ch,
                                           evaluate_model,
                                           process_sep_events,
                                           prepare_rnn_inputs)
@@ -26,7 +26,7 @@ def main():
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
             # Construct the title
-            title = f'RNN_{inputs_str}_add_slope_{str(add_slope)}'
+            title = f'RNN_ch_{inputs_str}_slope_{str(add_slope)}'
 
             # Replace any other characters that are not suitable for filenames (if any)
             title = title.replace(' ', '_').replace(':', '_')
@@ -36,7 +36,7 @@ def main():
             experiment_name = f'{title}_{current_time}'
 
             # Initialize wandb
-            wandb.init(project="rnn-ts", name=experiment_name, config={
+            wandb.init(project="rnn-ch-ts", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
             })
@@ -61,8 +61,8 @@ def main():
             print(f'y_val.shape: {y_val.shape}')
 
             # print a sample of the training cme_files
-            print(f'X_train[0]: {X_train[0]}')
-            print(f'y_train[0]: {y_train[0]}')
+            # print(f'X_train[0]: {X_train[0]}')
+            # print(f'y_train[0]: {y_train[0]}')
 
             # x = S / 49
             # get the number of features
@@ -73,12 +73,14 @@ def main():
             print(f'n_features: {n_features}')
 
             # create the model
-            rnn_model_sep = create_rnns(input_dims=n_features)
+            rnn_model_sep = create_rnns_ch(input_dims=n_features)
             rnn_model_sep.summary()
 
             # Set the early stopping patience and learning rate as variables
             patience = 50
             learning_rate = 3e-3
+            use_ch = True
+
 
             # Define the EarlyStopping callback
             early_stopping = EarlyStopping(monitor='val_forecast_head_loss', patience=patience, verbose=1,
@@ -88,10 +90,10 @@ def main():
             rnn_model_sep.compile(optimizer=Adam(learning_rate=learning_rate), loss={'forecast_head': 'mse'})
 
             # prepare rnn inputs
-            X_subtrain_rnn = prepare_rnn_inputs(X_subtrain, n_features, add_slope)
-            X_val_rnn = prepare_rnn_inputs(X_val, n_features, add_slope)
-            X_train_rnn = prepare_rnn_inputs(X_train, n_features, add_slope)
-            X_test_rnn = prepare_rnn_inputs(X_test, n_features, add_slope)
+            X_subtrain_rnn = prepare_rnn_inputs(X_subtrain, n_features, add_slope, use_ch)
+            X_val_rnn = prepare_rnn_inputs(X_val, n_features, add_slope, use_ch)
+            X_train_rnn = prepare_rnn_inputs(X_train, n_features, add_slope, use_ch)
+            X_test_rnn = prepare_rnn_inputs(X_test, n_features, add_slope, use_ch)
 
             # Train the model with the callback
             history = rnn_model_sep.fit(X_subtrain_rnn,
@@ -113,7 +115,7 @@ def main():
 
             # Determine the optimal number of epochs from early stopping
             optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
-            final_rnn_model_sep = create_rnns(input_dims=n_features)  # Recreate the model architecture
+            final_rnn_model_sep = create_rnns_ch(input_dims=n_features)  # Recreate the model architecture
             final_rnn_model_sep.compile(optimizer=Adam(learning_rate=learning_rate),
                                         loss={'forecast_head': 'mse'})  # Compile the model just like before
             # Train on the full dataset
@@ -133,7 +135,7 @@ def main():
             filenames = process_sep_events(
                 test_directory,
                 final_rnn_model_sep,
-                model_type='rnn',
+                model_type='rnn-ch',
                 title=title,
                 inputs_to_use=inputs_to_use,
                 add_slope=add_slope)

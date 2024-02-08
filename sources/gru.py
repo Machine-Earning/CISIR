@@ -59,8 +59,8 @@ def main():
             print(f'y_val.shape: {y_val.shape}')
 
             # print a sample of the training cme_files
-            print(f'X_train[0]: {X_train[0]}')
-            print(f'y_train[0]: {y_train[0]}')
+            # print(f'X_train[0]: {X_train[0]}')
+            # print(f'y_train[0]: {y_train[0]}')
 
             # x = S / 49
             # get the number of features

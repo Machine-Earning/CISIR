@@ -99,7 +99,7 @@ def create_cnns(
     if output_dim > 0:
         # Output layer for regression or classification tasks
         output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
-        model_output = [final_repr_output, output_layer] if pds else output_layer
+        model_output = [final_repr_output, output_layer]
     else:
         # Only output the representation layer if output_dim is not greater than 0
         model_output = final_repr_output
@@ -207,6 +207,8 @@ def create_rnns(
     - rnn_layers (int): The number of RNN layers in each branch. Default is 2.
     - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
 
+    Note: inputs for RNNs is sequence: A 3D tensor, with shape [batch, timesteps, feature].
+    In this context, features is like channels, number of variables per timesteps
     Returns:
     - Model: A Keras model instance.
     """
@@ -223,8 +225,8 @@ def create_rnns(
         x = input_layer
 
         # Add GRU layers with LeakyReLU activation
-        for _ in range(rnn_layers):
-            x = GRU(units=gru_units, return_sequences=True if _ < rnn_layers - 1 else False)(x)
+        for layer in range(rnn_layers):
+            x = GRU(units=gru_units, return_sequences=True if layer < rnn_layers - 1 else False)(x)
             x = LeakyReLU()(x)
 
         # Flatten the output for concatenation
@@ -251,7 +253,85 @@ def create_rnns(
     if output_dim > 0:
         # Output layer for regression or classification tasks
         output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
-        model_output = [final_repr_output, output_layer] if pds else output_layer
+        model_output = [final_repr_output, output_layer]
+    else:
+        # Only output the representation layer if output_dim is not greater than 0
+        model_output = final_repr_output
+
+    # Create the model
+    model = Model(inputs=rnn_inputs, outputs=model_output)
+
+    return model
+
+
+def create_rnns_ch(
+        input_dims: list = None,
+        gru_units: int = 64,
+        rnn_layers: int = 2,
+        repr_dim: int = 50,
+        output_dim: int = 1,
+        pds: bool = False
+) -> Model:
+    """
+    Create a model with multiple RNN (GRU) branches, each processing a different input dimension.
+    The outputs of these branches are concatenated before being passed to dense layers.
+
+    Parameters:
+    - input_dims (list): List of input dimensions, one for each RNN branch. Default is [25, 25, 25].
+    - gru_units (int): The number of units in each GRU layer. Default is 64.
+    - repr_dim (int): The number of units in the fully connected layer. Default is 50.
+    - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
+    - rnn_layers (int): The number of RNN layers in each branch. Default is 2.
+    - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
+
+    Note: inputs for RNNs is sequence: A 3D tensor, with shape [batch, timesteps, feature].
+    In this context, features is like channels, number of variables per timesteps
+    Returns:
+    - Model: A Keras model instance.
+    """
+
+    if input_dims is None:
+        input_dims = [25, 25, 25]
+
+    # Group the input dimensions to find the number of channels for each branch
+    dim_counts = Counter(input_dims)
+    rnn_branches = []
+    rnn_inputs = []
+
+    for dim, count in dim_counts.items():
+        # Define the input layer for this set of channels
+        input_layer = Input(shape=(dim, count), name=f'input_{dim}x{count}')
+        x = input_layer
+
+        # Add GRU layers with LeakyReLU activation
+        for layer in range(rnn_layers):
+            x = GRU(units=gru_units, return_sequences=True if layer < rnn_layers - 1 else False)(x)
+            x = LeakyReLU()(x)
+
+        # Flatten the output for concatenation
+        flattened = Flatten()(x)
+        rnn_branches.append(flattened)
+        rnn_inputs.append(input_layer)
+
+    # Concatenate the outputs of all branches
+    concatenated = Concatenate()(rnn_branches) if len(rnn_branches) > 1 else rnn_branches[0]
+
+    # Proceed with the representation layer
+    dense = Dense(repr_dim)(concatenated)
+    if pds:
+        # Apply normalization if PDS is enabled
+        repr_layer = LeakyReLU()(dense)
+        normalized_repr_layer = NormalizeLayer(name='normalize_layer')(repr_layer)
+        final_repr_output = normalized_repr_layer
+    else:
+        # Regular processing without PDS
+        final_repr_output = LeakyReLU(name='repr_layer')(dense)
+
+    # Determine the model's output based on output_dim
+    if output_dim > 0:
+        # Output layer for regression or classification tasks
+        output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+        model_output = [final_repr_output, output_layer]
     else:
         # Only output the representation layer if output_dim is not greater than 0
         model_output = final_repr_output
@@ -490,7 +570,7 @@ def build_dataset(
     return X_combined, y_combined
 
 
-def generate_slope_column_names(inputs_to_use: List[str], padding: bool = True) -> List[str]:
+def generate_slope_column_names(inputs_to_use: List[str], padding: bool = False) -> List[str]:
     """
     Generate slope column names for each input type based on the specified time steps, optionally including padding.
 
@@ -520,7 +600,7 @@ def generate_slope_column_names(inputs_to_use: List[str], padding: bool = True) 
     return slope_column_names
 
 
-def compute_slope(data: pd.DataFrame, input_type: str, padding: bool = True) -> np.ndarray:
+def compute_slope(data: pd.DataFrame, input_type: str, padding: bool = False) -> np.ndarray:
     """
     Compute the slope for a given input type across its time-series columns and optionally
     pad the slope series to match the original time series length by duplicating the first slope.
@@ -1038,8 +1118,8 @@ def plot_and_evaluate_sep_event(
     e18_intensity_log = None
 
     if add_slope:
-        # n_features = len(inputs_to_use) * (25 + 24)
-        n_features = len(inputs_to_use) * 25 * 2
+        n_features = len(inputs_to_use) * (25 + 24)
+        # n_features = len(inputs_to_use) * 25 * 2
     else:
         n_features = len(inputs_to_use) * 25
 
@@ -1083,7 +1163,8 @@ def plot_and_evaluate_sep_event(
         X_reshaped = X.reshape(-1, n_features, 1)
 
     if add_slope:
-        n_features_list = [25] * len(inputs_to_use) * 2
+        # n_features_list = [25] * len(inputs_to_use) * 2
+        n_features_list = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
     else:
         n_features_list = [25] * len(inputs_to_use)
 
@@ -1521,7 +1602,8 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
         return tuple(cnn_inputs)
 
 
-def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_slope: bool = False) -> Tuple:
+def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_slope: bool = False,
+                       use_ch: bool = False) -> Tuple:
     """
     Splits the input cme_files into parts for the RNN branches of the model,
     dynamically based on the rnn_input_dims list. If with_slope is True,
@@ -1535,6 +1617,38 @@ def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_
     Returns:
     - Tuple: Tuple of arrays, each for RNN inputs.
     """
+    # if rnn_input_dims is None:
+    #     rnn_input_dims = [25, 24]  # Default dimensions for regular and slope inputs
+    #
+    # # Initialize a list to store rnn inputs
+    # rnn_inputs = []
+    #
+    # # Split input dimensions into regular and slope inputs if with_slope is True
+    # if with_slope:
+    #     half_len = len(rnn_input_dims) // 2
+    #     regular_dims = rnn_input_dims[:half_len]
+    #     slope_dims = rnn_input_dims[half_len:]
+    # else:
+    #     regular_dims = rnn_input_dims
+    #     slope_dims = []
+    #
+    # # Generate rnn inputs for regular cme_files
+    # start_index = 0
+    # for dim in regular_dims:
+    #     end_index = start_index + dim
+    #     rnn_input = data[:, start_index:end_index].reshape((-1, dim, 1))
+    #     rnn_inputs.append(rnn_input)
+    #     start_index = end_index
+    #
+    # # Generate rnn inputs for slope cme_files if with_slope is True
+    # for dim in slope_dims:
+    #     end_index = start_index + dim
+    #     slope_input = data[:, start_index:end_index].reshape((-1, dim, 1))
+    #     rnn_inputs.append(slope_input)
+    #     start_index = end_index
+    #
+    # return tuple(rnn_inputs)
+
     if rnn_input_dims is None:
         rnn_input_dims = [25, 24]  # Default dimensions for regular and slope inputs
 
@@ -1546,23 +1660,67 @@ def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_
         half_len = len(rnn_input_dims) // 2
         regular_dims = rnn_input_dims[:half_len]
         slope_dims = rnn_input_dims[half_len:]
+
+        # print(f"Regular dims: {regular_dims}")
+        # print(f"Slope dims: {slope_dims}")
     else:
         regular_dims = rnn_input_dims
         slope_dims = []
 
-    # Generate rnn inputs for regular cme_files
-    start_index = 0
-    for dim in regular_dims:
-        end_index = start_index + dim
-        rnn_input = data[:, start_index:end_index].reshape((-1, dim, 1))
-        rnn_inputs.append(rnn_input)
-        start_index = end_index
+    if use_ch:
+        # Handle channel-wise concatenation
+        # For regular cme_files
+        regular_channels = [data[:, start:start + dim].reshape(-1, dim, 1) for start, dim in
+                            zip(range(0, sum(regular_dims), regular_dims[0]), regular_dims)]
+        rnn_input_regular = np.concatenate(regular_channels, axis=-1) if regular_channels else None
 
-    # Generate rnn inputs for slope cme_files if with_slope is True
-    for dim in slope_dims:
-        end_index = start_index + dim
-        slope_input = data[:, start_index:end_index].reshape((-1, dim, 1))
-        rnn_inputs.append(slope_input)
-        start_index = end_index
+        # print(f"Regular channels: {rnn_input_regular}")
+        # print(f"Regular channels shape: {rnn_input_regular.shape}")
 
-    return tuple(rnn_inputs)
+        # Add regular channels to inputs
+        if rnn_input_regular is not None:
+            rnn_inputs.append(rnn_input_regular)
+        # For slope cme_files, if with_slope is True
+        if with_slope:
+            slope_channels = [data[:, start:start + dim].reshape(-1, dim, 1) for start, dim in
+                              zip(range(sum(regular_dims), sum(regular_dims) + sum(slope_dims), slope_dims[0]),
+                                  slope_dims)]
+
+            # print(f"Slope channels: {slope_channels}")
+
+            rnn_input_slope = np.concatenate(slope_channels, axis=-1) if slope_channels else None
+
+            # print(f"Slope channels: {rnn_input_slope}")
+            # print(f"Slope channels shape: {rnn_input_slope.shape}")
+
+            # Add slope channels to inputs
+            if rnn_input_slope is not None:
+                rnn_inputs.append(rnn_input_slope)
+
+        # print(f"Final rnn inputs: {rnn_inputs}")
+
+        # Check if all rnn_inputs have the same shape
+        if all(rnn_input.shape == rnn_inputs[0].shape for rnn_input in rnn_inputs):
+            # All inputs have the same shape, concatenate them along the second axis
+            concatenate_rnn_inputs = np.concatenate(rnn_inputs, axis=-1)
+            return (concatenate_rnn_inputs,)
+        else:
+            # The inputs do not all have the same shape, return the tuple of original inputs
+            return tuple(rnn_inputs)
+    else:
+        # Generate rnn inputs for regular cme_files
+        start_index = 0
+        for dim in regular_dims:
+            end_index = start_index + dim
+            rnn_input = data[:, start_index:end_index].reshape((-1, dim, 1))
+            rnn_inputs.append(rnn_input)
+            start_index = end_index
+
+        # Generate rnn inputs for slope cme_files if with_slope is True
+        for dim in slope_dims:
+            end_index = start_index + dim
+            slope_input = data[:, start_index:end_index].reshape((-1, dim, 1))
+            rnn_inputs.append(slope_input)
+            start_index = end_index
+
+        return tuple(rnn_inputs)
