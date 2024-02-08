@@ -1495,7 +1495,7 @@ def prepare_hybrid_inputs(
     # Prepare inputs for the TSF extractor
     if tsf_extractor_type == 'cnn' or tsf_extractor_type == 'cnn-ch':
         tsf_inputs = prepare_cnn_inputs(data, tsf_input_dims, with_slope)
-    elif tsf_extractor_type == 'rnn':
+    elif tsf_extractor_type == 'rnn' or tsf_extractor_type == 'rnn-ch':
         tsf_inputs = prepare_rnn_inputs(data, tsf_input_dims, with_slope)
     else:
         raise ValueError("Invalid tsf_extractor_type. Must be 'cnn' or 'rnn'.")
@@ -1603,7 +1603,7 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
 
 
 def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_slope: bool = False,
-                       use_ch: bool = False) -> Tuple:
+                       use_ch: bool = True) -> Tuple:
     """
     Splits the input cme_files into parts for the RNN branches of the model,
     dynamically based on the rnn_input_dims list. If with_slope is True,
@@ -1613,41 +1613,11 @@ def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_
     - cme_files (np.ndarray): The combined input cme_files array.
     - rnn_input_dims (List[int]): The dimensions for each RNN input.
     - with_slope (bool): Whether to add additional inputs for slopes.
+    - use_ch (bool): Whether to use channel-wise concatenation.
 
     Returns:
     - Tuple: Tuple of arrays, each for RNN inputs.
     """
-    # if rnn_input_dims is None:
-    #     rnn_input_dims = [25, 24]  # Default dimensions for regular and slope inputs
-    #
-    # # Initialize a list to store rnn inputs
-    # rnn_inputs = []
-    #
-    # # Split input dimensions into regular and slope inputs if with_slope is True
-    # if with_slope:
-    #     half_len = len(rnn_input_dims) // 2
-    #     regular_dims = rnn_input_dims[:half_len]
-    #     slope_dims = rnn_input_dims[half_len:]
-    # else:
-    #     regular_dims = rnn_input_dims
-    #     slope_dims = []
-    #
-    # # Generate rnn inputs for regular cme_files
-    # start_index = 0
-    # for dim in regular_dims:
-    #     end_index = start_index + dim
-    #     rnn_input = data[:, start_index:end_index].reshape((-1, dim, 1))
-    #     rnn_inputs.append(rnn_input)
-    #     start_index = end_index
-    #
-    # # Generate rnn inputs for slope cme_files if with_slope is True
-    # for dim in slope_dims:
-    #     end_index = start_index + dim
-    #     slope_input = data[:, start_index:end_index].reshape((-1, dim, 1))
-    #     rnn_inputs.append(slope_input)
-    #     start_index = end_index
-    #
-    # return tuple(rnn_inputs)
 
     if rnn_input_dims is None:
         rnn_input_dims = [25, 24]  # Default dimensions for regular and slope inputs

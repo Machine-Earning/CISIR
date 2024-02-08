@@ -6,13 +6,12 @@ from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.optimizers import Adam
 from wandb.keras import WandbCallback
 
-from modules.training.ts_modeling import (
-    build_full_dataset,
-    create_cnns_ch,
-    create_hybrid_model,
-    evaluate_model,
-    process_sep_events,
-    prepare_hybrid_inputs)
+from modules.training.ts_modeling import (build_full_dataset,
+                                          create_rnns_ch,
+                                          create_hybrid_model,
+                                          evaluate_model,
+                                          process_sep_events,
+                                          prepare_hybrid_inputs)
 
 
 def main():
@@ -23,14 +22,13 @@ def main():
     for inputs_to_use in [['e0.5'], ['e0.5', 'e1.8'], ['e0.5', 'p'], ['e0.5', 'e1.8', 'p']]:
         for add_slope in [True, False]:
             for cme_speed_threshold in [0, 500]:
-                # padded = True
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'CNN_ch_withCME_{inputs_str}_slope_{str(add_slope)}_cmeSpeed{cme_speed_threshold}'
+                title = f'RNN_ch_withCME_{inputs_str}_slope_{str(add_slope)}_cmeSpeed{cme_speed_threshold}'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -40,14 +38,14 @@ def main():
                 experiment_name = f'{title}_{current_time}'
 
                 # Initialize wandb
-                wandb.init(project="cnn-ch-ts", name=experiment_name, config={
+                wandb.init(project="rnn-ch-ts", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
                     "add_slope": add_slope,
-                    # "padded": padded,
                 })
 
                 # set the root directory
                 root_dir = 'data/electron_cme_data_split'
+                # build the dataset
                 # build the dataset
                 X_train, y_train = build_full_dataset(root_dir + '/training', inputs_to_use=inputs_to_use,
                                                       add_slope=add_slope, cme_speed_threshold=cme_speed_threshold)
@@ -76,7 +74,6 @@ def main():
                 # x = S / 49
                 # get the number of features
                 if add_slope:
-                    # n_features = [25] * len(inputs_to_use) * 2
                     n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
                 else:
                     n_features = [25] * len(inputs_to_use)
@@ -86,16 +83,16 @@ def main():
                 n_cme_features = 20 + len(inputs_to_use)  # 20 for the cme features without max of e0.5, e1.8, or p
 
                 # create the model
-                print('creating cnn model')
-                cnn_tsf_extractor = create_cnns_ch(input_dims=n_features, output_dim=0)
-                cnn_tsf_extractor.summary()
+                print('Creating the RNN model with CME features...')
+                rnn_tsf_extractor = create_rnns_ch(input_dims=n_features, output_dim=0)
+                rnn_tsf_extractor.summary()
 
-                # create the hybrid model
+                # create hybrid model
                 print('creating hybrid model')
-                cnn_model_sep = create_hybrid_model(
-                    tsf_extractor=cnn_tsf_extractor,
+                rnn_model_sep = create_hybrid_model(
+                    tsf_extractor=rnn_tsf_extractor,
                     mlp_input_dim=n_cme_features)
-                cnn_model_sep.summary()
+                rnn_model_sep.summary()
 
                 # Set the early stopping patience and learning rate as variables
                 patience = 50
@@ -107,32 +104,32 @@ def main():
                                                restore_best_weights=True)
 
                 # Compile the model with the specified learning rate
-                cnn_model_sep.compile(optimizer=Adam(learning_rate=learning_rate), loss={'forecast_head': 'mse'})
+                rnn_model_sep.compile(optimizer=Adam(learning_rate=learning_rate), loss={'forecast_head': 'mse'})
 
-                # prepare cnn inputs
-                X_subtrain_cnn = prepare_hybrid_inputs(X_subtrain,
+                # prepare rnn inputs
+                X_subtrain_rnn = prepare_hybrid_inputs(X_subtrain,
                                                        tsf_extractor_type='cnn',
                                                        tsf_input_dims=n_features,
                                                        with_slope=add_slope,
                                                        mlp_input_dim=n_cme_features)
-                X_val_cnn = prepare_hybrid_inputs(X_val, tsf_extractor_type='cnn',
+                X_val_rnn = prepare_hybrid_inputs(X_val, tsf_extractor_type='cnn',
                                                   tsf_input_dims=n_features,
                                                   with_slope=add_slope,
                                                   mlp_input_dim=n_cme_features)
-                X_train_cnn = prepare_hybrid_inputs(X_train, tsf_extractor_type='cnn',
+                X_train_rnn = prepare_hybrid_inputs(X_train, tsf_extractor_type='cnn',
                                                     tsf_input_dims=n_features,
                                                     with_slope=add_slope,
                                                     mlp_input_dim=n_cme_features)
-                X_test_cnn = prepare_hybrid_inputs(X_test, tsf_extractor_type='cnn',
+                X_test_rnn = prepare_hybrid_inputs(X_test, tsf_extractor_type='cnn',
                                                    tsf_input_dims=n_features,
                                                    with_slope=add_slope,
                                                    mlp_input_dim=n_cme_features)
 
                 # Train the model with the callback
-                history = cnn_model_sep.fit(X_subtrain_cnn,
+                history = rnn_model_sep.fit(X_subtrain_rnn,
                                             {'forecast_head': y_subtrain},
                                             epochs=1000, batch_size=32,
-                                            validation_data=(X_val_cnn, {'forecast_head': y_val}),
+                                            validation_data=(X_val_rnn, {'forecast_head': y_val}),
                                             callbacks=[early_stopping, WandbCallback()])
 
                 # Plot the training and validation loss
@@ -144,24 +141,24 @@ def main():
                 plt.ylabel('Loss')
                 plt.legend()
                 # save the plot
-                plt.savefig(f'cnn_loss_{title}.png')
+                plt.savefig(f'rnn_loss_{title}.png')
 
                 # Determine the optimal number of epochs from early stopping
                 optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
-                final_cnn_tsf_extractor = create_cnns_ch(input_dims=n_features, output_dim=0)
-                final_cnn_model_sep = create_hybrid_model(
-                    tsf_extractor=final_cnn_tsf_extractor,
+                final_rnn_tsf_extractor = create_rnns_ch(input_dims=n_features, output_dim=0)
+                final_rnn_model_sep = create_hybrid_model(
+                    tsf_extractor=final_rnn_tsf_extractor,
                     mlp_input_dim=n_cme_features)
-                final_cnn_model_sep.compile(optimizer=Adam(learning_rate=learning_rate),
+                final_rnn_model_sep.compile(optimizer=Adam(learning_rate=learning_rate),
                                             loss={'forecast_head': 'mse'})  # Compile the model just like before
                 # Train on the full dataset
-                final_cnn_model_sep.fit(X_train_cnn,
+                final_rnn_model_sep.fit(X_train_rnn,
                                         {'forecast_head': y_train},
                                         epochs=optimal_epochs,
                                         batch_size=32, verbose=1)
 
                 # evaluate the model on test cme_files
-                error_mae = evaluate_model(final_cnn_model_sep, X_test_cnn, y_test)
+                error_mae = evaluate_model(final_rnn_model_sep, X_test_rnn, y_test)
                 print(f'mae error: {error_mae}')
                 # Log the MAE error to wandb
                 wandb.log({"mae_error": error_mae})
@@ -170,8 +167,8 @@ def main():
                 test_directory = root_dir + '/testing'
                 filenames = process_sep_events(
                     test_directory,
-                    final_cnn_model_sep,
-                    model_type='cnn-hybrid',
+                    final_rnn_model_sep,
+                    model_type='rnn-hybrid',
                     using_cme=True,
                     title=title,
                     inputs_to_use=inputs_to_use,
