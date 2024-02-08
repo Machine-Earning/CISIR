@@ -2,7 +2,7 @@ import os
 import random
 import traceback
 from collections import Counter
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -1694,3 +1694,19 @@ def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_
             start_index = end_index
 
         return tuple(rnn_inputs)
+
+
+def evaluate_lag_error(actual_ts: np.ndarray, predicted_ts: np.ndarray, threshold: Optional[float] = None):
+    """
+    Evaluates the lag error between the actual and predicted time series data.
+
+    Parameters:
+    - actual_ts (np.ndarray): The actual time series data.
+    - predicted_ts (np.ndarray): The predicted time series data.
+    - threshold (float, optional): The sep intensity threshold
+
+    Returns:
+    - Tuple: A tuple containing the lag error and the threshold lag error
+    """
+    # Calculate the lag error
+    pass

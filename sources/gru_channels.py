@@ -18,7 +18,7 @@ def main():
     Main function to run the E-CNN model
     :return:
     """
-    for inputs_to_use in [['e0.5'], ['e0.5', 'e1.8'], ['e0.5', 'p'], ['e0.5', 'e1.8', 'p']]:
+    for inputs_to_use in [['e0.5', 'e1.8'], ['e0.5', 'p'], ['e0.5', 'e1.8', 'p']]:
         for add_slope in [True, False]:
             # inputs_to_use = ['e0.5']
             # add_slope = True
