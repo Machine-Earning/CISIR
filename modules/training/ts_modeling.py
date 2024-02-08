@@ -1252,6 +1252,9 @@ def plot_and_evaluate_sep_event(
     else:
         predictions_plot = predictions.flatten()
 
+    mae_loss = mean_absolute_error(y_true, predictions_plot)
+    # print(f"Mean Absolute Error (MAE) on the cme_files: {mae_loss}")
+
     lw = .65  # Line width for the plots
     tlw = 2.75  # Thicker line width for the actual and predicted lines
 
