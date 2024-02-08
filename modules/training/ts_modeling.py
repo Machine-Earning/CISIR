@@ -474,7 +474,8 @@ def build_dataset(
         apply_log: bool = True,
         norm_target: bool = False,
         inputs_to_use: List[str] = None,
-        add_slope: bool = True) -> Tuple[np.ndarray, np.ndarray]:
+        add_slope: bool = True,
+        target_change: bool = False) -> Tuple[np.ndarray, np.ndarray]:
     """
     Reads SEP event files from the specified directory, processes them to extract
     input and target cme_files, normalizes the values between 0 and 1 for the columns
@@ -487,6 +488,8 @@ def build_dataset(
         - norm_target (bool): Whether to normalize the target cme_files. False by default.
         - inputs_to_use (List[str]): List of input types to include in the dataset. Default is ['e0.5', 'e1.8', 'p'].
         - add_slope (bool): If True, adds slope features to the dataset.
+        - target_change (bool): If True, the target is the change in proton intensity from t to t+6. requires 'p' in
+        inputs to use
 
 
 
@@ -494,6 +497,7 @@ def build_dataset(
     - Tuple[np.ndarray, np.ndarray]: A tuple containing the normalized input cme_files (X) and target cme_files (y).
     """
 
+    global p_t_values, p_t_values_normalized, adjusted_target
     if inputs_to_use is None:
         inputs_to_use = ['e0.5', 'e1.8', 'p']
 
@@ -520,6 +524,14 @@ def build_dataset(
             if apply_log:
                 data[input_columns] = np.log(data[input_columns] + 1)  # Adding 1 to avoid log(0)
                 data[target_column] = np.log(data[target_column] + 1)  # Adding 1 to avoid log(0)
+
+            # Save p_t for target change if 'p' is in inputs_to_use and target_change is True
+            if 'p' in inputs_to_use and target_change:
+                # Assuming 'p_t' is the correct column name in your data
+                p_t_column_name = 'p_t'
+                # Save the p_t column. This saves the column after any potential log transformation
+                # has been applied if apply_log is True.
+                p_t_values = data[p_t_column_name].copy()
 
             # Normalize inputs between 0 and 1
             input_data = data[input_columns]
@@ -548,12 +560,44 @@ def build_dataset(
             else:
                 target_data_normalized = target_data
 
+            # Handle p_t_values based on whether they are used for target adjustment
+            if 'p' in inputs_to_use and target_change:
+                # Assume p_t_values need to be on the same scale as the target data for adjustment
+                # Normalize p_t_values only if norm_target is True, to match the normalized target scale
+                if norm_target:
+                    # Normalize p_t_values using the same method as the target data
+                    p_t_values_normalized = (p_t_values - p_t_values.min()) / (p_t_values.max() - p_t_values.min())
+                else:
+                    # If not normalizing target data, use p_t_values as is without normalization
+                    # But still consider whether apply_log was True and adjust accordingly
+                    p_t_values_normalized = p_t_values
+
+                # print shape of p_t_values_normalized and target_data_normalized along with the file name
+                # print(f'p_t_values_normalized.shape: {p_t_values_normalized.shape} for {file_name}')
+                # print(f'target_data_normalized.shape: {target_data_normalized.shape} for {file_name}')
+
+                # NOTE: target_data_normalized[target_column] instead of target_data_normalized because
+                # the latter is a DataFrame and we want to subtract a Series from it
+                adjusted_target = target_data_normalized[target_column] - p_t_values_normalized  # Adjust target
+
+                # print shape of adjusted_target along with the file name
+                # print(f'adjusted_target.shape: {adjusted_target.shape} for {file_name}')
+
             # Reshape inputs to be in the format [samples, time steps, features]
             # X = input_data_normalized.values.reshape((input_data_normalized.shape[0], 75, 1))
             X = input_data_normalized.values.reshape((input_data_normalized.shape[0], -1, 1))
 
+            # print shape of X along with the file name
+            # print(f'X.shape: {X.shape} for {file_name}')
+
             # Flatten targets to 1D array
-            y = target_data_normalized.values.flatten()
+            if 'p' in inputs_to_use and target_change:
+                y = adjusted_target.values.flatten()
+            else:
+                y = target_data_normalized.values.flatten()
+
+            # print shape of y along with the file name
+            # print(f'y.shape: {y.shape} for {file_name}')
 
             # Append to list
             all_inputs.append(X)
@@ -562,6 +606,10 @@ def build_dataset(
     # Combine all input and target cme_files
     X_combined = np.vstack(all_inputs)
     y_combined = np.concatenate(all_targets)
+
+    # print shape of X_combined and y_combined
+    print(X_combined.shape)
+    print(y_combined.shape)
 
     # Shuffle the cme_files if the flag is True
     if shuffle_data:
@@ -1092,7 +1140,8 @@ def plot_and_evaluate_sep_event(
         model_type: str = "cnn",
         title: str = None,
         inputs_to_use: List[str] = None,
-        add_slope: bool = True) -> [float, str]:
+        add_slope: bool = True,
+        target_change: bool = False) -> [float, str]:
     """
     Plots the SEP event cme_files with actual and predicted proton intensities, electron intensity,
     and evaluates the model's performance using MAE.
@@ -1111,6 +1160,7 @@ def plot_and_evaluate_sep_event(
     - title (str): The title of the plot. Default is None.
     - inputs_to_use (List[str]): The list of input types to use. Default is None.
     - add_slope (bool): Whether to add slope features. Default is True.
+    - target_change (bool): Whether to use target change. Default is False.
 
     Returns:
     - Tuple[float, str]: A tuple containing the MAE loss and the plot title.
@@ -1128,6 +1178,7 @@ def plot_and_evaluate_sep_event(
     t_timestamps = pd.to_datetime(df['Timestamp'])
     # Transform 't' column to log scale and plot
     e05_intensity_log = np.log1p(df['e0.5_t'])  # Using log1p for numerical stability
+    p_t_log = np.log1p(df['p_t'])  # Using log1p for numerical stability
     if 'e1.8' in inputs_to_use:
         e18_intensity_log = np.log1p(df['e1.8_t'])  # Using log1p for numerical stability
     # Normalize the flux intensities
@@ -1191,8 +1242,15 @@ def plot_and_evaluate_sep_event(
 
     # Evaluate the model
     _, predictions = model.predict(X_reshaped)
+
     mae_loss = mean_absolute_error(y_true, predictions.flatten())
     # print(f"Mean Absolute Error (MAE) on the cme_files: {mae_loss}")
+
+    # if target change then we need to convert prediction into actual value
+    if 'p' in inputs_to_use and target_change:
+        predictions_plot = p_t_log + predictions.flatten()
+    else:
+        predictions_plot = predictions.flatten()
 
     lw = .65  # Line width for the plots
     tlw = 2.75  # Thicker line width for the actual and predicted lines
@@ -1200,7 +1258,7 @@ def plot_and_evaluate_sep_event(
     # Plot the cme_files
     plt.figure(figsize=(15, 10), facecolor='white')
     plt.plot(timestamps, y_true, label='Actual Proton ln(Intensity)', color='blue', linewidth=tlw)
-    plt.plot(timestamps, predictions.flatten(), label='Predicted Proton ln(Intensity)', color='red', linewidth=tlw)
+    plt.plot(timestamps, predictions_plot, label='Predicted Proton ln(Intensity)', color='red', linewidth=tlw)
     # electron_line, = plt.plot(t_timestamps, df['t'], label='Electron Intensity', color='blue')
     plt.plot(t_timestamps, e05_intensity_log, label='E 0.5 ln(Intensity)', color='orange', linewidth=lw)
     if 'e1.8' in inputs_to_use:
@@ -1256,8 +1314,8 @@ def process_sep_events(
         title: str = None,
         inputs_to_use: List[str] = None,
         add_slope: bool = True,
-        cme_speed_threshold: float = 0
-) -> List[str]:
+        cme_speed_threshold: float = 0,
+        target_change: bool = False) -> List[str]:
     """
     Processes SEP event files in the specified directory, normalizes flux intensities, predicts proton intensities,
     plots the results, and calculates the MAE for each file.
@@ -1270,7 +1328,8 @@ def process_sep_events(
     - title (str): The title of the plot. Default is None.
     - inputs_to_use (List[str]): List of input types to include in the dataset. Default is ['e0.5', 'e1.8', 'p'].
     - add_slope (bool): If True, adds slope features to the dataset.
-     - cme_speed_threshold (float): The threshold for CME speed. CMEs with speeds below this threshold will be excluded.
+    - cme_speed_threshold (float): The threshold for CME speed. CMEs with speeds below this threshold will be excluded.
+    - target_change (bool): Whether to use the target change approach. Default is False.
 
     Returns:
     - str: The name of the plot file.
@@ -1332,7 +1391,8 @@ def process_sep_events(
                     df, cme_start_times, event_id, model,
                     input_columns, target_column, using_cme=using_cme,
                     model_type=model_type, title=title,
-                    inputs_to_use=inputs_to_use, add_slope=add_slope)
+                    inputs_to_use=inputs_to_use, add_slope=add_slope,
+                    target_change=target_change)
 
                 print(f"Processed file: {file_name} with MAE: {mae_loss}")
 
