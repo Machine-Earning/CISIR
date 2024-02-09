@@ -1141,7 +1141,9 @@ def plot_and_evaluate_sep_event(
         title: str = None,
         inputs_to_use: List[str] = None,
         add_slope: bool = True,
-        target_change: bool = False) -> [float, str]:
+        target_change: bool = False,
+        show_persistent: bool = True,
+        show_changes: bool = True) -> [float, str]:
     """
     Plots the SEP event cme_files with actual and predicted proton intensities, electron intensity,
     and evaluates the model's performance using MAE.
@@ -1161,10 +1163,13 @@ def plot_and_evaluate_sep_event(
     - inputs_to_use (List[str]): The list of input types to use. Default is None.
     - add_slope (bool): Whether to add slope features. Default is True.
     - target_change (bool): Whether to use target change. Default is False.
+    - show_persistent (bool): Whether to show the persistent model where the delta = 0. Default is True.
+    - show_changes (bool): Whether to show the scatter plot of target changes vs predicted changes. Default is True.
 
     Returns:
     - Tuple[float, str]: A tuple containing the MAE loss and the plot title.
     """
+    global actual_changes, predicted_changes
     e18_intensity_log = None
 
     if add_slope:
@@ -1246,6 +1251,9 @@ def plot_and_evaluate_sep_event(
     # if target change then we need to convert prediction into actual value
     if 'p' in inputs_to_use and target_change:
         predictions_plot = p_t_log + predictions.flatten()
+        if show_changes:
+            actual_changes = y_true - p_t_log
+            predicted_changes = predictions.flatten()
     else:
         predictions_plot = predictions.flatten()
 
@@ -1253,7 +1261,7 @@ def plot_and_evaluate_sep_event(
     print(f"Mean Absolute Error (MAE) on the cme_files: {mae_loss}")
 
     lw = .65  # Line width for the plots
-    tlw = 1.75  # Thicker line width for the actual and predicted lines
+    tlw = 1.3  # Thicker line width for the actual and predicted lines
 
     # Plot the cme_files
     plt.figure(figsize=(15, 10), facecolor='white')
@@ -1263,6 +1271,11 @@ def plot_and_evaluate_sep_event(
     plt.plot(t_timestamps, e05_intensity_log, label='E 0.5 ln(Intensity)', color='orange', linewidth=lw)
     if 'e1.8' in inputs_to_use:
         plt.plot(t_timestamps, e18_intensity_log, label='E 1.8 ln(Intensity)', color='yellow', linewidth=lw)
+    if 'p' in inputs_to_use and target_change and show_persistent:
+        plt.plot(timestamps, p_t_log, label='Persistent Model', color='gray', linestyle=':', linewidth=lw)
+    if 'p' in inputs_to_use and target_change and show_changes:
+        plt.scatter(timestamps, actual_changes, color='pink', label='Actual Changes', alpha=0.5, s=10)
+        plt.scatter(timestamps, predicted_changes, color='purple', label='Predicted Changes', alpha=0.5, s=10)
     # Add a black horizontal line at log(0.05) on the y-axis and create a handle for the legend
     threshold_value = np.log(0.4535)
     plt.axhline(y=threshold_value, color='black', linestyle='--', linewidth=lw, label='Threshold')
