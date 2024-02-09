@@ -18,7 +18,7 @@ def main():
     Main function to run the E-CNN model
     :return:
     """
-    for inputs_to_use in [['e0.5', 'e1.8'], ['e0.5', 'p'], ['e0.5', 'e1.8', 'p']]:
+    for inputs_to_use in [['e0.5', 'p'], ['e0.5', 'e1.8', 'p']]:
         for add_slope in [True, False]:
             # inputs_to_use = ['e0.5']
             # add_slope = True
@@ -67,7 +67,8 @@ def main():
             # x = S / 49
             # get the number of features
             if add_slope:
-                n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
+                # n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
+                n_features = [25] * len(inputs_to_use) * 2
             else:
                 n_features = [25] * len(inputs_to_use)
             print(f'n_features: {n_features}')
@@ -83,7 +84,7 @@ def main():
 
 
             # Define the EarlyStopping callback
-            early_stopping = EarlyStopping(monitor='val_forecast_head_loss', patience=patience, verbose=1,
+            early_stopping = EarlyStopping(monitor='val_loss', patience=patience, verbose=1,
                                            restore_best_weights=True)
 
             # Compile the model with the specified learning rate

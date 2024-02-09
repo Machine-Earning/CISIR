@@ -1243,9 +1243,6 @@ def plot_and_evaluate_sep_event(
     # Evaluate the model
     _, predictions = model.predict(X_reshaped)
 
-    mae_loss = mean_absolute_error(y_true, predictions.flatten())
-    # print(f"Mean Absolute Error (MAE) on the cme_files: {mae_loss}")
-
     # if target change then we need to convert prediction into actual value
     if 'p' in inputs_to_use and target_change:
         predictions_plot = p_t_log + predictions.flatten()
@@ -1253,10 +1250,10 @@ def plot_and_evaluate_sep_event(
         predictions_plot = predictions.flatten()
 
     mae_loss = mean_absolute_error(y_true, predictions_plot)
-    # print(f"Mean Absolute Error (MAE) on the cme_files: {mae_loss}")
+    print(f"Mean Absolute Error (MAE) on the cme_files: {mae_loss}")
 
     lw = .65  # Line width for the plots
-    tlw = 2.75  # Thicker line width for the actual and predicted lines
+    tlw = 1.75  # Thicker line width for the actual and predicted lines
 
     # Plot the cme_files
     plt.figure(figsize=(15, 10), facecolor='white')
@@ -1267,8 +1264,8 @@ def plot_and_evaluate_sep_event(
     if 'e1.8' in inputs_to_use:
         plt.plot(t_timestamps, e18_intensity_log, label='E 1.8 ln(Intensity)', color='yellow', linewidth=lw)
     # Add a black horizontal line at log(0.05) on the y-axis and create a handle for the legend
-    # threshold_value = 0.1
-    # threshold_line = plt.axhline(y=threshold_value, color='black', linestyle='--', linewidth=lw, label='Threshold')
+    threshold_value = np.log(0.4535)
+    plt.axhline(y=threshold_value, color='black', linestyle='--', linewidth=lw, label='Threshold')
 
     # Create a custom legend handle for the CME start times
     cme_line = Line2D([0], [0], color='green', linestyle='--', linewidth=lw, label='CME Start Time')
@@ -1513,7 +1510,10 @@ def plot_sample_with_cme(data: np.ndarray, cme_start_index: int, cme_features_na
     plt.show()
 
 
-def evaluate_model(model: tf.keras.Model, X_test: np.ndarray or List[np.ndarray], y_test: np.ndarray) -> float:
+def evaluate_model(
+        model: tf.keras.Model,
+        X_test: np.ndarray or List[np.ndarray],
+        y_test: np.ndarray) -> float:
     """
     Evaluates a given model using Mean Absolute Error (MAE) on the provided test cme_files.
 
@@ -1665,7 +1665,9 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
         return tuple(cnn_inputs)
 
 
-def prepare_rnn_inputs(data: np.ndarray, rnn_input_dims: List[int] = None, with_slope: bool = False,
+def prepare_rnn_inputs(data: np.ndarray,
+                       rnn_input_dims: List[int] = None,
+                       with_slope: bool = False,
                        use_ch: bool = True) -> Tuple:
     """
     Splits the input cme_files into parts for the RNN branches of the model,
