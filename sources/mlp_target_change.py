@@ -3,30 +3,33 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.optimizers import Adam
+from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
 
-from modules.training.ts_modeling import (build_dataset,
-                                          create_rnns_ch,
-                                          evaluate_model,
-                                          process_sep_events,
-                                          prepare_rnn_inputs)
+from modules.training.ts_modeling import (
+    build_dataset,
+    create_mlp,
+    evaluate_model,
+    process_sep_events)
 
 
 def main():
     """
-    Main function to run the E-CNN model
+    Main function to run the E-MLP model
     :return:
     """
-    for inputs_to_use in [['e0.5', 'e1.8'], ['e0.5', 'p'], ['e0.5', 'e1.8', 'p']]:
-        for add_slope in [True, False]:
+
+    for inputs_to_use in [['e0.5', 'e1.8', 'p'], ['e0.5', 'p']]:
+        for add_slope in [False, True]:
+            # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
+
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
             # Construct the title
-            title = f'RNN_ch_{inputs_str}_slope_{str(add_slope)}'
+            title = f'MLP_targetChange_{inputs_str}_slope_{str(add_slope)}'
 
             # Replace any other characters that are not suitable for filenames (if any)
             title = title.replace(' ', '_').replace(':', '_')
@@ -36,19 +39,32 @@ def main():
             experiment_name = f'{title}_{current_time}'
 
             # Initialize wandb
-            wandb.init(project="rnn-ch-ts", name=experiment_name, config={
+            wandb.init(project="mlp-ts-target-change", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
             })
 
+            target_change = True
+
             # set the root directory
-            root_dir = 'D:/College/Fall2023/electron_cme_v4/electron_cme_data_split'
+            root_dir = 'data/electron_cme_data_split'
             # build the dataset
-            X_train, y_train = build_dataset(root_dir + '/training', inputs_to_use=inputs_to_use, add_slope=add_slope)
-            X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining', inputs_to_use=inputs_to_use,
-                                                   add_slope=add_slope)
-            X_test, y_test = build_dataset(root_dir + '/testing', inputs_to_use=inputs_to_use, add_slope=add_slope)
-            X_val, y_val = build_dataset(root_dir + '/validation', inputs_to_use=inputs_to_use, add_slope=add_slope)
+            X_train, y_train = build_dataset(root_dir + '/training',
+                                             inputs_to_use=inputs_to_use,
+                                             add_slope=add_slope,
+                                             target_change=target_change)
+            X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining',
+                                                   inputs_to_use=inputs_to_use,
+                                                   add_slope=add_slope,
+                                                   target_change=target_change)
+            X_test, y_test = build_dataset(root_dir + '/testing',
+                                           inputs_to_use=inputs_to_use,
+                                           add_slope=add_slope,
+                                           target_change=target_change)
+            X_val, y_val = build_dataset(root_dir + '/validation',
+                                         inputs_to_use=inputs_to_use,
+                                         add_slope=add_slope,
+                                         target_change=target_change)
 
             # print all cme_files shapes
             print(f'X_train.shape: {X_train.shape}')
@@ -64,42 +80,36 @@ def main():
             # print(f'X_train[0]: {X_train[0]}')
             # print(f'y_train[0]: {y_train[0]}')
 
-            # x = S / 49
             # get the number of features
-            if add_slope:
-                n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
-            else:
-                n_features = [25] * len(inputs_to_use)
+            n_features = X_train.shape[1]
             print(f'n_features: {n_features}')
+            hiddens = [100, 100, 50]
 
             # create the model
-            rnn_model_sep = create_rnns_ch(input_dims=n_features)
-            rnn_model_sep.summary()
+            mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens)
+            mlp_model_sep.summary()
 
             # Set the early stopping patience and learning rate as variables
             patience = 50
-            learning_rate = 3e-3
-            use_ch = True
-
+            learning_rate = 3e-3  # og learning rate
+            weight_decay = 0  # higher weight decay
+            momentum_beta1 = 0.9  # higher momentum beta1
 
             # Define the EarlyStopping callback
             early_stopping = EarlyStopping(monitor='val_forecast_head_loss', patience=patience, verbose=1,
                                            restore_best_weights=True)
 
             # Compile the model with the specified learning rate
-            rnn_model_sep.compile(optimizer=Adam(learning_rate=learning_rate), loss={'forecast_head': 'mse'})
-
-            # prepare rnn inputs
-            X_subtrain_rnn = prepare_rnn_inputs(X_subtrain, n_features, add_slope, use_ch)
-            X_val_rnn = prepare_rnn_inputs(X_val, n_features, add_slope, use_ch)
-            X_train_rnn = prepare_rnn_inputs(X_train, n_features, add_slope, use_ch)
-            X_test_rnn = prepare_rnn_inputs(X_test, n_features, add_slope, use_ch)
+            mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
+                                                  weight_decay=weight_decay,
+                                                  beta_1=momentum_beta1),
+                                  loss={'forecast_head': 'mse'})
 
             # Train the model with the callback
-            history = rnn_model_sep.fit(X_subtrain_rnn,
+            history = mlp_model_sep.fit(X_subtrain,
                                         {'forecast_head': y_subtrain},
                                         epochs=1000, batch_size=32,
-                                        validation_data=(X_val_rnn, {'forecast_head': y_val}),
+                                        validation_data=(X_val, {'forecast_head': y_val}),
                                         callbacks=[early_stopping, WandbCallback()])
 
             # Plot the training and validation loss
@@ -111,21 +121,22 @@ def main():
             plt.ylabel('Loss')
             plt.legend()
             # save the plot
-            plt.savefig(f'rnn_loss_{title}.png')
+            plt.savefig(f'mlp_loss_{title}.png')
 
             # Determine the optimal number of epochs from early stopping
             optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
-            final_rnn_model_sep = create_rnns_ch(input_dims=n_features)  # Recreate the model architecture
-            final_rnn_model_sep.compile(optimizer=Adam(learning_rate=learning_rate),
+            final_mlp_model_sep = create_mlp(input_dim=n_features,
+                                             hiddens=hiddens)  # Recreate the model architecture
+            final_mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
+                                                        weight_decay=weight_decay,
+                                                        beta_1=momentum_beta1),
                                         loss={'forecast_head': 'mse'})  # Compile the model just like before
             # Train on the full dataset
-            final_rnn_model_sep.fit(X_train_rnn,
-                                    {'forecast_head': y_train},
-                                    epochs=optimal_epochs,
-                                    batch_size=32, verbose=1)
+            final_mlp_model_sep.fit(X_train, {'forecast_head': y_train}, epochs=optimal_epochs, batch_size=32,
+                                    verbose=1)
 
             # evaluate the model on test cme_files
-            error_mae = evaluate_model(final_rnn_model_sep, X_test_rnn, y_test)
+            error_mae = evaluate_model(final_mlp_model_sep, X_test, y_test)
             print(f'mae error: {error_mae}')
             # Log the MAE error to wandb
             wandb.log({"mae_error": error_mae})
@@ -134,11 +145,12 @@ def main():
             test_directory = root_dir + '/testing'
             filenames = process_sep_events(
                 test_directory,
-                final_rnn_model_sep,
-                model_type='rnn-ch',
+                final_mlp_model_sep,
+                model_type='mlp',
                 title=title,
                 inputs_to_use=inputs_to_use,
-                add_slope=add_slope)
+                add_slope=add_slope,
+                target_change=target_change)
 
             # Log the plot to wandb
             for filename in filenames:
