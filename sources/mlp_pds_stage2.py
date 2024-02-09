@@ -8,6 +8,7 @@ from wandb.keras import WandbCallback
 
 from modules.training.cme_modeling import ModelBuilder
 from modules.training.ts_modeling import build_dataset, create_mlp, evaluate_model, process_sep_events
+from modules.evaluate.utils import plot_tsne_pds, plot_tsne_extended
 
 mb = ModelBuilder()
 
@@ -78,15 +79,38 @@ def main():
                 mlp_model_sep_stage1 = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=True)
                 mlp_model_sep_stage1.summary()
                 # load the weights from the first stage
-                weight_path = 'D:/College/Fall2023/sep-forecasting-research/model_weights_20240205-231633_features.h5'
+                weight_path = '/home1/jmoukpe2016/keras-functional-api/model_weights_20240205-230529_features.h5'
                 mlp_model_sep_stage1.load_weights(weight_path)
+                # print the save 
+                print(f'weights loaded successfully from: {weight_path}')
+
+                # Log t-SNE plot for training
+                # Log the training t-SNE plot to wandb
+                stage1_file_path = plot_tsne_pds(mlp_model_sep_stage1,
+                                        X_train,
+                                        y_train,
+                                        title, 'stage1_training',
+                                        save_tag=current_time)
+                wandb.log({'stage1_tsne_training_plot': wandb.Image(stage1_file_path)})
+                print('stage1_file_path: ' + stage1_file_path)
+                
+
+                # Log t-SNE plot for testing
+                # Log the testing t-SNE plot to wandb
+                stage1_file_path = plot_tsne_pds(mlp_model_sep_stage1,
+                                      X_test,
+                                      y_test,
+                                      title, 'stage1_testing',
+                                      save_tag=current_time)
+                wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
+                print('stage1_file_path: ' + stage1_file_path)
 
                 mlp_model_sep = mb.add_proj_head(mlp_model_sep_stage1, output_dim=1, freeze_features=freeze, pds=True)
                 mlp_model_sep.summary()
 
                 # Set the early stopping patience and learning rate as variables
                 patience = 50
-                learning_rate = 3e-3
+                learning_rate = 3e-4
                 weight_decay = 0  # higher weight decay
                 momentum_beta1 = 0.9  # higher momentum beta1
 
@@ -140,6 +164,27 @@ def main():
                 print(f'mae error: {error_mae}')
                 # Log the MAE error to wandb
                 wandb.log({"mae_error": error_mae})
+
+
+                # Log t-SNE plot for training
+                # Log the training t-SNE plot to wandb
+                stage2_file_path = plot_tsne_extended(final_mlp_model_sep,
+                                      X_train,
+                                      y_train,
+                                      title, 'stage2_training',
+                                      save_tag=current_time)
+                wandb.log({'stage2_tsne_training_plot': wandb.Image(stage2_file_path)})
+                print('stage2_file_path: ' + stage2_file_path)
+
+                # Log t-SNE plot for testing
+                # Log the testing t-SNE plot to wandb
+                stage2_file_path = plot_tsne_extended(final_mlp_model_sep,
+                                      X_test,
+                                      y_test,
+                                      title, 'stage2_testing',
+                                      save_tag=current_time)
+                wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage2_file_path)})
+                print('stage2_file_path: ' + stage2_file_path)
 
                 # Process SEP event files in the specified directory
                 test_directory = root_dir + '/testing'
