@@ -36,7 +36,7 @@ def main():
 
             # Set the early stopping patience and learning rate as variables
             patience = 150
-            learning_rate = 1e-5  # og learning rate
+            learning_rate = 1e-6  # og learning rate
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
             batch_size = 4096
