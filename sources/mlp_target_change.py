@@ -19,8 +19,8 @@ def main():
     :return:
     """
 
-    for inputs_to_use in [['e0.5', 'e1.8', 'p']]: #, ['e0.5', 'p']]:
-        for add_slope in [True]: #, False]:
+    for inputs_to_use in [['e0.5', 'e1.8', 'p']]:  # , ['e0.5', 'p']]:
+        for add_slope in [True]:  # , False]:
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
@@ -38,10 +38,22 @@ def main():
             current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
             experiment_name = f'{title}_{current_time}'
 
+            # Set the early stopping patience and learning rate as variables
+            patience = 100
+            learning_rate = 7e-5  # og learning rate
+            weight_decay = 0  # higher weight decay
+            momentum_beta1 = 0.9  # higher momentum beta1
+            batch_size = 2048
+
             # Initialize wandb
             wandb.init(project="mlp-ts-target-change", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
+                "patience": patience,
+                "learning_rate": learning_rate,
+                "weight_decay": weight_decay,
+                "momentum_beta1": momentum_beta1,
+                "batch_size": batch_size
             })
 
             target_change = True
@@ -89,12 +101,6 @@ def main():
             mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens)
             mlp_model_sep.summary()
 
-            # Set the early stopping patience and learning rate as variables
-            patience = 50
-            learning_rate = 3e-3  # og learning rate
-            weight_decay = 0  # higher weight decay
-            momentum_beta1 = 0.9  # higher momentum beta1
-
             # Define the EarlyStopping callback
             early_stopping = EarlyStopping(monitor='val_forecast_head_loss', patience=patience, verbose=1,
                                            restore_best_weights=True)
@@ -108,7 +114,7 @@ def main():
             # Train the model with the callback
             history = mlp_model_sep.fit(X_subtrain,
                                         {'forecast_head': y_subtrain},
-                                        epochs=1000, batch_size=32,
+                                        epochs=1000, batch_size=batch_size,
                                         validation_data=(X_val, {'forecast_head': y_val}),
                                         callbacks=[early_stopping, WandbCallback()])
 
@@ -132,7 +138,7 @@ def main():
                                                         beta_1=momentum_beta1),
                                         loss={'forecast_head': 'mse'})  # Compile the model just like before
             # Train on the full dataset
-            final_mlp_model_sep.fit(X_train, {'forecast_head': y_train}, epochs=optimal_epochs, batch_size=32,
+            final_mlp_model_sep.fit(X_train, {'forecast_head': y_train}, epochs=optimal_epochs, batch_size=batch_size,
                                     verbose=1)
 
             # evaluate the model on test cme_files

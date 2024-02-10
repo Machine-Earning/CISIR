@@ -1,10 +1,12 @@
-from modules.dataload.ts_modeling import build_dataset, create_mlp, evaluate_model, process_sep_events
-from tensorflow_addons.optimizers import AdamW
-from tensorflow.keras.callbacks import EarlyStopping
+from datetime import datetime
+
 import matplotlib.pyplot as plt
 import wandb
-from datetime import datetime
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
+
+from modules.training.ts_modeling import build_dataset, create_mlp, evaluate_model, process_sep_events
 
 
 def main():
@@ -14,7 +16,7 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [False]:
+        for add_slope in [False, True]:
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
@@ -32,14 +34,26 @@ def main():
             current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
             experiment_name = f'{title}_{current_time}'
 
+            # Set the early stopping patience and learning rate as variables
+            patience = 100
+            learning_rate = 7e-5
+            weight_decay = 0  # higher weight decay
+            momentum_beta1 = 0.9  # higher momentum beta1
+            batch_size = 2048
+
             # Initialize wandb
-            wandb.init(project="mlp-ts-all", name=experiment_name, config={
+            wandb.init(project="mlp-ts-2", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
+                "patience": patience,
+                "learning_rate": learning_rate,
+                "weight_decay": weight_decay,
+                "momentum_beta1": momentum_beta1,
+                "batch_size": batch_size
             })
 
             # set the root directory
-            root_dir = 'D:/College/Fall2023/electron_cme_v4/electron_cme_data_split'
+            root_dir = 'data/electron_cme_data_split'
             # build the dataset
             X_train, y_train = build_dataset(root_dir + '/training', inputs_to_use=inputs_to_use, add_slope=add_slope)
             X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining', inputs_to_use=inputs_to_use,
@@ -58,8 +72,8 @@ def main():
             print(f'y_val.shape: {y_val.shape}')
 
             # print a sample of the training cme_files
-            print(f'X_train[0]: {X_train[0]}')
-            print(f'y_train[0]: {y_train[0]}')
+            # print(f'X_train[0]: {X_train[0]}')
+            # print(f'y_train[0]: {y_train[0]}')
 
             # get the number of features
             n_features = X_train.shape[1]
@@ -69,12 +83,6 @@ def main():
             # create the model
             mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens)
             mlp_model_sep.summary()
-
-            # Set the early stopping patience and learning rate as variables
-            patience = 50
-            learning_rate = 3e-5
-            weight_decay = 0 # higher weight decay
-            momentum_beta1 = 0.9 # higher momentum beta1
 
             # Define the EarlyStopping callback
             early_stopping = EarlyStopping(monitor='val_forecast_head_loss', patience=patience, verbose=1,
@@ -89,7 +97,7 @@ def main():
             # Train the model with the callback
             history = mlp_model_sep.fit(X_subtrain,
                                         {'forecast_head': y_subtrain},
-                                        epochs=1000, batch_size=32,
+                                        epochs=1000, batch_size=batch_size,
                                         validation_data=(X_val, {'forecast_head': y_val}),
                                         callbacks=[early_stopping, WandbCallback()])
 
@@ -113,7 +121,7 @@ def main():
                                                         beta_1=momentum_beta1),
                                         loss={'forecast_head': 'mse'})  # Compile the model just like before
             # Train on the full dataset
-            final_mlp_model_sep.fit(X_train, {'forecast_head': y_train}, epochs=optimal_epochs, batch_size=32,
+            final_mlp_model_sep.fit(X_train, {'forecast_head': y_train}, epochs=optimal_epochs, batch_size=batch_size,
                                     verbose=1)
 
             # evaluate the model on test cme_files
@@ -123,7 +131,7 @@ def main():
             wandb.log({"mae_error": error_mae})
 
             # Process SEP event files in the specified directory
-            test_directory = 'D:/College/Fall2023/electron_cme_v4/electron_cme_data_filled'
+            test_directory = root_dir + '/testing'
             filenames = process_sep_events(
                 test_directory,
                 final_mlp_model_sep,
