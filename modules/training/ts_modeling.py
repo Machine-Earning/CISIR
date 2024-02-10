@@ -1143,7 +1143,8 @@ def plot_and_evaluate_sep_event(
         add_slope: bool = True,
         target_change: bool = False,
         show_persistent: bool = True,
-        show_changes: bool = True) -> [float, str]:
+        show_changes: bool = True,
+        prefix: str = 'testing') -> [float, str]:
     """
     Plots the SEP event cme_files with actual and predicted proton intensities, electron intensity,
     and evaluates the model's performance using MAE.
@@ -1165,6 +1166,7 @@ def plot_and_evaluate_sep_event(
     - target_change (bool): Whether to use target change. Default is False.
     - show_persistent (bool): Whether to show the persistent model where the delta = 0. Default is True.
     - show_changes (bool): Whether to show the scatter plot of target changes vs predicted changes. Default is True.
+    - prefix (bool): Whether to add the prefix 'SEP Event' to the title. Default is True.
 
     Returns:
     - Tuple[float, str]: A tuple containing the MAE loss and the plot title.
@@ -1252,32 +1254,34 @@ def plot_and_evaluate_sep_event(
     if 'p' in inputs_to_use and target_change:
         predictions_plot = p_t_log + predictions.flatten()
         if show_changes:
-            actual_changes = y_true - p_t_log
-            predicted_changes = predictions.flatten()
+            actual_changes = y_true - p_t_log - 1  # offset by 1
+            predicted_changes = predictions.flatten() - 1  # offset by 1
     else:
         predictions_plot = predictions.flatten()
 
     mae_loss = mean_absolute_error(y_true, predictions_plot)
+    # mae_loss = mean_absolute_error(y_true, p_t_log) # simple model
     print(f"Mean Absolute Error (MAE) on the cme_files: {mae_loss}")
 
     lw = .65  # Line width for the plots
-    tlw = 1.3  # Thicker line width for the actual and predicted lines
+    tlw = 1.8  # Thicker line width for the actual and predicted lines
+    ssz = 4.7  # Scatter size for the changes
 
     # Plot the cme_files
     plt.figure(figsize=(15, 10), facecolor='white')
     plt.plot(timestamps, y_true, label='Actual Proton ln(Intensity)', color='blue', linewidth=tlw)
-    plt.plot(timestamps, predictions_plot, label='Predicted Proton ln(Intensity)', color='red', linewidth=tlw)
+    # plt.plot(timestamps, predictions_plot, label='Predicted Proton ln(Intensity)', color='red', linewidth=tlw)
     # electron_line, = plt.plot(t_timestamps, df['t'], label='Electron Intensity', color='blue')
     plt.plot(t_timestamps, e05_intensity_log, label='E 0.5 ln(Intensity)', color='orange', linewidth=lw)
     if 'e1.8' in inputs_to_use:
         plt.plot(t_timestamps, e18_intensity_log, label='E 1.8 ln(Intensity)', color='yellow', linewidth=lw)
     if 'p' in inputs_to_use and target_change and show_persistent:
-        plt.plot(timestamps, p_t_log, label='Persistent Model', color='gray', linestyle=':', linewidth=lw)
+        plt.plot(timestamps, p_t_log, label='Persistent Model', color='black', linestyle=':', linewidth=tlw)
     if 'p' in inputs_to_use and target_change and show_changes:
-        plt.scatter(timestamps, actual_changes, color='pink', label='Actual Changes', alpha=0.5, s=10)
-        plt.scatter(timestamps, predicted_changes, color='purple', label='Predicted Changes', alpha=0.5, s=10)
+        plt.scatter(timestamps, actual_changes, color='gray', label='Actual Changes', alpha=0.5, s=ssz)
+        plt.scatter(timestamps, predicted_changes, color='purple', label='Predicted Changes', alpha=0.5, s=ssz)
     # Add a black horizontal line at log(0.05) on the y-axis and create a handle for the legend
-    threshold_value = np.log(0.4535)
+    threshold_value = 0.4535
     plt.axhline(y=threshold_value, color='black', linestyle='--', linewidth=lw, label='Threshold')
 
     # Create a custom legend handle for the CME start times
@@ -1306,7 +1310,7 @@ def plot_and_evaluate_sep_event(
     plt.legend(handles=handles, labels=labels)
 
     # Save the plot to a file with the MAE in the file name
-    file_name = f'{title}_SEP_Event_{event_id}_MAE_{mae_loss:.4f}.png'
+    file_name = f'{title}_SEP_Event_{event_id}_{prefix}_MAE_{mae_loss:.4f}.png'
     plt.savefig(file_name)
 
     # plt.show()
@@ -1319,6 +1323,125 @@ def plot_and_evaluate_sep_event(
     return mae_loss, file_name
 
 
+def plot_avsp_delta(
+        df: pd.DataFrame,
+        cme_start_times: List[pd.Timestamp],
+        event_id: str,
+        model: tf.keras.Model,
+        input_columns: List[str],
+        target_column: str,
+        normalize_target: bool = False,
+        using_cme: bool = False,
+        model_type: str = "cnn",
+        title: str = None,
+        inputs_to_use: List[str] = None,
+        add_slope: bool = True,
+        target_change: bool = False
+) -> [float, str]:
+    """
+    Plots theactual delta (x) vs predicted delta (y) with a diagonal dotted line indicating perfect prediction.
+    Different colors are used for different events
+
+    Parameters:
+    - df (pd.DataFrame): The DataFrame containing the SEP event cme_files with normalized values.
+    - cme_start_times (List[pd.Timestamp]): A list of CME start times for vertical markers.
+    - event_id (str): The event ID to be displayed in the plot title.
+    - model (tf.keras.Model): The trained model to be evaluated.
+    - input_columns (List[str]): The list of input columns for the model.
+    - cme_columns (List[str]): The list of CME feature columns.
+    - target_column (str): The column name of the target variable.
+    - normalize_target (bool): Whether to normalize the target column. Default is False.
+    - using_cme (bool): Whether to use CME features. Default is False.
+    - model_type (str): The type of model used. Default is 'cnn'.
+    - title (str): The title of the plot. Default is None.
+    - inputs_to_use (List[str]): The list of input types to use. Default is None.
+    - add_slope (bool): Whether to add slope features. Default is True.
+    - target_change (bool): Whether to use target change. Default is False.
+
+    Returns:
+    - Tuple[float, str]: A tuple containing the MAE loss and the plot title.
+    """
+    global actual_changes, predicted_changes
+
+    if add_slope:
+        n_features = len(inputs_to_use) * (25 + 24)
+        # n_features = len(inputs_to_use) * 25 * 2
+    else:
+        n_features = len(inputs_to_use) * 25
+
+    p_t_log = np.log1p(df['p_t'])  # Using log1p for numerical stability
+    # Normalize the flux intensities
+    df_norm = normalize_flux(df, input_columns, apply_log=True)
+    # X = df_norm[input_columns].values
+    added_columns = []
+    if add_slope:
+        added_columns = generate_slope_column_names(inputs_to_use)
+        for input_type in inputs_to_use:
+            slope_values = compute_slope(df_norm, input_type)
+            slope_column_names = generate_slope_column_names([input_type])
+            for slope_column, slope_index in zip(slope_column_names, range(slope_values.shape[1])):
+                df_norm[slope_column] = slope_values[:, slope_index]
+
+    X = df_norm[input_columns + added_columns].values
+
+    if normalize_target:
+        df_norm[target_column] = normalize_flux(df, [target_column], apply_log=True)[target_column]
+        y_true = df_norm[target_column].values
+    else:
+        y_true = df[target_column].values
+        y_true = np.log1p(y_true)  # Log transform target if normalization is not applied
+
+    if using_cme:
+        # process cme features
+        cme_features = preprocess_cme_features(df, inputs_to_use)
+        X_reshaped = np.concatenate([X, cme_features.values], axis=1)
+    else:
+        # Reshape X accordingly
+        # The '-1' in reshape indicates that the number of samples is automatically determined
+        # 'num_features' is the actual number of features in X
+        # '1' is for the third dimension, typically used for weights expecting 3D input (like CNNs)
+        X_reshaped = X.reshape(-1, n_features, 1)
+
+    if add_slope:
+        # n_features_list = [25] * len(inputs_to_use) * 2
+        n_features_list = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
+    else:
+        n_features_list = [25] * len(inputs_to_use)
+
+    if model_type == "cnn":
+        X_reshaped = prepare_cnn_inputs(X_reshaped, n_features_list, add_slope)
+    elif model_type == "cnn-ch":
+        X_reshaped = prepare_cnn_inputs(X_reshaped, n_features_list, add_slope, use_ch=True)
+    elif model_type == "rnn":
+        X_reshaped = prepare_rnn_inputs(X_reshaped, n_features_list, add_slope)
+    elif model_type == "rnn-ch":
+        X_reshaped = prepare_rnn_inputs(X_reshaped, n_features_list, add_slope, use_ch=True)
+    elif model_type == "cnn-hybrid":
+        X_reshaped = prepare_hybrid_inputs(X_reshaped,
+                                           tsf_extractor_type='cnn',
+                                           tsf_input_dims=n_features_list,
+                                           with_slope=add_slope,
+                                           mlp_input_dim=20 + len(inputs_to_use))
+    elif model_type == "rnn-hybrid":
+        X_reshaped = prepare_hybrid_inputs(X_reshaped,
+                                           tsf_extractor_type='rnn',
+                                           tsf_input_dims=n_features_list,
+                                           with_slope=add_slope,
+                                           mlp_input_dim=20 + len(inputs_to_use))
+
+    # Evaluate the model
+    _, predictions = model.predict(X_reshaped)
+
+    # if target change then we need to convert prediction into actual value
+    if 'p' in inputs_to_use and target_change:
+        actual_changes = y_true - p_t_log  # offset by 1
+        predicted_changes = predictions.flatten()  # offset by 1
+    else:
+        predictions_plot = predictions.flatten()
+
+    return actual_changes, predicted_changes
+
+
 def process_sep_events(
         directory: str,
         model: tf.keras.Model,
@@ -1328,7 +1451,9 @@ def process_sep_events(
         inputs_to_use: List[str] = None,
         add_slope: bool = True,
         cme_speed_threshold: float = 0,
-        target_change: bool = False) -> List[str]:
+        target_change: bool = False,
+        show_avsp: bool = False,
+        prefix: str = 'testing') -> List[str]:
     """
     Processes SEP event files in the specified directory, normalizes flux intensities, predicts proton intensities,
     plots the results, and calculates the MAE for each file.
@@ -1343,6 +1468,8 @@ def process_sep_events(
     - add_slope (bool): If True, adds slope features to the dataset.
     - cme_speed_threshold (float): The threshold for CME speed. CMEs with speeds below this threshold will be excluded.
     - target_change (bool): Whether to use the target change approach. Default is False.
+    - show_avsp (bool): Whether to show the Actual vs Predicted delta plot. Default is False.
+    - prefix (str): The prefix to use for the plot file names. Default is 'testing'.
 
     Returns:
     - str: The name of the plot file.
@@ -1372,6 +1499,9 @@ def process_sep_events(
         '2nd_order_speed_final', '2nd_order_speed_20R', 'CPA', 'Halo', 'Type2_Viz_Area',
         'solar_wind_speed', 'diffusive_shock', 'half_richardson_value'
     ]
+
+    # Initialize a list to hold data for plotting
+    avsp_data = []
 
     # Iterate over files in the directory
     for file_name in os.listdir(directory):
@@ -1405,16 +1535,56 @@ def process_sep_events(
                     input_columns, target_column, using_cme=using_cme,
                     model_type=model_type, title=title,
                     inputs_to_use=inputs_to_use, add_slope=add_slope,
-                    target_change=target_change)
+                    target_change=target_change,
+                    prefix=prefix)
 
                 print(f"Processed file: {file_name} with MAE: {mae_loss}")
-
                 plot_names.append(plotname)
+
+                if show_avsp:
+                    actual_ch, predicted_ch = plot_avsp_delta(
+                        df, cme_start_times, event_id, model,
+                        input_columns, target_column, using_cme=using_cme,
+                        model_type=model_type, title=title,
+                        inputs_to_use=inputs_to_use, add_slope=add_slope,
+                        target_change=target_change)
+
+                    avsp_data.append((event_id, actual_ch, predicted_ch))
             except Exception as e:
                 print(f"Error processing file: {file_name}")
                 print(e)
                 traceback.print_exc()
                 continue
+
+    if show_avsp and avsp_data:
+        # Plotting logic here...
+        plt.figure(figsize=(10, 7))  # Adjust size as needed
+        # Use a colormap
+        colors = plt.cm.viridis(np.linspace(0, 1, len(avsp_data)))
+
+        for idx, (event_id, actual, predicted) in enumerate(avsp_data):
+            plt.scatter(actual, predicted, color=colors[idx], label=f'{event_id}', alpha=0.5)
+
+        # Add a diagonal line for perfect prediction
+        min_val = min(min(actual.min(), predicted.min()) for _, actual, predicted in avsp_data)
+        max_val = max(max(actual.max(), predicted.max()) for _, actual, predicted in avsp_data)
+        plt.plot([min_val, max_val], [min_val, max_val], 'k--', label='Perfect Prediction')
+
+        plt.xlabel('Actual Changes')
+        plt.ylabel('Predicted Changes')
+        plt.title(f"{title}\n{prefix}_Actual_vs_Predicted_Changes")
+        # plt.legend()
+        plt.grid(True)
+
+        # Save the plot
+        plot_filename = f"{prefix}_actual_vs_predicted_changes.png"
+        plt.savefig(plot_filename)
+        plt.close()
+
+        # Return the file location
+        file_location = os.path.abspath(plot_filename)
+        print(f"Saved plot to: {file_location}")
+        plot_names.append(file_location)
 
     return plot_names
 

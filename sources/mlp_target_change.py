@@ -19,8 +19,8 @@ def main():
     :return:
     """
 
-    for inputs_to_use in [['e0.5', 'e1.8', 'p'], ['e0.5', 'p']]:
-        for add_slope in [False, True]:
+    for inputs_to_use in [['e0.5', 'e1.8', 'p']]: #, ['e0.5', 'p']]:
+        for add_slope in [True]: #, False]:
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
@@ -29,7 +29,7 @@ def main():
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
             # Construct the title
-            title = f'MLP_targetChange_{inputs_str}_slope_{str(add_slope)}'
+            title = f'MLP_targetChange_{inputs_str}_slope_{str(add_slope)}_morePlots'
 
             # Replace any other characters that are not suitable for filenames (if any)
             title = title.replace(' ', '_').replace(':', '_')
@@ -150,11 +150,31 @@ def main():
                 title=title,
                 inputs_to_use=inputs_to_use,
                 add_slope=add_slope,
-                target_change=target_change)
+                target_change=target_change,
+                show_avsp=True)
 
             # Log the plot to wandb
             for filename in filenames:
-                wandb.log({f'{filename}': wandb.Image(filename)})
+                log_title = filename.split("\\")[-1]
+                wandb.log({f'{log_title}': wandb.Image(filename)})
+
+            # Process SEP event files in the specified directory
+            test_directory = root_dir + '/training'
+            filenames = process_sep_events(
+                test_directory,
+                final_mlp_model_sep,
+                model_type='mlp',
+                title=title,
+                inputs_to_use=inputs_to_use,
+                add_slope=add_slope,
+                target_change=target_change,
+                show_avsp=True,
+                prefix='training')
+
+            # Log the plot to wandb
+            for filename in filenames:
+                log_title = filename.split("\\")[-1]
+                wandb.log({f'{log_title}': wandb.Image(filename)})
 
             # Finish the wandb run
             wandb.finish()
