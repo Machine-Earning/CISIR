@@ -39,7 +39,7 @@ def main():
             learning_rate = 1e-6  # og learning rate
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 4096
+            batch_size = 8192
             epochs = 100000
 
             # Initialize wandb

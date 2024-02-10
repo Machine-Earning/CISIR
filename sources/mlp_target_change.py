@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 
 import matplotlib.pyplot as plt
@@ -43,7 +44,7 @@ def main():
             learning_rate = 1e-6  # og learning rate
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 4096
+            batch_size = 8192
             epochs = 100000
 
             # Initialize wandb
@@ -163,7 +164,7 @@ def main():
 
             # Log the plot to wandb
             for filename in filenames:
-                log_title = filename.split("\\")[-1]
+                log_title = os.path.basename(filename)
                 wandb.log({f'{log_title}': wandb.Image(filename)})
 
             # Process SEP event files in the specified directory
@@ -181,7 +182,7 @@ def main():
 
             # Log the plot to wandb
             for filename in filenames:
-                log_title = filename.split("\\")[-1]
+                log_title = os.path.basename(filename)
                 wandb.log({f'{log_title}': wandb.Image(filename)})
 
             # Finish the wandb run
