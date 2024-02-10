@@ -39,11 +39,12 @@ def main():
             experiment_name = f'{title}_{current_time}'
 
             # Set the early stopping patience and learning rate as variables
-            patience = 100
-            learning_rate = 7e-5  # og learning rate
+            patience = 150
+            learning_rate = 1e-5  # og learning rate
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 2048
+            batch_size = 4096
+            epochs = 100000
 
             # Initialize wandb
             wandb.init(project="mlp-ts-target-change", name=experiment_name, config={
@@ -53,7 +54,8 @@ def main():
                 "learning_rate": learning_rate,
                 "weight_decay": weight_decay,
                 "momentum_beta1": momentum_beta1,
-                "batch_size": batch_size
+                "batch_size": batch_size,
+                "epochs": epochs
             })
 
             target_change = True
@@ -114,7 +116,7 @@ def main():
             # Train the model with the callback
             history = mlp_model_sep.fit(X_subtrain,
                                         {'forecast_head': y_subtrain},
-                                        epochs=1000, batch_size=batch_size,
+                                        epochs=epochs, batch_size=batch_size,
                                         validation_data=(X_val, {'forecast_head': y_val}),
                                         callbacks=[early_stopping, WandbCallback()])
 
