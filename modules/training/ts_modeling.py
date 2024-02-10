@@ -1270,8 +1270,7 @@ def plot_and_evaluate_sep_event(
     # Plot the cme_files
     plt.figure(figsize=(15, 10), facecolor='white')
     plt.plot(timestamps, y_true, label='Actual Proton ln(Intensity)', color='blue', linewidth=tlw)
-    # plt.plot(timestamps, predictions_plot, label='Predicted Proton ln(Intensity)', color='red', linewidth=tlw)
-    # electron_line, = plt.plot(t_timestamps, df['t'], label='Electron Intensity', color='blue')
+    plt.plot(timestamps, predictions_plot, label='Predicted Proton ln(Intensity)', color='red', linewidth=tlw)
     plt.plot(t_timestamps, e05_intensity_log, label='E 0.5 ln(Intensity)', color='orange', linewidth=lw)
     if 'e1.8' in inputs_to_use:
         plt.plot(t_timestamps, e18_intensity_log, label='E 1.8 ln(Intensity)', color='yellow', linewidth=lw)

@@ -39,7 +39,7 @@ def main():
             learning_rate = 7e-5
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 2048
+            batch_size = 32
 
             # Initialize wandb
             wandb.init(project="mlp-ts-2", name=experiment_name, config={
