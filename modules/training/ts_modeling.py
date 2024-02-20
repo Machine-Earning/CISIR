@@ -1984,7 +1984,7 @@ def find_shift_lag(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_ts: 
     time_interval = (timestamps[1] - timestamps[0]) / np.timedelta64(1, 'm')  # Assuming uniform spacing
 
     # Consider shifts up to a reasonable limit to avoid overfitting to noise
-    max_shifts = min(len(actual_ts) // 2, 60)  # Limit to 60 shifts as an example
+    max_shifts = min(len(actual_ts) // 2, 12)  # For example, limit to 10 shifts ( if data is 5-minute intervals)
 
     # Loop for shifting left (positive shifts)
     for shift in range(1, max_shifts + 1):
@@ -2038,7 +2038,7 @@ def find_shift_lag_with_correlation(timestamps: np.ndarray, actual_ts: np.ndarra
     optimal_lag = lags[max_corr_index]
 
     # Convert the optimal lag to minutes
-    shift_lag = optimal_lag * time_interval
+    shift_lag = -optimal_lag * time_interval
     return shift_lag
 
 
