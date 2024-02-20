@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from matplotlib.lines import Line2D
+from scipy.signal import correlate, correlation_lags
 from sklearn.metrics import mean_absolute_error
 from sklearn.utils import shuffle
 from tensorflow.keras.layers import Input, Conv1D, Flatten, Dense, LeakyReLU, Concatenate, GRU
@@ -1966,7 +1967,49 @@ def find_threshold_crossing_indices(values: np.ndarray, threshold: float) -> np.
 
 def find_shift_lag(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_ts: np.ndarray) -> float:
     """
-    Find the shift lag by calculating the MAE for various shifts of predicted data, both left and right.
+    Find the shift lag by calculating the MAE for various shifts of predicted data, both left (positive shifts)
+    and right (negative shifts).
+
+    Parameters:
+    - timestamps (np.ndarray): Timestamps for the time series data.
+    - actual_ts (np.ndarray): The actual time series data.
+    - predicted_ts (np.ndarray): The predicted time series data.
+
+    Returns:
+    - float: The shift lag in minutes for the best alignment of predicted data to actual data. Positive lag indicates
+      that the predicted series should be shifted earlier, and negative lag indicates a shift to later times.
+    """
+    min_mae = float('inf')
+    best_shift = 0
+    time_interval = (timestamps[1] - timestamps[0]) / np.timedelta64(1, 'm')  # Assuming uniform spacing
+
+    # Consider shifts up to a reasonable limit to avoid overfitting to noise
+    max_shifts = min(len(actual_ts) // 2, 60)  # Limit to 60 shifts as an example
+
+    # Loop for shifting left (positive shifts)
+    for shift in range(1, max_shifts + 1):
+        shifted_predicted_ts = np.roll(predicted_ts, -shift)
+        mae = np.mean(np.abs(actual_ts[shift:] - shifted_predicted_ts[:-shift]))
+        if mae < min_mae:
+            min_mae = mae
+            best_shift = shift
+
+    # Loop for shifting right (negative shifts)
+    for shift in range(1, max_shifts + 1):
+        shifted_predicted_ts = np.roll(predicted_ts, shift)
+        mae = np.mean(np.abs(actual_ts[:-shift] - shifted_predicted_ts[shift:]))
+        if mae < min_mae:
+            min_mae = mae
+            best_shift = -shift
+
+    # Convert the best shift to minutes
+    shift_lag = best_shift * time_interval
+    return shift_lag
+
+
+def find_shift_lag_with_correlation(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_ts: np.ndarray) -> float:
+    """
+    Find the shift lag by calculating the correlation for various shifts of predicted data, both left and right.
 
     Parameters:
     - timestamps (np.ndarray): Timestamps for the time series data.
@@ -1978,33 +2021,24 @@ def find_shift_lag(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_ts: 
       indicate the predicted series should be shifted left (earlier), and negative values indicate a shift
       right (later).
     """
-    min_mae = float('inf')
-    best_shift = 0
+    # Ensure both series have the same length
+    len_diff = len(actual_ts) - len(predicted_ts)
+    if len_diff > 0:
+        predicted_ts = np.pad(predicted_ts, (len_diff, 0), 'constant', constant_values=0)
+    elif len_diff < 0:
+        actual_ts = np.pad(actual_ts, (abs(len_diff), 0), 'constant', constant_values=0)
+
+    # Calculate correlation and lags
+    correlation = correlate(actual_ts, predicted_ts, mode='full')
+    lags = correlation_lags(len(actual_ts), len(predicted_ts), mode='full')
     time_interval = (timestamps[1] - timestamps[0]) / np.timedelta64(1, 'm')  # assuming uniform spacing
 
-    # Consider shifts in both directions up to a reasonable limit to avoid overfitting to noise
-    max_shifts = min(len(actual_ts) // 2, 60)  # For example, limit to 60 shifts (5 hours if data is 5-minute intervals)
+    # Find the lag with the maximum correlation
+    max_corr_index = np.argmax(correlation)
+    optimal_lag = lags[max_corr_index]
 
-    for shift in range(-max_shifts, max_shifts + 1):
-        # Shift predicted_ts to the left or right by 'shift' indices
-        shifted_predicted_ts = np.roll(predicted_ts, -shift)
-        if shift < 0:
-            # Calculate MAE for right shift (negative shift values)
-            mae = np.mean(np.abs(actual_ts[-shift:] - shifted_predicted_ts[:-shift]))
-        elif shift > 0:
-            # Calculate MAE for left shift (positive shift values)
-            mae = np.mean(np.abs(actual_ts[:-shift] - shifted_predicted_ts[shift:]))
-        else:
-            # No shift
-            mae = np.mean(np.abs(actual_ts - shifted_predicted_ts))
-
-        # Update minimum MAE and best shift if current MAE is lower
-        if mae < min_mae:
-            min_mae = mae
-            best_shift = shift
-
-    # Convert the best shift to minutes
-    shift_lag = best_shift * time_interval
+    # Convert the optimal lag to minutes
+    shift_lag = optimal_lag * time_interval
     return shift_lag
 
 
