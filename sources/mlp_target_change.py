@@ -41,11 +41,11 @@ def main():
 
             # Set the early stopping patience and learning rate as variables
             patience = 150
-            learning_rate = 1e-6  # og learning rate
+            learning_rate = 1e-4  # og learning rate
             weight_decay = 1e-8  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 32 # 8192
-            epochs = 10 # 100000
+            batch_size = 3000
+            epochs = 100000
 
             # Initialize wandb
             wandb.init(project="mlp-ts-target-change", name=experiment_name, config={
