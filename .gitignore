@@ -189,3 +189,5 @@ modules/training/code_snippet.py
 
 #wandb
 wandb/
+
+*.csv
