@@ -1262,9 +1262,9 @@ def plot_and_evaluate_sep_event(
     threshold_value = 0.4535
     mae_loss = mean_absolute_error(y_true, predictions_plot)
     t_lag, s_lag, avg_lag = evaluate_lag_error(timestamps, y_true, predictions_plot, threshold=threshold_value)
-    print(f"Threshold lag error: {t_lag:.4f} minutes")
-    print(f"Shift lag error: {s_lag:.4f} minutes")
-    print(f"Average lag error: {avg_lag:.4f} minutes")
+    print(f"Threshold lag error: {t_lag:.2f} minutes")
+    print(f"Shift lag error: {s_lag:.2f} minutes")
+    print(f"Average lag error: {avg_lag:.2f} minutes")
     # mae_loss = mean_absolute_error(y_true, p_t_log) # simple model
     print(f"Mean Absolute Error (MAE) on the cme_files: {mae_loss}")
 
@@ -1302,7 +1302,7 @@ def plot_and_evaluate_sep_event(
     plt.xlabel('Timestamp')
     plt.ylabel('Ln Flux lnIntensity')
     # plt.yscale('log')  # Set y-axis to logarithmic scale
-    plt.title(f'{title} - SEP Event {event_id} - MAE: {mae_loss:.4f} - Lag: {avg_lag:.4f} minutes')
+    plt.title(f'{title} - SEP Event {event_id} - MAE: {mae_loss:.4f} - Lag: {s_lag:.2f} minutes')
 
     # Extract handles and labels for the plot's elements
     handles, labels = plt.gca().get_legend_handles_labels()
@@ -1314,7 +1314,7 @@ def plot_and_evaluate_sep_event(
     plt.legend(handles=handles, labels=labels)
 
     # Save the plot to a file with the MAE in the file name
-    file_name = f'{title}_SEP_Event_{event_id}_{prefix}_MAE_{mae_loss:.4f}_Lag_{avg_lag:.4f}.png'
+    file_name = f'{title}_SEP_Event_{event_id}_{prefix}_MAE_{mae_loss:.4f}_Lag_{s_lag:.2f}.png'
     plt.savefig(file_name)
 
     # plt.show()
@@ -2060,8 +2060,6 @@ def evaluate_lag_error(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_
     # Part 2: shift lag
     # Calculate shift lag
     shift_lag = find_shift_lag(timestamps, actual_ts, predicted_ts)
-    print(f"Shift Lag: {shift_lag} minutes")
-
     # average lag
     avg_lag = (threshold_lag + shift_lag) / 2
 
