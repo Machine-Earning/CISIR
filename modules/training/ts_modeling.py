@@ -2102,7 +2102,8 @@ def evaluate_lag_error(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_
 
     # Part 2: shift lag
     # Calculate shift lag
-    shift_lag = find_shift_lag(timestamps, actual_ts, predicted_ts)
+    # shift_lag = find_shift_lag(timestamps, actual_ts, predicted_ts)
+    shift_lag = find_shift_lag_with_correlation(timestamps, actual_ts, predicted_ts)
     # average lag
     avg_lag = (threshold_lag + shift_lag) / 2
 
