@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/../../../Make-Print-Dev/crawlers/.idea/crawlers.iml" filepath="$PROJECT_DIR$/../../../Make-Print-Dev/crawlers/.idea/crawlers.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/keras-functional-api.iml" filepath="$PROJECT_DIR$/.idea/keras-functional-api.iml" />
     </modules>
   </component>

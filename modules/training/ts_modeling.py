@@ -2,7 +2,7 @@ import os
 import random
 import traceback
 from collections import Counter
-from typing import Tuple, List, Optional
+from typing import Tuple, List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -1259,7 +1259,12 @@ def plot_and_evaluate_sep_event(
     else:
         predictions_plot = predictions.flatten()
 
+    threshold_value = 0.4535
     mae_loss = mean_absolute_error(y_true, predictions_plot)
+    t_lag, s_lag, avg_lag = evaluate_lag_error(timestamps, y_true, predictions_plot, threshold=threshold_value)
+    print(f"Threshold lag error: {t_lag:.2f} minutes")
+    print(f"Shift lag error: {s_lag:.2f} minutes")
+    print(f"Average lag error: {avg_lag:.2f} minutes")
     # mae_loss = mean_absolute_error(y_true, p_t_log) # simple model
     print(f"Mean Absolute Error (MAE) on the cme_files: {mae_loss}")
 
@@ -1280,7 +1285,7 @@ def plot_and_evaluate_sep_event(
         plt.scatter(timestamps, actual_changes, color='gray', label='Actual Changes', alpha=0.5, s=ssz)
         plt.scatter(timestamps, predicted_changes, color='purple', label='Predicted Changes', alpha=0.5, s=ssz)
     # Add a black horizontal line at log(0.05) on the y-axis and create a handle for the legend
-    threshold_value = 0.4535
+
     plt.axhline(y=threshold_value, color='black', linestyle='--', linewidth=lw, label='Threshold')
 
     # Create a custom legend handle for the CME start times
@@ -1297,7 +1302,7 @@ def plot_and_evaluate_sep_event(
     plt.xlabel('Timestamp')
     plt.ylabel('Ln Flux lnIntensity')
     # plt.yscale('log')  # Set y-axis to logarithmic scale
-    plt.title(f'{title} - SEP Event {event_id} - MAE: {mae_loss:.4f}')
+    plt.title(f'{title} - SEP Event {event_id} - MAE: {mae_loss:.4f} - Lag: {s_lag:.2f} minutes')
 
     # Extract handles and labels for the plot's elements
     handles, labels = plt.gca().get_legend_handles_labels()
@@ -1309,7 +1314,7 @@ def plot_and_evaluate_sep_event(
     plt.legend(handles=handles, labels=labels)
 
     # Save the plot to a file with the MAE in the file name
-    file_name = f'{title}_SEP_Event_{event_id}_{prefix}_MAE_{mae_loss:.4f}.png'
+    file_name = f'{title}_SEP_Event_{event_id}_{prefix}_MAE_{mae_loss:.4f}_Lag_{s_lag:.2f}.png'
     plt.savefig(file_name)
 
     # plt.show()
@@ -1943,17 +1948,119 @@ def prepare_rnn_inputs(data: np.ndarray,
         return tuple(rnn_inputs)
 
 
-def evaluate_lag_error(actual_ts: np.ndarray, predicted_ts: np.ndarray, threshold: Optional[float] = None):
+def find_threshold_crossing_indices(values: np.ndarray, threshold: float) -> np.ndarray:
     """
-    Evaluates the lag error between the actual and predicted time series data.
+    Find indices where values cross the threshold.
 
     Parameters:
-    - actual_ts (np.ndarray): The actual time series data.
-    - predicted_ts (np.ndarray): The predicted time series data.
-    - threshold (float, optional): The sep intensity threshold
+    - values (np.ndarray): The time series data.
+    - threshold (float): The threshold to check for crossings.
 
     Returns:
-    - Tuple: A tuple containing the lag error and the threshold lag error
+    - np.ndarray: Indices where the values cross the threshold from below.
     """
-    # Calculate the lag error
-    pass
+    # Identify where values cross the threshold from below
+    crossings = np.where((values[:-1] < threshold) & (values[1:] >= threshold))[0]
+    return crossings + 1  # +1 to correct for the shift due to diff
+
+
+def find_shift_lag(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_ts: np.ndarray) -> float:
+    """
+    Find the shift lag by calculating the MAE for various shifts of predicted data.
+
+    Parameters:
+    - timestamps (np.ndarray): Timestamps for the time series data.
+    - actual_ts (np.ndarray): The actual time series data.
+    - predicted_ts (np.ndarray): The predicted time series data.
+
+    Returns:
+    - float: The shift lag in minutes for the best alignment of predicted data to actual data.
+    """
+    min_mae = float('inf')
+    best_shift = 0
+    time_interval = (timestamps[1] - timestamps[0]) / np.timedelta64(1, 'm')  # assuming uniform spacing
+
+    # Only consider shifts up to a reasonable limit to avoid overfitting to noise
+    max_shifts = min(len(actual_ts), 60)  # For example, limit to 60 shifts (5 hours if data is 5-minute intervals)
+
+    for shift in range(max_shifts):
+        # Shift predicted_ts to the left by 'shift' indices
+        shifted_predicted_ts = np.roll(predicted_ts, -shift)
+        # Calculate MAE for the shifted predicted data against actual data
+        mae = np.mean(np.abs(actual_ts[:-shift] - shifted_predicted_ts[:-shift])) if shift != 0 else np.mean(
+            np.abs(actual_ts - shifted_predicted_ts))
+        # Update minimum MAE and best shift if current MAE is lower
+        if mae < min_mae:
+            min_mae = mae
+            best_shift = shift
+
+    # Convert the best shift to minutes
+    shift_lag = best_shift * time_interval
+    return shift_lag
+
+
+def evaluate_lag_error(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_ts: np.ndarray,
+                       threshold: float) -> Tuple[float, float, float]:
+    """
+    Evaluates the lag error for threshold crossings and the shift lag for the best alignment of predicted data to actual
+    data. Also computes the average lag for the threshold crossings.
+
+
+    Parameters:
+    - timestamps (np.ndarray): Timestamps for the time series data.
+    - actual_ts (np.ndarray): The actual time series data.
+    - predicted_ts (np.ndarray): The predicted time series data.
+    - threshold (float): The threshold for identifying significant events in the time series.
+
+    Returns:
+    - float: The lag error in minutes for the threshold crossings.
+    - float: The shift lag in minutes for the best alignment of predicted data to actual data.
+    - float: The average lag in minutes for the threshold crossings.
+    """
+
+    # Part 1: threshold lag
+    global threshold_lag, shift_lag, avg_lag
+    # Convert pandas.Series to numpy.ndarray if necessary
+    if isinstance(timestamps, pd.Series):
+        timestamps = timestamps.to_numpy()
+    if isinstance(actual_ts, pd.Series):
+        actual_ts = actual_ts.to_numpy()
+    if isinstance(predicted_ts, pd.Series):
+        predicted_ts = predicted_ts.to_numpy()
+
+    # print(f"Timestamps: {timestamps}, of type {type(timestamps)}")
+    # print(f"Actual TS: {actual_ts}, of type {type(actual_ts)}")
+    # print(f"Predicted TS: {predicted_ts}, of type {type(predicted_ts)}")
+    print(f"Threshold: {threshold}")
+    # Find threshold crossings in actual and predicted time series
+    actual_crossings = find_threshold_crossing_indices(actual_ts, threshold)
+    predicted_crossings = find_threshold_crossing_indices(predicted_ts, threshold)
+
+    print(f"Actual Crossings: {actual_crossings}, of type {type(actual_crossings)}")
+    print(f"Predicted Crossings: {predicted_crossings}, of type {type(predicted_crossings)}")
+
+    # Ensure there is at least one crossing in both actual and predicted to compute lag
+    if len(actual_crossings) == 0 or len(predicted_crossings) == 0:
+        if len(actual_crossings) == 0:
+            print("No crossings found in actual time series.")
+        if len(predicted_crossings) == 0:
+            print("No crossings found in predicted time series.")
+
+        threshold_lag = np.nan
+
+    # Compute the lag for the first crossing as an example
+    # More sophisticated logic can be applied to handle multiple crossings
+    first_actual_crossing_time = timestamps[actual_crossings[0]]
+    first_predicted_crossing_time = timestamps[predicted_crossings[0]]
+    threshold_lag = first_predicted_crossing_time - first_actual_crossing_time
+
+    # convert lag from nanoseconds to minutes
+    threshold_lag = threshold_lag / np.timedelta64(1, 'm')
+
+    # Part 2: shift lag
+    # Calculate shift lag
+    shift_lag = find_shift_lag(timestamps, actual_ts, predicted_ts)
+    # average lag
+    avg_lag = (threshold_lag + shift_lag) / 2
+
+    return threshold_lag, shift_lag, avg_lag
