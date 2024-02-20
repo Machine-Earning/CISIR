@@ -2008,7 +2008,6 @@ def find_shift_lag(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_ts: 
     return shift_lag
 
 
-
 def evaluate_lag_error(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_ts: np.ndarray,
                        threshold: float) -> Tuple[float, float, float]:
     """
