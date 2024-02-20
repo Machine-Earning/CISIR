@@ -6,6 +6,7 @@ import wandb
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
+import tensorflow as tf
 
 from modules.training.ts_modeling import (
     build_dataset,
@@ -40,12 +41,16 @@ def main():
             experiment_name = f'{title}_{current_time}'
 
             # Set the early stopping patience and learning rate as variables
-            patience = 150
-            learning_rate = 1e-6  # og learning rate
-            weight_decay = 1e-8  # higher weight decay
+            patience = 1000 # higher patience
+            learning_rate = 3e-5  # og learning rate
+            weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 8192
+            batch_size = 256
             epochs = 100000
+            hiddens = [100, 100, 50]
+            hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
+
+
 
             # Initialize wandb
             wandb.init(project="mlp-ts-target-change", name=experiment_name, config={
@@ -56,8 +61,14 @@ def main():
                 "weight_decay": weight_decay,
                 "momentum_beta1": momentum_beta1,
                 "batch_size": batch_size,
-                "epochs": epochs
+                "epochs": epochs,
+                # hidden in a more readable format  (wandb does not support lists)
+                "hiddens": hiddens_str
             })
+
+            def exp_mse(y_true, y_pred):
+                mse = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)
+                return tf.exp(mse)
 
             target_change = True
 
@@ -112,7 +123,7 @@ def main():
             mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
                                                   weight_decay=weight_decay,
                                                   beta_1=momentum_beta1),
-                                  loss={'forecast_head': 'mse'})
+                                  loss={'forecast_head': exp_mse})
 
             # Train the model with the callback
             history = mlp_model_sep.fit(X_subtrain,
@@ -139,7 +150,7 @@ def main():
             final_mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
                                                         weight_decay=weight_decay,
                                                         beta_1=momentum_beta1),
-                                        loss={'forecast_head': 'mse'})  # Compile the model just like before
+                                        loss={'forecast_head': exp_mse})  # Compile the model just like before
             # Train on the full dataset
             final_mlp_model_sep.fit(X_train, {'forecast_head': y_train}, epochs=optimal_epochs, batch_size=batch_size,
                                     verbose=1)
