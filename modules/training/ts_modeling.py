@@ -2090,15 +2090,14 @@ def evaluate_lag_error(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_
             print("No crossings found in predicted time series.")
 
         threshold_lag = np.nan
-
-    # Compute the lag for the first crossing as an example
-    # More sophisticated logic can be applied to handle multiple crossings
-    first_actual_crossing_time = timestamps[actual_crossings[0]]
-    first_predicted_crossing_time = timestamps[predicted_crossings[0]]
-    threshold_lag = first_predicted_crossing_time - first_actual_crossing_time
-
-    # convert lag from nanoseconds to minutes
-    threshold_lag = threshold_lag / np.timedelta64(1, 'm')
+    else:
+        # Compute the lag for the first crossing as an example
+        # More sophisticated logic can be applied to handle multiple crossings
+        first_actual_crossing_time = timestamps[actual_crossings[0]]
+        first_predicted_crossing_time = timestamps[predicted_crossings[0]]
+        threshold_lag = first_predicted_crossing_time - first_actual_crossing_time
+        # convert lag from nanoseconds to minutes
+        threshold_lag = threshold_lag / np.timedelta64(1, 'm')
 
     # Part 2: shift lag
     # Calculate shift lag
