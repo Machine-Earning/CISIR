@@ -42,15 +42,15 @@ def main():
             experiment_name = f'{title}_{current_time}'
 
             # Set the early stopping patience and learning rate as variables
-            patience = 1000  # higher patience
-            learning_rate = 3e-4  # og learning rate
+            patience = 3000  # higher patience
+            learning_rate = 3e-5  # og learning rate
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 256
+            batch_size = 3
             epochs = 100000
             hiddens = [100, 100, 50]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-            loss_key = 'mse'
+            loss_key = 'exp_mse'
             target_change = True
             print_batch_mse_cb = PrintBatchMSE()
             symlog1p = True
