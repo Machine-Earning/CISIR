@@ -470,6 +470,86 @@ def create_hybrid_model(
     return model
 
 
+def build_univariate_dataset(
+        directory_path: str,
+        shuffle_data: bool = True,
+        apply_log: bool = True,
+        norm_target: bool = False,
+        inputs_to_use: List[str] = None,
+        input_to_return: str = 'p_t',
+        add_slope: bool = True,
+        target_change: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Reads SEP event files from the specified directory, processes them to extract
+    the specified input feature and target values, normalizes the values between 0 and 1
+    for the input of interest, excludes rows where proton intensity is -9999, and optionally
+    shuffles the data.
+
+     Parameters:
+        - directory_path (str): Path to the directory containing the sep_event_X files.
+        - shuffle_data (bool): If True, shuffle the data before returning.
+        - apply_log (bool): Whether to apply a logarithmic transformation before normalization.
+        - norm_target (bool): Whether to normalize the target data. False by default.
+        - inputs_to_use (List[str]): List of input types to include in the dataset. Not used in this modified function.
+        - input_to_return (str): The specific input feature to return.
+        - add_slope (bool): If True, adds slope features to the dataset. Not used in this modified function.
+        - target_change (bool): If True, the target is the change in proton intensity from t to t+6.
+
+    Returns:
+    - Tuple[np.ndarray, np.ndarray]: A tuple containing the normalized input data (X) and target data (y).
+    """
+
+    all_inputs = []
+    all_targets = []
+
+    target_column = 'Proton Intensity'
+
+    # Loop through each file in the directory
+    for file_name in os.listdir(directory_path):
+        if file_name.endswith('_ie.csv'):
+            file_path = os.path.join(directory_path, file_name)
+            data = pd.read_csv(file_path)
+
+            # Exclude rows where proton intensity is -9999
+            data = data[data[target_column] != -9999]
+
+            # Apply logarithmic transformation (if specified)
+            if apply_log:
+                data[input_to_return] = np.log(data[input_to_return] + 1)  # Adding 1 to avoid log(0)
+                data[target_column] = np.log(data[target_column] + 1)  # Adding 1 to avoid log(0)
+
+            # Normalize the specified input feature between 0 and 1
+            input_data = data[[input_to_return]]
+            input_data_normalized = (input_data - input_data.min()) / (input_data.max() - input_data.min())
+
+            # Normalize target data
+            target_data = data[[target_column]]
+            if norm_target:
+                target_data_normalized = (target_data - target_data.min()) / (target_data.max() - target_data.min())
+            else:
+                target_data_normalized = target_data
+
+            # Reshape inputs to be in the format [samples, features]
+            X = input_data_normalized.values
+
+            # Flatten targets to 1D array
+            y = target_data_normalized.values.flatten()
+
+            # Append to list
+            all_inputs.append(X)
+            all_targets.append(y)
+
+    # Combine all input and target data
+    X_combined = np.vstack(all_inputs)
+    y_combined = np.concatenate(all_targets)
+
+    # Shuffle the data if the flag is True
+    if shuffle_data:
+        X_combined, y_combined = shuffle(X_combined, y_combined, random_state=seed_value)
+
+    return X_combined, y_combined
+
+
 def build_dataset(
         directory_path: str,
         shuffle_data: bool = True,
@@ -618,6 +698,41 @@ def build_dataset(
         X_combined, y_combined = shuffle(X_combined, y_combined, random_state=seed_value)
 
     return X_combined, y_combined
+
+
+def generate_feature_names(inputs_to_use: List[str], add_slope: bool) -> List[str]:
+    """
+    Generates a list of feature names based on specified input types and whether slope features should be added.
+
+    This function dynamically creates feature names for time-lagged inputs and optionally for slope features,
+    given a list of input types (e.g., ['e0.5', 'e1.8', 'p']). For each input type, it generates names for features
+    representing lagged values up to 24 hours prior ('tminus24' to 't') and, if requested, adds a name for the slope
+    feature associated with each input type.
+
+    Parameters:
+    - inputs_to_use (List[str]): A list of strings representing the input types for which features should be generated.
+    - add_slope (bool): A flag indicating whether to include slope features for each input type in the output list.
+
+    Returns:
+    - List[str]: A list containing the generated feature names.
+
+    Example:
+    >>> generate_feature_names(['e0.5', 'p'], add_slope=True)
+    ['e0.5_tminus24', 'e0.5_tminus23', ..., 'e0.5_t', 'e0.5_slope', 'p_tminus24', ..., 'p_t', 'p_slope']
+    """
+    feature_names = []  # Initialize the list to store generated feature names
+
+    # Loop through each input type specified in inputs_to_use
+    for input_type in inputs_to_use:
+        # Generate feature names for lagged inputs from tminus24 to t
+        feature_names += [f'{input_type}_tminus{i}' for i in range(24, 0, -1)] + [f'{input_type}_t']
+
+        # If add_slope is True, add a slope feature name for the current input type
+        if add_slope:
+            feature_names.append(f'{input_type}_slope')
+
+    # Return the list of generated feature names
+    return feature_names
 
 
 def generate_slope_column_names(inputs_to_use: List[str], padding: bool = False) -> List[str]:
@@ -2135,3 +2250,46 @@ class PrintBatchMSE(Callback):
             # Print batch MSE
             batch_mse = logs.get('loss')
             print(f"Batch {batch + 1}, MSE: {batch_mse:.4f}")
+
+
+def sym_log1p(x: np.ndarray) -> np.ndarray:
+    """
+    Applies a symmetric logarithmic transformation to a given input array or scalar.
+
+    The transformation is defined as:
+    - For x > 0: log(x + 1)
+    - For x < 0: log(-x + 1)
+    - For x = 0: 0
+
+    This function is vectorized and can handle inputs as either scalars or np.ndarray.
+
+    Parameters:
+    - x (np.ndarray or scalar): The input array or scalar to transform.
+
+    Returns:
+    - np.ndarray or scalar: The transformed array or scalar.
+    """
+    # Apply transformation symmetrically for positive and negative values of x
+    return np.where(x > 0, np.log(x + 1), np.log(np.abs(x) + 1) * np.sign(x))
+
+
+def inverse_sym_log1p(y: np.ndarray) -> np.ndarray:
+    """
+    Reverses the symmetric logarithmic transformation applied by the sym_log1p function
+    to a given input array or scalar.
+
+    The inverse transformation is defined as:
+    - For y derived from y >= 0: exp(y) - 1
+    - For y derived from x < 0: -(exp(y) - 1)
+
+    This function is vectorized and can handle inputs as either scalars or np.ndarray.
+
+    Parameters:
+    - y (np.ndarray or scalar): The transformed array or scalar to reverse.
+
+    Returns:
+    - np.ndarray or scalar: The original array or scalar before the symmetric logarithmic transformation.
+    """
+    # Reverse the transformation
+    return np.where(y >= 0, np.exp(y) - 1, -np.exp(y) + 1)
+
