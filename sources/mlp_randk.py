@@ -6,7 +6,7 @@ from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
 import tensorflow as tf
-from modules.dataload.ts_modeling import build_dataset, create_mlp, evaluate_model, process_sep_events
+from modules.training.ts_modeling import build_dataset, create_mlp, evaluate_model, process_sep_events
 
 
 def main():

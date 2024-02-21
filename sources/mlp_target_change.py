@@ -68,7 +68,8 @@ def main():
                 "hiddens": hiddens_str,
                 "loss": loss_key,
                 "target_change": target_change,
-                "printing_batch_mse": True if print_batch_mse_cb else False
+                "printing_batch_mse": True if print_batch_mse_cb else False,
+                "seed": 42
             })
 
             # set the root directory
