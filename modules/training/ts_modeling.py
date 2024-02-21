@@ -557,7 +557,8 @@ def build_dataset(
         norm_target: bool = False,
         inputs_to_use: List[str] = None,
         add_slope: bool = True,
-        target_change: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+        target_change: bool = False,
+        symlog1p: bool = False) -> Tuple[np.ndarray, np.ndarray]:
     """
     Reads SEP event files from the specified directory, processes them to extract
     input and target cme_files, normalizes the values between 0 and 1 for the columns
@@ -572,6 +573,7 @@ def build_dataset(
         - add_slope (bool): If True, adds slope features to the dataset.
         - target_change (bool): If True, the target is the change in proton intensity from t to t+6. requires 'p' in
         inputs to use
+        - symlog1p (bool): If True, the target data will be transformed using symlog1p.
 
 
 
@@ -688,6 +690,9 @@ def build_dataset(
     # Combine all input and target cme_files
     X_combined = np.vstack(all_inputs)
     y_combined = np.concatenate(all_targets)
+
+    if symlog1p:
+        y_combined = sym_log1p(y_combined)
 
     # print shape of X_combined and y_combined
     print(X_combined.shape)
@@ -1259,6 +1264,7 @@ def plot_and_evaluate_sep_event(
         inputs_to_use: List[str] = None,
         add_slope: bool = True,
         target_change: bool = False,
+        symlog1p: bool = False,
         show_persistent: bool = True,
         show_changes: bool = True,
         prefix: str = 'testing') -> [float, str]:
@@ -1281,6 +1287,7 @@ def plot_and_evaluate_sep_event(
     - inputs_to_use (List[str]): The list of input types to use. Default is None.
     - add_slope (bool): Whether to add slope features. Default is True.
     - target_change (bool): Whether to use target change. Default is False.
+    - symlog1p (bool): Whether to use inverse symlog1p for the predictions. Default is False.
     - show_persistent (bool): Whether to show the persistent model where the delta = 0. Default is True.
     - show_changes (bool): Whether to show the scatter plot of target changes vs predicted changes. Default is True.
     - prefix (bool): Whether to add the prefix 'SEP Event' to the title. Default is True.
@@ -1366,6 +1373,9 @@ def plot_and_evaluate_sep_event(
 
     # Evaluate the model
     _, predictions = model.predict(X_reshaped)
+
+    if symlog1p:
+        predictions = inverse_sym_log1p(predictions)
 
     # if target change then we need to convert prediction into actual value
     if 'p' in inputs_to_use and target_change:
@@ -1457,7 +1467,8 @@ def plot_avsp_delta(
         title: str = None,
         inputs_to_use: List[str] = None,
         add_slope: bool = True,
-        target_change: bool = False
+        target_change: bool = False,
+        symlog1p: bool = False,
 ) -> [float, str]:
     """
     Plots theactual delta (x) vs predicted delta (y) with a diagonal dotted line indicating perfect prediction.
@@ -1478,6 +1489,7 @@ def plot_avsp_delta(
     - inputs_to_use (List[str]): The list of input types to use. Default is None.
     - add_slope (bool): Whether to add slope features. Default is True.
     - target_change (bool): Whether to use target change. Default is False.
+    - symlog1p (bool): Whether to use inverse symlog1p for the predictions. Default is False.
 
     Returns:
     - Tuple[float, str]: A tuple containing the MAE loss and the plot title.
@@ -1553,6 +1565,9 @@ def plot_avsp_delta(
     # Evaluate the model
     _, predictions = model.predict(X_reshaped)
 
+    if symlog1p:
+        predictions = inverse_sym_log1p(predictions)
+
     # if target change then we need to convert prediction into actual value
     if 'p' in inputs_to_use and target_change:
         actual_changes = y_true - p_t_log  # offset by 1
@@ -1574,6 +1589,7 @@ def process_sep_events(
         cme_speed_threshold: float = 0,
         target_change: bool = False,
         show_avsp: bool = False,
+        symlog1p: bool = False,
         prefix: str = 'testing') -> List[str]:
     """
     Processes SEP event files in the specified directory, normalizes flux intensities, predicts proton intensities,
@@ -1590,6 +1606,7 @@ def process_sep_events(
     - cme_speed_threshold (float): The threshold for CME speed. CMEs with speeds below this threshold will be excluded.
     - target_change (bool): Whether to use the target change approach. Default is False.
     - show_avsp (bool): Whether to show the Actual vs Predicted delta plot. Default is False.
+    - symlog1p (bool): Whether to apply inverse sym_log1p to model predictions
     - prefix (str): The prefix to use for the plot file names. Default is 'testing'.
 
     Returns:
@@ -1657,6 +1674,7 @@ def process_sep_events(
                     model_type=model_type, title=title,
                     inputs_to_use=inputs_to_use, add_slope=add_slope,
                     target_change=target_change,
+                    symlog1p=symlog1p,
                     prefix=prefix)
 
                 print(f"Processed file: {file_name} with MAE: {mae_loss}")
@@ -1668,7 +1686,7 @@ def process_sep_events(
                         input_columns, target_column, using_cme=using_cme,
                         model_type=model_type, title=title,
                         inputs_to_use=inputs_to_use, add_slope=add_slope,
-                        target_change=target_change)
+                        target_change=target_change, symlog1p=symlog1p)
 
                     avsp_data.append((event_id, actual_ch, predicted_ch))
             except Exception as e:
@@ -1817,7 +1835,8 @@ def plot_sample_with_cme(data: np.ndarray, cme_start_index: int, cme_features_na
 def evaluate_model(
         model: tf.keras.Model,
         X_test: np.ndarray or List[np.ndarray],
-        y_test: np.ndarray) -> float:
+        y_test: np.ndarray,
+        symlog1p: bool = False) -> float:
     """
     Evaluates a given model using Mean Absolute Error (MAE) on the provided test cme_files.
 
@@ -1825,12 +1844,17 @@ def evaluate_model(
     - model (tf.keras.Model): The trained model to evaluate.
     - X_test (np.ndarray): Test features.
     - y_test (np.ndarray): True target values for the test set.
+    - symlog1p (bool): Whether to apply inverse symlog1p transformation to predictions. Default is False.
 
     Returns:
     - float: The MAE loss of the model on the test cme_files.
     """
     # Make predictions
     _, predictions = model.predict(X_test)
+
+    if symlog1p:
+        # Apply inverse symlog1p transformation to the target value
+        predictions = inverse_sym_log1p(predictions)
 
     # Calculate MAE
     mae_loss = mean_absolute_error(y_test, predictions)
@@ -2292,4 +2316,3 @@ def inverse_sym_log1p(y: np.ndarray) -> np.ndarray:
     """
     # Reverse the transformation
     return np.where(y >= 0, np.exp(y) - 1, -np.exp(y) + 1)
-

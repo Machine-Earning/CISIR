@@ -43,16 +43,17 @@ def main():
 
             # Set the early stopping patience and learning rate as variables
             patience = 1000  # higher patience
-            learning_rate = 3e-5  # og learning rate
+            learning_rate = 3e-4  # og learning rate
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 2
+            batch_size = 256
             epochs = 100000
             hiddens = [100, 100, 50]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
             loss_key = 'mse'
             target_change = True
             print_batch_mse_cb = PrintBatchMSE()
+            symlog1p = True
 
             # Initialize wandb
             wandb.init(project="mlp-ts-target-change", name=experiment_name, config={
@@ -69,7 +70,8 @@ def main():
                 "loss": loss_key,
                 "target_change": target_change,
                 "printing_batch_mse": True if print_batch_mse_cb else False,
-                "seed": 42
+                "seed": 42,
+                "symlog1p": symlog1p,
             })
 
             # set the root directory
@@ -78,11 +80,13 @@ def main():
             X_train, y_train = build_dataset(root_dir + '/training',
                                              inputs_to_use=inputs_to_use,
                                              add_slope=add_slope,
-                                             target_change=target_change)
+                                             target_change=target_change,
+                                             symlog1p=symlog1p)
             X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining',
                                                    inputs_to_use=inputs_to_use,
                                                    add_slope=add_slope,
-                                                   target_change=target_change)
+                                                   target_change=target_change,
+                                                   symlog1p=symlog1p)
             X_test, y_test = build_dataset(root_dir + '/testing',
                                            inputs_to_use=inputs_to_use,
                                            add_slope=add_slope,
@@ -90,7 +94,8 @@ def main():
             X_val, y_val = build_dataset(root_dir + '/validation',
                                          inputs_to_use=inputs_to_use,
                                          add_slope=add_slope,
-                                         target_change=target_change)
+                                         target_change=target_change,
+                                         symlog1p=symlog1p)
 
             # print all cme_files shapes
             print(f'X_train.shape: {X_train.shape}')
@@ -160,7 +165,7 @@ def main():
                 verbose=1)
 
             # evaluate the model on test cme_files
-            error_mae = evaluate_model(final_mlp_model_sep, X_test, y_test)
+            error_mae = evaluate_model(final_mlp_model_sep, X_test, y_test, symlog1p=True)
             print(f'mae error: {error_mae}')
             # Log the MAE error to wandb
             wandb.log({"mae_error": error_mae})
@@ -175,6 +180,7 @@ def main():
                 inputs_to_use=inputs_to_use,
                 add_slope=add_slope,
                 target_change=target_change,
+                symlog1p=True,
                 show_avsp=True)
 
             # Log the plot to wandb
@@ -192,6 +198,7 @@ def main():
                 inputs_to_use=inputs_to_use,
                 add_slope=add_slope,
                 target_change=target_change,
+                symlog1p=True,
                 show_avsp=True,
                 prefix='training')
 
