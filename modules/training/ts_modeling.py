@@ -2316,3 +2316,29 @@ def inverse_sym_log1p(y: np.ndarray) -> np.ndarray:
     """
     # Reverse the transformation
     return np.where(y >= 0, np.exp(y) - 1, -np.exp(y) + 1)
+
+
+def compute_sample_weights(y_train, num_bins=100):
+    """
+    Compute sample weights based on the frequency of target values.
+
+    Parameters:
+    - y_train: np.ndarray, the training target values.
+    - num_bins: int, the number of bins to use for histogram.
+
+    Returns:
+    - weights: np.ndarray, the computed weights for each sample in y_train.
+    """
+    # Compute histogram
+    hist, bin_edges = np.histogram(y_train, bins=num_bins)
+
+    # Compute bin indexes for each sample
+    bin_indexes = np.digitize(y_train, bin_edges[:-1], right=True)
+
+    # Compute weights as inverse frequency
+    weights = 1.0 / hist[bin_indexes - 1]  # Subtract 1 because bins are 1-indexed in digitize
+
+    # Normalize weights to make the least frequent class have a weight of 1
+    weights /= weights.min()
+
+    return weights
