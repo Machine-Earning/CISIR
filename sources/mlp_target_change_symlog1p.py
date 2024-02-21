@@ -165,7 +165,7 @@ def main():
                 verbose=1)
 
             # evaluate the model on test cme_files
-            error_mae = evaluate_model(final_mlp_model_sep, X_test, y_test, symlog1p=True)
+            error_mae = evaluate_model(final_mlp_model_sep, X_test, y_test, symlog1p=symlog1p)
             print(f'mae error: {error_mae}')
             # Log the MAE error to wandb
             wandb.log({"mae_error": error_mae})
@@ -180,7 +180,7 @@ def main():
                 inputs_to_use=inputs_to_use,
                 add_slope=add_slope,
                 target_change=target_change,
-                symlog1p=True,
+                symlog1p=symlog1p,
                 show_avsp=True)
 
             # Log the plot to wandb
@@ -198,7 +198,7 @@ def main():
                 inputs_to_use=inputs_to_use,
                 add_slope=add_slope,
                 target_change=target_change,
-                symlog1p=True,
+                symlog1p=symlog1p,
                 show_avsp=True,
                 prefix='training')
 
