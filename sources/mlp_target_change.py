@@ -6,13 +6,14 @@ import wandb
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
-import tensorflow as tf
 
 from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
     evaluate_model,
-    process_sep_events)
+    process_sep_events,
+    get_loss,
+    PrintBatchMSE)
 
 
 def main():
@@ -41,7 +42,7 @@ def main():
             experiment_name = f'{title}_{current_time}'
 
             # Set the early stopping patience and learning rate as variables
-            patience = 1000 # higher patience
+            patience = 1000  # higher patience
             learning_rate = 3e-5  # og learning rate
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
@@ -49,8 +50,9 @@ def main():
             epochs = 100000
             hiddens = [100, 100, 50]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-
-
+            loss_key = 'mse'
+            target_change = True
+            print_batch_mse_cb = PrintBatchMSE()
 
             # Initialize wandb
             wandb.init(project="mlp-ts-target-change", name=experiment_name, config={
@@ -64,14 +66,10 @@ def main():
                 "epochs": epochs,
                 # hidden in a more readable format  (wandb does not support lists)
                 "hiddens": hiddens_str,
-                "loss": "exp_mse",
+                "loss": loss_key,
+                "target_change": target_change,
+                "printing_batch_mse": True if print_batch_mse_cb else False
             })
-
-            def exp_mse(y_true, y_pred):
-                mse = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)
-                return tf.exp(mse) - 1
-
-            target_change = True
 
             # set the root directory
             root_dir = 'data/electron_cme_data_split'
@@ -110,28 +108,27 @@ def main():
             # get the number of features
             n_features = X_train.shape[1]
             print(f'n_features: {n_features}')
-            hiddens = [100, 100, 50]
 
             # create the model
             mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens)
             mlp_model_sep.summary()
 
             # Define the EarlyStopping callback
-            early_stopping = EarlyStopping(monitor='val_forecast_head_loss', patience=patience, verbose=1,
+            early_stopping = EarlyStopping(monitor='val_loss', patience=patience, verbose=1,
                                            restore_best_weights=True)
 
             # Compile the model with the specified learning rate
             mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
                                                   weight_decay=weight_decay,
                                                   beta_1=momentum_beta1),
-                                  loss={'forecast_head': exp_mse})
+                                  loss={'forecast_head': get_loss(loss_key)})
 
             # Train the model with the callback
             history = mlp_model_sep.fit(X_subtrain,
                                         {'forecast_head': y_subtrain},
                                         epochs=epochs, batch_size=batch_size,
                                         validation_data=(X_val, {'forecast_head': y_val}),
-                                        callbacks=[early_stopping, WandbCallback()])
+                                        callbacks=[early_stopping, WandbCallback(), print_batch_mse_cb])
 
             # Plot the training and validation loss
             plt.figure(figsize=(12, 6))
@@ -148,13 +145,18 @@ def main():
             optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
             final_mlp_model_sep = create_mlp(input_dim=n_features,
                                              hiddens=hiddens)  # Recreate the model architecture
-            final_mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
-                                                        weight_decay=weight_decay,
-                                                        beta_1=momentum_beta1),
-                                        loss={'forecast_head': exp_mse})  # Compile the model just like before
+            final_mlp_model_sep.compile(
+                optimizer=AdamW(learning_rate=learning_rate,
+                                weight_decay=weight_decay,
+                                beta_1=momentum_beta1),
+                loss={'forecast_head': get_loss(loss_key)})  # Compile the model just like before
             # Train on the full dataset
-            final_mlp_model_sep.fit(X_train, {'forecast_head': y_train}, epochs=optimal_epochs, batch_size=batch_size,
-                                    verbose=1)
+            final_mlp_model_sep.fit(
+                X_train,
+                {'forecast_head': y_train},
+                epochs=optimal_epochs,
+                batch_size=batch_size,
+                verbose=1)
 
             # evaluate the model on test cme_files
             error_mae = evaluate_model(final_mlp_model_sep, X_test, y_test)
@@ -177,7 +179,7 @@ def main():
             # Log the plot to wandb
             for filename in filenames:
                 log_title = os.path.basename(filename)
-                wandb.log({f'{log_title}': wandb.Image(filename)})
+                wandb.log({f'testing_{log_title}': wandb.Image(filename)})
 
             # Process SEP event files in the specified directory
             test_directory = root_dir + '/training'
@@ -195,7 +197,7 @@ def main():
             # Log the plot to wandb
             for filename in filenames:
                 log_title = os.path.basename(filename)
-                wandb.log({f'{log_title}': wandb.Image(filename)})
+                wandb.log({f'training_{log_title}': wandb.Image(filename)})
 
             # Finish the wandb run
             wandb.finish()

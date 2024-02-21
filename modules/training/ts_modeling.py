@@ -12,6 +12,7 @@ from matplotlib.lines import Line2D
 from scipy.signal import correlate, correlation_lags
 from sklearn.metrics import mean_absolute_error
 from sklearn.utils import shuffle
+from tensorflow.keras.callbacks import Callback
 from tensorflow.keras.layers import Input, Conv1D, Flatten, Dense, LeakyReLU, Concatenate, GRU
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
@@ -2047,7 +2048,7 @@ def evaluate_lag_error(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_
     """
     Evaluates the lag error for threshold crossings and the shift lag for the best alignment of predicted data to actual
     data. Also computes the average lag for the threshold crossings.
-
+    TODO: fix lag
 
     Parameters:
     - timestamps (np.ndarray): Timestamps for the time series data.
@@ -2107,3 +2108,30 @@ def evaluate_lag_error(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_
     avg_lag = (threshold_lag + shift_lag) / 2
 
     return threshold_lag, shift_lag, avg_lag
+
+
+def get_loss(loss_key: str = 'mse'):
+    """
+    given the key, return the appropiate loss function for the model
+
+    :param loss_key: key for the loss function
+    :return: loss string or function for Tensorflow compile loss
+    """
+
+    if loss_key == 'mse':
+        return 'mse'
+    elif loss_key == 'exp_mse':
+        def exp_mse(y_true, y_pred):
+            mse = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)
+            return tf.exp(mse) - 1
+
+        return exp_mse
+
+
+class PrintBatchMSE(Callback):
+    def on_batch_end(self, batch, logs=None):
+        # Check if logs dictionary is not None
+        if logs is not None:
+            # Print batch MSE
+            batch_mse = logs.get('loss')
+            print(f"Batch {batch + 1}, MSE: {batch_mse:.4f}")
