@@ -45,7 +45,7 @@ def main():
             learning_rate = 3e-5  # og learning rate
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 1024
+            batch_size = 1
             epochs = 100000
             hiddens = [100, 100, 50]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
@@ -63,12 +63,13 @@ def main():
                 "batch_size": batch_size,
                 "epochs": epochs,
                 # hidden in a more readable format  (wandb does not support lists)
-                "hiddens": hiddens_str
+                "hiddens": hiddens_str,
+                "loss": "exp_mse",
             })
 
             def exp_mse(y_true, y_pred):
                 mse = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)
-                return tf.exp(mse)
+                return tf.exp(mse) - 1
 
             target_change = True
 
