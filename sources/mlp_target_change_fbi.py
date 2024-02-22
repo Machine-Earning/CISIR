@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 
 import matplotlib.pyplot as plt
+import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow_addons.optimizers import AdamW
@@ -12,8 +13,7 @@ from modules.training.ts_modeling import (
     create_mlp,
     evaluate_model,
     process_sep_events,
-    get_loss,
-    PrintBatchMSE)
+    get_loss)
 
 
 def main():
@@ -42,8 +42,19 @@ def main():
             experiment_name = f'{title}_{current_time}'
 
             # Set the early stopping patience and learning rate as variables
-            patience = 1000  # higher patience
-            learning_rate = 3e-5  # og learning rate
+            patience = 3000  # higher patience
+            # learning_rate = 3e-5  # og learning rate
+            initial_learning_rate = 3e-3
+            final_learning_rate = 3e-7
+            learning_rate_decay_factor = (final_learning_rate / initial_learning_rate) ** (1 / 3000)
+            steps_per_epoch = int(20000 / 2)
+
+            learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
+                initial_learning_rate=initial_learning_rate,
+                decay_steps=steps_per_epoch,
+                decay_rate=learning_rate_decay_factor,
+                staircase=True)
+
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
             batch_size = 2
@@ -52,14 +63,14 @@ def main():
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
             loss_key = 'mse'
             target_change = True
-            print_batch_mse_cb = PrintBatchMSE()
+            # print_batch_mse_cb = PrintBatchMSE()
 
             # Initialize wandb
             wandb.init(project="mlp-ts-target-change", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
                 "patience": patience,
-                "learning_rate": learning_rate,
+                "learning_rate": "lr_decay_3e-3_3e-7",
                 "weight_decay": weight_decay,
                 "momentum_beta1": momentum_beta1,
                 "batch_size": batch_size,
@@ -68,7 +79,7 @@ def main():
                 "hiddens": hiddens_str,
                 "loss": loss_key,
                 "target_change": target_change,
-                "printing_batch_mse": True if print_batch_mse_cb else False,
+                "printing_batch_mse": False,
                 "seed": 42
             })
 
@@ -129,7 +140,7 @@ def main():
                                         {'forecast_head': y_subtrain},
                                         epochs=epochs, batch_size=batch_size,
                                         validation_data=(X_val, {'forecast_head': y_val}),
-                                        callbacks=[early_stopping, WandbCallback(), print_batch_mse_cb])
+                                        callbacks=[early_stopping, WandbCallback()])
 
             # Plot the training and validation loss
             plt.figure(figsize=(12, 6))
