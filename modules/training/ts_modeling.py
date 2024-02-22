@@ -2342,3 +2342,31 @@ def compute_sample_weights(y_train, num_bins=100):
     weights /= weights.min()
 
     return weights
+
+def build_dataset_from_numpy(x, y, batch_size, options=None):
+    """
+    Builds a tf.data.Dataset from NumPy arrays with optional sharding.
+
+    Args:
+        x (np.ndarray): Input features array.
+        y (np.ndarray): Labels array.
+        batch_size (int): Global batch size to be used for the dataset. This is the total batch size that gets
+                          divided across all replicas (workers/GPUs).
+        options (tf.data.Options, optional): Dataset options to apply. Use this to specify sharding and other
+                                             behaviors. Defaults to None, in which case the default options are used.
+
+    Returns:
+        tf.data.Dataset: A TensorFlow Dataset object ready for training or evaluation.
+    """
+    # Create a dataset from the input features and labels
+    dataset = tf.data.Dataset.from_tensor_slices((x, y))
+    # Shuffle the dataset with a buffer size equal to the length of the dataset
+    dataset = dataset.shuffle(buffer_size=len(x))
+    # Batch the dataset with the provided global batch size
+    dataset = dataset.batch(batch_size)
+
+    # If options are provided, apply them to the dataset
+    if options:
+        dataset = dataset.with_options(options)
+
+    return dataset

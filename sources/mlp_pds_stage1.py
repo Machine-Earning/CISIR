@@ -8,7 +8,7 @@ from wandb.keras import WandbCallback
 
 from modules.evaluate.utils import plot_tsne_pds
 from modules.training import cme_modeling
-from modules.training.ts_modeling import build_dataset, create_mlp
+from modules.training.ts_modeling import build_dataset, create_mlp, build_dataset_from_numpy
 
 # SEEDING
 SEED = 42  # seed number
@@ -35,6 +35,10 @@ def main():
     print("Number of devices: {}".format(strategy.num_replicas_in_sync))
     devices = tf.config.list_physical_devices('GPU')
     print(f'devices: {devices}')
+    # Define the dataset options, including the sharding policy
+    options = tf.data.Options()
+    options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.AUTO
+
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for add_slope in [False]:
             # PARAMS
@@ -43,8 +47,6 @@ def main():
             per_worker_batch_size = 1600
             bs = per_worker_batch_size * strategy.num_replicas_in_sync
             print(f'batch size : {bs}')
-
-
 
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
@@ -98,6 +100,10 @@ def main():
                                                    add_slope=add_slope)
             X_test, y_test = build_dataset(root_dir + '/testing', inputs_to_use=inputs_to_use, add_slope=add_slope)
             X_val, y_val = build_dataset(root_dir + '/validation', inputs_to_use=inputs_to_use, add_slope=add_slope)
+            # building the dataset from numpy
+            train_ds = build_dataset_from_numpy(X_train, y_train, bs, options)
+            subtrain_ds = build_dataset_from_numpy(X_subtrain, y_subtrain, bs, options)
+            val_ds = build_dataset_from_numpy(X_val, y_val, bs, options)
 
             # print all cme_files shapes
             print(f'X_train.shape: {X_train.shape}')
@@ -123,15 +129,14 @@ def main():
                 mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=pds)
                 mlp_model_sep.summary()
 
-                mb.train_pds(mlp_model_sep,
-                             X_subtrain, y_subtrain,
-                             X_val, y_val,
-                             X_train, y_train,
-                             learning_rate=Options['learning_rate'],
-                             epochs=Options['epochs'],
-                             batch_size=Options['batch_size'],
-                             patience=Options['patience'], save_tag=current_time + "_features",
-                             callbacks_list=[WandbCallback()])
+                mb.train_pds_distributed(mlp_model_sep,
+                                         subtrain_ds,
+                                         val_ds,
+                                         train_ds,
+                                         learning_rate=Options['learning_rate'],
+                                         epochs=Options['epochs'],
+                                         patience=Options['patience'], save_tag=current_time + "_features",
+                                         callbacks_list=[WandbCallback()])
 
             file_path = plot_tsne_pds(mlp_model_sep,
                                       X_train,
