@@ -286,7 +286,7 @@ class ModelBuilder:
         initial_weights = model.get_weights()
 
         # Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss)
 
         # First train the model with a validation set to determine the best epoch
         history = model.fit(X_subtrain, y_subtrain,
@@ -314,7 +314,7 @@ class ModelBuilder:
         # Reset model weights to initial state before retraining
         model.set_weights(initial_weights)
 
-        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
+        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss)
         model.fit(X_train, y_train,
                   epochs=best_epoch,
                   batch_size=batch_size if batch_size > 0 else len(y_train),
@@ -387,7 +387,7 @@ class ModelBuilder:
         callback_list = [early_stopping_cb, checkpoint_cb]
 
         # Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss)
 
         # First train the model with a validation set to determine the best epoch
         history = model.fit(X_subtrain, y_subtrain,
@@ -415,7 +415,7 @@ class ModelBuilder:
         # X_combined = np.concatenate((X_subtrain, X_val), axis=0)
         # y_combined = np.concatenate((y_subtrain, y_val), axis=0)
 
-        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
+        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss)
         model.fit(X_train, y_train,
                   epochs=best_epoch,
                   batch_size=batch_size if batch_size > 0 else len(y_train),
@@ -690,14 +690,14 @@ class ModelBuilder:
 
         for epoch in range(epochs):
             train_loss = self.train_for_one_epoch(
-                model, optimizer, self.repr_loss_dl,
+                model, optimizer, self.pds_loss_dl,
                 X_subtrain, y_subtrain,
                 batch_size=batch_size if batch_size > 0 else len(y_subtrain),
                 joint_weights=sample_joint_weights,
                 joint_weight_indices=sample_joint_weights_indices)
 
             val_loss = self.train_for_one_epoch(
-                model, optimizer, self.repr_loss_dl, X_val, y_val,
+                model, optimizer, self.pds_loss_dl, X_val, y_val,
                 batch_size=batch_size if batch_size > 0 else len(y_val),
                 joint_weights=val_sample_joint_weights,
                 joint_weight_indices=val_sample_joint_weights_indices, training=False)
@@ -741,7 +741,7 @@ class ModelBuilder:
         for epoch in range(best_epoch):
             retrain_loss = self.train_for_one_epoch(
                 model, optimizer,
-                self.repr_loss_dl,
+                self.pds_loss_dl,
                 X_train, y_train,
                 batch_size=batch_size if batch_size > 0 else len(y_train),
                 joint_weights=train_sample_joint_weights,
@@ -822,7 +822,7 @@ class ModelBuilder:
             batch_size = random.choice(batch_sizes)
             train_loss = self.train_for_one_epoch(
                 model, optimizer,
-                self.repr_loss_dl,
+                self.pds_loss_dl,
                 X_subtrain, y_subtrain,
                 batch_size=batch_size if batch_size > 0 else len(y_subtrain),
                 joint_weights=sample_joint_weights,
@@ -830,7 +830,7 @@ class ModelBuilder:
 
             val_loss = self.train_for_one_epoch(
                 model, optimizer,
-                self.repr_loss_dl,
+                self.pds_loss_dl,
                 X_val, y_val,
                 batch_size=batch_size if batch_size > 0 else len(y_val),
                 training=False,
@@ -877,7 +877,7 @@ class ModelBuilder:
             batch_size = random.choice(batch_sizes)
             retrain_loss = self.train_for_one_epoch(
                 model, optimizer,
-                self.repr_loss_dl,
+                self.pds_loss_dl,
                 X_train, y_train,
                 batch_size=batch_size if batch_size > 0 else len(y_train),
                 joint_weights=train_sample_joint_weights,
@@ -953,7 +953,7 @@ class ModelBuilder:
         epochs_for_estimation = 5
 
         gamma_coeff, lambda_coeff = self.estimate_gamma_lambda_coeffs(
-            model, X_subtrain, y_subtrain, self.repr_loss_dl,
+            model, X_subtrain, y_subtrain, self.pds_loss_dl,
             sample_weights, sample_joint_weights, sample_joint_weights_indices,
             learning_rate=learning_rate, n_epochs=epochs_for_estimation,
             batch_size=batch_size if batch_size > 0 else len(y_subtrain),
@@ -973,14 +973,14 @@ class ModelBuilder:
 
         for epoch in range(epochs):
             train_loss = self.train_for_one_epoch_mh(
-                model, optimizer, self.repr_loss_dl, X_subtrain, y_subtrain,
+                model, optimizer, self.pds_loss_dl, X_subtrain, y_subtrain,
                 batch_size=batch_size if batch_size > 0 else len(y_subtrain)
                 , gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
                 sample_weights=sample_weights, joint_weights=sample_joint_weights,
                 joint_weight_indices=sample_joint_weights_indices, with_reg=with_reg, with_ae=with_ae)
 
             val_loss = self.train_for_one_epoch_mh(
-                model, optimizer, self.repr_loss_dl, X_val, y_val,
+                model, optimizer, self.pds_loss_dl, X_val, y_val,
                 batch_size=batch_size if batch_size > 0 else len(y_val),
                 gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
                 sample_weights=val_sample_weights, joint_weights=val_sample_joint_weights,
@@ -1025,7 +1025,7 @@ class ModelBuilder:
         # Retrain up to the best epoch
         for epoch in range(best_epoch):
             retrain_loss = self.train_for_one_epoch_mh(
-                model, optimizer, self.repr_loss_dl, X_train, y_train,
+                model, optimizer, self.pds_loss_dl, X_train, y_train,
                 batch_size=batch_size if batch_size > 0 else len(y_train),
                 gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
                 sample_weights=train_sample_weights,
@@ -1128,7 +1128,7 @@ class ModelBuilder:
         callback_list = [early_stopping_cb, checkpoint_cb]
 
         # Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss)
 
         # First train the model with a validation set to determine the best epoch
         history = model.fit(train_gen,
@@ -1159,7 +1159,7 @@ class ModelBuilder:
         train_steps_comb = len(X_train) // batch_size
 
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss)
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss)
 
         model.fit(train_gen_comb,
                   steps_per_epoch=train_steps_comb,
@@ -1222,7 +1222,7 @@ class ModelBuilder:
     #         callback_list.append(weighted_loss_cb)
     #
     #     # Compile the model
-    #     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss_fast)
+    #     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_fast)
     #
     #     # First train the model with a validation set to determine the best epoch
     #     history = model.fit(X_subtrain, y_subtrain,
@@ -1250,7 +1250,7 @@ class ModelBuilder:
     #     if sample_joint_weights is not None:
     #         sample_joint_weights_combined = np.concatenate((sample_joint_weights, sample_joint_weights), axis=0)
     #
-    #     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.repr_loss_fast)
+    #     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_fast)
     #     if sample_joint_weights is not None:
     #         model.fit(X_combined, y_combined, epochs=best_epoch, batch_size=batch_size, callbacks=[weighted_loss_cb])
     #     else:
@@ -1599,7 +1599,7 @@ class ModelBuilder:
 
         return squared_difference
 
-    def repr_loss_dl(self, y_true, z_pred, sample_weights=None, reduction=tf.keras.losses.Reduction.NONE):
+    def pds_loss_dl(self, y_true, z_pred, sample_weights=None, reduction=tf.keras.losses.Reduction.NONE):
         """
         Computes the weighted loss for a batch of predicted features and their labels.
 
@@ -1661,10 +1661,11 @@ class ModelBuilder:
             tf.cast((is_elevated_1 & is_background_2) | (is_background_1 & is_elevated_2), tf.int32))
         self.background_background_count.assign_add(tf.cast(is_background_1 & is_background_2, tf.int32))
 
-    def repr_loss(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
+    def pds_loss(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
         """
         Computes the loss for a batch of predicted features and their labels.
         verified!
+        TODO: vectorize
 
         :param y_true: A batch of true label values, shape of [batch_size, 1].
         :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
@@ -1702,7 +1703,7 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
-    # def repr_loss_fast(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
+    # def pds_loss_fast(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
     #     """
     #     Computes the loss for a batch of predicted features and their labels.
     #      TODO: Leads to wrong losses, how to fix it?
@@ -2125,7 +2126,7 @@ class InvestigateCallback(callbacks.Callback):
     #     print(f"Saved SEP loss plot at {file_path}")
 
 
-def repr_loss_eval(y_true, z_pred, reduction='none'):
+def pds_loss_eval(y_true, z_pred, reduction='none'):
     """
     Computes the loss for a batch of predicted features and their labels.
 
@@ -2158,7 +2159,7 @@ def repr_loss_eval(y_true, z_pred, reduction='none'):
         raise ValueError(f"Unsupported reduction type: {reduction}.")
 
 
-def repr_loss_eval_pairs(y_true, z_pred, reduction='none'):
+def pds_loss_eval_pairs(y_true, z_pred, reduction='none'):
     """
     Computes the loss for a batch of predicted features and their labels.
     Returns a dictionary of average losses for each pair type and overall.
@@ -2252,12 +2253,12 @@ def evaluate(model, X, y, batch_size=-1, pairs=False):
     :param X: Input features.
     :param y: True labels.
     :param batch_size: Size of the batch, use the whole dataset if batch_size <= 0.
-    :param pairs: If True, uses repr_loss_eval_pairs to evaluate loss on pairs.
+    :param pairs: If True, uses pds_loss_eval_pairs to evaluate loss on pairs.
     :return: Calculated loss over the dataset or a dictionary of losses for each pair type.
     """
     if batch_size <= 0:
         z_pred = model.predict(X)
-        return repr_loss_eval_pairs(y, z_pred) if pairs else repr_loss_eval(y, z_pred)
+        return pds_loss_eval_pairs(y, z_pred) if pairs else pds_loss_eval(y, z_pred)
 
     total_loss = 0
     pair_losses = {key: 0.0 for key in
@@ -2272,12 +2273,12 @@ def evaluate(model, X, y, batch_size=-1, pairs=False):
         z_pred = model.predict(X_batch)
 
         if pairs:
-            batch_pair_losses = repr_loss_eval_pairs(y_batch, z_pred)
+            batch_pair_losses = pds_loss_eval_pairs(y_batch, z_pred)
             for key in batch_pair_losses:
                 pair_losses[key] += batch_pair_losses[key]
                 pair_counts[key] += 1  # Count each batch for each pair type
         else:
-            total_loss += repr_loss_eval(y_batch, z_pred)
+            total_loss += pds_loss_eval(y_batch, z_pred)
 
         total_batches += 1
 
@@ -2309,7 +2310,7 @@ def evaluate(model, X, y, batch_size=-1, pairs=False):
 #     if batch_size <= 0:
 #         # Use the whole dataset
 #         z_pred = model.predict(X)
-#         total_loss = repr_loss_eval(y, z_pred, reduction='none')
+#         total_loss = pds_loss_eval(y, z_pred, reduction='none')
 #         total_batches = 1
 #     else:
 #         # Process in batches
@@ -2317,7 +2318,7 @@ def evaluate(model, X, y, batch_size=-1, pairs=False):
 #             X_batch = X[i:i + batch_size]
 #             y_batch = y[i:i + batch_size]
 #             z_pred = model.predict(X_batch)  # model prediction
-#             batch_loss = repr_loss_eval(y_batch, z_pred, reduction='none')
+#             batch_loss = pds_loss_eval(y_batch, z_pred, reduction='none')
 #             total_loss += batch_loss
 #             total_batches += 1
 #

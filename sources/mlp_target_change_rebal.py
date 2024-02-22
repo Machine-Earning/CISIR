@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-
+import tensorflow as tf
 import matplotlib.pyplot as plt
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping
@@ -30,7 +30,8 @@ def main():
             # inputs_to_use = ['e0.5']
             # add_slope = True
             seed = 123456789
-
+            # list devices
+            devices = tf.config.list_physical_devices('GPU')
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
