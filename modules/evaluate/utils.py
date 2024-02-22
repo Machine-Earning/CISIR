@@ -139,7 +139,7 @@ def plot_tsne_extended(
     Returns:
     - Saves a 2D t-SNE plot to a file with a timestamp
     """
-    T = 0.4535
+    T = 1.57381089527 #0.4535
     # Define the thresholds
     if threshold is None:
         threshold = np.log(T / np.exp(2)) + 1e-4
@@ -312,7 +312,7 @@ def plot_tsne_pds(model, X, y, title, prefix, save_tag=None, seed=42):
     Returns:
     - Saves a 2D t-SNE plot to a file with a timestamp
     """
-    T = 0.4535
+    T = 1.57381089527 # 0.4535
     # Define the thresholds
     threshold = np.log(T / np.exp(2)) + 1e-4
     sep_threshold = np.log(T)
