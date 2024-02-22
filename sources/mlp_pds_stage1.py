@@ -64,8 +64,8 @@ def main():
             Options = {
                 'batch_size': bs,  # Assuming batch_size is defined elsewhere
                 'epochs': 1000,
-                'patience': 50,  # Updated to 50
-                'learning_rate': 3e-4,  # Updated to 3e-4
+                'patience': 100,  # Updated to 50
+                'learning_rate': 1e-4,  # Updated to 3e-4
                 'weight_decay': 0,  # Added weight decay
                 'momentum_beta1': 0.9,  # Added momentum beta1
             }
