@@ -4,6 +4,7 @@
 # this module should be interchangeable with other modules (
 ##############################################################################################################
 import random
+import time
 from itertools import cycle
 # types for type hinting
 from typing import Tuple, List, Optional
@@ -39,7 +40,7 @@ def zdist(vec1: Tensor, vec2: Tensor) -> float:
     return tf.reduce_sum(tf.square(vec1 - vec2))
 
 
-def error(z1: Tensor, z2: Tensor, label1: float, label2: float) -> float:
+def error(z1: Tensor, z2: Tensor, label1: float, label2: float) -> Tensor:
     """
     Computes the error between the zdist of two input predicted z values and their ydist.
     Range of the error is [0, 8].
@@ -1754,7 +1755,6 @@ class ModelBuilder:
         """
         Computes the loss for a batch of predicted features and their labels.
         verified!
-        TODO: vectorize
 
         :param y_true: A batch of true label values, shape of [batch_size, 1].
         :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
@@ -1775,7 +1775,7 @@ class ModelBuilder:
                 # tf.print(z1, z2, sep=', ', end='\n')
                 label1, label2 = y_true[i], y_true[j]
                 # Update pair counts and check if it's a SEP-SEP pair
-                self.update_pair_counts(label1, label2)
+                # self.update_pair_counts(label1, label2)
                 # tf.print(label1, label2, sep=', ', end='\n')
                 err = error(z1, z2, label1, label2)
                 # tf.print(err, end='\n\n')
@@ -1792,38 +1792,40 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
-    # def pds_loss_fast(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
-    #     """
-    #     Computes the loss for a batch of predicted features and their labels.
-    #      TODO: Leads to wrong losses, how to fix it?
-    #     :param y_true: A batch of true label values, shape of [batch_size, 1].
-    #     :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
-    #     :param reduction: The type of reduction to apply to the loss.
-    #     :return: The average error for all unique combinations of the samples in the batch.
-    #     """
-    #     batch_size = tf.shape(z_pred)[0]
-    #     denom = tf.cast(batch_size * (batch_size - 1) / 2, dtype=tf.float32)
-    #
-    #     # Compute all pairs of errors at once
-    #     # We expand dimensions to prepare for broadcasting
-    #     z1 = tf.expand_dims(z_pred, 1)
-    #     z2 = tf.expand_dims(z_pred, 0)
-    #     label1 = tf.expand_dims(y_true, 1)
-    #     label2 = tf.expand_dims(y_true, 0)
-    #
-    #     # Compute the pairwise errors using the 'self.error' function
-    #     err_matrix = self.error_vectorized(z1, z2, label1, label2)
-    #
-    #     mask_upper_triangle = tf.linalg.band_part(tf.ones_like(err_matrix), 0, -1)  # Upper triangular matrix of ones
-    #     mask_no_diag = mask_upper_triangle - tf.eye(tf.shape(err_matrix)[0])  # Remove diagonal
-    #     total_error = tf.reduce_sum(err_matrix * mask_no_diag)
-    #
-    #     if reduction == tf.keras.losses.Reduction.SUM:
-    #         return total_error  # total loss
-    #     elif reduction == tf.keras.losses.Reduction.NONE:
-    #         return total_error / (denom + 1e-9)  # average loss
-    #     else:
-    #         raise ValueError(f"Unsupported reduction type: {reduction}.")
+    def pds_loss_vec(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
+        """
+        Vectorized computation of the loss for a batch of predicted features and their labels.
+
+        :param y_true: A batch of true label values, shape of [batch_size, 1].
+        :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
+        :param reduction: The type of reduction to apply to the loss.
+        :return: The average error for all unique combinations of the samples in the batch.
+        """
+        # Expand y_true and z_pred to compute pairwise differences
+        y_true_expanded = tf.expand_dims(y_true, 1)
+        z_pred_expanded = tf.expand_dims(z_pred, 1)
+
+        # Compute pairwise squared L2 norm for z_pred
+        # tf.norm(tensor, axis) computes the L2 norm across the specified axis
+        z_diff = tf.norm(z_pred_expanded - tf.transpose(z_pred_expanded, perm=[1, 0, 2]), axis=2) ** 2
+
+        # Compute pairwise differences for y_true
+        y_diff = (y_true_expanded - tf.transpose(y_true_expanded, perm=[1, 0, 2])) ** 2
+
+        # Apply the error function to the pairwise differences
+        squared_difference = .5 * (z_diff - y_diff) ** 2
+        total_error = tf.reduce_sum(squared_difference)
+
+        # Determine the number of comparisons (avoiding double counting and self-comparison)
+        num_comparisons = tf.cast(tf.shape(y_true)[0] * (tf.shape(y_true)[0] - 1) / 2, dtype=tf.float32)
+
+        if reduction == tf.keras.losses.Reduction.SUM:
+            return total_error
+        elif reduction == tf.keras.losses.Reduction.NONE:
+            # Avoid division by zero
+            return total_error / (num_comparisons + 1e-9)
+        else:
+            raise ValueError(f"Unsupported reduction type: {reduction}.")
 
 
 class NormalizeLayer(layers.Layer):
@@ -2416,5 +2418,57 @@ def evaluate(model, X, y, batch_size=-1, pairs=False):
 
 
 # Helper function to map 2D indices to 1D indices (assuming it's defined elsewhere in your code)
-def map_to_1D_idx(i, j, n):
-    return n * i + j
+# def map_to_1D_idx(i, j, n):
+#     return n * i + j
+
+
+# main run
+if __name__ == '__main__':
+
+    print("Testing the vectorized loss function...")
+    loss_tester = ModelBuilder()
+    # Generate dummy data for testing
+    np.random.seed(42)  # For reproducibility
+    batch_size = 1600
+    z_dim = 9
+    y_true_dummy = np.random.rand(batch_size, 1).astype(np.float32)
+    z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32)
+
+    print("y_true_dummy shape:", y_true_dummy.shape)
+    print("z_pred_dummy shape:", z_pred_dummy.shape)
+
+    # Convert NumPy arrays to TensorFlow tensors
+    y_true_tensor = tf.convert_to_tensor(y_true_dummy, dtype=tf.float32)
+    z_pred_tensor = tf.convert_to_tensor(z_pred_dummy, dtype=tf.float32)
+
+    # Time and compute loss using the original function
+    print("Computing loss using the original function...")
+    start_time_original = time.time()
+    loss_original = loss_tester.pds_loss(y_true_tensor, z_pred_tensor)
+    end_time_original = time.time()
+    original_duration = end_time_original - start_time_original
+
+    # Time and compute loss using the vectorized function
+    print("Computing loss using the vectorized function...")
+    start_time_vectorized = time.time()
+    loss_vectorized = loss_tester.pds_loss_vec(y_true_tensor, z_pred_tensor)
+    end_time_vectorized = time.time()
+    vectorized_duration = end_time_vectorized - start_time_vectorized
+
+    # Evaluate the TensorFlow tensors to get their numpy values
+    loss_original_value = loss_original.numpy()
+    loss_vectorized_value = loss_vectorized.numpy()
+
+    # Print the losses and timing for comparison
+    print(f"Original Loss: {loss_original_value}, Time Taken: {original_duration} seconds")
+    print(f"Vectorized Loss: {loss_vectorized_value}, Time Taken: {vectorized_duration} seconds")
+
+    # Check if the losses are approximately equal
+    np.testing.assert_almost_equal(loss_original_value, loss_vectorized_value, decimal=5)
+    print("Test passed: The original and vectorized loss functions return approximately the same value.")
+
+    # Compare the execution time
+    if vectorized_duration < original_duration:
+        print(f"The vectorized function is faster by {original_duration - vectorized_duration} seconds.")
+    else:
+        print(f"The original function is faster by {vectorized_duration - original_duration} seconds.")
