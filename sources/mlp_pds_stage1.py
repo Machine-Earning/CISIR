@@ -30,16 +30,21 @@ def main():
     Main function to run the PDS model
     :return:
     """
+    # list the devices available
+    strategy = tf.distribute.MultiWorkerMirroredStrategy()
+    print("Number of devices: {}".format(strategy.num_replicas_in_sync))
+    devices = tf.config.list_physical_devices('GPU')
+    print(f'devices: {devices}')
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for add_slope in [False]:
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
-            bs = 1600
+            per_worker_batch_size = 1600
+            bs = per_worker_batch_size * strategy.num_replicas_in_sync
             print(f'batch size : {bs}')
-            # list the devices availables
-            devices = tf.config.list_physical_devices('GPU')
-            print(f'devices: {devices}')
+
+
 
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
@@ -80,7 +85,8 @@ def main():
                 "hiddens": hiddens_str,
                 "pds": pds,
                 "seed": SEED,
-                "stage": 1
+                "stage": 1,
+                "per_worker_batch_size": per_worker_batch_size,
             })
 
             # set the root directory
@@ -111,19 +117,21 @@ def main():
             n_features = X_train.shape[1]
             print(f'n_features: {n_features}')
 
-            # create the model
-            mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=pds)
-            mlp_model_sep.summary()
+            # parallelize training
+            with strategy.scope():
+                # create the model
+                mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=pds)
+                mlp_model_sep.summary()
 
-            mb.train_pds(mlp_model_sep,
-                         X_subtrain, y_subtrain,
-                         X_val, y_val,
-                         X_train, y_train,
-                         learning_rate=Options['learning_rate'],
-                         epochs=Options['epochs'],
-                         batch_size=Options['batch_size'],
-                         patience=Options['patience'], save_tag=current_time + "_features",
-                         callbacks_list=[WandbCallback()])
+                mb.train_pds(mlp_model_sep,
+                             X_subtrain, y_subtrain,
+                             X_val, y_val,
+                             X_train, y_train,
+                             learning_rate=Options['learning_rate'],
+                             epochs=Options['epochs'],
+                             batch_size=Options['batch_size'],
+                             patience=Options['patience'], save_tag=current_time + "_features",
+                             callbacks_list=[WandbCallback()])
 
             file_path = plot_tsne_pds(mlp_model_sep,
                                       X_train,
