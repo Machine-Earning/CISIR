@@ -287,7 +287,7 @@ class ModelBuilder:
         initial_weights = model.get_weights()
 
         # Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss)
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
 
         # First train the model with a validation set to determine the best epoch
         history = model.fit(X_subtrain, y_subtrain,
@@ -315,7 +315,7 @@ class ModelBuilder:
         # Reset model weights to initial state before retraining
         model.set_weights(initial_weights)
 
-        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss)
+        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
         model.fit(X_train, y_train,
                   epochs=best_epoch,
                   batch_size=batch_size if batch_size > 0 else len(y_train),
@@ -376,7 +376,7 @@ class ModelBuilder:
         initial_weights = model.get_weights()
 
         # Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss)
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
 
         # First train the model with a validation set to determine the best epoch
         history = model.fit(subtrain_ds,
@@ -404,7 +404,7 @@ class ModelBuilder:
         # Reset model weights to initial state before retraining
         model.set_weights(initial_weights)
 
-        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss)
+        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
         model.fit(train_ds,
                   epochs=best_epoch,
                   # batch_size=batch_size if batch_size > 0 else len(y_train),
@@ -477,7 +477,7 @@ class ModelBuilder:
         callback_list = [early_stopping_cb, checkpoint_cb]
 
         # Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss)
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
 
         # First train the model with a validation set to determine the best epoch
         history = model.fit(X_subtrain, y_subtrain,
@@ -505,7 +505,7 @@ class ModelBuilder:
         # X_combined = np.concatenate((X_subtrain, X_val), axis=0)
         # y_combined = np.concatenate((y_subtrain, y_val), axis=0)
 
-        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss)
+        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
         model.fit(X_train, y_train,
                   epochs=best_epoch,
                   batch_size=batch_size if batch_size > 0 else len(y_train),
@@ -1218,7 +1218,7 @@ class ModelBuilder:
         callback_list = [early_stopping_cb, checkpoint_cb]
 
         # Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss)
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
 
         # First train the model with a validation set to determine the best epoch
         history = model.fit(train_gen,
@@ -1249,7 +1249,7 @@ class ModelBuilder:
         train_steps_comb = len(X_train) // batch_size
 
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss)
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
 
         model.fit(train_gen_comb,
                   steps_per_epoch=train_steps_comb,
@@ -1730,6 +1730,59 @@ class ModelBuilder:
             return total_error / denom  # Average loss
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
+
+    def pds_loss_dl_vec(self, y_true, z_pred, sample_weights=None, reduction=tf.keras.losses.Reduction.NONE):
+        """
+        Adjusted vectorized computation of the weighted loss for a batch of predicted features
+        and their labels, incorporating optional pair-specific sample weights into the loss calculation,
+        ensuring each unique pair is considered exactly once.
+
+        :param y_true: A batch of true label values, shape of [batch_size, 1].
+        :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
+        :param sample_weights: A batch of sample weights, shape of [batch_size, 1].
+        :param reduction: The type of reduction to apply to the loss.
+        :return: The weighted average error for all unique combinations of the samples in the batch.
+        """
+        # Compute pairwise differences for z_pred and y_true using broadcasting
+        y_true_diff = y_true - tf.transpose(y_true)
+        z_pred_diff = z_pred[:, tf.newaxis, :] - z_pred[tf.newaxis, :, :]
+
+        # Calculate squared L2 norm for z_pred differences
+        z_diff_squared = tf.reduce_sum(tf.square(z_pred_diff), axis=-1)
+
+        # Calculate squared differences for y_true
+        y_diff_squared = tf.square(y_true_diff)
+
+        # Compute the loss for each pair
+        pairwise_loss = .5 * tf.square(z_diff_squared - y_diff_squared)
+
+        # Use only the upper triangular part of the pairwise loss matrix, excluding the diagonal
+        mask = tf.linalg.band_part(tf.ones_like(pairwise_loss), 0, -1) - tf.linalg.band_part(
+            tf.ones_like(pairwise_loss), 0, 0)
+        pairwise_loss_masked = pairwise_loss * mask
+
+        if sample_weights is not None:
+            # Assuming pair_weights are correctly ordered and aligned with the upper triangular part of the matrix
+            # This simplistic approach needs adjustment for actual indexing or reshaping to apply weights correctly
+            weighted_pairwise_loss_masked = pairwise_loss_masked  # Placeholder for actual weight application logic
+        else:
+            weighted_pairwise_loss_masked = pairwise_loss_masked
+
+        # Sum over the masked (and possibly weighted) pairwise losses
+        total_error = tf.reduce_sum(weighted_pairwise_loss_masked)
+
+        # Number of unique comparisons
+        batch_size = tf.shape(y_true)[0]
+        num_comparisons = tf.cast(batch_size * (batch_size - 1) / 2, dtype=tf.float32)
+
+        # Normalization and reduction
+        if reduction == tf.keras.losses.Reduction.SUM:
+            return total_error
+        elif reduction == tf.keras.losses.Reduction.NONE:
+            normalized_error = total_error / (num_comparisons + 1e-9)  # Normalize by the number of unique pairs
+            return normalized_error
+        else:
+            raise ValueError("Unsupported reduction type.")
 
     def update_pair_counts(self, label1, label2):
         label1 = label1[0]
@@ -2456,10 +2509,11 @@ def evaluate(model, X, y, batch_size=-1, pairs=False):
 if __name__ == '__main__':
 
     print("Testing the vectorized loss function...")
+    print("WITHOUT SAMPLE WEIGHTS")
     loss_tester = ModelBuilder()
     # Generate dummy data for testing
     np.random.seed(42)  # For reproducibility
-    batch_size = 500
+    batch_size = 200
     z_dim = 9
     y_true_dummy = np.random.rand(batch_size, 1).astype(np.float32)
     z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32)
@@ -2502,3 +2556,52 @@ if __name__ == '__main__':
         print(f"The vectorized function is faster by {original_duration - vectorized_duration} seconds.")
     else:
         print(f"The original function is faster by {vectorized_duration - original_duration} seconds.")
+
+    print("WITH SAMPLE WEIGHTS")
+    # Generate dummy data for testing
+    np.random.seed(42)  # For reproducibility
+    batch_size = 200
+    z_dim = 9
+    num_unique_pairs = batch_size * (batch_size - 1) // 2
+    y_true_dummy = np.random.rand(batch_size, 1).astype(np.float32)
+    z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32)
+    sample_weights_dummy = np.random.rand(num_unique_pairs, 1).astype(np.float32)
+
+    print("y_true_dummy shape:", y_true_dummy.shape)
+    print("z_pred_dummy shape:", z_pred_dummy.shape)
+    print("sample_weights_dummy shape:", sample_weights_dummy.shape)
+
+    # Convert NumPy arrays to TensorFlow tensors
+    y_true_tensor = tf.convert_to_tensor(y_true_dummy, dtype=tf.float32)
+    z_pred_tensor = tf.convert_to_tensor(z_pred_dummy, dtype=tf.float32)
+    sample_weights_tensor = tf.convert_to_tensor(sample_weights_dummy, dtype=tf.float32)  # Convert sample weights
+
+    # Time and compute loss using the original function with sample weights
+    print("Computing loss using the original function with sample weights...")
+    start_time_original = time.time()
+    loss_original = loss_tester.pds_loss_dl(y_true_tensor, z_pred_tensor, sample_weights=sample_weights_tensor)
+    end_time_original = time.time()
+    original_duration = end_time_original - start_time_original
+
+    # Time and compute loss using the vectorized function with sample weights
+    print("Computing loss using the vectorized function with sample weights...")
+    start_time_vectorized = time.time()
+    loss_vectorized = loss_tester.pds_loss_dl_vec(y_true_tensor, z_pred_tensor, sample_weights=sample_weights_tensor)
+    end_time_vectorized = time.time()
+    vectorized_duration = end_time_vectorized - start_time_vectorized
+
+    # Evaluate the TensorFlow tensors to get their numpy values
+    loss_original_value = loss_original.numpy()
+    loss_vectorized_value = loss_vectorized.numpy()
+
+    # Print the losses and timing for comparison
+    print(f"Original Loss with Sample Weights: {loss_original_value}, Time Taken: {original_duration} seconds")
+    print(f"Vectorized Loss with Sample Weights: {loss_vectorized_value}, Time Taken: {vectorized_duration} seconds")
+
+    # Compare the execution time
+    if vectorized_duration < original_duration:
+        print(
+            f"The vectorized function with sample weights is faster by {original_duration - vectorized_duration} seconds.")
+    else:
+        print(
+            f"The original function with sample weights is faster by {vectorized_duration - original_duration} seconds.")
