@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --job-name=TestJob              # Job name
-#SBATCH --nodes=4                       # Number of nodes gpu5, gpu6, gpu7, gpu8 (max 4 for partition gpu2). if using two nodes then gpu[06-07]
-#SBATCH --ntasks=4                      # Number of tasks needs to match number of nodes?
+#SBATCH --nodes=1                       # Number of nodes gpu5, gpu6, gpu7, gpu8 (max 4 for partition gpu2). if using two nodes then gpu[06-07]
+#SBATCH --ntasks=1                      # Number of tasks needs to greater or equal to the number of nodes
 #SBATCH --mem=32GB                      # Memory per node
 #SBATCH --time=infinite                 # Time limit
 #SBATCH --partition=gpu2                # Partition, dynamically set

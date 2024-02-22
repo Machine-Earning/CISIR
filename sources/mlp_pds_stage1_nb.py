@@ -31,21 +31,17 @@ def main():
     :return:
     """
     # list the devices available
-    strategy = tf.distribute.MultiWorkerMirroredStrategy()
-    print("Number of devices: {}".format(strategy.num_replicas_in_sync))
     devices = tf.config.list_physical_devices('GPU')
     print(f'devices: {devices}')
     # Define the dataset options, including the sharding policy
-    options = tf.data.Options()
-    options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.AUTO
+
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for add_slope in [False]:
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
-            per_worker_batch_size = 1600
-            bs = per_worker_batch_size * strategy.num_replicas_in_sync
+            bs = 0 # full dataset used
             print(f'batch size : {bs}')
 
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -65,7 +61,7 @@ def main():
                 'batch_size': bs,  # Assuming batch_size is defined elsewhere
                 'epochs': 1000,
                 'patience': 200,  # Updated to 50
-                'learning_rate': 3e-5,  # Updated to 3e-4
+                'learning_rate': 3e-3,  # Updated to 3e-4
                 'weight_decay': 0,  # Added weight decay
                 'momentum_beta1': 0.9,  # Added momentum beta1
             }
@@ -88,7 +84,6 @@ def main():
                 "pds": pds,
                 "seed": SEED,
                 "stage": 1,
-                "per_worker_batch_size": per_worker_batch_size,
             })
 
             # set the root directory
@@ -100,10 +95,6 @@ def main():
                                                    add_slope=add_slope)
             X_test, y_test = build_dataset(root_dir + '/testing', inputs_to_use=inputs_to_use, add_slope=add_slope)
             X_val, y_val = build_dataset(root_dir + '/validation', inputs_to_use=inputs_to_use, add_slope=add_slope)
-            # building the dataset from numpy
-            train_ds = build_dataset_from_numpy(X_train, y_train, bs, options)
-            subtrain_ds = build_dataset_from_numpy(X_subtrain, y_subtrain, bs, options)
-            val_ds = build_dataset_from_numpy(X_val, y_val, bs, options)
 
             # print all cme_files shapes
             print(f'X_train.shape: {X_train.shape}')
@@ -123,20 +114,20 @@ def main():
             n_features = X_train.shape[1]
             print(f'n_features: {n_features}')
 
-            # parallelize training
-            with strategy.scope():
-                # create the model
-                mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=pds)
-                mlp_model_sep.summary()
 
-                mb.train_pds_distributed(mlp_model_sep,
-                                         subtrain_ds,
-                                         val_ds,
-                                         train_ds,
-                                         learning_rate=Options['learning_rate'],
-                                         epochs=Options['epochs'],
-                                         patience=Options['patience'], save_tag=current_time + "_features",
-                                         callbacks_list=[WandbCallback()])
+            # create the model
+            mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=pds)
+            mlp_model_sep.summary()
+
+            mb.train_pds(mlp_model_sep,
+                        X_subtrain, y_subtrain,
+                        X_val, y_val,
+                        X_train, y_train,
+                        learning_rate=Options['learning_rate'],
+                        epochs=Options['epochs'],
+                        batch_size=Options['batch_size'],
+                        patience=Options['patience'], save_tag=current_time + "_features",
+                        callbacks_list=[WandbCallback()])
 
             file_path = plot_tsne_pds(mlp_model_sep,
                                       X_train,
