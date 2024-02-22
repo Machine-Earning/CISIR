@@ -1,12 +1,14 @@
-from modules.training.ts_modeling import build_dataset, create_mlp
-import wandb
+import random
 from datetime import datetime
+
+import numpy as np
+import tensorflow as tf
+import wandb
+from wandb.keras import WandbCallback
+
 from modules.evaluate.utils import plot_tsne_pds
 from modules.training import cme_modeling
-import numpy as np
-import random
-import tensorflow as tf
-from wandb.keras import WandbCallback
+from modules.training.ts_modeling import build_dataset, create_mlp
 
 # SEEDING
 SEED = 42  # seed number
@@ -33,7 +35,11 @@ def main():
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
-            bs = 8
+            bs = 1600
+            print(f'batch size : {bs}')
+            # list the devices availables
+            devices = tf.config.list_physical_devices('GPU')
+            print(f'devices: {devices}')
 
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
@@ -47,11 +53,34 @@ def main():
             # Create a unique experiment name with a timestamp
             current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
             experiment_name = f'{title}_{current_time}'
+            # Set the early stopping patience and learning rate as variables
+            Options = {
+                'batch_size': bs,  # Assuming batch_size is defined elsewhere
+                'epochs': 1000,
+                'patience': 50,  # Updated to 50
+                'learning_rate': 3e-4,  # Updated to 3e-4
+                'weight_decay': 0,  # Added weight decay
+                'momentum_beta1': 0.9,  # Added momentum beta1
+            }
+            hiddens = [100, 100, 50]
+            hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
+            pds = True
 
             # Initialize wandb
             wandb.init(project="mlp-ts-pds", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
+                "patience": Options['patience'],
+                "learning_rate": Options['learning_rate'],
+                "weight_decay": Options['weight_decay'],
+                "momentum_beta1": Options['momentum_beta1'],
+                "batch_size": Options['batch_size'],
+                "epochs": Options['epochs'],
+                # hidden in a more readable format  (wandb does not support lists)
+                "hiddens": hiddens_str,
+                "pds": pds,
+                "seed": SEED,
+                "stage": 1
             })
 
             # set the root directory
@@ -81,21 +110,10 @@ def main():
             # get the number of features
             n_features = X_train.shape[1]
             print(f'n_features: {n_features}')
-            hiddens = [100, 100, 50]
 
             # create the model
-            mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=True)
+            mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=pds)
             mlp_model_sep.summary()
-
-            # Set the early stopping patience and learning rate as variables
-            Options = {
-                'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                'epochs': 1000,
-                'patience': 50,  # Updated to 50
-                'learning_rate': 3e-4,  # Updated to 3e-4
-                'weight_decay': 0,  # Added weight decay
-                'momentum_beta1': 0.9,  # Added momentum beta1
-            }
 
             mb.train_pds(mlp_model_sep,
                          X_subtrain, y_subtrain,
