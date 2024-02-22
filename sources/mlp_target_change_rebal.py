@@ -6,6 +6,7 @@ import wandb
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
+import tensorflow as tf
 
 from modules.training.ts_modeling import (
     build_dataset,
@@ -28,6 +29,7 @@ def main():
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
+            seed = 123456789
 
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
@@ -47,14 +49,15 @@ def main():
             learning_rate = 3e-5  # og learning rate
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 3
+            batch_size = 512
             epochs = 100000
             hiddens = [100, 100, 50]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
             loss_key = 'mse'
             target_change = True
-            print_batch_mse_cb = PrintBatchMSE()
+            # print_batch_mse_cb = PrintBatchMSE()
             rebalacing = True
+            tf.random.set_seed(seed)
 
             # Initialize wandb
             wandb.init(project="mlp-ts-target-change", name=experiment_name, config={
@@ -70,8 +73,8 @@ def main():
                 "hiddens": hiddens_str,
                 "loss": loss_key,
                 "target_change": target_change,
-                "printing_batch_mse": True if print_batch_mse_cb else False,
-                "seed": 42,
+                "printing_batch_mse": False,
+                "seed": seed,
                 "rebalancing": rebalacing
             })
 
@@ -137,7 +140,7 @@ def main():
                                         sample_weight=y_subtrain_weights,
                                         epochs=epochs, batch_size=batch_size,
                                         validation_data=(X_val, {'forecast_head': y_val}),
-                                        callbacks=[early_stopping, WandbCallback(), print_batch_mse_cb])
+                                        callbacks=[early_stopping, WandbCallback()])
 
             # Plot the training and validation loss
             plt.figure(figsize=(12, 6))

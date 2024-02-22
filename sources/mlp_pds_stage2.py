@@ -39,11 +39,29 @@ def main():
                 current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
                 experiment_name = f'{title}_{current_time}'
 
+                hiddens = [100, 100, 50]
+                hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
+                                # Set the early stopping patience and learning rate as variables
+                patience = 50
+                learning_rate = 3e-4
+                weight_decay = 0  # higher weight decay
+                momentum_beta1 = 0.9  # higher momentum beta1
+                batch_size = 32
+                epochs = 100000
+
                 # Initialize wandb
                 wandb.init(project="mlp-ts-pds", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
                     "add_slope": add_slope,
-                    "freeze": freeze
+                    "freeze": freeze,
+                    "hiddens": hiddens_str,
+                    "patience": patience,
+                    "learning_rate": learning_rate,
+                    "weight_decay": weight_decay,
+                    "momentum_beta1": momentum_beta1,
+                    "batch_size": batch_size,
+                    "epochs": epochs,
+
                 })
 
                 # set the root directory
@@ -73,7 +91,6 @@ def main():
                 # get the number of features
                 n_features = X_train.shape[1]
                 print(f'n_features: {n_features}')
-                hiddens = [100, 100, 50]
 
                 # create the model
                 mlp_model_sep_stage1 = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=True)
@@ -107,12 +124,6 @@ def main():
 
                 mlp_model_sep = mb.add_proj_head(mlp_model_sep_stage1, output_dim=1, freeze_features=freeze, pds=True)
                 mlp_model_sep.summary()
-
-                # Set the early stopping patience and learning rate as variables
-                patience = 50
-                learning_rate = 3e-4
-                weight_decay = 0  # higher weight decay
-                momentum_beta1 = 0.9  # higher momentum beta1
 
                 # Define the EarlyStopping callback
                 early_stopping = EarlyStopping(monitor='val_loss', patience=patience, verbose=1,
