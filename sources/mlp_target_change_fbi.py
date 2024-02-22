@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 
 import matplotlib.pyplot as plt
+import numpy as np
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping
@@ -42,6 +43,9 @@ def main():
             experiment_name = f'{title}_{current_time}'
 
             # Set the early stopping patience and learning rate as variables
+            seed = 1245
+            tf.random.set_seed(seed)
+            np.random.seed(seed)
             patience = 3000  # higher patience
             # learning_rate = 3e-5  # og learning rate
             initial_learning_rate = 3e-3
@@ -57,7 +61,7 @@ def main():
 
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 2
+            batch_size = 3
             epochs = 100000
             hiddens = [100, 100, 50]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
@@ -80,7 +84,7 @@ def main():
                 "loss": loss_key,
                 "target_change": target_change,
                 "printing_batch_mse": False,
-                "seed": 42
+                "seed": seed
             })
 
             # set the root directory
