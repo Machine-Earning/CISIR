@@ -127,9 +127,11 @@ def main():
             with strategy.scope():
                 # create the model
                 mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=pds)
+                final_mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=pds)
                 mlp_model_sep.summary()
 
                 mb.train_pds_distributed(mlp_model_sep,
+                                         final_mlp_model_sep,
                                          subtrain_ds,
                                          val_ds,
                                          train_ds,
@@ -138,7 +140,7 @@ def main():
                                          patience=Options['patience'], save_tag=current_time + "_features",
                                          callbacks_list=[WandbCallback()])
 
-            file_path = plot_tsne_pds(mlp_model_sep,
+            file_path = plot_tsne_pds(final_mlp_model_sep,
                                       X_train,
                                       y_train,
                                       title, 'training',
@@ -149,7 +151,7 @@ def main():
             wandb.log({'tsne_training_plot': wandb.Image(file_path)})
             print('file_path: ' + file_path)
 
-            file_path = plot_tsne_pds(mlp_model_sep,
+            file_path = plot_tsne_pds(final_mlp_model_sep,
                                       X_test,
                                       y_test,
                                       title, 'testing',

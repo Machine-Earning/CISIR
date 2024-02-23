@@ -334,6 +334,7 @@ class ModelBuilder:
 
     def train_pds_distributed(self,
                               model: Model,
+                              final_model: Model,
                               subtrain_ds: tf.data.Dataset,
                               val_ds: tf.data.Dataset,
                               train_ds: tf.data.Dataset,
@@ -350,7 +351,8 @@ class ModelBuilder:
         :param val_ds: Validation features.
         :param train_ds: training and validation sets together
         :param save_tag: tag to use for saving experiments
-        :param model: The TensorFlow model to train.
+        :param model: The TensorFlow model to subtrain for best epoch
+        :param final_model: The TensorFlow model to train on the entire training set
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
         :param patience: The number of epochs with no improvement to wait before early stopping.
@@ -371,9 +373,6 @@ class ModelBuilder:
 
         # Append the early stopping and checkpoint callbacks to the custom callbacks list
         callbacks_list.extend([early_stopping_cb, checkpoint_cb])
-
-        # Save initial weights for retraining on full training set after best epoch found
-        initial_weights = model.get_weights()
 
         # Compile the model
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
@@ -401,21 +400,20 @@ class ModelBuilder:
         plt.savefig(file_path)
         plt.close()
 
-        # Reset model weights to initial state before retraining
-        model.set_weights(initial_weights)
+        # Compile the final model
+        final_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
 
-        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
-        model.fit(train_ds,
-                  epochs=best_epoch,
-                  # batch_size=batch_size if batch_size > 0 else len(y_train),
-                  callbacks=[checkpoint_cb],
-                  verbose=verbose)
+        final_model.fit(train_ds,
+                        epochs=best_epoch,
+                        # batch_size=batch_size if batch_size > 0 else len(y_train),
+                        callbacks=[checkpoint_cb],
+                        verbose=verbose)
 
         # Evaluate the model on the entire training set
         # entire_training_loss = model.evaluate(X_train, y_train)
 
         # save the model weights
-        model.save_weights(f"model_weights_{str(save_tag)}.h5")
+        final_model.save_weights(f"model_weights_{str(save_tag)}.h5")
         # print where the model weights are saved
         print(f"Model weights are saved in model_weights_{str(save_tag)}.h5")
 
