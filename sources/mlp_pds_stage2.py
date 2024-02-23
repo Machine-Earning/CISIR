@@ -58,6 +58,8 @@ def main():
                 tf.random.set_seed(seed)
                 target_change = False
                 pds = True
+                # weight_path = '/home1/jmoukpe2016/keras-functional-api/model_weights_20240205-230529_features.h5'
+                weight_path = '/home1/jmoukpe2016/keras-functional-api/model_weights_20240222-192939_features.h5'
 
                 # Initialize wandb
                 wandb.init(project="mlp-ts-pds", name=experiment_name, config={
@@ -73,7 +75,9 @@ def main():
                     "epochs": epochs,
                     "seed": seed,
                     "target_change": target_change,
-                    "pds": pds
+                    "pds": pds,
+                    "stage": 2,
+                    "stage1_weights": weight_path
                 })
 
                 # set the root directory
@@ -114,7 +118,8 @@ def main():
                 mlp_model_sep_stage1 = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=pds)
                 mlp_model_sep_stage1.summary()
                 # load the weights from the first stage
-                weight_path = '/home1/jmoukpe2016/keras-functional-api/model_weights_20240205-230529_features.h5'
+
+
                 mlp_model_sep_stage1.load_weights(weight_path)
                 # print the save 
                 print(f'weights loaded successfully from: {weight_path}')

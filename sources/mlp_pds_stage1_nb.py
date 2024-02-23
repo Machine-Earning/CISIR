@@ -41,7 +41,7 @@ def main():
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
-            bs = 0 # full dataset used
+            bs = 2000 # full dataset used
             print(f'batch size : {bs}')
 
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -59,11 +59,11 @@ def main():
             # Set the early stopping patience and learning rate as variables
             Options = {
                 'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                'epochs': 1000,
-                'patience': 200,  # Updated to 50
-                'learning_rate': 3e-3,  # Updated to 3e-4
+                'epochs': 10000,
+                'patience': 5000,  # Updated to 50
+                'learning_rate': 7e-4,  # Updated to 3e-4
                 'weight_decay': 0,  # Added weight decay
-                'momentum_beta1': 0.9,  # Added momentum beta1
+                'momentum_beta1': 0.95,  # Added momentum beta1
             }
             hiddens = [100, 100, 50]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')

@@ -44,7 +44,7 @@ def main():
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
-            per_worker_batch_size = 1600
+            per_worker_batch_size = 3000
             bs = per_worker_batch_size * strategy.num_replicas_in_sync
             print(f'batch size : {bs}')
 
@@ -63,9 +63,9 @@ def main():
             # Set the early stopping patience and learning rate as variables
             Options = {
                 'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                'epochs': 1000,
-                'patience': 200,  # Updated to 50
-                'learning_rate': 3e-5,  # Updated to 3e-4
+                'epochs': 10000,
+                'patience': 1000,  # Updated to 50
+                'learning_rate': 3e-7,  # Updated to 3e-4
                 'weight_decay': 0,  # Added weight decay
                 'momentum_beta1': 0.9,  # Added momentum beta1
             }
