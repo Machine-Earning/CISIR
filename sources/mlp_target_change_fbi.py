@@ -65,7 +65,7 @@ def main():
             epochs = 100000
             hiddens = [100, 100, 50]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-            loss_key = 'mse'
+            loss_key = 'exp_mse'
             target_change = True
             # print_batch_mse_cb = PrintBatchMSE()
 

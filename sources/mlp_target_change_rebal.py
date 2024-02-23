@@ -7,6 +7,7 @@ from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
 import tensorflow as tf
+import numpy as np
 
 from modules.training.ts_modeling import (
     build_dataset,
@@ -29,7 +30,7 @@ def main():
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
-            seed = 123456789
+            
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
@@ -44,11 +45,25 @@ def main():
             experiment_name = f'{title}_{current_time}'
 
             # Set the early stopping patience and learning rate as variables
+            seed = 123456789
+            tf.random.set_seed(seed)
+            np.random.seed(seed)
             patience = 3000  # higher patience
-            learning_rate = 3e-5  # og learning rate
+            # learning_rate = 3e-5  # og learning rate
+            initial_learning_rate = 3e-3
+            final_learning_rate = 3e-7
+            learning_rate_decay_factor = (final_learning_rate / initial_learning_rate) ** (1 / 3000)
+            steps_per_epoch = int(20000 / 8)
+
+            learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
+                initial_learning_rate=initial_learning_rate,
+                decay_steps=steps_per_epoch,
+                decay_rate=learning_rate_decay_factor,
+                staircase=True)
+            
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 512
+            batch_size = 8
             epochs = 100000
             hiddens = [100, 100, 50]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
@@ -56,14 +71,13 @@ def main():
             target_change = True
             # print_batch_mse_cb = PrintBatchMSE()
             rebalacing = True
-            tf.random.set_seed(seed)
 
             # Initialize wandb
             wandb.init(project="mlp-ts-target-change", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
                 "patience": patience,
-                "learning_rate": learning_rate,
+                "learning_rate": "lr_decay_3e-3_3e-7",
                 "weight_decay": weight_decay,
                 "momentum_beta1": momentum_beta1,
                 "batch_size": batch_size,
