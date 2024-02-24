@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from sklearn.manifold import TSNE
-
+from scipy.spatial.distance import pdist, squareform
 from modules.training import seploader as sepl, cme_modeling
 from modules.evaluate import evaluation as eval
 
@@ -110,6 +110,66 @@ def split_combined_joint_weights_indices(
 
     return np.array(train_weights), train_indices, np.array(val_weights), val_indices
 
+
+def plot_shepard_diagram(model: tf.keras.Model, X: np.ndarray, seed: int = 42) -> Tuple[str, str]:
+    """
+    Generates and plots a Shepard diagram for the t-SNE reduced features extracted by the given model.
+    TODO: test this and add to tsne plot functions
+    Parameters:
+    - model: tf.keras.Model
+        The trained feature extractor model.
+    - X: np.ndarray
+        Input features (NumPy array or compatible) from which t-SNE embeddings are computed.
+    - seed: int, optional
+        Random seed for t-SNE to ensure reproducibility.
+
+    Returns:
+    - Tuple[str, str]
+        A tuple containing the path to the saved Shepard plot and the t-SNE plot.
+    """
+    # Extract features using the trained model
+    features = model.predict(X)
+
+    # Compute pairwise distances in the original feature space
+    original_distances = pdist(features, metric='euclidean')
+
+    # Apply t-SNE to reduce dimensionality to 2D for visualization
+    tsne = TSNE(n_components=2, random_state=seed, metric='euclidean')
+    tsne_features = tsne.fit_transform(features)
+
+    # Compute pairwise distances in the t-SNE space
+    tsne_distances = pdist(tsne_features, metric='euclidean')
+
+    # Plot Shepard diagram: original vs. t-SNE distances
+    plt.figure(figsize=(8, 6))
+    plt.scatter(original_distances, tsne_distances, alpha=0.6)
+    plt.title('Shepard Diagram')
+    plt.xlabel('Original Feature Distances')
+    plt.ylabel('t-SNE Feature Distances')
+    plt.grid(True)
+
+    # Linear fit to highlight the relationship
+    fit = np.polyfit(original_distances, tsne_distances, deg=1)
+    fit_fn = np.poly1d(fit)
+    plt.plot(original_distances, fit_fn(original_distances), '--k', alpha=0.75, label='Linear fit')
+
+    plt.legend()
+
+    shepard_plot_path = f'shepard_plot_{seed}.png'
+    plt.savefig(shepard_plot_path)
+    plt.close()
+
+    # Optionally, save the t-SNE plot as well for reference
+    plt.figure(figsize=(8, 6))
+    plt.scatter(tsne_features[:, 0], tsne_features[:, 1], alpha=0.6)
+    plt.title('t-SNE Visualization')
+    plt.xlabel('t-SNE Dimension 1')
+    plt.ylabel('t-SNE Dimension 2')
+    tsne_plot_path = f'tsne_plot_{seed}.png'
+    plt.savefig(tsne_plot_path)
+    plt.close()
+
+    return shepard_plot_path, tsne_plot_path
 
 def plot_tsne_extended(
         model, X, y,
