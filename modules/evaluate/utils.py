@@ -6,6 +6,8 @@ import numpy as np
 import tensorflow as tf
 from sklearn.manifold import TSNE
 from scipy.spatial.distance import pdist, squareform
+from scipy.stats import spearmanr
+from sklearn.preprocessing import MinMaxScaler
 from modules.training import seploader as sepl, cme_modeling
 from modules.evaluate import evaluation as eval
 
@@ -111,65 +113,38 @@ def split_combined_joint_weights_indices(
     return np.array(train_weights), train_indices, np.array(val_weights), val_indices
 
 
-def plot_shepard_diagram(model: tf.keras.Model, X: np.ndarray, seed: int = 42) -> Tuple[str, str]:
+def plot_shepard(features, tsne_result):
     """
-    Generates and plots a Shepard diagram for the t-SNE reduced features extracted by the given model.
-    TODO: test this and add to tsne plot functions
+    Helper function to create a Shepard plot with normalized distances, including a perfect fit diagonal,
+    and displaying the rank correlation in the title.
+
     Parameters:
-    - model: tf.keras.Model
-        The trained feature extractor model.
-    - X: np.ndarray
-        Input features (NumPy array or compatible) from which t-SNE embeddings are computed.
-    - seed: int, optional
-        Random seed for t-SNE to ensure reproducibility.
+    - features: High-dimensional features
+    - tsne_result: 2D coordinates from t-SNE
 
     Returns:
-    - Tuple[str, str]
-        A tuple containing the path to the saved Shepard plot and the t-SNE plot.
+    - Plots the Shepard plot
     """
-    # Extract features using the trained model
-    features = model.predict(X)
+    # Calculate pairwise distances in the original and reduced space
+    distances_original = pdist(features, 'euclidean')
+    distances_tsne = pdist(tsne_result, 'euclidean')
 
-    # Compute pairwise distances in the original feature space
-    original_distances = pdist(features, metric='euclidean')
+    # Normalize distances
+    scaler = MinMaxScaler()
+    distances_original_norm = scaler.fit_transform(distances_original[:, np.newaxis]).flatten()
+    distances_tsne_norm = scaler.fit_transform(distances_tsne[:, np.newaxis]).flatten()
 
-    # Apply t-SNE to reduce dimensionality to 2D for visualization
-    tsne = TSNE(n_components=2, random_state=seed, metric='euclidean')
-    tsne_features = tsne.fit_transform(features)
+    # Calculate Spearman's rank correlation
+    rho, _ = spearmanr(distances_original_norm, distances_tsne_norm)
 
-    # Compute pairwise distances in the t-SNE space
-    tsne_distances = pdist(tsne_features, metric='euclidean')
-
-    # Plot Shepard diagram: original vs. t-SNE distances
-    plt.figure(figsize=(8, 6))
-    plt.scatter(original_distances, tsne_distances, alpha=0.6)
-    plt.title('Shepard Diagram')
-    plt.xlabel('Original Feature Distances')
-    plt.ylabel('t-SNE Feature Distances')
+    # Plot normalized distances
+    plt.scatter(distances_original_norm, distances_tsne_norm, alpha=0.5)
+    plt.plot([0, 1], [0, 1], 'k--')  # Perfect fit diagonal
+    plt.xlabel('Normalized Original Distances')
+    plt.ylabel('Normalized t-SNE Distances')
+    plt.title(f'Shepard Plot (ρ = {rho:.2f})')
     plt.grid(True)
 
-    # Linear fit to highlight the relationship
-    fit = np.polyfit(original_distances, tsne_distances, deg=1)
-    fit_fn = np.poly1d(fit)
-    plt.plot(original_distances, fit_fn(original_distances), '--k', alpha=0.75, label='Linear fit')
-
-    plt.legend()
-
-    shepard_plot_path = f'shepard_plot_{seed}.png'
-    plt.savefig(shepard_plot_path)
-    plt.close()
-
-    # Optionally, save the t-SNE plot as well for reference
-    plt.figure(figsize=(8, 6))
-    plt.scatter(tsne_features[:, 0], tsne_features[:, 1], alpha=0.6)
-    plt.title('t-SNE Visualization')
-    plt.xlabel('t-SNE Dimension 1')
-    plt.ylabel('t-SNE Dimension 2')
-    tsne_plot_path = f'tsne_plot_{seed}.png'
-    plt.savefig(tsne_plot_path)
-    plt.close()
-
-    return shepard_plot_path, tsne_plot_path
 
 def plot_tsne_extended(
         model, X, y,
@@ -199,7 +174,7 @@ def plot_tsne_extended(
     Returns:
     - Saves a 2D t-SNE plot to a file with a timestamp
     """
-    T = 1.57381089527 #0.4535
+    T = 1.57381089527  # 0.4535
     # Define the thresholds
     if threshold is None:
         threshold = np.log(T / np.exp(2)) + 1e-4
@@ -226,8 +201,12 @@ def plot_tsne_extended(
     elevated_event_indices = np.where((y > threshold) & (y <= sep_threshold))[0]
     below_threshold_indices = np.where(y <= threshold)[0]
 
-    plt.figure(figsize=(12, 8))
+    # plt.figure(figsize=(12, 8))
+    # Adjusted subplot layout
+    fig, axs = plt.subplots(2, 1, figsize=(12, 16), gridspec_kw={'height_ratios': [3, 1]})  # Adjust size as needed
 
+    # Plot t-SNE on the first subplot
+    plt.sca(axs[0])
     # Create scatter plot for below-threshold points (in gray)
     plt.scatter(tsne_result[below_threshold_indices, 0], tsne_result[below_threshold_indices, 1], marker='o',
                 color='gray', alpha=0.6)
@@ -265,6 +244,13 @@ def plot_tsne_extended(
     # plt.xlabel('Dimension 1')
     # plt.ylabel('Dimension 2')
 
+    # Plot Shepard plot on the second subplot
+    plt.sca(axs[1])
+    plot_shepard(features, tsne_result)
+
+    # Adjust the subplot layout
+    plt.tight_layout()
+
     # Save the plot
     file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
     plt.savefig(file_path)
@@ -276,6 +262,110 @@ def plot_tsne_extended(
 
     return file_path
 
+
+def plot_tsne_pds(model, X, y, title, prefix, save_tag=None, seed=42):
+    """
+    Applies t-SNE to the features extracted by the given model and saves the plot in 2D with a timestamp.
+    The color of the points is determined by their label values.
+
+    Parameters:
+    - model: Trained feature extractor model
+    - X: Input cme_files (NumPy array or compatible)
+    - y: Target labels (NumPy array or compatible)
+    - prefix: Prefix for the file name
+
+    Returns:
+    - Saves a 2D t-SNE plot to a file with a timestamp
+    """
+    T = 1.57381089527  # 0.4535
+    # Define the thresholds
+    threshold = np.log(T / np.exp(2)) + 1e-4
+    sep_threshold = np.log(T)
+
+    # Extract features using the trained model
+    features = model.predict(X)
+
+    # Apply t-SNE
+    tsne = TSNE(n_components=2, random_state=seed)
+    tsne_result = tsne.fit_transform(features)
+
+    # Identify indices based on thresholds
+    above_sep_threshold_indices = np.where(y > sep_threshold)[0]
+    elevated_event_indices = np.where((y > threshold) & (y <= sep_threshold))[0]
+    below_threshold_indices = np.where(y <= threshold)[0]
+
+    # plt.figure(figsize=(12, 8))
+    # Adjusted subplot layout
+    fig, axs = plt.subplots(2, 1, figsize=(12, 16), gridspec_kw={'height_ratios': [3, 1]})  # Adjust size as needed
+
+    # Plot t-SNE on the first subplot
+    plt.sca(axs[0])
+    # Create scatter plot for below-threshold points (in gray)
+    plt.scatter(tsne_result[below_threshold_indices, 0],
+                tsne_result[below_threshold_indices, 1],
+                marker='o',
+                color='gray', alpha=0.6)
+
+    # Normalize y-values for better color mapping
+    norm = plt.Normalize(y.min(), y.max())
+
+    # Compute marker sizes based on y-values
+    marker_sizes_elevated = 50 * ((y[elevated_event_indices] - y.min()) / (y.max() - y.min())) ** 2 + 10
+    marker_sizes_sep = 50 * ((y[above_sep_threshold_indices] - y.min()) / (y.max() - y.min())) ** 2 + 10
+
+    # Create scatter plot for elevated events (square marker)
+    plt.scatter(tsne_result[elevated_event_indices, 0],
+                tsne_result[elevated_event_indices, 1],
+                c=y[elevated_event_indices],
+                cmap='plasma',
+                norm=norm,
+                alpha=0.6,
+                marker='o',
+                s=marker_sizes_elevated)
+
+    # Create scatter plot for SEPs (diamond marker)
+    plt.scatter(tsne_result[above_sep_threshold_indices, 0],
+                tsne_result[above_sep_threshold_indices, 1],
+                c=y[above_sep_threshold_indices],
+                cmap='plasma',
+                norm=norm,
+                alpha=0.6,
+                marker='d',
+                s=marker_sizes_sep)
+
+    # Add a color bar
+    sm = plt.cm.ScalarMappable(cmap='plasma', norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm)
+    cbar.set_label('Label Value')
+
+    # Add legend
+    # Add a legend
+    legend_labels = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=10),
+                     plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='blue', markersize=10),
+                     plt.Line2D([0], [0], marker='d', color='w', markerfacecolor='red', markersize=10)]
+
+    plt.legend(legend_labels,
+               ['Background', 'Elevated Events (darker colors)', 'SEPs (lighter colors)'],
+               loc='upper left')
+
+    plt.title(f'{title}\nT-SNE Visualization')
+    # plt.xlabel('Dimension 1')
+    # plt.ylabel('Dimension 2')
+
+    # Plot Shepard plot on the second subplot
+    plt.sca(axs[1])
+    plot_shepard(features, tsne_result)
+
+    # Adjust the subplot layout
+    plt.tight_layout()
+
+    # Save the plot
+    file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
+    plt.savefig(file_path)
+    plt.close()
+
+    return file_path
 
 def plot_2D_pds(model, X, y, title, prefix, save_tag=None):
     """
@@ -358,83 +448,7 @@ def plot_2D_pds(model, X, y, title, prefix, save_tag=None):
     return file_path
 
 
-def plot_tsne_pds(model, X, y, title, prefix, save_tag=None, seed=42):
-    """
-    Applies t-SNE to the features extracted by the given model and saves the plot in 2D with a timestamp.
-    The color of the points is determined by their label values.
 
-    Parameters:
-    - model: Trained feature extractor model
-    - X: Input cme_files (NumPy array or compatible)
-    - y: Target labels (NumPy array or compatible)
-    - prefix: Prefix for the file name
-
-    Returns:
-    - Saves a 2D t-SNE plot to a file with a timestamp
-    """
-    T = 1.57381089527 # 0.4535
-    # Define the thresholds
-    threshold = np.log(T / np.exp(2)) + 1e-4
-    sep_threshold = np.log(T)
-
-    # Extract features using the trained model
-    features = model.predict(X)
-
-    # Apply t-SNE
-    tsne = TSNE(n_components=2, random_state=seed)
-    tsne_result = tsne.fit_transform(features)
-
-    # Identify indices based on thresholds
-    above_sep_threshold_indices = np.where(y > sep_threshold)[0]
-    elevated_event_indices = np.where((y > threshold) & (y <= sep_threshold))[0]
-    below_threshold_indices = np.where(y <= threshold)[0]
-
-    plt.figure(figsize=(12, 8))
-
-    # Create scatter plot for below-threshold points (in gray)
-    plt.scatter(tsne_result[below_threshold_indices, 0], tsne_result[below_threshold_indices, 1], marker='o',
-                color='gray', alpha=0.6)
-
-    # Normalize y-values for better color mapping
-    norm = plt.Normalize(y.min(), y.max())
-
-    # Compute marker sizes based on y-values
-    marker_sizes_elevated = 50 * ((y[elevated_event_indices] - y.min()) / (y.max() - y.min())) ** 2 + 10
-    marker_sizes_sep = 50 * ((y[above_sep_threshold_indices] - y.min()) / (y.max() - y.min())) ** 2 + 10
-
-    # Create scatter plot for elevated events (square marker)
-    plt.scatter(tsne_result[elevated_event_indices, 0], tsne_result[elevated_event_indices, 1],
-                c=y[elevated_event_indices], cmap='plasma', norm=norm, alpha=0.6, marker='o', s=marker_sizes_elevated)
-
-    # Create scatter plot for SEPs (diamond marker)
-    plt.scatter(tsne_result[above_sep_threshold_indices, 0], tsne_result[above_sep_threshold_indices, 1],
-                c=y[above_sep_threshold_indices], cmap='plasma', norm=norm, alpha=0.6, marker='d', s=marker_sizes_sep)
-
-    # Add a color bar
-    sm = plt.cm.ScalarMappable(cmap='plasma', norm=norm)
-    sm.set_array([])
-    cbar = plt.colorbar(sm)
-    cbar.set_label('Label Value')
-
-    # Add legend
-    # Add a legend
-    legend_labels = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=10),
-                     plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='blue', markersize=10),
-                     plt.Line2D([0], [0], marker='d', color='w', markerfacecolor='red', markersize=10)]
-
-    plt.legend(legend_labels, ['Background', 'Elevated Events (darker colors)', 'SEPs (lighter colors)'],
-               loc='upper left')
-
-    plt.title(f'{title}\nT-SNE Visualization')
-    # plt.xlabel('Dimension 1')
-    # plt.ylabel('Dimension 2')
-
-    # Save the plot
-    file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
-    plt.savefig(file_path)
-    plt.close()
-
-    return file_path
 
 
 def count_above_threshold(y_values: List[float], threshold: float = 0.3027, sep_threshold: float = 2.3026) -> Tuple[
@@ -525,6 +539,7 @@ def load_and_plot_tsne(
     """
     Load a trained model and plot its t-SNE visualization.
 
+    :param with_head:
     :param model_path: Path to the saved model.
     :param model_type: Type of model to load ('features', 'features_reg', 'features_reg_dec').
     :param title: Title for the t-SNE plot.

@@ -4,13 +4,12 @@ from datetime import datetime
 import numpy as np
 import tensorflow as tf
 import wandb
+from tensorflow.keras.callbacks import ReduceLROnPlateau
 from wandb.keras import WandbCallback
 
 from modules.evaluate.utils import plot_tsne_pds
 from modules.training import cme_modeling
 from modules.training.ts_modeling import build_dataset, create_mlp
-
-from tensorflow.keras.callbacks import ReduceLROnPlateau
 
 # SEEDING
 SEED = 42  # seed number
@@ -37,13 +36,12 @@ def main():
     print(f'devices: {devices}')
     # Define the dataset options, including the sharding policy
 
-
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for add_slope in [False]:
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
-            bs = 12000 # full dataset used
+            bs = 50  # full dataset used
             print(f'batch size : {bs}')
 
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -61,8 +59,8 @@ def main():
             # Set the early stopping patience and learning rate as variables
             Options = {
                 'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                'epochs': 10000,
-                'patience': 4000,  # Updated to 50
+                'epochs': 10,
+                'patience': 5,  # Updated to 50
                 'learning_rate': 1e-2,  # Updated to 3e-4
                 'weight_decay': 0,  # Added weight decay
                 'momentum_beta1': 0.95,  # Added momentum beta1
@@ -74,11 +72,11 @@ def main():
             reduce_lr_on_plateau_cb = ReduceLROnPlateau(
                 monitor='val_loss',  # Metric to monitor
                 factor=0.3,  # Factor by which the learning rate will be reduced. new_lr = lr * factor
-                patience=200,  # Number of epochs with no improvement after which learning rate will be reduced
+                patience=3,  # Number of epochs with no improvement after which learning rate will be reduced
                 verbose=1,  # If 1, prints a message when reducing the learning rate
                 mode='min',  # In 'min' mode, lr will reduce when the quantity monitored has stopped decreasing
                 min_delta=1e-4,  # Threshold for measuring the new optimum, to only focus on significant changes
-                cooldown=5,  # Number of epochs to wait before resuming normal operation after lr has been reduced
+                cooldown=1,  # Number of epochs to wait before resuming normal operation after lr has been reduced
                 min_lr=1e-8  # Lower bound on the learning rate
             )
 
@@ -128,20 +126,19 @@ def main():
             n_features = X_train.shape[1]
             print(f'n_features: {n_features}')
 
-
             # create the model
             mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=pds)
             mlp_model_sep.summary()
 
             mb.train_pds(mlp_model_sep,
-                        X_subtrain, y_subtrain,
-                        X_val, y_val,
-                        X_train, y_train,
-                        learning_rate=Options['learning_rate'],
-                        epochs=Options['epochs'],
-                        batch_size=Options['batch_size'],
-                        patience=Options['patience'], save_tag=current_time + "_features",
-                        callbacks_list=[WandbCallback(), reduce_lr_on_plateau_cb])
+                         X_subtrain, y_subtrain,
+                         X_val, y_val,
+                         X_train, y_train,
+                         learning_rate=Options['learning_rate'],
+                         epochs=Options['epochs'],
+                         batch_size=Options['batch_size'],
+                         patience=Options['patience'], save_tag=current_time + "_features",
+                         callbacks_list=[WandbCallback(), reduce_lr_on_plateau_cb])
 
             file_path = plot_tsne_pds(mlp_model_sep,
                                       X_train,
