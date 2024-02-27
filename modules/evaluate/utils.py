@@ -4,12 +4,12 @@ from typing import List, Tuple, Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+from scipy.spatial.distance import pdist
 from sklearn.manifold import TSNE
-from scipy.spatial.distance import pdist, squareform
-from scipy.stats import spearmanr
 from sklearn.preprocessing import MinMaxScaler
-from modules.training import seploader as sepl, cme_modeling
+from scipy.stats import spearmanr
 from modules.evaluate import evaluation as eval
+from modules.training import seploader as sepl
 
 
 def print_statistics(statistics: dict) -> None:
@@ -126,6 +126,7 @@ def plot_shepard(features, tsne_result):
     - Plots the Shepard plot
     """
     # Calculate pairwise distances in the original and reduced space
+    print('In plot_shepard')
     distances_original = pdist(features, 'euclidean')
     distances_tsne = pdist(tsne_result, 'euclidean')
 
@@ -134,16 +135,20 @@ def plot_shepard(features, tsne_result):
     distances_original_norm = scaler.fit_transform(distances_original[:, np.newaxis]).flatten()
     distances_tsne_norm = scaler.fit_transform(distances_tsne[:, np.newaxis]).flatten()
 
+    print('calculating the spearman rank correlation')
     # Calculate Spearman's rank correlation
     rho, _ = spearmanr(distances_original_norm, distances_tsne_norm)
-
+    print('plotting now...')
     # Plot normalized distances
-    plt.scatter(distances_original_norm, distances_tsne_norm, alpha=0.5)
+    plt.scatter(distances_original_norm, distances_tsne_norm, alpha=0.5, s=1)
     plt.plot([0, 1], [0, 1], 'k--')  # Perfect fit diagonal
     plt.xlabel('Normalized Original Distances')
     plt.ylabel('Normalized t-SNE Distances')
     plt.title(f'Shepard Plot (ρ = {rho:.2f})')
+    # plt.title(f'Shepard Plot')
     plt.grid(True)
+
+    print('Done with plot_shepard')
 
 
 def plot_tsne_extended(
@@ -203,7 +208,7 @@ def plot_tsne_extended(
 
     # plt.figure(figsize=(12, 8))
     # Adjusted subplot layout
-    fig, axs = plt.subplots(2, 1, figsize=(12, 16), gridspec_kw={'height_ratios': [3, 1]})  # Adjust size as needed
+    fig, axs = plt.subplots(2, 1, figsize=(16, 16), gridspec_kw={'height_ratios': [3, 1]})  # Adjust size as needed
 
     # Plot t-SNE on the first subplot
     plt.sca(axs[0])
@@ -296,7 +301,7 @@ def plot_tsne_pds(model, X, y, title, prefix, save_tag=None, seed=42):
 
     # plt.figure(figsize=(12, 8))
     # Adjusted subplot layout
-    fig, axs = plt.subplots(2, 1, figsize=(12, 16), gridspec_kw={'height_ratios': [3, 1]})  # Adjust size as needed
+    fig, axs = plt.subplots(2, 1, figsize=(16, 16), gridspec_kw={'height_ratios': [3, 1]})  # Adjust size as needed
 
     # Plot t-SNE on the first subplot
     plt.sca(axs[0])
@@ -353,6 +358,8 @@ def plot_tsne_pds(model, X, y, title, prefix, save_tag=None, seed=42):
     # plt.xlabel('Dimension 1')
     # plt.ylabel('Dimension 2')
 
+    print("Done with t-sne, starting with shepard...")
+
     # Plot Shepard plot on the second subplot
     plt.sca(axs[1])
     plot_shepard(features, tsne_result)
@@ -366,6 +373,7 @@ def plot_tsne_pds(model, X, y, title, prefix, save_tag=None, seed=42):
     plt.close()
 
     return file_path
+
 
 def plot_2D_pds(model, X, y, title, prefix, save_tag=None):
     """
@@ -446,9 +454,6 @@ def plot_2D_pds(model, X, y, title, prefix, save_tag=None):
     plt.close()
 
     return file_path
-
-
-
 
 
 def count_above_threshold(y_values: List[float], threshold: float = 0.3027, sep_threshold: float = 2.3026) -> Tuple[

@@ -1731,9 +1731,7 @@ class ModelBuilder:
 
     def pds_loss_dl_vec(self, y_true, z_pred, sample_weights=None, reduction=tf.keras.losses.Reduction.NONE):
         """
-        Adjusted vectorized computation of the weighted loss for a batch of predicted features
-        and their labels, incorporating optional pair-specific sample weights into the loss calculation,
-        ensuring each unique pair is considered exactly once.
+        Computes the weighted loss for a batch of predicted features and their labels.
 
         :param y_true: A batch of true label values, shape of [batch_size, 1].
         :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
@@ -1741,6 +1739,8 @@ class ModelBuilder:
         :param reduction: The type of reduction to apply to the loss.
         :return: The weighted average error for all unique combinations of the samples in the batch.
         """
+
+        batch_size = tf.shape(y_true)[0]
         # Compute pairwise differences for z_pred and y_true using broadcasting
         y_true_diff = y_true - tf.transpose(y_true)
         z_pred_diff = z_pred[:, tf.newaxis, :] - z_pred[tf.newaxis, :, :]
@@ -1752,35 +1752,62 @@ class ModelBuilder:
         y_diff_squared = tf.square(y_true_diff)
 
         # Compute the loss for each pair
-        pairwise_loss = .5 * tf.square(z_diff_squared - y_diff_squared)
+        pairwise_loss = 0.5 * tf.square(z_diff_squared - y_diff_squared)
 
-        # Use only the upper triangular part of the pairwise loss matrix, excluding the diagonal
-        mask = tf.linalg.band_part(tf.ones_like(pairwise_loss), 0, -1) - tf.linalg.band_part(
-            tf.ones_like(pairwise_loss), 0, 0)
+        # Apply sample weights if provided
+        if sample_weights is not None:
+            # Expand the flat array of sample weights into a matrix
+            weights_matrix = self.expand_sample_weights_to_matrix(sample_weights, batch_size)
+            # Apply the weights to the pairwise loss
+            pairwise_loss *= weights_matrix
+
+        # Mask to exclude self-comparisons (where i == j)
+        mask = 1 - tf.eye(batch_size, dtype=tf.float32)
+
+        # Apply mask to exclude self-comparisons from the loss calculation
         pairwise_loss_masked = pairwise_loss * mask
 
-        if sample_weights is not None:
-            # Assuming pair_weights are correctly ordered and aligned with the upper triangular part of the matrix
-            # This simplistic approach needs adjustment for actual indexing or reshaping to apply weights correctly
-            weighted_pairwise_loss_masked = pairwise_loss_masked  # Placeholder for actual weight application logic
-        else:
-            weighted_pairwise_loss_masked = pairwise_loss_masked
+        # Sum over all unique pairs
+        total_error = tf.reduce_sum(pairwise_loss_masked)
 
-        # Sum over the masked (and possibly weighted) pairwise losses
-        total_error = tf.reduce_sum(weighted_pairwise_loss_masked)
+        # Number of unique comparisons, excluding self-pairs
+        num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=tf.float32)
 
-        # Number of unique comparisons
-        batch_size = tf.shape(y_true)[0]
-        num_comparisons = tf.cast(batch_size * (batch_size - 1) / 2, dtype=tf.float32)
-
-        # Normalization and reduction
         if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error
+            return total_error / 2
         elif reduction == tf.keras.losses.Reduction.NONE:
-            normalized_error = total_error / (num_comparisons + 1e-9)  # Normalize by the number of unique pairs
-            return normalized_error
+            # Avoid division by zero
+            return total_error / (num_comparisons + 1e-9)
         else:
-            raise ValueError("Unsupported reduction type.")
+            raise ValueError(f"Unsupported reduction type: {reduction}.")
+
+    def expand_sample_weights_to_matrix(self, sample_weights, batch_size):
+        """
+        Expands a flat array of sample weights for unique pairs into a symmetric matrix.
+
+        :param sample_weights: A 1D tensor of sample weights for unique pairs.
+        :param batch_size: The number of samples in the batch.
+        :return weights_matrix: A 2D tensor of sample weights for all pairs in the batch.
+        """
+        # Ensure sample_weights is a 1D tensor
+        sample_weights = tf.reshape(sample_weights, [-1])
+
+        # Generate indices for the rows and columns
+        rows, cols = tf.meshgrid(tf.range(batch_size), tf.range(batch_size), indexing='ij')
+
+        # Identify the indices of the upper triangle (excluding the diagonal)
+        upper_tri_indices = tf.where(rows < cols)
+
+        # Create a matrix of zeros with the same shape as the desired output
+        weights_matrix = tf.zeros((batch_size, batch_size), dtype=sample_weights.dtype)
+
+        # Update the weights_matrix with sample_weights at the upper triangle indices
+        weights_matrix = tf.tensor_scatter_nd_update(weights_matrix, upper_tri_indices, sample_weights)
+
+        # Since the weights for the pairs are symmetric, we can add the transpose to fill in the lower triangle
+        weights_matrix += tf.transpose(weights_matrix)
+
+        return weights_matrix
 
     def update_pair_counts(self, label1, label2):
         label1 = label1[0]
@@ -1880,25 +1907,6 @@ class ModelBuilder:
 
         # Number of unique comparisons, excluding self-pairs
         num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=tf.float32)
-
-        # Print shapes and a sample of pairwise differences for debugging
-        # tf.print("y_true shape:", tf.shape(y_true))
-        # tf.print("z_pred shape:", tf.shape(z_pred))
-        # tf.print("y_true_diff shape:", tf.shape(y_true_diff))
-        # tf.print("z_pred_diff shape:", tf.shape(z_pred_diff))
-        #
-        # tf.print("Sample y_true_diff:", y_true_diff[0, :])
-        # tf.print("Sample z_pred_diff:", z_pred_diff[0, :, :])
-        #
-        # tf.print("Sample squared z_diff:", z_diff_squared[0, :])
-        # tf.print("Sample squared y_diff:", y_diff_squared[0, :])
-        # tf.print("Mask:", mask)
-        #
-        # tf.print("Pairwise loss (sample):", pairwise_loss[0, :])
-        # tf.print("Masked pairwise loss (sample):", pairwise_loss_masked[0, :])
-        #
-        # tf.print("Total error before normalization:", total_error)
-        # tf.print("Number of comparisons (num_comparisons):", num_comparisons)
 
         if reduction == tf.keras.losses.Reduction.SUM:
             return total_error / 2
@@ -2510,50 +2518,50 @@ if __name__ == '__main__':
     print("WITHOUT SAMPLE WEIGHTS")
     loss_tester = ModelBuilder()
     # Generate dummy data for testing
-    np.random.seed(42)  # For reproducibility
-    batch_size = 200
-    z_dim = 9
-    y_true_dummy = np.random.rand(batch_size, 1).astype(np.float32)
-    z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32)
-
-    print("y_true_dummy shape:", y_true_dummy.shape)
-    print("z_pred_dummy shape:", z_pred_dummy.shape)
-
-    # Convert NumPy arrays to TensorFlow tensors
-    y_true_tensor = tf.convert_to_tensor(y_true_dummy, dtype=tf.float32)
-    z_pred_tensor = tf.convert_to_tensor(z_pred_dummy, dtype=tf.float32)
-
-    # Time and compute loss using the original function
-    print("Computing loss using the original function...")
-    start_time_original = time.time()
-    loss_original = loss_tester.pds_loss(y_true_tensor, z_pred_tensor)
-    end_time_original = time.time()
-    original_duration = end_time_original - start_time_original
-
-    # Time and compute loss using the vectorized function
-    print("Computing loss using the vectorized function...")
-    start_time_vectorized = time.time()
-    loss_vectorized = loss_tester.pds_loss_vec(y_true_tensor, z_pred_tensor)
-    end_time_vectorized = time.time()
-    vectorized_duration = end_time_vectorized - start_time_vectorized
-
-    # Evaluate the TensorFlow tensors to get their numpy values
-    loss_original_value = loss_original.numpy()
-    loss_vectorized_value = loss_vectorized.numpy()
-
-    # Print the losses and timing for comparison
-    print(f"Original Loss: {loss_original_value}, Time Taken: {original_duration} seconds")
-    print(f"Vectorized Loss: {loss_vectorized_value}, Time Taken: {vectorized_duration} seconds")
-
-    # # Check if the losses are approximately equal
-    # np.testing.assert_almost_equal(loss_original_value, loss_vectorized_value, decimal=5)
-    # print("Test passed: The original and vectorized loss functions return approximately the same value.")
-
-    # Compare the execution time
-    if vectorized_duration < original_duration:
-        print(f"The vectorized function is faster by {original_duration - vectorized_duration} seconds.")
-    else:
-        print(f"The original function is faster by {vectorized_duration - original_duration} seconds.")
+    # np.random.seed(42)  # For reproducibility
+    # batch_size = 200
+    # z_dim = 9
+    # y_true_dummy = np.random.rand(batch_size, 1).astype(np.float32)
+    # z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32)
+    #
+    # print("y_true_dummy shape:", y_true_dummy.shape)
+    # print("z_pred_dummy shape:", z_pred_dummy.shape)
+    #
+    # # Convert NumPy arrays to TensorFlow tensors
+    # y_true_tensor = tf.convert_to_tensor(y_true_dummy, dtype=tf.float32)
+    # z_pred_tensor = tf.convert_to_tensor(z_pred_dummy, dtype=tf.float32)
+    #
+    # # Time and compute loss using the original function
+    # print("Computing loss using the original function...")
+    # start_time_original = time.time()
+    # loss_original = loss_tester.pds_loss(y_true_tensor, z_pred_tensor)
+    # end_time_original = time.time()
+    # original_duration = end_time_original - start_time_original
+    #
+    # # Time and compute loss using the vectorized function
+    # print("Computing loss using the vectorized function...")
+    # start_time_vectorized = time.time()
+    # loss_vectorized = loss_tester.pds_loss_vec(y_true_tensor, z_pred_tensor)
+    # end_time_vectorized = time.time()
+    # vectorized_duration = end_time_vectorized - start_time_vectorized
+    #
+    # # Evaluate the TensorFlow tensors to get their numpy values
+    # loss_original_value = loss_original.numpy()
+    # loss_vectorized_value = loss_vectorized.numpy()
+    #
+    # # Print the losses and timing for comparison
+    # print(f"Original Loss: {loss_original_value}, Time Taken: {original_duration} seconds")
+    # print(f"Vectorized Loss: {loss_vectorized_value}, Time Taken: {vectorized_duration} seconds")
+    #
+    # # # Check if the losses are approximately equal
+    # # np.testing.assert_almost_equal(loss_original_value, loss_vectorized_value, decimal=5)
+    # # print("Test passed: The original and vectorized loss functions return approximately the same value.")
+    #
+    # # Compare the execution time
+    # if vectorized_duration < original_duration:
+    #     print(f"The vectorized function is faster by {original_duration - vectorized_duration} seconds.")
+    # else:
+    #     print(f"The original function is faster by {vectorized_duration - original_duration} seconds.")
 
     print("WITH SAMPLE WEIGHTS")
     # Generate dummy data for testing
