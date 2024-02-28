@@ -711,8 +711,8 @@ def generate_feature_names(inputs_to_use: List[str], add_slope: bool) -> List[st
 
     This function dynamically creates feature names for time-lagged inputs and optionally for slope features,
     given a list of input types (e.g., ['e0.5', 'e1.8', 'p']). For each input type, it generates names for features
-    representing lagged values up to 24 hours prior ('tminus24' to 't') and, if requested, adds a name for the slope
-    feature associated with each input type.
+    representing lagged values up to 24 hours prior ('tminus24' to 't') and, if requested, adds names for the slope
+    feature associated with each input type, indicating specific time lags between which the slope is calculated.
 
     Parameters:
     - inputs_to_use (List[str]): A list of strings representing the input types for which features should be generated.
@@ -722,8 +722,8 @@ def generate_feature_names(inputs_to_use: List[str], add_slope: bool) -> List[st
     - List[str]: A list containing the generated feature names.
 
     Example:
-    >>> generate_feature_names(['e0.5', 'p'], add_slope=True)
-    ['e0.5_tminus24', 'e0.5_tminus23', ..., 'e0.5_t', 'e0.5_slope', 'p_tminus24', ..., 'p_t', 'p_slope']
+     generate_feature_names(['e0.5', 'p'], add_slope=True)
+    ['e0.5_tminus24', 'e0.5_tminus23', ..., 'e0.5_t', 'e0.5_slope_tminus24_to_tminus23', ..., 'e0.5_slope_tminus1_to_t', 'p_tminus24', ..., 'p_t', 'p_slope_tminus24_to_tminus23', ..., 'p_slope_tminus1_to_t']
     """
     feature_names = []  # Initialize the list to store generated feature names
 
@@ -732,9 +732,13 @@ def generate_feature_names(inputs_to_use: List[str], add_slope: bool) -> List[st
         # Generate feature names for lagged inputs from tminus24 to t
         feature_names += [f'{input_type}_tminus{i}' for i in range(24, 0, -1)] + [f'{input_type}_t']
 
-        # If add_slope is True, add a slope feature name for the current input type
-        if add_slope:
-            feature_names.append(f'{input_type}_slope')
+    # If add_slope is True, add slope feature names for the current input type
+    if add_slope:
+        for input_type in inputs_to_use:
+            # Add slope names from tminus24 to tminus1
+            feature_names += [f'{input_type}_slope_tminus{i}_to_tminus{i - 1}' for i in range(24, 1, -1)]
+            # Add slope name from tminus1 to t
+            feature_names.append(f'{input_type}_slope_tminus1_to_t')
 
     # Return the list of generated feature names
     return feature_names

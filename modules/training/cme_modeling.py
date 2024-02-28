@@ -346,6 +346,7 @@ class ModelBuilder:
                               verbose: int = 1) -> callbacks.History:
         """
         Trains the model and returns the training history.
+        TODO: needs to fix ASAP when worker > 1 and NAN happens
 
         :param subtrain_ds: The training feature set.
         :param val_ds: Validation features.
@@ -530,15 +531,27 @@ class ModelBuilder:
         :param joint_weight_indices: A list of tuples, each containing a pair of indices for which a joint weight exists.
         :return: An array containing joint weights corresponding to the batch of indices.
         """
+        # batch_weights = []
+        # for i in batch_indices:
+        #     for j in batch_indices:
+        #         if i < j:  # Only consider pairs (i, j) where i < j
+        #             try:
+        #                 weight_idx = joint_weight_indices.index((i, j))
+        #             except ValueError:
+        #                 continue  # Skip if the pair doesn't have a corresponding weight
+        #             batch_weights.append(joint_weights[weight_idx])  # Append the weight for this pair
+        #
+        # return np.array(batch_weights)
+        # Convert list of tuples into a dictionary for O(1) lookup
+        weight_dict = {pair: weight for pair, weight in zip(joint_weight_indices, joint_weights)}
+
         batch_weights = []
         for i in batch_indices:
             for j in batch_indices:
                 if i < j:  # Only consider pairs (i, j) where i < j
-                    try:
-                        weight_idx = joint_weight_indices.index((i, j))
-                    except ValueError:
-                        continue  # Skip if the pair doesn't have a corresponding weight
-                    batch_weights.append(joint_weights[weight_idx])  # Append the weight for this pair
+                    weight = weight_dict.get((i, j))
+                    if weight is not None:
+                        batch_weights.append(weight)
 
         return np.array(batch_weights)
 
@@ -778,14 +791,14 @@ class ModelBuilder:
 
         for epoch in range(epochs):
             train_loss = self.train_for_one_epoch(
-                model, optimizer, self.pds_loss_dl,
+                model, optimizer, self.pds_loss_dl_vec,
                 X_subtrain, y_subtrain,
                 batch_size=batch_size if batch_size > 0 else len(y_subtrain),
                 joint_weights=sample_joint_weights,
                 joint_weight_indices=sample_joint_weights_indices)
 
             val_loss = self.train_for_one_epoch(
-                model, optimizer, self.pds_loss_dl, X_val, y_val,
+                model, optimizer, self.pds_loss_dl_vec, X_val, y_val,
                 batch_size=batch_size if batch_size > 0 else len(y_val),
                 joint_weights=val_sample_joint_weights,
                 joint_weight_indices=val_sample_joint_weights_indices, training=False)
@@ -829,7 +842,7 @@ class ModelBuilder:
         for epoch in range(best_epoch):
             retrain_loss = self.train_for_one_epoch(
                 model, optimizer,
-                self.pds_loss_dl,
+                self.pds_loss_dl_vec,
                 X_train, y_train,
                 batch_size=batch_size if batch_size > 0 else len(y_train),
                 joint_weights=train_sample_joint_weights,
@@ -845,141 +858,141 @@ class ModelBuilder:
 
         return history
 
-    def train_pds_dl_bs(self,
-                        model: tf.keras.Model,
-                        X_subtrain: np.ndarray,
-                        y_subtrain: np.ndarray,
-                        X_val: np.ndarray,
-                        y_val: np.ndarray,
-                        X_train: np.ndarray,
-                        y_train: np.ndarray,
-                        sample_joint_weights: Optional[np.ndarray] = None,
-                        sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
-                        val_sample_joint_weights: Optional[np.ndarray] = None,
-                        val_sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
-                        train_sample_joint_weights: Optional[np.ndarray] = None,
-                        train_sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
-                        learning_rate: float = 1e-3,
-                        epochs: int = 100,
-                        batch_sizes=None,
-                        patience: int = 9,
-                        save_tag: Optional[str] = None) -> dict:
-        """
-        Custom training loop to train the model and returns the training history.
-        Per epoch batch size variation
-
-        :param train_sample_joint_weights_indices:
-        :param train_sample_joint_weights:
-        :param y_train:
-        :param X_train:
-        :param model: The TensorFlow model to train.
-        :param X_subtrain: The training feature set.
-        :param y_subtrain: The training labels.
-        :param X_val: Validation features.
-        :param y_val: Validation labels.
-        :param sample_joint_weights: The reweighting factors for pairs of labels in training set.
-        :param sample_joint_weights_indices: Indices of the reweighting factors in training set.
-        :param val_sample_joint_weights: The reweighting factors for pairs of labels in validation set.
-        :param val_sample_joint_weights_indices: Indices of the reweighting factors in validation set.
-        :param learning_rate: The learning rate for the Adam optimizer.
-        :param epochs: The maximum number of epochs for training.
-        :param batch_sizes: The batch size for training.
-        :param patience: The number of epochs with no improvement to wait before early stopping.
-        :param save_tag: Tag to use for saving experiments.
-        :return: The training history as a dictionary.
-        """
-
-        # Initialize early stopping and best epoch variables
-        if batch_sizes is None:
-            batch_sizes = [32]
-        best_val_loss = float('inf')
-        best_epoch = 0
-        epochs_without_improvement = 0
-
-        # Initialize TensorBoard
-        # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        # tensorboard_cb = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
-        #
-        # print("Run the command line:\n tensorboard --logdir logs/fit")
-
-        # Optimizer and history initialization
-        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-        history = {'loss': [], 'val_loss': []}
-
-        for epoch in range(epochs):
-            batch_size = random.choice(batch_sizes)
-            train_loss = self.train_for_one_epoch(
-                model, optimizer,
-                self.pds_loss_dl,
-                X_subtrain, y_subtrain,
-                batch_size=batch_size if batch_size > 0 else len(y_subtrain),
-                joint_weights=sample_joint_weights,
-                joint_weight_indices=sample_joint_weights_indices)
-
-            val_loss = self.train_for_one_epoch(
-                model, optimizer,
-                self.pds_loss_dl,
-                X_val, y_val,
-                batch_size=batch_size if batch_size > 0 else len(y_val),
-                training=False,
-                joint_weights=val_sample_joint_weights,
-                joint_weight_indices=val_sample_joint_weights_indices)
-
-            # Log and save epoch losses
-            history['loss'].append(train_loss)
-            history['val_loss'].append(val_loss)
-
-            print(f"Epoch {epoch + 1}/{epochs}, Loss: {train_loss}, Validation Loss: {val_loss}")
-
-            # Early stopping logic
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                best_epoch = epoch
-                epochs_without_improvement = 0
-                # Save the model weights
-                model.save_weights(f"best_model_weights_{str(save_tag)}.h5")
-            else:
-                epochs_without_improvement += 1
-                if epochs_without_improvement >= patience:
-                    print("Early stopping triggered.")
-                    break
-
-        # Plotting the losses
-        plt.plot(history['loss'], label='Training Loss')
-        plt.plot(history['val_loss'], label='Validation Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.title('Training and Validation Loss Over Epochs')
-        plt.legend()
-        plt.savefig(f"training_plot_{str(save_tag)}.png")
-        plt.close()
-
-        # Retraining on the combined dataset
-        print(f"Retraining to the best epoch: {best_epoch}")
-        # Reset history for retraining
-        retrain_history = {'loss': []}
-
-        # NOTE: test if this fixes the issue
-        # Retrain up to the best epoch
-        for epoch in range(best_epoch):
-            batch_size = random.choice(batch_sizes)
-            retrain_loss = self.train_for_one_epoch(
-                model, optimizer,
-                self.pds_loss_dl,
-                X_train, y_train,
-                batch_size=batch_size if batch_size > 0 else len(y_train),
-                joint_weights=train_sample_joint_weights,
-                joint_weight_indices=train_sample_joint_weights_indices)
-
-            # Log the retrain loss
-            retrain_history['loss'].append(retrain_loss)
-
-            print(f"Retrain Epoch {epoch + 1}/{best_epoch}, Loss: {retrain_loss}")
-
-        # Save the final model
-        model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
-
-        return history
+    # def train_pds_dl_bs(self,
+    #                     model: tf.keras.Model,
+    #                     X_subtrain: np.ndarray,
+    #                     y_subtrain: np.ndarray,
+    #                     X_val: np.ndarray,
+    #                     y_val: np.ndarray,
+    #                     X_train: np.ndarray,
+    #                     y_train: np.ndarray,
+    #                     sample_joint_weights: Optional[np.ndarray] = None,
+    #                     sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
+    #                     val_sample_joint_weights: Optional[np.ndarray] = None,
+    #                     val_sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
+    #                     train_sample_joint_weights: Optional[np.ndarray] = None,
+    #                     train_sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
+    #                     learning_rate: float = 1e-3,
+    #                     epochs: int = 100,
+    #                     batch_sizes=None,
+    #                     patience: int = 9,
+    #                     save_tag: Optional[str] = None) -> dict:
+    #     """
+    #     Custom training loop to train the model and returns the training history.
+    #     Per epoch batch size variation
+    #
+    #     :param train_sample_joint_weights_indices:
+    #     :param train_sample_joint_weights:
+    #     :param y_train:
+    #     :param X_train:
+    #     :param model: The TensorFlow model to train.
+    #     :param X_subtrain: The training feature set.
+    #     :param y_subtrain: The training labels.
+    #     :param X_val: Validation features.
+    #     :param y_val: Validation labels.
+    #     :param sample_joint_weights: The reweighting factors for pairs of labels in training set.
+    #     :param sample_joint_weights_indices: Indices of the reweighting factors in training set.
+    #     :param val_sample_joint_weights: The reweighting factors for pairs of labels in validation set.
+    #     :param val_sample_joint_weights_indices: Indices of the reweighting factors in validation set.
+    #     :param learning_rate: The learning rate for the Adam optimizer.
+    #     :param epochs: The maximum number of epochs for training.
+    #     :param batch_sizes: The batch size for training.
+    #     :param patience: The number of epochs with no improvement to wait before early stopping.
+    #     :param save_tag: Tag to use for saving experiments.
+    #     :return: The training history as a dictionary.
+    #     """
+    #
+    #     # Initialize early stopping and best epoch variables
+    #     if batch_sizes is None:
+    #         batch_sizes = [32]
+    #     best_val_loss = float('inf')
+    #     best_epoch = 0
+    #     epochs_without_improvement = 0
+    #
+    #     # Initialize TensorBoard
+    #     # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    #     # tensorboard_cb = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+    #     #
+    #     # print("Run the command line:\n tensorboard --logdir logs/fit")
+    #
+    #     # Optimizer and history initialization
+    #     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    #     history = {'loss': [], 'val_loss': []}
+    #
+    #     for epoch in range(epochs):
+    #         batch_size = random.choice(batch_sizes)
+    #         train_loss = self.train_for_one_epoch(
+    #             model, optimizer,
+    #             self.pds_loss_dl_vec,
+    #             X_subtrain, y_subtrain,
+    #             batch_size=batch_size if batch_size > 0 else len(y_subtrain),
+    #             joint_weights=sample_joint_weights,
+    #             joint_weight_indices=sample_joint_weights_indices)
+    #
+    #         val_loss = self.train_for_one_epoch(
+    #             model, optimizer,
+    #             self.pds_loss_dl_vec,
+    #             X_val, y_val,
+    #             batch_size=batch_size if batch_size > 0 else len(y_val),
+    #             training=False,
+    #             joint_weights=val_sample_joint_weights,
+    #             joint_weight_indices=val_sample_joint_weights_indices)
+    #
+    #         # Log and save epoch losses
+    #         history['loss'].append(train_loss)
+    #         history['val_loss'].append(val_loss)
+    #
+    #         print(f"Epoch {epoch + 1}/{epochs}, Loss: {train_loss}, Validation Loss: {val_loss}")
+    #
+    #         # Early stopping logic
+    #         if val_loss < best_val_loss:
+    #             best_val_loss = val_loss
+    #             best_epoch = epoch
+    #             epochs_without_improvement = 0
+    #             # Save the model weights
+    #             model.save_weights(f"best_model_weights_{str(save_tag)}.h5")
+    #         else:
+    #             epochs_without_improvement += 1
+    #             if epochs_without_improvement >= patience:
+    #                 print("Early stopping triggered.")
+    #                 break
+    #
+    #     # Plotting the losses
+    #     plt.plot(history['loss'], label='Training Loss')
+    #     plt.plot(history['val_loss'], label='Validation Loss')
+    #     plt.xlabel('Epoch')
+    #     plt.ylabel('Loss')
+    #     plt.title('Training and Validation Loss Over Epochs')
+    #     plt.legend()
+    #     plt.savefig(f"training_plot_{str(save_tag)}.png")
+    #     plt.close()
+    #
+    #     # Retraining on the combined dataset
+    #     print(f"Retraining to the best epoch: {best_epoch}")
+    #     # Reset history for retraining
+    #     retrain_history = {'loss': []}
+    #
+    #     # NOTE: test if this fixes the issue
+    #     # Retrain up to the best epoch
+    #     for epoch in range(best_epoch):
+    #         batch_size = random.choice(batch_sizes)
+    #         retrain_loss = self.train_for_one_epoch(
+    #             model, optimizer,
+    #             self.pds_loss_dl_vec,
+    #             X_train, y_train,
+    #             batch_size=batch_size if batch_size > 0 else len(y_train),
+    #             joint_weights=train_sample_joint_weights,
+    #             joint_weight_indices=train_sample_joint_weights_indices)
+    #
+    #         # Log the retrain loss
+    #         retrain_history['loss'].append(retrain_loss)
+    #
+    #         print(f"Retrain Epoch {epoch + 1}/{best_epoch}, Loss: {retrain_loss}")
+    #
+    #     # Save the final model
+    #     model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
+    #
+    #     return history
 
     def train_pds_dl_heads(self,
                            model: tf.keras.Model,
@@ -1041,7 +1054,7 @@ class ModelBuilder:
         epochs_for_estimation = 5
 
         gamma_coeff, lambda_coeff = self.estimate_gamma_lambda_coeffs(
-            model, X_subtrain, y_subtrain, self.pds_loss_dl,
+            model, X_subtrain, y_subtrain, self.pds_loss_dl_vec,
             sample_weights, sample_joint_weights, sample_joint_weights_indices,
             learning_rate=learning_rate, n_epochs=epochs_for_estimation,
             batch_size=batch_size if batch_size > 0 else len(y_subtrain),
@@ -1061,14 +1074,14 @@ class ModelBuilder:
 
         for epoch in range(epochs):
             train_loss = self.train_for_one_epoch_mh(
-                model, optimizer, self.pds_loss_dl, X_subtrain, y_subtrain,
+                model, optimizer, self.pds_loss_dl_vec, X_subtrain, y_subtrain,
                 batch_size=batch_size if batch_size > 0 else len(y_subtrain)
                 , gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
                 sample_weights=sample_weights, joint_weights=sample_joint_weights,
                 joint_weight_indices=sample_joint_weights_indices, with_reg=with_reg, with_ae=with_ae)
 
             val_loss = self.train_for_one_epoch_mh(
-                model, optimizer, self.pds_loss_dl, X_val, y_val,
+                model, optimizer, self.pds_loss_dl_vec, X_val, y_val,
                 batch_size=batch_size if batch_size > 0 else len(y_val),
                 gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
                 sample_weights=val_sample_weights, joint_weights=val_sample_joint_weights,
@@ -1113,7 +1126,7 @@ class ModelBuilder:
         # Retrain up to the best epoch
         for epoch in range(best_epoch):
             retrain_loss = self.train_for_one_epoch_mh(
-                model, optimizer, self.pds_loss_dl, X_train, y_train,
+                model, optimizer, self.pds_loss_dl_vec, X_train, y_train,
                 batch_size=batch_size if batch_size > 0 else len(y_train),
                 gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
                 sample_weights=train_sample_weights,

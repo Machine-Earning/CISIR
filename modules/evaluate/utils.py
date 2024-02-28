@@ -144,7 +144,7 @@ def plot_shepard(features, tsne_result):
     plt.plot([0, 1], [0, 1], 'k--')  # Perfect fit diagonal
     plt.xlabel('Normalized Original Distances')
     plt.ylabel('Normalized t-SNE Distances')
-    plt.title(f'Shepard Plot (ρ = {rho:.2f})')
+    plt.title(f'Shepard Plot (correlation = {rho:.2f})')
     # plt.title(f'Shepard Plot')
     plt.grid(True)
 
@@ -208,7 +208,7 @@ def plot_tsne_extended(
 
     # plt.figure(figsize=(12, 8))
     # Adjusted subplot layout
-    fig, axs = plt.subplots(2, 1, figsize=(16, 16), gridspec_kw={'height_ratios': [3, 1]})  # Adjust size as needed
+    fig, axs = plt.subplots(2, 1, figsize=(18, 16), gridspec_kw={'height_ratios': [2, 1]})  # Adjust size as needed
 
     # Plot t-SNE on the first subplot
     plt.sca(axs[0])
@@ -301,7 +301,7 @@ def plot_tsne_pds(model, X, y, title, prefix, save_tag=None, seed=42):
 
     # plt.figure(figsize=(12, 8))
     # Adjusted subplot layout
-    fig, axs = plt.subplots(2, 1, figsize=(16, 16), gridspec_kw={'height_ratios': [3, 1]})  # Adjust size as needed
+    fig, axs = plt.subplots(2, 1, figsize=(18, 16), gridspec_kw={'height_ratios': [2, 1]})  # Adjust size as needed
 
     # Plot t-SNE on the first subplot
     plt.sca(axs[0])
