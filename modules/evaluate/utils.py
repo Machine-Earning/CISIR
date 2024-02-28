@@ -5,9 +5,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from scipy.spatial.distance import pdist
+from scipy.stats import spearmanr
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import MinMaxScaler
-from scipy.stats import spearmanr
+
 from modules.evaluate import evaluation as eval
 from modules.training import seploader as sepl
 
@@ -111,6 +112,63 @@ def split_combined_joint_weights_indices(
             val_indices.append((i - len_train, j - len_train))
 
     return np.array(train_weights), train_indices, np.array(val_weights), val_indices
+
+
+def plot_repr_correlation(model, X, y, title, model_type='features'):
+    """
+    Plots the correlation between distances in target values and distances in the representation space.
+
+    Parameters:
+    - model: The trained model used to transform input features into a representation space.
+    - X: Input features (NumPy array or compatible).
+    - y: Target values (NumPy array or compatible).
+    - title: Title for the plot.
+    - model_type: The type of model to use (features, features_reg, features_dec, features_reg_dec).
+
+    Returns:
+    - Plots the representation distance correlation plot.
+    """
+    print('In plot_repr_correlation')
+    # Extract features using the trained extended model
+    if model_type == 'features_reg_dec':
+        representations, _, _ = model.predict(X)
+    elif model_type == 'features_reg' or model_type == 'features_dec':
+        representations, _ = model.predict(X)
+    else:  # model_type == 'features'
+        representations = model.predict(X)
+
+    print('Calculating the pairwise distances')
+    # Calculate pairwise distances in the target space and representation space
+    distances_target = pdist(y[:, np.newaxis], 'euclidean')
+    distances_repr = pdist(representations, 'euclidean')
+
+    # Normalize distances to [0, 1] range for better comparison
+    scaler = MinMaxScaler()
+    distances_target_norm = scaler.fit_transform(distances_target.reshape(-1, 1)).flatten()
+    distances_repr_norm = scaler.fit_transform(distances_repr.reshape(-1, 1)).flatten()
+
+    print('Calculating the spearman rank correlation')
+    # Calculate Spearman's rank correlation coefficient
+    rho, _ = spearmanr(distances_target_norm, distances_repr_norm)
+
+    # Normalize label intensities for color mapping
+    norm = plt.Normalize(y.min(), y.max())
+
+    # Create scatter plot with color-coded label intensities
+    plt.figure(figsize=(8, 6))
+    scatter = plt.scatter(distances_target_norm, distances_repr_norm, c=y, cmap='viridis', norm=norm, alpha=0.6)
+    plt.colorbar(scatter, label='Label Intensity')
+    plt.xlabel('Normalized Distance in Target Space')
+    plt.ylabel('Normalized Distance in Representation Space')
+    plt.title(f'{title}\nRepresentation Space Correlation (Spearman ρ = {rho:.2f})')
+    plt.grid(True)
+    # plt.show()
+    # save the plot
+    file_path = f"representation_correlation_{title}.png"
+    plt.savefig(file_path)
+    plt.close()
+
+    return file_path
 
 
 def plot_shepard(features, tsne_result):

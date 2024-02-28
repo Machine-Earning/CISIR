@@ -7,7 +7,7 @@ import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from wandb.keras import WandbCallback
 
-from modules.evaluate.utils import plot_tsne_pds
+from modules.evaluate.utils import plot_tsne_pds, plot_repr_correlation
 from modules.training import cme_modeling
 from modules.training.ts_modeling import build_dataset, create_mlp
 
@@ -162,6 +162,11 @@ def main():
             # Log t-SNE plot for testing
             # Log the testing t-SNE plot to wandb
             wandb.log({'tsne_testing_plot': wandb.Image(file_path)})
+            print('file_path: ' + file_path)
+
+            file_path = plot_repr_correlation(mlp_model_sep, X_test, y_test, title)
+            # Log the representation correlation plot to wandb
+            wandb.log({'representation_correlation_plot': wandb.Image(file_path)})
             print('file_path: ' + file_path)
 
             # Finish the wandb run
