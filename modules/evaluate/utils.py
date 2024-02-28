@@ -154,7 +154,8 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
 
     # Create scatter plot
     plt.figure(figsize=(8, 6))
-    plt.scatter(distances_target_norm, distances_repr_norm, alpha=0.5)
+    plt.scatter(distances_target_norm, distances_repr_norm, alpha=0.5, s=1)
+    plt.plot([0, 1], [0, 1], 'k--')  # Perfect fit diagonal
     plt.xlabel('Normalized Distance in Target Space')
     plt.ylabel('Normalized Distance in Representation Space')
     plt.title(f'{title}\nRepresentation Space Correlation (Spearman ρ = {rho:.2f})')
