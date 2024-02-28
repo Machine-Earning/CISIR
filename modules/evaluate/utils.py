@@ -128,6 +128,7 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
     Returns:
     - Plots the representation distance correlation plot.
     """
+    # Get representations from the model
     print('In plot_repr_correlation')
     # Extract features using the trained extended model
     if model_type == 'features_reg_dec':
@@ -137,7 +138,7 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
     else:  # model_type == 'features'
         representations = model.predict(X)
 
-    print('Calculating the pairwise distances')
+    print('calculating the pairwise distances')
     # Calculate pairwise distances in the target space and representation space
     distances_target = pdist(y[:, np.newaxis], 'euclidean')
     distances_repr = pdist(representations, 'euclidean')
@@ -147,17 +148,13 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
     distances_target_norm = scaler.fit_transform(distances_target.reshape(-1, 1)).flatten()
     distances_repr_norm = scaler.fit_transform(distances_repr.reshape(-1, 1)).flatten()
 
-    print('Calculating the spearman rank correlation')
+    print('calculating the spearman rank correlation')
     # Calculate Spearman's rank correlation coefficient
     rho, _ = spearmanr(distances_target_norm, distances_repr_norm)
 
-    # Normalize label intensities for color mapping
-    norm = plt.Normalize(y.min(), y.max())
-
-    # Create scatter plot with color-coded label intensities
+    # Create scatter plot
     plt.figure(figsize=(8, 6))
-    scatter = plt.scatter(distances_target_norm, distances_repr_norm, c=y, cmap='viridis', norm=norm, alpha=0.6)
-    plt.colorbar(scatter, label='Label Intensity')
+    plt.scatter(distances_target_norm, distances_repr_norm, alpha=0.5)
     plt.xlabel('Normalized Distance in Target Space')
     plt.ylabel('Normalized Distance in Representation Space')
     plt.title(f'{title}\nRepresentation Space Correlation (Spearman ρ = {rho:.2f})')
@@ -169,7 +166,6 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
     plt.close()
 
     return file_path
-
 
 def plot_shepard(features, tsne_result):
     """
