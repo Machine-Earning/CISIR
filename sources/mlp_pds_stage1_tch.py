@@ -37,7 +37,7 @@ def main():
     # Define the dataset options, including the sharding policy
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [False]:
+        for add_slope in [True]:
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
@@ -81,7 +81,7 @@ def main():
             # )
 
             # Initialize wandb
-            wandb.init(project="mlp-ts-pds", name=experiment_name, config={
+            wandb.init(project="mlp-ts-pds-delta", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
                 "patience": Options['patience'],
