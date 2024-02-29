@@ -41,7 +41,7 @@ def main():
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
-            bs = 50  # full dataset used
+            bs = 9000  # full dataset used
             print(f'batch size : {bs}')
 
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -59,8 +59,8 @@ def main():
             # Set the early stopping patience and learning rate as variables
             Options = {
                 'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                'epochs': 10,
-                'patience': 5,  # Updated to 50
+                'epochs': 10000,
+                'patience': 1000,  # Updated to 50
                 'learning_rate': 1e-2,  # Updated to 3e-4
                 'weight_decay': 0,  # Added weight decay
                 'momentum_beta1': 0.95,  # Added momentum beta1
@@ -68,22 +68,24 @@ def main():
             hiddens = [100, 100, 50]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
             pds = True
+            target_change = True
             # Callback for reducing learning rate when a metric has stopped improving
-            # reduce_lr_on_plateau_cb = ReduceLROnPlateau(
-            #     monitor='val_loss',  # Metric to monitor
-            #     factor=0.3,  # Factor by which the learning rate will be reduced. new_lr = lr * factor
-            #     patience=3,  # Number of epochs with no improvement after which learning rate will be reduced
-            #     verbose=1,  # If 1, prints a message when reducing the learning rate
-            #     mode='min',  # In 'min' mode, lr will reduce when the quantity monitored has stopped decreasing
-            #     min_delta=1e-4,  # Threshold for measuring the new optimum, to only focus on significant changes
-            #     cooldown=1,  # Number of epochs to wait before resuming normal operation after lr has been reduced
-            #     min_lr=1e-8  # Lower bound on the learning rate
-            # )
+            reduce_lr_on_plateau_cb = ReduceLROnPlateau(
+                monitor='val_loss',  # Metric to monitor
+                factor=0.5,  # Factor by which the learning rate will be reduced. new_lr = lr * factor
+                patience=150,  # Number of epochs with no improvement after which learning rate will be reduced
+                verbose=1,  # If 1, prints a message when reducing the learning rate
+                mode='min',  # In 'min' mode, lr will reduce when the quantity monitored has stopped decreasing
+                min_delta=1e-4,  # Threshold for measuring the new optimum, to only focus on significant changes
+                cooldown=1,  # Number of epochs to wait before resuming normal operation after lr has been reduced
+                min_lr=1e-8  # Lower bound on the learning rate
+            )
 
             # Initialize wandb
             wandb.init(project="mlp-ts-pds-delta", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
+                "target_change": target_change,
                 "patience": Options['patience'],
                 "learning_rate": Options['learning_rate'],
                 "weight_decay": Options['weight_decay'],
@@ -96,17 +98,30 @@ def main():
                 "seed": SEED,
                 "stage": 1,
                 "reduce_lr_on_plateau": True
+
             })
 
             # set the root directory
             # root_dir = 'D:/College/Fall2023/electron_cme_v5/electron_cme_data_split'
             root_dir = "data/electron_cme_data_split"
             # build the dataset
-            X_train, y_train = build_dataset(root_dir + '/training', inputs_to_use=inputs_to_use, add_slope=add_slope)
-            X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining', inputs_to_use=inputs_to_use,
-                                                   add_slope=add_slope)
-            X_test, y_test = build_dataset(root_dir + '/testing', inputs_to_use=inputs_to_use, add_slope=add_slope)
-            X_val, y_val = build_dataset(root_dir + '/validation', inputs_to_use=inputs_to_use, add_slope=add_slope)
+            # build the dataset
+            X_train, y_train = build_dataset(root_dir + '/training',
+                                             inputs_to_use=inputs_to_use,
+                                             add_slope=add_slope,
+                                             target_change=target_change)
+            X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining',
+                                                   inputs_to_use=inputs_to_use,
+                                                   add_slope=add_slope,
+                                                   target_change=target_change)
+            X_test, y_test = build_dataset(root_dir + '/testing',
+                                           inputs_to_use=inputs_to_use,
+                                           add_slope=add_slope,
+                                           target_change=target_change)
+            X_val, y_val = build_dataset(root_dir + '/validation',
+                                         inputs_to_use=inputs_to_use,
+                                         add_slope=add_slope,
+                                         target_change=target_change)
 
             # print all cme_files shapes
             print(f'X_train.shape: {X_train.shape}')
@@ -138,9 +153,7 @@ def main():
                          epochs=Options['epochs'],
                          batch_size=Options['batch_size'],
                          patience=Options['patience'], save_tag=current_time + "_features",
-                         callbacks_list=[WandbCallback(),
-                                         # reduce_lr_on_plateau_cb
-                                         ])
+                         callbacks_list=[WandbCallback(), reduce_lr_on_plateau_cb])
 
             file_path = plot_tsne_pds(mlp_model_sep,
                                       X_train,
