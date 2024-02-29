@@ -7,12 +7,12 @@
 from typing import Tuple, List, Union, Optional
 
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FormatStrFormatter
+import mlflow
 # imports
 import numpy as np
+from matplotlib.ticker import FormatStrFormatter
 from numpy import ndarray
 from scipy.stats import gaussian_kde
-import mlflow
 
 
 class DenseJointReweights:
@@ -37,7 +37,7 @@ class DenseJointReweights:
     def __init__(self,
                  X, y,
                  alpha: float = .9,
-                 bw: float = .9,
+                 bw: [float, str] = .9,
                  min_norm_weight: Optional[float] = None,
                  debug: bool = False) -> None:
         """
@@ -298,7 +298,7 @@ class DenseReweights:
 
     def __init__(self, X, y,
                  alpha: float = .9,
-                 bw: float = .9,
+                 bw: [float, str] = .9,
                  min_norm_weight: Optional[float] = None,
                  tag: Optional[str] = None,
                  debug: bool = False) -> None:
@@ -320,7 +320,6 @@ class DenseReweights:
         self.debug = debug
         self.alpha = alpha
         self.min_norm_weight = min_norm_weight
-
 
         # Create training cme_files
         self.X_train = X
