@@ -3,7 +3,6 @@
 # using validation loss to determine epoch number for training).
 # this module should be interchangeable with other modules (
 ##############################################################################################################
-import random
 import time
 from itertools import cycle
 # types for type hinting
@@ -531,17 +530,6 @@ class ModelBuilder:
         :param joint_weight_indices: A list of tuples, each containing a pair of indices for which a joint weight exists.
         :return: An array containing joint weights corresponding to the batch of indices.
         """
-        # batch_weights = []
-        # for i in batch_indices:
-        #     for j in batch_indices:
-        #         if i < j:  # Only consider pairs (i, j) where i < j
-        #             try:
-        #                 weight_idx = joint_weight_indices.index((i, j))
-        #             except ValueError:
-        #                 continue  # Skip if the pair doesn't have a corresponding weight
-        #             batch_weights.append(joint_weights[weight_idx])  # Append the weight for this pair
-        #
-        # return np.array(batch_weights)
         # Convert list of tuples into a dictionary for O(1) lookup
         weight_dict = {pair: weight for pair, weight in zip(joint_weight_indices, joint_weights)}
 
@@ -554,6 +542,56 @@ class ModelBuilder:
                         batch_weights.append(weight)
 
         return np.array(batch_weights)
+
+    def process_batch_weights_vec(self,
+                                  batch_indices: np.ndarray,
+                                  joint_weights: np.ndarray,
+                                  joint_weight_indices: List[Tuple[int, int]]) -> np.ndarray:
+        """
+        Vectorized approach to return corresponding joint weights for upper diagonal pairs in the batch.
+
+        :param batch_indices: A batch of sample indices.
+        :param joint_weights: An array containing all joint weights for the dataset.
+        :param joint_weight_indices: A list of tuples, each containing a pair of indices for which a joint weight exists.
+        :return: An array containing joint weights corresponding to the upper diagonal pairs in the batch of indices.
+        """
+        # # Create a max index for generating a full index matrix
+        # max_index = np.max(batch_indices) + 1
+        #
+        # # Initialize a matrix to hold weights, defaulting to an indicator for missing weights (e.g., -1)
+        # weights_matrix = np.full((max_index, max_index), -1, dtype=np.float32)
+        #
+        # # Map each pair of indices to its corresponding weight in the matrix
+        # for (i, j), weight in zip(joint_weight_indices, joint_weights):
+        #     weights_matrix[i, j] = weight
+        #
+        # # Use broadcasting to generate a mask for pairs within the batch indices
+        # mask = np.isin(np.arange(max_index)[:, None], batch_indices) & np.isin(np.arange(max_index),
+        #                                                                        batch_indices[None, :])
+        #
+        # # Extract the upper diagonal part of the mask for the batch
+        # upper_diagonal_mask = np.triu(mask, k=1)
+        #
+        # # Apply the mask to the weights matrix to extract relevant weights
+        # batch_weights = weights_matrix[upper_diagonal_mask]
+        #
+        # # Filter out the default indicator for missing weights
+        # return batch_weights[batch_weights != -1]
+        # Convert joint_weight_indices to a structured array for efficient searching.
+        dtype = [('i', int), ('j', int)]
+        joint_indices_structured = np.array(joint_weight_indices, dtype=dtype)
+
+        # Create a boolean array to mark each pair as within the batch and upper diagonal.
+        is_in_batch_and_upper_diagonal = np.fromiter(
+            ((i in batch_indices and j in batch_indices and i < j) for i, j in joint_weight_indices),
+            dtype=bool,
+            count=len(joint_weight_indices)
+        )
+
+        # Filter the weights based on the boolean array.
+        filtered_weights = joint_weights[is_in_batch_and_upper_diagonal]
+
+        return filtered_weights
 
     def train_for_one_epoch(self,
                             model: tf.keras.Model,
@@ -1515,17 +1553,35 @@ class ModelBuilder:
                                     batch_size=batch_size)
             dec_losses = history_dec.history['loss']
 
+        # # Initialize coefficients to None
+        # gamma_coef = None
+        # lambda_coef = None
+        #
+        # # Calculate gamma and lambda as the sum of the ratios, if applicable
+        # if with_reg:
+        #     gamma_ratios = [p / r for p, r in zip(primary_losses, reg_losses)]
+        #     gamma_coef = np.mean(gamma_ratios)
+        #
+        # if with_ae:
+        #     lambda_ratios = [p / d for p, d in zip(primary_losses, dec_losses)]
+        #     lambda_coef = np.mean(lambda_ratios)
+
         # Initialize coefficients to None
         gamma_coef = None
         lambda_coef = None
 
-        # Calculate gamma and lambda as the sum of the ratios, if applicable
+        # Assuming primary_losses, reg_losses, and dec_losses are lists or could be converted to NumPy arrays
+        primary_losses = np.array(primary_losses)
+
+        # Calculate gamma and lambda as the mean of the ratios, if applicable
         if with_reg:
-            gamma_ratios = [p / r for p, r in zip(primary_losses, reg_losses)]
+            reg_losses = np.array(reg_losses)
+            gamma_ratios = primary_losses / reg_losses
             gamma_coef = np.mean(gamma_ratios)
 
         if with_ae:
-            lambda_ratios = [p / d for p, d in zip(primary_losses, dec_losses)]
+            dec_losses = np.array(dec_losses)
+            lambda_ratios = primary_losses / dec_losses
             lambda_coef = np.mean(lambda_ratios)
 
         return gamma_coef, lambda_coef
@@ -1571,7 +1627,15 @@ class ModelBuilder:
         dec_losses = history_dec.history['loss']
 
         # Calculate lambda as the sum of the ratios
-        ratios = [r / d for r, d in zip(reg_losses, dec_losses)]
+        # ratios = [r / d for r, d in zip(reg_losses, dec_losses)]
+        # lambda_coef = np.mean(ratios)
+        reg_losses = np.array(reg_losses)
+        dec_losses = np.array(dec_losses)
+
+        # Compute ratios using element-wise division
+        ratios = reg_losses / dec_losses
+
+        # Calculate the mean of the ratios
         lambda_coef = np.mean(ratios)
 
         return lambda_coef
