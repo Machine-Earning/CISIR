@@ -524,7 +524,7 @@ class ModelBuilder:
                               joint_weight_indices: List[Tuple[int, int]]) -> np.ndarray:
         """
         Process a batch of indices to return the corresponding joint weights.
-        NOTE: slow due to index matching!!!
+
         :param batch_indices: A batch of sample indices.
         :param joint_weights: An array containing all joint weights for the dataset.
         :param joint_weight_indices: A list of tuples, each containing a pair of indices for which a joint weight exists.
@@ -543,55 +543,44 @@ class ModelBuilder:
 
         return np.array(batch_weights)
 
-    def process_batch_weights_vec(self,
-                                  batch_indices: np.ndarray,
-                                  joint_weights: np.ndarray,
-                                  joint_weight_indices: List[Tuple[int, int]]) -> np.ndarray:
-        """
-        Vectorized approach to return corresponding joint weights for upper diagonal pairs in the batch.
-
-        :param batch_indices: A batch of sample indices.
-        :param joint_weights: An array containing all joint weights for the dataset.
-        :param joint_weight_indices: A list of tuples, each containing a pair of indices for which a joint weight exists.
-        :return: An array containing joint weights corresponding to the upper diagonal pairs in the batch of indices.
-        """
-        # # Create a max index for generating a full index matrix
-        # max_index = np.max(batch_indices) + 1
-        #
-        # # Initialize a matrix to hold weights, defaulting to an indicator for missing weights (e.g., -1)
-        # weights_matrix = np.full((max_index, max_index), -1, dtype=np.float32)
-        #
-        # # Map each pair of indices to its corresponding weight in the matrix
-        # for (i, j), weight in zip(joint_weight_indices, joint_weights):
-        #     weights_matrix[i, j] = weight
-        #
-        # # Use broadcasting to generate a mask for pairs within the batch indices
-        # mask = np.isin(np.arange(max_index)[:, None], batch_indices) & np.isin(np.arange(max_index),
-        #                                                                        batch_indices[None, :])
-        #
-        # # Extract the upper diagonal part of the mask for the batch
-        # upper_diagonal_mask = np.triu(mask, k=1)
-        #
-        # # Apply the mask to the weights matrix to extract relevant weights
-        # batch_weights = weights_matrix[upper_diagonal_mask]
-        #
-        # # Filter out the default indicator for missing weights
-        # return batch_weights[batch_weights != -1]
-        # Convert joint_weight_indices to a structured array for efficient searching.
-        dtype = [('i', int), ('j', int)]
-        joint_indices_structured = np.array(joint_weight_indices, dtype=dtype)
-
-        # Create a boolean array to mark each pair as within the batch and upper diagonal.
-        is_in_batch_and_upper_diagonal = np.fromiter(
-            ((i in batch_indices and j in batch_indices and i < j) for i, j in joint_weight_indices),
-            dtype=bool,
-            count=len(joint_weight_indices)
-        )
-
-        # Filter the weights based on the boolean array.
-        filtered_weights = joint_weights[is_in_batch_and_upper_diagonal]
-
-        return filtered_weights
+    # def process_batch_weights_vec(self,
+    #                               batch_indices: np.ndarray,
+    #                               joint_weights: np.ndarray,
+    #                               joint_weight_indices: List[Tuple[int, int]]) -> np.ndarray:
+    #     """
+    #     Vectorized approach to return corresponding joint weights for upper diagonal pairs in the batch.
+    #      TODO: speed up more
+    #     :param batch_indices: A batch of sample indices.
+    #     :param joint_weights: An array containing all joint weights for the dataset.
+    #     :param joint_weight_indices: A list of tuples, each containing a pair of indices for which a joint weight exists.
+    #     :return: An array containing joint weights corresponding to the upper diagonal pairs in the batch of indices.
+    #     """
+    #     # Create an efficient mapping from pairs to weights
+    #     max_index = batch_indices.max() + 1
+    #     weight_matrix = np.full((max_index, max_index), -1, dtype=int)  # Use an invalid index initially
+    #
+    #     # Populate the matrix with valid indices from joint_weight_indices
+    #     for idx, (i, j) in enumerate(joint_weight_indices):
+    #         if i < max_index and j < max_index:
+    #             weight_matrix[i, j] = idx
+    #
+    #     # Generate upper diagonal pairs using broadcasting
+    #     i_indices, j_indices = np.triu_indices_from(weight_matrix, k=1)
+    #
+    #     # Filter pairs that are in batch_indices
+    #     valid_mask = np.isin(i_indices, batch_indices) & np.isin(j_indices, batch_indices)
+    #     i_indices, j_indices = i_indices[valid_mask], j_indices[valid_mask]
+    #
+    #     # Lookup indices in the weight matrix
+    #     weight_indices = weight_matrix[i_indices, j_indices]
+    #
+    #     # Filter out invalid indices
+    #     valid_weight_indices = weight_indices[weight_indices != -1]
+    #
+    #     # Retrieve corresponding weights using the valid weight indices
+    #     batch_weights = joint_weights[valid_weight_indices]
+    #
+    #     return batch_weights
 
     def train_for_one_epoch(self,
                             model: tf.keras.Model,
