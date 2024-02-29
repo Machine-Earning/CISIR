@@ -48,21 +48,21 @@ def main():
             tf.random.set_seed(seed)
             np.random.seed(seed)
             patience = 3000  # higher patience
-            # learning_rate = 3e-5  # og learning rate
-            initial_learning_rate = 3e-3
-            final_learning_rate = 3e-7
-            learning_rate_decay_factor = (final_learning_rate / initial_learning_rate) ** (1 / 3000)
-            steps_per_epoch = int(20000 / 8)
+            learning_rate = 3e-5  # og learning rate
+            # initial_learning_rate = 3e-3
+            # final_learning_rate = 3e-7
+            # learning_rate_decay_factor = (final_learning_rate / initial_learning_rate) ** (1 / 3000)
+            # steps_per_epoch = int(20000 / 8)
 
-            learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
-                initial_learning_rate=initial_learning_rate,
-                decay_steps=steps_per_epoch,
-                decay_rate=learning_rate_decay_factor,
-                staircase=True)
+            # learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
+            #     initial_learning_rate=initial_learning_rate,
+            #     decay_steps=steps_per_epoch,
+            #     decay_rate=learning_rate_decay_factor,
+            #     staircase=True)
 
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 8
+            batch_size = 300
             epochs = 100000
             hiddens = [100, 100, 50]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
@@ -70,7 +70,7 @@ def main():
             target_change = True
             # print_batch_mse_cb = PrintBatchMSE()
             rebalacing = True
-            alpha_rw = 0.9
+            alpha_rw = 1.3
 
             # Initialize wandb
             wandb.init(project="mlp-ts-target-change", name=experiment_name, config={

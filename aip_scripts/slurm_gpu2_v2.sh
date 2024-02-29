@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=TestJob            # Job name
+#SBATCH --job-name=rew            # Job name
 #SBATCH --nodes=1                     # Number of nodes
 #SBATCH --ntasks=1                    # Number of tasks
 #SBATCH --mem=32GB                    # Memory per node
