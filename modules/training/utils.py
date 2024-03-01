@@ -99,7 +99,7 @@ def find_rand_bs_2(y, left_threshold, right_threshold, num_trials=1000, early_ex
         raise ValueError("There are not enough samples meeting one or both threshold criteria.")
 
     # Loop through possible batch sizes, starting from 2 (minimum batch size to meet both conditions)
-    for batch_size in range(2, len(y) + 1):
+    for batch_size in range(4300, len(y) + 1):
         print(f'batch_size: {batch_size}')
         success_count = 0
 
@@ -145,7 +145,7 @@ if __name__ == '__main__':
         y_train,
         left_threshold=-1,
         right_threshold=1,
-        num_trials=2000,
+        num_trials=10000,
         early_exit_ratio=0.99)
 
     print(f"Minimum batch size: {min_batch_size}")
