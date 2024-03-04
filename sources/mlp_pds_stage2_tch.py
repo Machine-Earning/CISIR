@@ -49,10 +49,10 @@ def main():
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 # Set the early stopping patience and learning rate as variables
                 patience = 1000
-                learning_rate = 3e-4
+                learning_rate = 1e-3
                 weight_decay = 0  # higher weight decay
                 momentum_beta1 = 0.9  # higher momentum beta1
-                batch_size = 32
+                batch_size = 256
                 epochs = 100000
                 loss_key = 'mse'
                 tf.random.set_seed(seed)
@@ -60,10 +60,11 @@ def main():
                 pds = True
                 # weight_path = '/home1/jmoukpe2016/keras-functional-api/model_weights_20240205-230529_features.h5'
                 # weight_path = '/home1/jmoukpe2016/keras-functional-api/model_weights_20240222-192939_features.h5'
-                weight_path = '/home1/jmoukpe2016/keras-functional-api/model_weights_20240223-000002_features.h5'
+                # weight_path = '/home1/jmoukpe2016/keras-functional-api/model_weights_20240223-000002_features.h5'
+                weight_path = '/home1/jmoukpe2016/keras-functional-api/model_weights_20240229-133949_features.h5'
 
                 # Initialize wandb
-                wandb.init(project="mlp-ts-pds", name=experiment_name, config={
+                wandb.init(project="mlp-ts-pds-delta", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
                     "add_slope": add_slope,
                     "freeze": freeze,

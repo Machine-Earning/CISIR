@@ -47,8 +47,8 @@ def main():
             seed = 123456789
             tf.random.set_seed(seed)
             np.random.seed(seed)
-            patience = 3000  # higher patience
-            learning_rate = 3e-5  # og learning rate
+            patience = 1000  # higher patience
+            learning_rate = 3e-3  # og learning rate
             # initial_learning_rate = 3e-3
             # final_learning_rate = 3e-7
             # learning_rate_decay_factor = (final_learning_rate / initial_learning_rate) ** (1 / 3000)
@@ -62,7 +62,7 @@ def main():
 
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 300
+            batch_size = 8
             epochs = 100000
             hiddens = [100, 100, 50]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
@@ -70,14 +70,14 @@ def main():
             target_change = True
             # print_batch_mse_cb = PrintBatchMSE()
             rebalacing = True
-            alpha_rw = 1.3
+            alpha_rw = 1.8
 
             # Initialize wandb
             wandb.init(project="mlp-ts-target-change", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
                 "patience": patience,
-                "learning_rate": "lr_decay_3e-3_3e-7",
+                "learning_rate": learning_rate,
                 "weight_decay": weight_decay,
                 "momentum_beta1": momentum_beta1,
                 "batch_size": batch_size,

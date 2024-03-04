@@ -41,7 +41,7 @@ def main():
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
-            bs = 2000  # full dataset used
+            bs = 5000  # full dataset used
             print(f'batch size : {bs}')
 
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -61,24 +61,24 @@ def main():
                 'batch_size': bs,  # Assuming batch_size is defined elsewhere
                 'epochs': 10000,
                 'patience': 1000,  # Updated to 50
-                'learning_rate': 1e-3,  # Updated to 3e-4
+                'learning_rate': 1e-3, #1e-3,  # Updated to 3e-4
                 'weight_decay': 0,  # Added weight decay
                 'momentum_beta1': 0.95,  # Added momentum beta1
             }
-            hiddens = [100, 100, 50]
+            hiddens = [2048, 4096, 4096, 2048]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
             pds = True
             # Callback for reducing learning rate when a metric has stopped improving
-            reduce_lr_on_plateau_cb = ReduceLROnPlateau(
-                monitor='val_loss',  # Metric to monitor
-                factor=0.3,  # Factor by which the learning rate will be reduced. new_lr = lr * factor
-                patience=150,  # Number of epochs with no improvement after which learning rate will be reduced
-                verbose=1,  # If 1, prints a message when reducing the learning rate
-                mode='min',  # In 'min' mode, lr will reduce when the quantity monitored has stopped decreasing
-                min_delta=1e-4,  # Threshold for measuring the new optimum, to only focus on significant changes
-                cooldown=1,  # Number of epochs to wait before resuming normal operation after lr has been reduced
-                min_lr=1e-8  # Lower bound on the learning rate
-            )
+            # reduce_lr_on_plateau_cb = ReduceLROnPlateau(
+            #     monitor='val_loss',  # Metric to monitor
+            #     factor=0.5,  # Factor by which the learning rate will be reduced. new_lr = lr * factor
+            #     patience=150,  # Number of epochs with no improvement after which learning rate will be reduced
+            #     verbose=1,  # If 1, prints a message when reducing the learning rate
+            #     mode='min',  # In 'min' mode, lr will reduce when the quantity monitored has stopped decreasing
+            #     min_delta=1e-4,  # Threshold for measuring the new optimum, to only focus on significant changes
+            #     cooldown=1,  # Number of epochs to wait before resuming normal operation after lr has been reduced
+            #     min_lr=1e-8  # Lower bound on the learning rate
+            # )
 
             # Initialize wandb
             wandb.init(project="mlp-ts-pds", name=experiment_name, config={
@@ -95,7 +95,7 @@ def main():
                 "pds": pds,
                 "seed": SEED,
                 "stage": 1,
-                "reduce_lr_on_plateau": True
+                "reduce_lr_on_plateau": False
             })
 
             # set the root directory
@@ -138,7 +138,7 @@ def main():
                          epochs=Options['epochs'],
                          batch_size=Options['batch_size'],
                          patience=Options['patience'], save_tag=current_time + "_features",
-                         callbacks_list=[WandbCallback(), reduce_lr_on_plateau_cb])
+                         callbacks_list=[WandbCallback()]) #, reduce_lr_on_plateau_cb])
 
             file_path = plot_tsne_pds(mlp_model_sep,
                                       X_train,
@@ -162,9 +162,15 @@ def main():
             wandb.log({'tsne_testing_plot': wandb.Image(file_path)})
             print('file_path: ' + file_path)
 
-            file_path = plot_repr_correlation(mlp_model_sep, X_test, y_test, title)
+            file_path = plot_repr_correlation(mlp_model_sep, X_val, y_val, title + "_training")
             # Log the representation correlation plot to wandb
-            wandb.log({'representation_correlation_plot': wandb.Image(file_path)})
+            wandb.log({'representation_correlation_plot_train': wandb.Image(file_path)})
+            print('file_path: ' + file_path)
+
+
+            file_path = plot_repr_correlation(mlp_model_sep, X_test, y_test, title + "_test")
+            # Log the representation correlation plot to wandb
+            wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
             print('file_path: ' + file_path)
 
             # Finish the wandb run

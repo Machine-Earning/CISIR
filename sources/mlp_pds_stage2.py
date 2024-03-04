@@ -60,7 +60,8 @@ def main():
                 pds = True
                 # weight_path = '/home1/jmoukpe2016/keras-functional-api/model_weights_20240205-230529_features.h5'
                 # weight_path = '/home1/jmoukpe2016/keras-functional-api/model_weights_20240222-192939_features.h5'
-                weight_path = '/home1/jmoukpe2016/keras-functional-api/model_weights_20240223-000002_features.h5'
+                # weight_path = '/home1/jmoukpe2016/keras-functional-api/model_weights_20240223-000002_features.h5'
+                weight_path = '/home1/jmoukpe2016/keras-functional-api/model_weights_20240229-142626_features.h5'
 
                 # Initialize wandb
                 wandb.init(project="mlp-ts-pds", name=experiment_name, config={
