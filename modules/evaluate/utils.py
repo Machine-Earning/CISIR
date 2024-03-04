@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from scipy.spatial.distance import pdist
-from scipy.stats import spearmanr
+from scipy.stats import pearsonr
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import MinMaxScaler
 
@@ -150,7 +150,7 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
 
     print('calculating the spearman rank correlation')
     # Calculate Spearman's rank correlation coefficient
-    rho, _ = spearmanr(distances_target_norm, distances_repr_norm)
+    r, _ = pearsonr(distances_target_norm, distances_repr_norm)
 
     # Create scatter plot
     plt.figure(figsize=(8, 6))
@@ -158,7 +158,7 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
     plt.plot([0, 1], [0, 1], 'k--')  # Perfect fit diagonal
     plt.xlabel('Normalized Distance in Target Space')
     plt.ylabel('Normalized Distance in Representation Space')
-    plt.title(f'{title}\nRepresentation Space Correlation (Spearman ρ = {rho:.2f})')
+    plt.title(f'{title}\nRepresentation Space Correlation (pearson r= {r:.2f})')
     plt.grid(True)
     # plt.show()
     # save the plot
@@ -167,6 +167,7 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
     plt.close()
 
     return file_path
+
 
 def plot_shepard(features, tsne_result):
     """
@@ -192,14 +193,14 @@ def plot_shepard(features, tsne_result):
 
     print('calculating the spearman rank correlation')
     # Calculate Spearman's rank correlation
-    rho, _ = spearmanr(distances_original_norm, distances_tsne_norm)
+    r, _ = pearsonr(distances_original_norm, distances_tsne_norm)
     print('plotting now...')
     # Plot normalized distances
     plt.scatter(distances_original_norm, distances_tsne_norm, alpha=0.5, s=1)
     plt.plot([0, 1], [0, 1], 'k--')  # Perfect fit diagonal
     plt.xlabel('Normalized Original Distances')
     plt.ylabel('Normalized t-SNE Distances')
-    plt.title(f'Shepard Plot (correlation = {rho:.2f})')
+    plt.title(f'Shepard Plot (correlation = {r:.2f})')
     # plt.title(f'Shepard Plot')
     plt.grid(True)
 
