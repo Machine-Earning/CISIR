@@ -24,4 +24,4 @@ echo "Current working directory is $(pwd)"
 srun python -m $1
 
 # how to use this script:
-# sbatch your_slurm_script.sh sources.mlp_pds
+# sbatch slurm_gpu2_v2.sh sources.mlp_pds

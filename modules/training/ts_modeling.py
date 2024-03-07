@@ -581,6 +581,8 @@ def build_dataset(
     - Tuple[np.ndarray, np.ndarray]: A tuple containing the normalized input cme_files (X) and target cme_files (y).
     """
 
+    # TODO: find the difference change before applying the log
+
     global p_t_values, p_t_values_normalized, adjusted_target
     if inputs_to_use is None:
         inputs_to_use = ['e0.5', 'e1.8', 'p']
@@ -1506,7 +1508,10 @@ def plot_avsp_delta(
     else:
         n_features = len(inputs_to_use) * 25
 
-    p_t_log = np.log1p(df['p_t'])  # Using log1p for numerical stability
+    p_t_ = df['p_t'].values
+    # print the p_t of the dataframe
+    print(f"p_t_: {p_t_[:5]}")
+    p_t_log = np.log(p_t_ + 1)  # Using log1p for numerical stability
     # Normalize the flux intensities
     df_norm = normalize_flux(df, input_columns, apply_log=True)
     # X = df_norm[input_columns].values
@@ -1574,8 +1579,15 @@ def plot_avsp_delta(
 
     # if target change then we need to convert prediction into actual value
     if 'p' in inputs_to_use and target_change:
-        actual_changes = y_true - p_t_log  # offset by 1
-        predicted_changes = predictions.flatten()  # offset by 1
+        print("Using target change approach")
+        print(f"y_true: {y_true.shape}, p_t_log: {p_t_log.shape}, predictions: {predictions.shape}")
+        print(f"y_true: {y_true[:5]}, p_t_log: {p_t_log[:5]}, predictions: {predictions[:5]}")
+        print(f"type of y_true: {type(y_true)}, type of p_t_log: {type(p_t_log)}, type of predictions: {type(predictions)}")
+        print(f"y_true min: {y_true.min()}, y_true max: {y_true.max()}")
+        print(f"p_t_log min: {p_t_log.min()}, p_t_log max: {p_t_log.max()}")
+        print(f"predictions min: {predictions.min()}, predictions max: {predictions.max()}")
+        actual_changes = y_true - p_t_log
+        predicted_changes = predictions.flatten()
     else:
         predictions_plot = predictions.flatten()
 
@@ -1706,12 +1718,13 @@ def process_sep_events(
         colors = plt.cm.viridis(np.linspace(0, 1, len(avsp_data)))
 
         for idx, (event_id, actual, predicted) in enumerate(avsp_data):
-            plt.scatter(actual, predicted, color=colors[idx], label=f'{event_id}', alpha=0.5)
+            plt.scatter(actual, predicted, color=colors[idx], label=f'{event_id}', alpha=0.5, s=2)
 
         # Add a diagonal line for perfect prediction
-        min_val = min(min(actual.min(), predicted.min()) for _, actual, predicted in avsp_data)
-        max_val = max(max(actual.max(), predicted.max()) for _, actual, predicted in avsp_data)
-        plt.plot([min_val, max_val], [min_val, max_val], 'k--', label='Perfect Prediction')
+        # TODO: there is something really wrong here.
+        # min_val = min(min(actual.min(), predicted.min()) for _, actual, predicted in avsp_data)
+        # max_val = max(max(actual.max(), predicted.max()) for _, actual, predicted in avsp_data)
+        # plt.plot([min_val, max_val], [min_val, max_val], 'k--', label='Perfect Prediction')
 
         plt.xlabel('Actual Changes')
         plt.ylabel('Predicted Changes')
