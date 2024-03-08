@@ -581,8 +581,6 @@ def build_dataset(
     - Tuple[np.ndarray, np.ndarray]: A tuple containing the normalized input cme_files (X) and target cme_files (y).
     """
 
-    # TODO: find the difference change before applying the log
-
     global p_t_values, p_t_values_normalized, adjusted_target
     if inputs_to_use is None:
         inputs_to_use = ['e0.5', 'e1.8', 'p']
@@ -1387,7 +1385,7 @@ def plot_and_evaluate_sep_event(
     if 'p' in inputs_to_use and target_change:
         predictions_plot = p_t_log + predictions.flatten()
         if show_changes:
-            actual_changes = y_true - p_t_log - 1  # offset by 1
+            actual_changes = df['delta_log_Intensity'].values - 1 # offset by 1
             predicted_changes = predictions.flatten() - 1  # offset by 1
     else:
         predictions_plot = predictions.flatten()
@@ -1462,15 +1460,12 @@ def plot_and_evaluate_sep_event(
 
 def plot_avsp_delta(
         df: pd.DataFrame,
-        cme_start_times: List[pd.Timestamp],
-        event_id: str,
         model: tf.keras.Model,
         input_columns: List[str],
         target_column: str,
         normalize_target: bool = False,
         using_cme: bool = False,
         model_type: str = "cnn",
-        title: str = None,
         inputs_to_use: List[str] = None,
         add_slope: bool = True,
         target_change: bool = False,
@@ -1508,10 +1503,6 @@ def plot_avsp_delta(
     else:
         n_features = len(inputs_to_use) * 25
 
-    p_t_ = df['p_t'].values
-    # print the p_t of the dataframe
-    print(f"p_t_: {p_t_[:5]}")
-    p_t_log = np.log(p_t_ + 1)  # Using log1p for numerical stability
     # Normalize the flux intensities
     df_norm = normalize_flux(df, input_columns, apply_log=True)
     # X = df_norm[input_columns].values
@@ -1580,14 +1571,15 @@ def plot_avsp_delta(
     # if target change then we need to convert prediction into actual value
     if 'p' in inputs_to_use and target_change:
         print("Using target change approach")
-        print(f"y_true: {y_true.shape}, p_t_log: {p_t_log.shape}, predictions: {predictions.shape}")
-        print(f"y_true: {y_true[:5]}, p_t_log: {p_t_log[:5]}, predictions: {predictions[:5]}")
-        print(f"type of y_true: {type(y_true)}, type of p_t_log: {type(p_t_log)}, type of predictions: {type(predictions)}")
-        print(f"y_true min: {y_true.min()}, y_true max: {y_true.max()}")
-        print(f"p_t_log min: {p_t_log.min()}, p_t_log max: {p_t_log.max()}")
-        print(f"predictions min: {predictions.min()}, predictions max: {predictions.max()}")
-        actual_changes = y_true - p_t_log
+        actual_changes = actual_changes = df['delta_log_Intensity'].values
         predicted_changes = predictions.flatten()
+
+    #     print type of actual_changes and predicted_changes and their shapes
+        print(f"Type of actual_changes: {type(actual_changes)}")
+        print(f"Type of predicted_changes: {type(predicted_changes)}")
+        print(f"Shape of actual_changes: {actual_changes.shape}")
+        print(f"Shape of predicted_changes: {predicted_changes.shape}")
+
     else:
         predictions_plot = predictions.flatten()
 
@@ -1698,9 +1690,8 @@ def process_sep_events(
 
                 if show_avsp:
                     actual_ch, predicted_ch = plot_avsp_delta(
-                        df, cme_start_times, event_id, model,
-                        input_columns, target_column, using_cme=using_cme,
-                        model_type=model_type, title=title,
+                        df, model, input_columns, target_column,
+                        model_type=model_type,
                         inputs_to_use=inputs_to_use, add_slope=add_slope,
                         target_change=target_change, symlog1p=symlog1p)
 
@@ -1718,13 +1709,12 @@ def process_sep_events(
         colors = plt.cm.viridis(np.linspace(0, 1, len(avsp_data)))
 
         for idx, (event_id, actual, predicted) in enumerate(avsp_data):
-            plt.scatter(actual, predicted, color=colors[idx], label=f'{event_id}', alpha=0.5, s=2)
+            plt.scatter(actual, predicted, color=colors[idx], label=f'{event_id}', alpha=0.5, s=4)
 
         # Add a diagonal line for perfect prediction
-        # TODO: there is something really wrong here.
-        # min_val = min(min(actual.min(), predicted.min()) for _, actual, predicted in avsp_data)
-        # max_val = max(max(actual.max(), predicted.max()) for _, actual, predicted in avsp_data)
-        # plt.plot([min_val, max_val], [min_val, max_val], 'k--', label='Perfect Prediction')
+        min_val = min(min(actual.min(), predicted.min()) for _, actual, predicted in avsp_data)
+        max_val = max(max(actual.max(), predicted.max()) for _, actual, predicted in avsp_data)
+        plt.plot([min_val, max_val], [min_val, max_val], 'k--', label='Perfect Prediction')
 
         plt.xlabel('Actual Changes')
         plt.ylabel('Predicted Changes')
@@ -2359,6 +2349,7 @@ def compute_sample_weights(y_train, num_bins=100):
     weights /= weights.min()
 
     return weights
+
 
 def build_dataset_from_numpy(x, y, batch_size, options=None):
     """

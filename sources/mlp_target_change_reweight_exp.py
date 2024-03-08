@@ -5,11 +5,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import wandb
-from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
 
-from modules.training.DenseReweights import DenseReweights
+from modules.training.DenseReweights import exDenseReweights
 from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
@@ -47,8 +47,8 @@ def main():
             seed = 123456789
             tf.random.set_seed(seed)
             np.random.seed(seed)
-            patience = 200  # higher patience
-            learning_rate = 3e-5  # og learning rate
+            patience = 5000  # higher patience
+            learning_rate = 1e-3  # og learning rate
             # initial_learning_rate = 3e-3
             # final_learning_rate = 3e-7
             # learning_rate_decay_factor = (final_learning_rate / initial_learning_rate) ** (1 / 3000)
@@ -60,17 +60,24 @@ def main():
             #     decay_rate=learning_rate_decay_factor,
             #     staircase=True)
 
+            reduce_lr_on_plateau = ReduceLROnPlateau(
+                monitor='loss',
+                factor=0.5,
+                patience=500,
+                verbose=1,
+                min_lr=1e-7)
+
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.95  # higher momentum beta1
-            batch_size = 256
+            batch_size = 64
             epochs = 100000
-            hiddens = [100, 100, 50]
+            hiddens = [400, 400, 200, 200, 100]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
             loss_key = 'mse'
             target_change = True
             # print_batch_mse_cb = PrintBatchMSE()
             rebalacing = True
-            alpha_rw = 10.0
+            alpha_rw = 1
             bandwidth = 0.0519
 
             # Initialize wandb
@@ -91,8 +98,8 @@ def main():
                 "seed": seed,
                 "rebalancing": rebalacing,
                 "alpha_rw": alpha_rw,
-                "bandwidth": bandwidth
-
+                "bandwidth": bandwidth,
+                "reciprocal_reweight": True
             })
 
             # set the root directory
@@ -119,14 +126,14 @@ def main():
             # y_subtrain_weights = compute_sample_weights(y_subtrain)
             # y_train_weights = compute_sample_weights(y_train)
             min_norm_weight = 0.01 / len(y_train)
-            y_train_weights = DenseReweights(
+            y_train_weights = exDenseReweights(
                 X_train, y_train,
                 alpha=alpha_rw, bw=bandwidth,
                 min_norm_weight=min_norm_weight,
                 debug=False).reweights
 
             min_norm_weight = 0.01 / len(y_subtrain)
-            y_subtrain_weights = DenseReweights(
+            y_subtrain_weights = exDenseReweights(
                 X_subtrain, y_subtrain,
                 alpha=alpha_rw, bw=bandwidth,
                 min_norm_weight=min_norm_weight,
@@ -170,7 +177,7 @@ def main():
                                         sample_weight=y_subtrain_weights,
                                         epochs=epochs, batch_size=batch_size,
                                         validation_data=(X_val, {'forecast_head': y_val}),
-                                        callbacks=[early_stopping, WandbCallback()])
+                                        callbacks=[early_stopping, reduce_lr_on_plateau, WandbCallback()])
 
             # Plot the training and validation loss
             plt.figure(figsize=(12, 6))
