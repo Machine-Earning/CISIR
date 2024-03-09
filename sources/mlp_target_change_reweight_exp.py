@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import wandb
+from tensorflow.keras.activations import gelu
+from tensorflow.keras.layers import PReLU
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
@@ -44,11 +46,11 @@ def main():
             experiment_name = f'{title}_{current_time}'
 
             # Set the early stopping patience and learning rate as variables
-            seed = 123456789
+            seed = 123456
             tf.random.set_seed(seed)
             np.random.seed(seed)
             patience = 5000  # higher patience
-            learning_rate = 1e-3  # og learning rate
+            learning_rate = 5e-4  # og learning rate
             # initial_learning_rate = 3e-3
             # final_learning_rate = 3e-7
             # learning_rate_decay_factor = (final_learning_rate / initial_learning_rate) ** (1 / 3000)
@@ -62,23 +64,31 @@ def main():
 
             reduce_lr_on_plateau = ReduceLROnPlateau(
                 monitor='loss',
-                factor=0.5,
+                factor=0.75,
                 patience=500,
                 verbose=1,
-                min_lr=1e-7)
+                min_delta=1e-6,
+                min_lr=1e-10)
 
-            weight_decay = 0  # higher weight decay
-            momentum_beta1 = 0.95  # higher momentum beta1
-            batch_size = 64
-            epochs = 100000
-            hiddens = [400, 400, 200, 200, 100]
+            weight_decay = 1e-10  # higher weight decay
+            momentum_beta1 = 0.99  # higher momentum beta1
+            batch_size = 4096
+            epochs = 50000
+            hiddens = [
+                4096, 4096, 2048, 2048,
+                1024, 1024, 512, 512
+            ]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-            loss_key = 'mse'
+            loss_key = 'var_mse'
             target_change = True
             # print_batch_mse_cb = PrintBatchMSE()
             rebalacing = True
             alpha_rw = 1
             bandwidth = 0.0519
+            repr_dim = 18
+            dropout = 0.1
+            activation = gelu()
+            norm = 'batch_norm'
 
             # Initialize wandb
             wandb.init(project="mlp-ts-target-change", name=experiment_name, config={
@@ -99,7 +109,11 @@ def main():
                 "rebalancing": rebalacing,
                 "alpha_rw": alpha_rw,
                 "bandwidth": bandwidth,
-                "reciprocal_reweight": True
+                "reciprocal_reweight": True,
+                "repr_dim": repr_dim,
+                "dropout": dropout,
+                "activation": 'gelu',
+                "norm": norm
             })
 
             # set the root directory
@@ -125,19 +139,23 @@ def main():
             # Compute the sample weights
             # y_subtrain_weights = compute_sample_weights(y_subtrain)
             # y_train_weights = compute_sample_weights(y_train)
+            print(f'rebalancing the training set...')
             min_norm_weight = 0.01 / len(y_train)
             y_train_weights = exDenseReweights(
                 X_train, y_train,
                 alpha=alpha_rw, bw=bandwidth,
                 min_norm_weight=min_norm_weight,
                 debug=False).reweights
+            print(f'training set rebalanced.')
 
+            print(f'rebalancing the subtraining set...')
             min_norm_weight = 0.01 / len(y_subtrain)
             y_subtrain_weights = exDenseReweights(
                 X_subtrain, y_subtrain,
                 alpha=alpha_rw, bw=bandwidth,
                 min_norm_weight=min_norm_weight,
                 debug=False).reweights
+            print(f'subtraining set rebalanced.')
 
             # print all cme_files shapes
             print(f'X_train.shape: {X_train.shape}')
@@ -158,7 +176,14 @@ def main():
             print(f'n_features: {n_features}')
 
             # create the model
-            mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens)
+            mlp_model_sep = create_mlp(
+                input_dim=n_features,
+                hiddens=hiddens,
+                repr_dim=repr_dim,
+                dropout_rate=dropout,
+                activation=activation,
+                norm=norm
+            )
             mlp_model_sep.summary()
 
             # Define the EarlyStopping callback
@@ -192,8 +217,16 @@ def main():
 
             # Determine the optimal number of epochs from early stopping
             optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
-            final_mlp_model_sep = create_mlp(input_dim=n_features,
-                                             hiddens=hiddens)  # Recreate the model architecture
+            final_mlp_model_sep = create_mlp(
+                input_dim=n_features,
+                hiddens=hiddens,
+                repr_dim=repr_dim,
+                dropout_rate=dropout,
+                activation=activation,
+                norm=norm
+            )  
+
+            # Recreate the model architecture
             final_mlp_model_sep.compile(
                 optimizer=AdamW(learning_rate=learning_rate,
                                 weight_decay=weight_decay,
@@ -206,6 +239,7 @@ def main():
                 sample_weight=y_train_weights,
                 epochs=optimal_epochs,
                 batch_size=batch_size,
+                callbacks=[reduce_lr_on_plateau, WandbCallback()],
                 verbose=1)
 
             # evaluate the model on test cme_files
@@ -213,6 +247,12 @@ def main():
             print(f'mae error: {error_mae}')
             # Log the MAE error to wandb
             wandb.log({"mae_error": error_mae})
+
+            # mae of original model
+            error_mae = evaluate_model(mlp_model_sep, X_test, y_test)
+            print(f'o_mae error: {error_mae}')
+            # Log the MAE error to wandb
+            wandb.log({"o_mae_error": error_mae})
 
             # Process SEP event files in the specified directory
             test_directory = root_dir + '/testing'
@@ -267,7 +307,7 @@ def main():
                 wandb.log({f'nr_testing_{log_title}': wandb.Image(filename)})
 
             # Process SEP event files in the specified directory
-            test_directory = root_dir + '/training'
+            test_directory = root_dir + '/subtraining'
             filenames = process_sep_events(
                 test_directory,
                 mlp_model_sep,

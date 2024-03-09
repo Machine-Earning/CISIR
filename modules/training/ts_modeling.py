@@ -13,7 +13,17 @@ from scipy.signal import correlate, correlation_lags
 from sklearn.metrics import mean_absolute_error
 from sklearn.utils import shuffle
 from tensorflow.keras.callbacks import Callback
-from tensorflow.keras.layers import Input, Conv1D, Flatten, Dense, LeakyReLU, Concatenate, GRU
+from tensorflow.keras.layers import (
+    Input,
+    Conv1D,
+    Flatten,
+    Dense,
+    Concatenate,
+    GRU,
+    Dropout,
+    LeakyReLU,
+    BatchNormalization,
+    LayerNormalization)
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
 
@@ -344,60 +354,76 @@ def create_rnns_ch(
     return model
 
 
-def create_mlp(input_dim: int = 25, output_dim: int = 1, hiddens=None, repr_dim: int = 9, pds: bool = False,
-               l2_reg: float = None) -> Model:
+def create_mlp(
+        input_dim: int = 25,
+        output_dim: int = 1,
+        hiddens=None,
+        repr_dim: int = 9,
+        pds: bool = False,
+        l2_reg: float = None,
+        dropout_rate: float = 0.0,
+        activation=None,
+        norm: str = None) -> Model:
     """
-    Create an MLP model with fully connected dense layers.
+    Create an MLP model with fully connected dense layers, optional dropout, and configurable activation functions,
+    with the option to include batch normalization or layer normalization.
 
     Parameters:
-    - input_dim (int): The number of features in the input cme_files.
+    - input_dim (int): The number of features in the input data.
     - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
     - hiddens (list): A list of integers where each integer is the number of units in a hidden layer.
     - repr_dim (int): The number of features in the final representation vector.
-    - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
+    - pds (bool): If True, the model will use PDS and there will have its representations normalized.
     - l2_reg (float): L2 regularization factor. Default is None (no regularization).
+    - dropout_rate (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
+    - activation: Optional activation function to use. If None, defaults to LeakyReLU.
+    - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None (no normalization).
 
     Returns:
     - Model: A Keras model instance.
     """
 
-    # Define the input layer
     if hiddens is None:
         hiddens = [50]
+
+    if activation is None:
+        activation = LeakyReLU()
+
     input_layer = Input(shape=(input_dim,))
-
-    # Create hidden layers with LeakyReLU activation
     x = input_layer
-    for units in hiddens:
-        if l2_reg:
-            x = Dense(units, kernel_regularizer=l2(l2_reg))(x)
-        else:
-            x = Dense(units)(x)
-        x = LeakyReLU()(x)
 
-    # Proceed with the representation layer
+    for units in hiddens:
+        x = Dense(units, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x)
+
+        if norm == 'batch_norm':
+            x = BatchNormalization()(x)
+        elif norm == 'layer_norm':
+            x = LayerNormalization()(x)
+
+        if callable(activation):
+            x = activation(x)
+        else:
+            x = LeakyReLU()(x)
+
+        if dropout_rate > 0.0:
+            x = Dropout(dropout_rate)(x)
+
     dense = Dense(repr_dim)(x)
     if pds:
-        # Apply normalization if PDS is enabled
-        repr_layer = LeakyReLU()(dense)
-        normalized_repr_layer = NormalizeLayer(name='normalize_layer')(repr_layer)
+        # Assuming NormalizeLayer is defined elsewhere
+        repr_layer = activation(dense) if callable(activation) else LeakyReLU()(dense)
+        normalized_repr_layer = NormalizeLayer(name='normalize_layer')(repr_layer)  # Custom normalization layer for PDS
         final_repr_output = normalized_repr_layer
     else:
-        # Regular processing without PDS
-        final_repr_output = LeakyReLU(name='repr_layer')(dense)
+        final_repr_output = activation(dense) if callable(activation) else LeakyReLU(name='repr_layer')(dense)
 
-    # Determine the model's output based on output_dim
     if output_dim > 0:
-        # Output layer for regression or classification tasks
         output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
         model_output = [final_repr_output, output_layer]
     else:
-        # Only output the representation layer if output_dim is not greater than 0
         model_output = final_repr_output
 
-    # Create the model
     model = Model(inputs=input_layer, outputs=model_output)
-
     return model
 
 
@@ -1385,7 +1411,7 @@ def plot_and_evaluate_sep_event(
     if 'p' in inputs_to_use and target_change:
         predictions_plot = p_t_log + predictions.flatten()
         if show_changes:
-            actual_changes = df['delta_log_Intensity'].values - 1 # offset by 1
+            actual_changes = df['delta_log_Intensity'].values - 1  # offset by 1
             predicted_changes = predictions.flatten() - 1  # offset by 1
     else:
         predictions_plot = predictions.flatten()
@@ -1574,7 +1600,7 @@ def plot_avsp_delta(
         actual_changes = actual_changes = df['delta_log_Intensity'].values
         predicted_changes = predictions.flatten()
 
-    #     print type of actual_changes and predicted_changes and their shapes
+        #     print type of actual_changes and predicted_changes and their shapes
         print(f"Type of actual_changes: {type(actual_changes)}")
         print(f"Type of predicted_changes: {type(predicted_changes)}")
         print(f"Shape of actual_changes: {actual_changes.shape}")
@@ -2272,6 +2298,15 @@ def get_loss(loss_key: str = 'mse'):
             return tf.exp(mse) - 1
 
         return exp_mse
+    elif loss_key == 'var_mse':
+        def var_mse(y_true, y_pred):
+            mse_loss = tf.reduce_mean(tf.square(y_true - y_pred))
+            variance_loss = -tf.reduce_mean(tf.square(y_pred - tf.reduce_mean(y_pred)))
+            total_loss = mse_loss + 0.1 * variance_loss  # Adjust the weighting factor as needed
+            return total_loss
+
+        return var_mse
+
 
 
 class PrintBatchMSE(Callback):
