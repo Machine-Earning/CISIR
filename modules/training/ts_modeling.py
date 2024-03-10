@@ -1419,9 +1419,9 @@ def plot_and_evaluate_sep_event(
     threshold_value = 0.4535
     mae_loss = mean_absolute_error(y_true, predictions_plot)
     t_lag, s_lag, avg_lag = evaluate_lag_error(timestamps, y_true, predictions_plot, threshold=threshold_value)
-    print(f"Threshold lag error: {t_lag:.2f} minutes")
-    print(f"Shift lag error: {s_lag:.2f} minutes")
-    print(f"Average lag error: {avg_lag:.2f} minutes")
+    # print(f"Threshold lag error: {t_lag:.2f} minutes")
+    # print(f"Shift lag error: {s_lag:.2f} minutes")
+    # print(f"Average lag error: {avg_lag:.2f} minutes")
     # mae_loss = mean_absolute_error(y_true, p_t_log) # simple model
     print(f"Mean Absolute Error (MAE) on the cme_files: {mae_loss}")
 
@@ -1601,10 +1601,10 @@ def plot_avsp_delta(
         predicted_changes = predictions.flatten()
 
         #     print type of actual_changes and predicted_changes and their shapes
-        print(f"Type of actual_changes: {type(actual_changes)}")
-        print(f"Type of predicted_changes: {type(predicted_changes)}")
-        print(f"Shape of actual_changes: {actual_changes.shape}")
-        print(f"Shape of predicted_changes: {predicted_changes.shape}")
+        # print(f"Type of actual_changes: {type(actual_changes)}")
+        # print(f"Type of predicted_changes: {type(predicted_changes)}")
+        # print(f"Shape of actual_changes: {actual_changes.shape}")
+        # print(f"Shape of predicted_changes: {predicted_changes.shape}")
 
     else:
         predictions_plot = predictions.flatten()
@@ -2247,13 +2247,13 @@ def evaluate_lag_error(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_
     # print(f"Timestamps: {timestamps}, of type {type(timestamps)}")
     # print(f"Actual TS: {actual_ts}, of type {type(actual_ts)}")
     # print(f"Predicted TS: {predicted_ts}, of type {type(predicted_ts)}")
-    print(f"Threshold: {threshold}")
+    # print(f"Threshold: {threshold}")
     # Find threshold crossings in actual and predicted time series
     actual_crossings = find_threshold_crossing_indices(actual_ts, threshold)
     predicted_crossings = find_threshold_crossing_indices(predicted_ts, threshold)
 
-    print(f"Actual Crossings: {actual_crossings}, of type {type(actual_crossings)}")
-    print(f"Predicted Crossings: {predicted_crossings}, of type {type(predicted_crossings)}")
+    # print(f"Actual Crossings: {actual_crossings}, of type {type(actual_crossings)}")
+    # print(f"Predicted Crossings: {predicted_crossings}, of type {type(predicted_crossings)}")
 
     # Ensure there is at least one crossing in both actual and predicted to compute lag
     if len(actual_crossings) == 0 or len(predicted_crossings) == 0:
@@ -2302,7 +2302,7 @@ def get_loss(loss_key: str = 'mse'):
         def var_mse(y_true, y_pred):
             mse_loss = tf.reduce_mean(tf.square(y_true - y_pred))
             variance_loss = -tf.reduce_mean(tf.square(y_pred - tf.reduce_mean(y_pred)))
-            total_loss = mse_loss + 0.1 * variance_loss  # Adjust the weighting factor as needed
+            total_loss = mse_loss + 1 * variance_loss  # Adjust the weighting factor as needed
             return total_loss
 
         return var_mse

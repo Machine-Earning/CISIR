@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import wandb
-from tensorflow.keras.activations import gelu
+from tensorflow.keras.activations import gelu, sigmoid
 from tensorflow.keras.layers import PReLU
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
@@ -50,7 +50,7 @@ def main():
             tf.random.set_seed(seed)
             np.random.seed(seed)
             patience = 5000  # higher patience
-            learning_rate = 5e-4  # og learning rate
+            learning_rate = 1e-3  # og learning rate
             # initial_learning_rate = 3e-3
             # final_learning_rate = 3e-7
             # learning_rate_decay_factor = (final_learning_rate / initial_learning_rate) ** (1 / 3000)
@@ -83,11 +83,11 @@ def main():
             target_change = True
             # print_batch_mse_cb = PrintBatchMSE()
             rebalacing = True
-            alpha_rw = 1
+            alpha_rw = 0.9
             bandwidth = 0.0519
-            repr_dim = 18
-            dropout = 0.1
-            activation = gelu()
+            repr_dim = 9
+            dropout = 0
+            activation = sigmoid
             norm = 'batch_norm'
 
             # Initialize wandb
