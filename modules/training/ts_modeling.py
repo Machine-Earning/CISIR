@@ -632,8 +632,8 @@ def build_dataset(
 
             # Apply logarithmic transformation (if specified)
             if apply_log:
-                data[input_columns] = np.log(data[input_columns] + 1)  # Adding 1 to avoid log(0)
-                data[target_column] = np.log(data[target_column] + 1)  # Adding 1 to avoid log(0)
+                data[input_columns] = np.log1p(data[input_columns])  # Adding 1 to avoid log(0)
+                data[target_column] = np.log1p(data[target_column])  # Adding 1 to avoid log(0)
 
             # Save p_t for target change if 'p' is in inputs_to_use and target_change is True
             if 'p' in inputs_to_use and target_change:
@@ -2302,11 +2302,10 @@ def get_loss(loss_key: str = 'mse'):
         def var_mse(y_true, y_pred):
             mse_loss = tf.reduce_mean(tf.square(y_true - y_pred))
             variance_loss = -tf.reduce_mean(tf.square(y_pred - tf.reduce_mean(y_pred)))
-            total_loss = mse_loss + 1 * variance_loss  # Adjust the weighting factor as needed
+            total_loss = mse_loss + 0.09 * variance_loss  # Adjust the weighting factor as needed
             return total_loss
 
         return var_mse
-
 
 
 class PrintBatchMSE(Callback):

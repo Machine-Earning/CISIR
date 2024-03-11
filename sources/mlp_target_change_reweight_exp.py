@@ -5,10 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import wandb
-from tensorflow.keras.activations import gelu, sigmoid
-from tensorflow.keras.layers import PReLU
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-from tensorflow_addons.optimizers import AdamW
+from tensorflow.keras.optimizers import SGD
 from wandb.keras import WandbCallback
 
 from modules.training.DenseReweights import exDenseReweights
@@ -46,10 +44,10 @@ def main():
             experiment_name = f'{title}_{current_time}'
 
             # Set the early stopping patience and learning rate as variables
-            seed = 123456
+            seed = 123456789
             tf.random.set_seed(seed)
             np.random.seed(seed)
-            patience = 5000  # higher patience
+            patience = 50000  # higher patience
             learning_rate = 1e-3  # og learning rate
             # initial_learning_rate = 3e-3
             # final_learning_rate = 3e-7
@@ -70,28 +68,27 @@ def main():
                 min_delta=1e-6,
                 min_lr=1e-10)
 
-            weight_decay = 1e-10  # higher weight decay
-            momentum_beta1 = 0.99  # higher momentum beta1
+            weight_decay = 0  # higher weight decay
+            momentum_beta1 = 0.95  # higher momentum beta1
             batch_size = 4096
-            epochs = 50000
+            epochs = 500000  # higher epochs
             hiddens = [
-                4096, 4096, 2048, 2048,
-                1024, 1024, 512, 512
+                25000
             ]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-            loss_key = 'var_mse'
+            loss_key = 'mse'
             target_change = True
             # print_batch_mse_cb = PrintBatchMSE()
             rebalacing = True
-            alpha_rw = 0.9
+            alpha_rw = 1
             bandwidth = 0.0519
             repr_dim = 9
             dropout = 0
-            activation = sigmoid
-            norm = 'batch_norm'
+            activation = None
+            norm = 'none'
 
             # Initialize wandb
-            wandb.init(project="mlp-ts-target-change", name=experiment_name, config={
+            wandb.init(project="mlp-ts-delta-overfit", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
                 "patience": patience,
@@ -112,8 +109,9 @@ def main():
                 "reciprocal_reweight": True,
                 "repr_dim": repr_dim,
                 "dropout": dropout,
-                "activation": 'gelu',
-                "norm": norm
+                "activation": 'leakyrelu',
+                "norm": norm,
+                'optimizer': 'sgd'
             })
 
             # set the root directory
@@ -187,13 +185,14 @@ def main():
             mlp_model_sep.summary()
 
             # Define the EarlyStopping callback
-            early_stopping = EarlyStopping(monitor='val_loss', patience=patience, verbose=1,
+            early_stopping = EarlyStopping(monitor='loss', patience=patience, verbose=1,
                                            restore_best_weights=True)
 
             # Compile the model with the specified learning rate
-            mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
-                                                  weight_decay=weight_decay,
-                                                  beta_1=momentum_beta1),
+            mlp_model_sep.compile(optimizer=SGD(learning_rate=learning_rate,
+                                                # weight_decay=weight_decay,
+                                                # beta_1=momentum_beta1
+                                                ),
                                   loss={'forecast_head': get_loss(loss_key)})
 
             # Train the model with the callback
@@ -224,13 +223,14 @@ def main():
                 dropout_rate=dropout,
                 activation=activation,
                 norm=norm
-            )  
+            )
 
             # Recreate the model architecture
             final_mlp_model_sep.compile(
-                optimizer=AdamW(learning_rate=learning_rate,
-                                weight_decay=weight_decay,
-                                beta_1=momentum_beta1),
+                optimizer=SGD(learning_rate=learning_rate,
+                            # weight_decay=weight_decay,
+                              # beta_1=momentum_beta1
+                              ),
                 loss={'forecast_head': get_loss(loss_key)})  # Compile the model just like before
             # Train on the full dataset
             final_mlp_model_sep.fit(
