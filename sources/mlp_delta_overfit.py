@@ -50,7 +50,7 @@ def main():
             seed = 456789
             tf.random.set_seed(seed)
             np.random.seed(seed)
-            patience = 1000  # higher patience
+            patience = 15000  # higher patience
             learning_rate = 5e-3  # og learning rate
             # initial_learning_rate = 3e-3
             # final_learning_rate = 3e-7
@@ -66,7 +66,7 @@ def main():
             reduce_lr_on_plateau = ReduceLROnPlateau(
                 monitor='loss',
                 factor=0.5,
-                patience=500,
+                patience=300,
                 verbose=1,
                 min_delta=1e-5,
                 min_lr=1e-10)
@@ -74,21 +74,21 @@ def main():
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
             batch_size = 4096
-            epochs = 1500  # higher epochs
+            epochs = 150000  # higher epochs
             hiddens = [
-                512, 256, 256, 128, 128, 64, 32
+                1024, 512, 512, 256, 256, 128, 128
             ]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-            loss_key = 'mse'
+            loss_key = 'var_mse'
             target_change = True
             # print_batch_mse_cb = PrintBatchMSE()
             rebalacing = True
-            alpha_rw = 1
+            alpha_rw = 1.3
             bandwidth = 0.0519
             repr_dim = 9
             output_dim = len(outputs_to_use)
             dropout = 0
-            activation = elu
+            activation = None
             norm = 'batch_norm'
 
             # Initialize wandb
@@ -113,7 +113,7 @@ def main():
                 "reciprocal_reweight": True,
                 "repr_dim": repr_dim,
                 "dropout": dropout,
-                "activation": 'elu',
+                "activation": 'LeakyReLU',
                 "norm": norm,
                 'optimizer': 'adamw',
                 'output_dim': output_dim,

@@ -67,7 +67,7 @@ def main():
             reduce_lr_on_plateau = ReduceLROnPlateau(
                 monitor='loss',
                 factor=0.65,
-                patience=500,
+                patience=300,
                 verbose=1,
                 min_delta=1e-5,
                 min_lr=1e-10)
@@ -77,7 +77,7 @@ def main():
             batch_size = 4096
             epochs = 1500  # higher epochs
             gru_units = 64
-            gru_layers = 5
+            gru_layers = 4
             hiddens_str = f'gru_units_{gru_units}_gru_layers_{gru_layers}'
             loss_key = 'mse'
             target_change = True

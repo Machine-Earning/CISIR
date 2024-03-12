@@ -33,7 +33,7 @@ def main():
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
-            outputs_to_use = ['delta_p', 'p']
+            outputs_to_use = ['delta_p']
 
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
@@ -67,26 +67,26 @@ def main():
 
             reduce_lr_on_plateau = ReduceLROnPlateau(
                 monitor='loss',
-                factor=0.65,
-                patience=500,
+                factor=0.5,
+                patience=300,
                 verbose=1,
                 min_delta=1e-5,
                 min_lr=1e-10)
 
             weight_decay = 0  # higher weight decay
             momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 4096
-            epochs = 10000  # higher epochs
-            n_filters = 64
+            batch_size = 2048
+            epochs = 15000  # higher epochs
+            n_filters = 32
             kernel_size = 10
-            conv_layers = 6
+            conv_layers = 24
             # hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
             hiddens_str = f'filters{n_filters}_kernelsize{kernel_size}_convlayers{conv_layers}'
-            loss_key = 'mse'
+            loss_key = 'var_mse'
             target_change = True
             # print_batch_mse_cb = PrintBatchMSE()
             rebalacing = True
-            alpha_rw = 1
+            alpha_rw = 1.5
             bandwidth = 0.0519
             repr_dim = 9
             output_dim = len(outputs_to_use)

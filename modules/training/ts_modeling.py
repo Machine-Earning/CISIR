@@ -1337,7 +1337,7 @@ def process_sep_events(
 
         # Create a scatter plot for each set of actual vs predicted values
         for event_id, actual, predicted in avsp_data:
-            plt.scatter(actual, predicted, c=actual, cmap=cmap, norm=norm, label=f'{event_id}', alpha=0.5, s=4)
+            plt.scatter(actual, predicted, c=actual, cmap=cmap, norm=norm, label=f'{event_id}', alpha=0.5, s=7)
 
         # Add a diagonal line for perfect prediction
         min_val = min(min(actual.min(), predicted.min()) for _, actual, predicted in avsp_data)
@@ -1867,7 +1867,7 @@ def get_loss(loss_key: str = 'mse'):
         def var_mse(y_true, y_pred):
             mse_loss = tf.reduce_mean(tf.square(y_true - y_pred))
             variance_loss = -tf.reduce_mean(tf.square(y_pred - tf.reduce_mean(y_pred)))
-            total_loss = mse_loss + 0.09 * variance_loss  # Adjust the weighting factor as needed
+            total_loss = mse_loss + 0.085 * variance_loss  # Adjust the weighting factor as needed
             return total_loss
 
         return var_mse
