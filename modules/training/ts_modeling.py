@@ -2,13 +2,14 @@ import os
 import random
 import traceback
 from collections import Counter
-from typing import Tuple, List
+from typing import Tuple, List, Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from matplotlib.lines import Line2D
+from numpy import ndarray
 from scipy.signal import correlate, correlation_lags
 from sklearn.metrics import mean_absolute_error
 from sklearn.utils import shuffle
@@ -45,91 +46,19 @@ np.random.seed(seed_value)
 tf.random.set_seed(seed_value)
 
 
-def create_cnns(
-        input_dims: list = None,
-        filters: int = 32,
-        kernel_size: int = 10,
-        conv_layers: int = 2,
-        repr_dim: int = 50,
-        output_dim: int = 1,
-        pds: bool = False
-) -> Model:
-    """
-    Create a model with multiple CNN branches, each processing a different input dimension.
-    The outputs of these branches are concatenated before being passed to dense layers.
-
-    Parameters:
-    - input_dims (list): List of input dimensions, one for each CNN branch. Default is [25, 25, 25].
-    - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
-    - filters (int): The number of filters in each convolutional layer. Default is 32.
-    - kernel_size (int): The size of the kernel in the convolutional layers. Default is 10.
-    - repr_dim (int): The number of units in the fully connected layer. Default is 50.
-    - conv_layers (int): The number of convolutional layers in each branch. Default is 2.
-    - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
-
-    Returns:
-    - Model: A Keras model instance.
-    """
-
-    if input_dims is None:
-        input_dims = [25, 25, 25]
-
-    cnn_branches = []
-    cnn_inputs = []
-
-    for i, dim in enumerate(input_dims):
-        # Define the input layer for this branch
-        input_layer = Input(shape=(dim, 1), name=f'input_{i}')
-        x = input_layer
-
-        # Add convolutional layers with LeakyReLU activation
-        for _ in range(conv_layers):
-            x = Conv1D(filters=filters, kernel_size=kernel_size, padding='same')(x)
-            x = LeakyReLU()(x)
-
-        # Flatten the output for concatenation
-        flattened = Flatten()(x)
-
-        cnn_branches.append(flattened)
-        cnn_inputs.append(input_layer)
-
-    # Concatenate the outputs of all branches
-    concatenated = Concatenate()(cnn_branches) if len(cnn_branches) > 1 else cnn_branches[0]
-
-    # Proceed with the representation layer
-    dense = Dense(repr_dim)(concatenated)
-    if pds:
-        # Apply normalization if PDS is enabled
-        repr_layer = LeakyReLU()(dense)
-        normalized_repr_layer = NormalizeLayer(name='normalize_layer')(repr_layer)
-        final_repr_output = normalized_repr_layer
-    else:
-        # Regular processing without PDS
-        final_repr_output = LeakyReLU(name='repr_layer')(dense)
-
-    # Determine the model's output based on output_dim
-    if output_dim > 0:
-        # Output layer for regression or classification tasks
-        output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
-        model_output = [final_repr_output, output_layer]
-    else:
-        # Only output the representation layer if output_dim is not greater than 0
-        model_output = final_repr_output
-
-    # Create the model
-    model = Model(inputs=cnn_inputs, outputs=model_output)
-
-    return model
-
-
-def create_cnns_ch(
+def create_1dcnn(
         input_dims: list,
         filters: int = 32,
         kernel_size: int = 10,
         conv_layers: int = 2,
         repr_dim: int = 50,
         output_dim: int = 1,
-        pds: bool = False
+        pds: bool = False,
+        l2_reg: float = None,
+        dropout_rate: float = 0.0,
+        activation=None,
+        norm: str = None,
+        name: str = '1dcnn'
 ) -> Model:
     """
     Create a CNN model with multiple input branches, each processing inputs stacked across the channel dimension.
@@ -150,62 +79,67 @@ def create_cnns_ch(
     if input_dims is None:
         input_dims = [25, 25, 25]
 
-    # Group the input dimensions to find the number of channels for each branch
     dim_counts = Counter(input_dims)
     branches = []
     cnn_inputs = []
 
     for dim, count in dim_counts.items():
-        # Define the input layer for this set of channels
         input_layer = Input(shape=(dim, count), name=f'input_{dim}x{count}')
         x = input_layer
 
-        # Add convolutional layers with LeakyReLU activation
         for _ in range(conv_layers):
-            x = Conv1D(filters=filters, kernel_size=kernel_size, padding='same')(x)
-            x = LeakyReLU()(x)
+            x = Conv1D(filters=filters, kernel_size=kernel_size, padding='same',
+                       kernel_regularizer=l2(l2_reg) if l2_reg else None)(x)
 
-        # Flatten the output for concatenation
+            if norm == 'batch_norm':
+                x = BatchNormalization()(x)
+            elif norm == 'layer_norm':
+                x = LayerNormalization()(x)
+
+            x = activation(x) if callable(activation) else LeakyReLU()(x)
+
+            if dropout_rate > 0.0:
+                x = Dropout(dropout_rate)(x)
+
         flattened = Flatten()(x)
         branches.append(flattened)
         cnn_inputs.append(input_layer)
 
-    # Concatenate the outputs of all branches
     concatenated = Concatenate()(branches) if len(branches) > 1 else branches[0]
 
-    # Proceed with the representation layer
-    dense = Dense(repr_dim)(concatenated)
+    dense = Dense(repr_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(concatenated)
     if pds:
-        # Apply normalization if PDS is enabled
-        repr_layer = LeakyReLU()(dense)
-        normalized_repr_layer = NormalizeLayer(name='normalize_layer')(repr_layer)
+        # Assuming NormalizeLayer is defined elsewhere
+        normalized_repr_layer = NormalizeLayer(name='normalize_layer')(dense)
         final_repr_output = normalized_repr_layer
     else:
-        # Regular processing without PDS
-        final_repr_output = LeakyReLU(name='repr_layer')(dense)
+        final_repr_output = activation(dense) if callable(activation) else LeakyReLU()(dense)
 
-    # Determine the model's output based on output_dim
     if output_dim > 0:
-        # Output layer for regression or classification tasks
         output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
         model_output = [final_repr_output, output_layer]
     else:
-        # Only output the representation layer if output_dim is not greater than 0
         model_output = final_repr_output
 
-    # Create the model
-    model = Model(inputs=cnn_inputs, outputs=model_output)
-
+    model = Model(inputs=cnn_inputs, outputs=model_output, name=name)
     return model
 
 
-def create_rnns(
+#
+
+
+def create_gru(
         input_dims: list = None,
         gru_units: int = 64,
-        rnn_layers: int = 2,
+        gru_layers: int = 2,
         repr_dim: int = 50,
         output_dim: int = 1,
-        pds: bool = False
+        pds: bool = False,
+        l2_reg: float = None,
+        dropout_rate: float = 0.0,
+        activation=None,
+        norm: str = None,
+        name: str = 'gru'
 ) -> Model:
     """
     Create a model with multiple RNN (GRU) branches, each processing a different input dimension.
@@ -218,6 +152,10 @@ def create_rnns(
     - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
     - rnn_layers (int): The number of RNN layers in each branch. Default is 2.
     - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
+    - l2_reg (float): L2 regularization factor. Default is None (no regularization).
+    - dropout_rate (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
+    - activation: Optional activation function to use. If None, defaults to LeakyReLU.
+    - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None (no normalization).
 
     Note: inputs for RNNs is sequence: A 3D tensor, with shape [batch, timesteps, feature].
     In this context, features is like channels, number of variables per timesteps
@@ -228,129 +166,50 @@ def create_rnns(
     if input_dims is None:
         input_dims = [25, 25, 25]
 
-    rnn_branches = []
-    rnn_inputs = []
-
-    for i, dim in enumerate(input_dims):
-        # Define the input layer for this branch
-        input_layer = Input(shape=(dim, 1), name=f'input_{i}')
-        x = input_layer
-
-        # Add GRU layers with LeakyReLU activation
-        for layer in range(rnn_layers):
-            x = GRU(units=gru_units, return_sequences=True if layer < rnn_layers - 1 else False)(x)
-            x = LeakyReLU()(x)
-
-        # Flatten the output for concatenation
-        flattened = Flatten()(x)
-
-        rnn_branches.append(flattened)
-        rnn_inputs.append(input_layer)
-
-    # Concatenate the outputs of all branches
-    concatenated = Concatenate()(rnn_branches) if len(rnn_branches) > 1 else rnn_branches[0]
-
-    # Proceed with the representation layer
-    dense = Dense(repr_dim)(concatenated)
-    if pds:
-        # Apply normalization if PDS is enabled
-        repr_layer = LeakyReLU()(dense)
-        normalized_repr_layer = NormalizeLayer(name='normalize_layer')(repr_layer)
-        final_repr_output = normalized_repr_layer
-    else:
-        # Regular processing without PDS
-        final_repr_output = LeakyReLU(name='repr_layer')(dense)
-
-    # Determine the model's output based on output_dim
-    if output_dim > 0:
-        # Output layer for regression or classification tasks
-        output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
-        model_output = [final_repr_output, output_layer]
-    else:
-        # Only output the representation layer if output_dim is not greater than 0
-        model_output = final_repr_output
-
-    # Create the model
-    model = Model(inputs=rnn_inputs, outputs=model_output)
-
-    return model
-
-
-def create_rnns_ch(
-        input_dims: list = None,
-        gru_units: int = 64,
-        rnn_layers: int = 2,
-        repr_dim: int = 50,
-        output_dim: int = 1,
-        pds: bool = False
-) -> Model:
-    """
-    Create a model with multiple RNN (GRU) branches, each processing a different input dimension.
-    The outputs of these branches are concatenated before being passed to dense layers.
-
-    Parameters:
-    - input_dims (list): List of input dimensions, one for each RNN branch. Default is [25, 25, 25].
-    - gru_units (int): The number of units in each GRU layer. Default is 64.
-    - repr_dim (int): The number of units in the fully connected layer. Default is 50.
-    - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
-    - rnn_layers (int): The number of RNN layers in each branch. Default is 2.
-    - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
-
-    Note: inputs for RNNs is sequence: A 3D tensor, with shape [batch, timesteps, feature].
-    In this context, features is like channels, number of variables per timesteps
-    Returns:
-    - Model: A Keras model instance.
-    """
-
-    if input_dims is None:
-        input_dims = [25, 25, 25]
-
-    # Group the input dimensions to find the number of channels for each branch
     dim_counts = Counter(input_dims)
     rnn_branches = []
-    rnn_inputs = []
+    gru_inputs = []
 
     for dim, count in dim_counts.items():
-        # Define the input layer for this set of channels
-        input_layer = Input(shape=(dim, count), name=f'input_{dim}x{count}')
+        input_layer = Input(shape=(None, count), name=f'input_{dim}x{count}')
         x = input_layer
 
-        # Add GRU layers with LeakyReLU activation
-        for layer in range(rnn_layers):
-            x = GRU(units=gru_units, return_sequences=True if layer < rnn_layers - 1 else False)(x)
-            x = LeakyReLU()(x)
+        for layer in range(gru_layers):
+            x = GRU(units=gru_units,
+                    return_sequences=True if layer < gru_layers - 1 else False,
+                    kernel_regularizer=l2(l2_reg) if l2_reg else None)(x)
 
-        # Flatten the output for concatenation
+            if norm == 'batch_norm':
+                x = BatchNormalization()(x)
+            elif norm == 'layer_norm':
+                x = LayerNormalization()(x)
+
+            x = activation(x) if callable(activation) else LeakyReLU()(x)
+
+            if dropout_rate > 0.0:
+                x = Dropout(dropout_rate)(x)
+
         flattened = Flatten()(x)
         rnn_branches.append(flattened)
-        rnn_inputs.append(input_layer)
+        gru_inputs.append(input_layer)
 
-    # Concatenate the outputs of all branches
     concatenated = Concatenate()(rnn_branches) if len(rnn_branches) > 1 else rnn_branches[0]
 
-    # Proceed with the representation layer
-    dense = Dense(repr_dim)(concatenated)
-    if pds:
-        # Apply normalization if PDS is enabled
-        repr_layer = LeakyReLU()(dense)
-        normalized_repr_layer = NormalizeLayer(name='normalize_layer')(repr_layer)
-        final_repr_output = normalized_repr_layer
-    else:
-        # Regular processing without PDS
-        final_repr_output = LeakyReLU(name='repr_layer')(dense)
+    dense = Dense(repr_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(concatenated)
+    final_repr_output = activation(dense) if callable(activation) else LeakyReLU()(dense)
 
-    # Determine the model's output based on output_dim
+    if pds:
+        # Assuming NormalizeLayer is defined elsewhere
+        normalized_repr_layer = NormalizeLayer(name='normalize_layer')(final_repr_output)
+        final_repr_output = normalized_repr_layer
+
     if output_dim > 0:
-        # Output layer for regression or classification tasks
         output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
         model_output = [final_repr_output, output_layer]
     else:
-        # Only output the representation layer if output_dim is not greater than 0
         model_output = final_repr_output
 
-    # Create the model
-    model = Model(inputs=rnn_inputs, outputs=model_output)
-
+    model = Model(inputs=gru_inputs, outputs=model_output, name=name)
     return model
 
 
@@ -363,7 +222,9 @@ def create_mlp(
         l2_reg: float = None,
         dropout_rate: float = 0.0,
         activation=None,
-        norm: str = None) -> Model:
+        norm: str = None,
+        name: str = 'mlp'
+) -> Model:
     """
     Create an MLP model with fully connected dense layers, optional dropout, and configurable activation functions,
     with the option to include batch normalization or layer normalization.
@@ -423,7 +284,7 @@ def create_mlp(
     else:
         model_output = final_repr_output
 
-    model = Model(inputs=input_layer, outputs=model_output)
+    model = Model(inputs=input_layer, outputs=model_output, name='mlp')
     return model
 
 
@@ -441,6 +302,7 @@ def create_hybrid_model(
     """
     Create a hybrid neural network model with a time series feature extraction branch (CNN or RNN)
     and an MLP branch.
+    TODO: update but not urgent
 
     Parameters:
     - tsf_extractor (Model): A pre-built model for time series feature extraction (CNN or RNN).
@@ -491,101 +353,127 @@ def create_hybrid_model(
     forecast_head = Dense(output_dim, activation='linear', name='forecast_head')(final_repr)
 
     # Create the model
-    model = Model(inputs=[tsf_extractor.input, mlp_input], outputs=[final_repr, forecast_head])
+    model = Model(inputs=[tsf_extractor.input, mlp_input], outputs=[final_repr, forecast_head], name='hybrid')
 
     return model
 
 
-def build_univariate_dataset(
-        directory_path: str,
-        shuffle_data: bool = True,
+def load_file_data(
+        file_path: str,
         apply_log: bool = True,
-        norm_target: bool = False,
-        inputs_to_use: List[str] = None,
-        input_to_return: str = 'p_t',
+        inputs_to_use: Optional[List[str]] = None,
         add_slope: bool = True,
-        target_change: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+        outputs_to_use: Optional[List[str]] = None,
+        cme_speed_threshold: float = -1
+) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Reads SEP event files from the specified directory, processes them to extract
-    the specified input feature and target values, normalizes the values between 0 and 1
-    for the input of interest, excludes rows where proton intensity is -9999, and optionally
-    shuffles the data.
+    Processes data from a single file.
 
-     Parameters:
-        - directory_path (str): Path to the directory containing the sep_event_X files.
-        - shuffle_data (bool): If True, shuffle the data before returning.
+    Parameters:
+        - file_path (str): Path to the file.
         - apply_log (bool): Whether to apply a logarithmic transformation before normalization.
-        - norm_target (bool): Whether to normalize the target data. False by default.
-        - inputs_to_use (List[str]): List of input types to include in the dataset. Not used in this modified function.
-        - input_to_return (str): The specific input feature to return.
-        - add_slope (bool): If True, adds slope features to the dataset. Not used in this modified function.
-        - target_change (bool): If True, the target is the change in proton intensity from t to t+6.
+        - inputs_to_use (Optional[List[str]]): List of input types to include in the dataset.
+        - add_slope (bool): If True, adds slope features to the dataset.
+        - outputs_to_use (Optional[List[str]]): List of output types to include in the dataset. default is both ['p'] and ['delta_p'].
+        - cme_speed_threshold (float): The threshold for CME speed. CMEs with speeds below (<) this threshold will be excluded. -1
+        for no cmes
 
     Returns:
-    - Tuple[np.ndarray, np.ndarray]: A tuple containing the normalized input data (X) and target data (y).
+    - Tuple[np.ndarray, np.ndarray]: Processed input data (X) and target data (y) as numpy arrays.
     """
+    # Initialization and file reading
+    if inputs_to_use is None:
+        inputs_to_use = ['e0.5', 'e1.8', 'p']
+    if outputs_to_use is None:
+        outputs_to_use = ['delta_p', 'p', ]
 
-    all_inputs = []
-    all_targets = []
+    # Dynamically define input columns based on inputs_to_use
+    input_columns = []
+    for input_type in inputs_to_use:
+        input_columns += [f'{input_type}_tminus{i}' for i in range(24, 0, -1)] + [f'{input_type}_t']
 
-    target_column = 'Proton Intensity'
+    target_column = []
+    # Dynamically define target column based on outputs_to_use
 
-    # Loop through each file in the directory
-    for file_name in os.listdir(directory_path):
-        if file_name.endswith('_ie.csv'):
-            file_path = os.path.join(directory_path, file_name)
-            data = pd.read_csv(file_path)
+    if 'delta_p' in outputs_to_use:  # delta should come first
+        target_column.append('delta_log_Intensity')
+    if 'p' in outputs_to_use:
+        target_column.append('Proton Intensity')
 
-            # Exclude rows where proton intensity is -9999
-            data = data[data[target_column] != -9999]
+    cme_columns_to_zero_out = [
+        'CME_DONKI_latitude', 'CME_DONKI_longitude', 'CME_DONKI_speed', 'CME_CDAW_MPA',
+        'CME_CDAW_LinearSpeed', 'VlogV', 'DONKI_half_width', 'Accelaration',
+        '2nd_order_speed_final', '2nd_order_speed_20R', 'CPA', 'Halo', 'Type2_Viz_Area',
+        'solar_wind_speed', 'diffusive_shock', 'half_richardson_value'
+    ]
 
-            # Apply logarithmic transformation (if specified)
-            if apply_log:
-                data[input_to_return] = np.log(data[input_to_return] + 1)  # Adding 1 to avoid log(0)
-                data[target_column] = np.log(data[target_column] + 1)  # Adding 1 to avoid log(0)
+    data = pd.read_csv(file_path)
 
-            # Normalize the specified input feature between 0 and 1
-            input_data = data[[input_to_return]]
-            input_data_normalized = (input_data - input_data.min()) / (input_data.max() - input_data.min())
+    if cme_speed_threshold > -1:
+        # Zero out CME columns for CMEs with speeds below the threshold
+        data = zero_out_cme_below_threshold(data, cme_speed_threshold, cme_columns_to_zero_out)
 
-            # Normalize target data
-            target_data = data[[target_column]]
-            if norm_target:
-                target_data_normalized = (target_data - target_data.min()) / (target_data.max() - target_data.min())
-            else:
-                target_data_normalized = target_data
+    # Apply transformations and normalizations
+    # Apply logarithmic transformation (if specified)
+    if apply_log:
+        data[input_columns] = np.log1p(data[input_columns])  # Adding 1 to avoid log(0)
+        data['Proton Intensity'] = np.log1p(data['Proton Intensity'])  # Adding 1 to avoid log(0)
 
-            # Reshape inputs to be in the format [samples, features]
-            X = input_data_normalized.values
+    # Normalize inputs between 0 and 1
+    input_data = data[input_columns]
+    input_data_normalized = (input_data - input_data.min()) / (input_data.max() - input_data.min())
 
-            # Flatten targets to 1D array
-            y = target_data_normalized.values.flatten()
+    # Compute and add slopes (if specified)
+    if add_slope:
+        for input_type in inputs_to_use:
+            # print(f"Computing slopes for {input_type}...")
+            slope_column_names = generate_slope_column_names([input_type])  # Generate for current input type
+            slope_values = compute_slope(input_data_normalized, input_type)
+            for slope_column, slope_index in zip(slope_column_names, range(slope_values.shape[1])):
+                # print(f"Adding {slope_column} to input cme_files...")
+                input_data_normalized[slope_column] = slope_values[:, slope_index]
+            # input_columns.extend(slope_column_names)
 
-            # Append to list
-            all_inputs.append(X)
-            all_targets.append(y)
+    # print the columns one by one
+    # for col in input_data_normalized.columns:
+    #     print(col)
+    # order - e0.5, e1.8, p, e0.5 slope, e1.8 slope, p slope
 
-    # Combine all input and target data
-    X_combined = np.vstack(all_inputs)
-    y_combined = np.concatenate(all_targets)
+    # Normalize targets between 0 and 1
+    target_data = data[target_column]
 
-    # Shuffle the data if the flag is True
-    if shuffle_data:
-        X_combined, y_combined = shuffle(X_combined, y_combined, random_state=seed_value)
+    if cme_speed_threshold > -1:
+        # Process and append CME features
+        cme_features = preprocess_cme_features(data, inputs_to_use)
+        combined_input = pd.concat([input_data_normalized, cme_features], axis=1)
+        X = combined_input.values
+    else:
+        X = input_data_normalized.values.reshape((input_data_normalized.shape[0], -1, 1))
 
-    return X_combined, y_combined
+    # print shape of X along with the file name
+    # print(f'X.shape: {X.shape} for {file_path}')
+
+    y = target_data.values
+
+    # print shape of y along with the file name
+    # print(f'y.shape: {y.shape} for {file_path}')
+
+    # Return processed X and y
+    return X, y
 
 
 def build_dataset(
         directory_path: str,
         shuffle_data: bool = True,
         apply_log: bool = True,
-        norm_target: bool = False,
-        inputs_to_use: List[str] = None,
+        inputs_to_use: Optional[List[str]] = None,
         add_slope: bool = True,
-        target_change: bool = False,
-        symlog1p: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+        outputs_to_use: Optional[List[str]] = None,
+        cme_speed_threshold: float = -1
+) -> Tuple[np.ndarray, np.ndarray]:
     """
+    Builds a dataset by processing files in a given directory.
+
     Reads SEP event files from the specified directory, processes them to extract
     input and target cme_files, normalizes the values between 0 and 1 for the columns
     of interest, excludes rows where proton intensity is -9999, and optionally shuffles the cme_files.
@@ -594,137 +482,32 @@ def build_dataset(
         - directory_path (str): Path to the directory containing the sep_event_X files.
         - shuffle_data (bool): If True, shuffle the cme_files before returning.
         - apply_log (bool): Whether to apply a logarithmic transformation before normalization.
-        - norm_target (bool): Whether to normalize the target cme_files. False by default.
         - inputs_to_use (List[str]): List of input types to include in the dataset. Default is ['e0.5', 'e1.8', 'p'].
         - add_slope (bool): If True, adds slope features to the dataset.
-        - target_change (bool): If True, the target is the change in proton intensity from t to t+6. requires 'p' in
-        inputs to use
-        - symlog1p (bool): If True, the target data will be transformed using symlog1p.
-
-
+        - outputs_to_use (List[str]): List of output types to include in the dataset. Default is both ['p'] and ['delta_p'].
+        - cme_speed_threshold (float): The threshold for CME speed. CMEs with speeds below (<) this threshold will be excluded. -1
 
     Returns:
-    - Tuple[np.ndarray, np.ndarray]: A tuple containing the normalized input cme_files (X) and target cme_files (y).
+    - Tuple[np.ndarray, np.ndarray]: A tuple containing the combined input data (X) and target data (y).
     """
+    all_inputs, all_targets = [], []
 
-    global p_t_values, p_t_values_normalized, adjusted_target
-    if inputs_to_use is None:
-        inputs_to_use = ['e0.5', 'e1.8', 'p']
-
-    all_inputs = []
-    all_targets = []
-
-    # Dynamically define input columns based on inputs_to_use
-    input_columns = []
-    for input_type in inputs_to_use:
-        input_columns += [f'{input_type}_tminus{i}' for i in range(24, 0, -1)] + [f'{input_type}_t']
-
-    target_column = 'Proton Intensity'
-
-    # Loop through each file in the directory
     for file_name in os.listdir(directory_path):
         if file_name.endswith('_ie.csv'):
             file_path = os.path.join(directory_path, file_name)
-            data = pd.read_csv(file_path)
-
-            # Exclude rows where proton intensity is -9999
-            data = data[data[target_column] != -9999]
-
-            # Apply logarithmic transformation (if specified)
-            if apply_log:
-                data[input_columns] = np.log1p(data[input_columns])  # Adding 1 to avoid log(0)
-                data[target_column] = np.log1p(data[target_column])  # Adding 1 to avoid log(0)
-
-            # Save p_t for target change if 'p' is in inputs_to_use and target_change is True
-            if 'p' in inputs_to_use and target_change:
-                # Assuming 'p_t' is the correct column name in your data
-                p_t_column_name = 'p_t'
-                # Save the p_t column. This saves the column after any potential log transformation
-                # has been applied if apply_log is True.
-                p_t_values = data[p_t_column_name].copy()
-
-            # Normalize inputs between 0 and 1
-            input_data = data[input_columns]
-            input_data_normalized = (input_data - input_data.min()) / (input_data.max() - input_data.min())
-
-            # Compute and add slopes (if specified)
-            if add_slope:
-                for input_type in inputs_to_use:
-                    # print(f"Computing slopes for {input_type}...")
-                    slope_column_names = generate_slope_column_names([input_type])  # Generate for current input type
-                    slope_values = compute_slope(input_data_normalized, input_type)
-                    for slope_column, slope_index in zip(slope_column_names, range(slope_values.shape[1])):
-                        # print(f"Adding {slope_column} to input cme_files...")
-                        input_data_normalized[slope_column] = slope_values[:, slope_index]
-                    # input_columns.extend(slope_column_names)
-
-            # print the columns one by one
-            # for col in input_data_normalized.columns:
-            #     print(col)
-            # order - e0.5, e1.8, p, e0.5 slope, e1.8 slope, p slope
-
-            # Normalize targets between 0 and 1
-            target_data = data[[target_column]]
-            if norm_target:
-                target_data_normalized = (target_data - target_data.min()) / (target_data.max() - target_data.min())
-            else:
-                target_data_normalized = target_data
-
-            # Handle p_t_values based on whether they are used for target adjustment
-            if 'p' in inputs_to_use and target_change:
-                # Assume p_t_values need to be on the same scale as the target data for adjustment
-                # Normalize p_t_values only if norm_target is True, to match the normalized target scale
-                if norm_target:
-                    # Normalize p_t_values using the same method as the target data
-                    p_t_values_normalized = (p_t_values - p_t_values.min()) / (p_t_values.max() - p_t_values.min())
-                else:
-                    # If not normalizing target data, use p_t_values as is without normalization
-                    # But still consider whether apply_log was True and adjust accordingly
-                    p_t_values_normalized = p_t_values
-
-                # print shape of p_t_values_normalized and target_data_normalized along with the file name
-                # print(f'p_t_values_normalized.shape: {p_t_values_normalized.shape} for {file_name}')
-                # print(f'target_data_normalized.shape: {target_data_normalized.shape} for {file_name}')
-
-                # NOTE: target_data_normalized[target_column] instead of target_data_normalized because
-                # the latter is a DataFrame and we want to subtract a Series from it
-                adjusted_target = target_data_normalized[target_column] - p_t_values_normalized  # Adjust target
-
-                # print shape of adjusted_target along with the file name
-                # print(f'adjusted_target.shape: {adjusted_target.shape} for {file_name}')
-
-            # Reshape inputs to be in the format [samples, time steps, features]
-            # X = input_data_normalized.values.reshape((input_data_normalized.shape[0], 75, 1))
-            X = input_data_normalized.values.reshape((input_data_normalized.shape[0], -1, 1))
-
-            # print shape of X along with the file name
-            # print(f'X.shape: {X.shape} for {file_name}')
-
-            # Flatten targets to 1D array
-            if 'p' in inputs_to_use and target_change:
-                y = adjusted_target.values.flatten()
-            else:
-                y = target_data_normalized.values.flatten()
-
-            # print shape of y along with the file name
-            # print(f'y.shape: {y.shape} for {file_name}')
-
-            # Append to list
+            X, y = load_file_data(
+                file_path,
+                apply_log,
+                inputs_to_use,
+                add_slope,
+                outputs_to_use,
+                cme_speed_threshold)
             all_inputs.append(X)
             all_targets.append(y)
 
-    # Combine all input and target cme_files
     X_combined = np.vstack(all_inputs)
     y_combined = np.concatenate(all_targets)
 
-    if symlog1p:
-        y_combined = sym_log1p(y_combined)
-
-    # print shape of X_combined and y_combined
-    print(X_combined.shape)
-    print(y_combined.shape)
-
-    # Shuffle the cme_files if the flag is True
     if shuffle_data:
         X_combined, y_combined = shuffle(X_combined, y_combined, random_state=seed_value)
 
@@ -970,131 +753,6 @@ def zero_out_cme_below_threshold(df: pd.DataFrame, threshold: float, cme_columns
     return df
 
 
-def build_full_dataset(
-        directory_path: str,
-        shuffle_data: bool = True,
-        apply_log: bool = True,
-        norm_target: bool = False,
-        inputs_to_use: List[str] = None,
-        add_slope: bool = True,
-        cme_speed_threshold: float = 0) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Reads SEP event files from the specified directory, processes them to extract
-    input and target cme_files including cme features, normalizes the values between 0 and 1 for the columns
-    of interest, excludes rows where proton intensity is -9999, and optionally shuffles the cme_files.
-
-    Parameters:
-    - directory_path (str): Path to the directory containing the sep_event_X files.
-    - shuffle_data (bool): If True, shuffle the cme_files before returning.
-    - apply_log (bool): Whether to apply a logarithmic transformation before normalization.
-    - norm_target (bool): Whether to normalize the target cme_files.
-    - inputs_to_use (List[str]): List of input types to include in the dataset.
-    - add_slope (bool): If True, adds slope features to the dataset.
-    - cme_speed_threshold (float): The threshold for CME speed. CMEs with speeds below (<) this threshold will be excluded.
-
-    Returns:
-    - Tuple[np.ndarray, np.ndarray]: A tuple containing the normalized input cme_files (X) and target cme_files (y).
-    """
-
-    if inputs_to_use is None:
-        inputs_to_use = ['e0.5', 'e1.8', 'p']
-
-    all_inputs = []
-    all_targets = []
-
-    # Dynamically define input columns based on inputs_to_use
-    input_columns = []
-    for input_type in inputs_to_use:
-        input_columns += [f'{input_type}_tminus{i}' for i in range(24, 0, -1)] + [f'{input_type}_t']
-
-    target_column = 'Proton Intensity'
-
-    cme_columns_to_zero_out = [
-        'CME_DONKI_latitude', 'CME_DONKI_longitude', 'CME_DONKI_speed', 'CME_CDAW_MPA',
-        'CME_CDAW_LinearSpeed', 'VlogV', 'DONKI_half_width', 'Accelaration',
-        '2nd_order_speed_final', '2nd_order_speed_20R', 'CPA', 'Halo', 'Type2_Viz_Area',
-        'solar_wind_speed', 'diffusive_shock', 'half_richardson_value'
-    ]
-
-    # Loop through each file in the directory
-    for file_name in os.listdir(directory_path):
-        if file_name.endswith('_ie.csv'):
-            file_path = os.path.join(directory_path, file_name)
-            data = pd.read_csv(file_path)
-
-            # Exclude rows where proton intensity is -9999
-            data = data[data[target_column] != -9999]
-
-            # Zero out CME values for rows with speed below threshold
-            data = zero_out_cme_below_threshold(data, cme_speed_threshold, cme_columns_to_zero_out)
-
-            # Apply logarithmic transformation (if specified)
-            if apply_log:
-                data[input_columns] = np.log1p(data[input_columns])  # Adding 1 to avoid log(0)
-                data[target_column] = np.log1p(data[target_column])  # Adding 1 to avoid log(0)
-
-            # Normalize inputs between 0 and 1
-            input_data = data[input_columns]
-            input_data_normalized = min_max_norm(input_data)
-
-            # Compute and add slopes (if specified)
-            if add_slope:
-                for input_type in inputs_to_use:
-                    # print(f"Computing slopes for {input_type}...")
-                    slope_column_names = generate_slope_column_names([input_type])  # Generate for current input type
-                    slope_values = compute_slope(input_data_normalized, input_type)
-                    for slope_column, slope_index in zip(slope_column_names, range(slope_values.shape[1])):
-                        # print(f"Adding {slope_column} to input cme_files...")
-                        input_data_normalized[slope_column] = slope_values[:, slope_index]
-                    # input_columns.extend(slope_column_names)
-
-            # print the columns one by one
-            # for col in input_data_normalized.columns:
-            #     print(col)
-            # order - e0.5, e1.8, p, e0.5 slope, e1.8 slope, p slope
-
-            # Normalize targets between 0 and 1
-            target_data = data[[target_column]]
-            if norm_target:
-                target_data_normalized = min_max_norm(target_data)
-            else:
-                target_data_normalized = target_data
-
-            # Process and append CME features
-            cme_features = preprocess_cme_features(data, inputs_to_use)
-            combined_input = pd.concat([input_data_normalized, cme_features], axis=1)
-
-            # # Get the order of the CME features
-            # cme_feature_order = cme_features.columns.tolist()
-            #
-            # # Now, cme_feature_order contains the names of the CME features in the order they appear
-            # print("Order of CME features:", cme_feature_order)
-
-            X = combined_input.values  # TODO: check if X needs to be reshaped
-
-            # Flatten targets to 1D array
-            y = target_data_normalized.values.flatten()
-
-            # check_nan_in_dataset(combined_input.values, f"in file {file_name}")
-
-            # save  combined input to a file for debuggin
-            # combined_input.to_csv(f"combined_input_{file_name}.csv")
-
-            # Append to list
-            all_inputs.append(X)
-            all_targets.append(y)
-
-    # Combine all input and target cme_files
-    X_combined = np.vstack(all_inputs)
-    y_combined = np.concatenate(all_targets)
-
-    # Shuffle the cme_files if the flag is True
-    if shuffle_data:
-        X_combined, y_combined = shuffle(X_combined, y_combined, random_state=seed_value)
-
-    return X_combined, y_combined
-
-
 def create_synthetic_dataset(n_samples: int = 50000, n_timesteps: int = 25) -> Tuple[np.ndarray, np.ndarray]:
     """
     Creates a synthetic dataset consisting of sequences with a flat line segment followed by an angled line segment.
@@ -1286,15 +944,11 @@ def plot_and_evaluate_sep_event(
         event_id: str,
         model: tf.keras.Model,
         input_columns: List[str],
-        target_column: str,
-        normalize_target: bool = False,
         using_cme: bool = False,
-        model_type: str = "cnn",
         title: str = None,
         inputs_to_use: List[str] = None,
         add_slope: bool = True,
-        target_change: bool = False,
-        symlog1p: bool = False,
+        outputs_to_use: List[str] = None,
         show_persistent: bool = True,
         show_changes: bool = True,
         prefix: str = 'testing') -> [float, str]:
@@ -1310,14 +964,12 @@ def plot_and_evaluate_sep_event(
     - input_columns (List[str]): The list of input columns for the model.
     - cme_columns (List[str]): The list of CME feature columns.
     - target_column (str): The column name of the target variable.
-    - normalize_target (bool): Whether to normalize the target column. Default is False.
     - using_cme (bool): Whether to use CME features. Default is False.
     - model_type (str): The type of model used. Default is 'cnn'.
     - title (str): The title of the plot. Default is None.
     - inputs_to_use (List[str]): The list of input types to use. Default is None.
     - add_slope (bool): Whether to add slope features. Default is True.
-    - target_change (bool): Whether to use target change. Default is False.
-    - symlog1p (bool): Whether to use inverse symlog1p for the predictions. Default is False.
+    - outputs_to_use (List[str]): The list of output types to use. Default is None.
     - show_persistent (bool): Whether to show the persistent model where the delta = 0. Default is True.
     - show_changes (bool): Whether to show the scatter plot of target changes vs predicted changes. Default is True.
     - prefix (bool): Whether to add the prefix 'SEP Event' to the title. Default is True.
@@ -1330,7 +982,6 @@ def plot_and_evaluate_sep_event(
 
     if add_slope:
         n_features = len(inputs_to_use) * (25 + 24)
-        # n_features = len(inputs_to_use) * 25 * 2
     else:
         n_features = len(inputs_to_use) * 25
 
@@ -1340,8 +991,10 @@ def plot_and_evaluate_sep_event(
     # Transform 't' column to log scale and plot
     e05_intensity_log = np.log1p(df['e0.5_t'])  # Using log1p for numerical stability
     p_t_log = np.log1p(df['p_t'])  # Using log1p for numerical stability
+
     if 'e1.8' in inputs_to_use:
         e18_intensity_log = np.log1p(df['e1.8_t'])  # Using log1p for numerical stability
+
     # Normalize the flux intensities
     df_norm = normalize_flux(df, input_columns, apply_log=True)
     # X = df_norm[input_columns].values
@@ -1356,12 +1009,16 @@ def plot_and_evaluate_sep_event(
 
     X = df_norm[input_columns + added_columns].values
 
-    if normalize_target:
-        df_norm[target_column] = normalize_flux(df, [target_column], apply_log=True)[target_column]
-        y_true = df_norm[target_column].values
-    else:
-        y_true = df[target_column].values
-        y_true = np.log1p(y_true)  # Log transform target if normalization is not applied
+    target_columns = []
+    if 'delta_p' in outputs_to_use:
+        target_columns.append('delta_log_Intensity')
+    if 'p' in outputs_to_use:
+        target_columns.append('Proton Intensity')
+
+    # log the intensity but not delta
+    df['Proton Intensity'] = np.log1p(df['Proton Intensity'])
+    # y_true = df[target_columns].values
+    actual_proton = df['Proton Intensity'].values
 
     if using_cme:
         # process cme features
@@ -1380,45 +1037,24 @@ def plot_and_evaluate_sep_event(
     else:
         n_features_list = [25] * len(inputs_to_use)
 
-    if model_type == "cnn":
-        X_reshaped = prepare_cnn_inputs(X_reshaped, n_features_list, add_slope)
-    elif model_type == "cnn-ch":
-        X_reshaped = prepare_cnn_inputs(X_reshaped, n_features_list, add_slope, use_ch=True)
-    elif model_type == "rnn":
-        X_reshaped = prepare_rnn_inputs(X_reshaped, n_features_list, add_slope)
-    elif model_type == "rnn-ch":
-        X_reshaped = prepare_rnn_inputs(X_reshaped, n_features_list, add_slope, use_ch=True)
-    elif model_type == "cnn-hybrid":
-        X_reshaped = prepare_hybrid_inputs(X_reshaped,
-                                           tsf_extractor_type='cnn',
-                                           tsf_input_dims=n_features_list,
-                                           with_slope=add_slope,
-                                           mlp_input_dim=20 + len(inputs_to_use))
-    elif model_type == "rnn-hybrid":
-        X_reshaped = prepare_hybrid_inputs(X_reshaped,
-                                           tsf_extractor_type='rnn',
-                                           tsf_input_dims=n_features_list,
-                                           with_slope=add_slope,
-                                           mlp_input_dim=20 + len(inputs_to_use))
+    X_reshaped = reshape_X(X_reshaped, n_features_list, inputs_to_use, add_slope, model.name)
 
     # Evaluate the model
     _, predictions = model.predict(X_reshaped)
-
-    if symlog1p:
-        predictions = inverse_sym_log1p(predictions)
+    predictions = process_predictions(predictions)
 
     # if target change then we need to convert prediction into actual value
-    if 'p' in inputs_to_use and target_change:
-        predictions_plot = p_t_log + predictions.flatten()
+    if 'p' in inputs_to_use and 'delta_p' in outputs_to_use:
+        predictions_plot = p_t_log + predictions
         if show_changes:
             actual_changes = df['delta_log_Intensity'].values - 1  # offset by 1
-            predicted_changes = predictions.flatten() - 1  # offset by 1
+            predicted_changes = predictions - 1  # offset by 1
     else:
-        predictions_plot = predictions.flatten()
+        predictions_plot = predictions
 
     threshold_value = 0.4535
-    mae_loss = mean_absolute_error(y_true, predictions_plot)
-    t_lag, s_lag, avg_lag = evaluate_lag_error(timestamps, y_true, predictions_plot, threshold=threshold_value)
+    mae_loss = mean_absolute_error(actual_proton, predictions_plot)
+    # t_lag, s_lag, avg_lag = evaluate_lag_error(timestamps, y_true, predictions_plot, threshold=threshold_value)
     # print(f"Threshold lag error: {t_lag:.2f} minutes")
     # print(f"Shift lag error: {s_lag:.2f} minutes")
     # print(f"Average lag error: {avg_lag:.2f} minutes")
@@ -1431,14 +1067,14 @@ def plot_and_evaluate_sep_event(
 
     # Plot the cme_files
     plt.figure(figsize=(15, 10), facecolor='white')
-    plt.plot(timestamps, y_true, label='Actual Proton ln(Intensity)', color='blue', linewidth=tlw)
+    plt.plot(timestamps, actual_proton, label='Actual Proton ln(Intensity)', color='blue', linewidth=tlw)
     plt.plot(timestamps, predictions_plot, label='Predicted Proton ln(Intensity)', color='red', linewidth=tlw)
     plt.plot(t_timestamps, e05_intensity_log, label='E 0.5 ln(Intensity)', color='orange', linewidth=lw)
     if 'e1.8' in inputs_to_use:
         plt.plot(t_timestamps, e18_intensity_log, label='E 1.8 ln(Intensity)', color='yellow', linewidth=lw)
-    if 'p' in inputs_to_use and target_change and show_persistent:
+    if 'p' in inputs_to_use and 'delta_p' in outputs_to_use and show_persistent:
         plt.plot(timestamps, p_t_log, label='Persistent Model', color='black', linestyle=':', linewidth=tlw)
-    if 'p' in inputs_to_use and target_change and show_changes:
+    if 'p' in inputs_to_use and 'delta_p' in outputs_to_use and show_changes:
         plt.scatter(timestamps, actual_changes, color='gray', label='Actual Changes', alpha=0.5, s=ssz)
         plt.scatter(timestamps, predicted_changes, color='purple', label='Predicted Changes', alpha=0.5, s=ssz)
     # Add a black horizontal line at log(0.05) on the y-axis and create a handle for the legend
@@ -1459,7 +1095,7 @@ def plot_and_evaluate_sep_event(
     plt.xlabel('Timestamp')
     plt.ylabel('Ln Flux lnIntensity')
     # plt.yscale('log')  # Set y-axis to logarithmic scale
-    plt.title(f'{title} - SEP Event {event_id} - MAE: {mae_loss:.4f} - Lag: {s_lag:.2f} minutes')
+    plt.title(f'{title} - SEP Event {event_id} - MAE: {mae_loss:.4f}') #- Lag: {s_lag:.2f} minutes')
 
     # Extract handles and labels for the plot's elements
     handles, labels = plt.gca().get_legend_handles_labels()
@@ -1471,7 +1107,7 @@ def plot_and_evaluate_sep_event(
     plt.legend(handles=handles, labels=labels)
 
     # Save the plot to a file with the MAE in the file name
-    file_name = f'{title}_SEP_Event_{event_id}_{prefix}_MAE_{mae_loss:.4f}_Lag_{s_lag:.2f}.png'
+    file_name = f'{title}_SEP_Event_{event_id}_{prefix}_MAE_{mae_loss:.4f}.png' #_Lag_{s_lag:.2f}.png'
     plt.savefig(file_name)
 
     # plt.show()
@@ -1488,14 +1124,10 @@ def plot_avsp_delta(
         df: pd.DataFrame,
         model: tf.keras.Model,
         input_columns: List[str],
-        target_column: str,
-        normalize_target: bool = False,
         using_cme: bool = False,
-        model_type: str = "cnn",
         inputs_to_use: List[str] = None,
         add_slope: bool = True,
-        target_change: bool = False,
-        symlog1p: bool = False,
+        outputs_to_use: List[str] = None,
 ) -> [float, str]:
     """
     Plots theactual delta (x) vs predicted delta (y) with a diagonal dotted line indicating perfect prediction.
@@ -1508,15 +1140,11 @@ def plot_avsp_delta(
     - model (tf.keras.Model): The trained model to be evaluated.
     - input_columns (List[str]): The list of input columns for the model.
     - cme_columns (List[str]): The list of CME feature columns.
-    - target_column (str): The column name of the target variable.
-    - normalize_target (bool): Whether to normalize the target column. Default is False.
     - using_cme (bool): Whether to use CME features. Default is False.
-    - model_type (str): The type of model used. Default is 'cnn'.
     - title (str): The title of the plot. Default is None.
     - inputs_to_use (List[str]): The list of input types to use. Default is None.
     - add_slope (bool): Whether to add slope features. Default is True.
-    - target_change (bool): Whether to use target change. Default is False.
-    - symlog1p (bool): Whether to use inverse symlog1p for the predictions. Default is False.
+    - outputs_to_use (List[str]): The list of output types to use. Default is None.
 
     Returns:
     - Tuple[float, str]: A tuple containing the MAE loss and the plot title.
@@ -1543,12 +1171,13 @@ def plot_avsp_delta(
 
     X = df_norm[input_columns + added_columns].values
 
-    if normalize_target:
-        df_norm[target_column] = normalize_flux(df, [target_column], apply_log=True)[target_column]
-        y_true = df_norm[target_column].values
-    else:
-        y_true = df[target_column].values
-        y_true = np.log1p(y_true)  # Log transform target if normalization is not applied
+    target_columns = []
+    if 'delta_p' in outputs_to_use:
+        target_columns.append('delta_log_Intensity')
+    if 'p' in outputs_to_use:
+        target_columns.append('Proton Intensity')
+        # log the intensity but not delta
+        df['Proton Intensity'] = np.log1p(df['Proton Intensity'])
 
     if using_cme:
         # process cme features
@@ -1567,47 +1196,21 @@ def plot_avsp_delta(
     else:
         n_features_list = [25] * len(inputs_to_use)
 
-    if model_type == "cnn":
-        X_reshaped = prepare_cnn_inputs(X_reshaped, n_features_list, add_slope)
-    elif model_type == "cnn-ch":
-        X_reshaped = prepare_cnn_inputs(X_reshaped, n_features_list, add_slope, use_ch=True)
-    elif model_type == "rnn":
-        X_reshaped = prepare_rnn_inputs(X_reshaped, n_features_list, add_slope)
-    elif model_type == "rnn-ch":
-        X_reshaped = prepare_rnn_inputs(X_reshaped, n_features_list, add_slope, use_ch=True)
-    elif model_type == "cnn-hybrid":
-        X_reshaped = prepare_hybrid_inputs(X_reshaped,
-                                           tsf_extractor_type='cnn',
-                                           tsf_input_dims=n_features_list,
-                                           with_slope=add_slope,
-                                           mlp_input_dim=20 + len(inputs_to_use))
-    elif model_type == "rnn-hybrid":
-        X_reshaped = prepare_hybrid_inputs(X_reshaped,
-                                           tsf_extractor_type='rnn',
-                                           tsf_input_dims=n_features_list,
-                                           with_slope=add_slope,
-                                           mlp_input_dim=20 + len(inputs_to_use))
+    X_reshaped = reshape_X(X_reshaped, n_features_list, inputs_to_use, add_slope, model.name)
 
     # Evaluate the model
     _, predictions = model.predict(X_reshaped)
+    predictions = process_predictions(predictions)
 
-    if symlog1p:
-        predictions = inverse_sym_log1p(predictions)
+    print("Using target change approach")
+    actual_changes = df['delta_log_Intensity'].values
+    predicted_changes = predictions
 
-    # if target change then we need to convert prediction into actual value
-    if 'p' in inputs_to_use and target_change:
-        print("Using target change approach")
-        actual_changes = actual_changes = df['delta_log_Intensity'].values
-        predicted_changes = predictions.flatten()
-
-        #     print type of actual_changes and predicted_changes and their shapes
-        # print(f"Type of actual_changes: {type(actual_changes)}")
-        # print(f"Type of predicted_changes: {type(predicted_changes)}")
-        # print(f"Shape of actual_changes: {actual_changes.shape}")
-        # print(f"Shape of predicted_changes: {predicted_changes.shape}")
-
-    else:
-        predictions_plot = predictions.flatten()
+    #     print type of actual_changes and predicted_changes and their shapes
+    # print(f"Type of actual_changes: {type(actual_changes)}")
+    # print(f"Type of predicted_changes: {type(predicted_changes)}")
+    # print(f"Shape of actual_changes: {actual_changes.shape}")
+    # print(f"Shape of predicted_changes: {predicted_changes.shape}")
 
     return actual_changes, predicted_changes
 
@@ -1616,14 +1219,12 @@ def process_sep_events(
         directory: str,
         model: tf.keras.Model,
         using_cme: bool = False,
-        model_type: str = "cnn",
         title: str = None,
         inputs_to_use: List[str] = None,
         add_slope: bool = True,
         cme_speed_threshold: float = 0,
-        target_change: bool = False,
+        outputs_to_use: List[str] = None,
         show_avsp: bool = False,
-        symlog1p: bool = False,
         prefix: str = 'testing') -> List[str]:
     """
     Processes SEP event files in the specified directory, normalizes flux intensities, predicts proton intensities,
@@ -1633,14 +1234,12 @@ def process_sep_events(
     - directory (str): Path to the directory containing the SEP event files.
     - model (tf.keras.Model): The trained machine learning model for predicting proton intensity.
     - using_cme (bool): Whether to use CME features. Default is False.
-    - model_type (str): The type of model used. Default is "cnn".
     - title (str): The title of the plot. Default is None.
     - inputs_to_use (List[str]): List of input types to include in the dataset. Default is ['e0.5', 'e1.8', 'p'].
     - add_slope (bool): If True, adds slope features to the dataset.
+    - outputs_to_use (List[str]): List of output types to include in the dataset. Default is ['p'].
     - cme_speed_threshold (float): The threshold for CME speed. CMEs with speeds below this threshold will be excluded.
-    - target_change (bool): Whether to use the target change approach. Default is False.
     - show_avsp (bool): Whether to show the Actual vs Predicted delta plot. Default is False.
-    - symlog1p (bool): Whether to apply inverse sym_log1p to model predictions
     - prefix (str): The prefix to use for the plot file names. Default is 'testing'.
 
     Returns:
@@ -1654,6 +1253,9 @@ def process_sep_events(
 
     if inputs_to_use is None:
         inputs_to_use = ['e0.5', 'e1.8', 'p']
+
+    if outputs_to_use is None:
+        outputs_to_use = ['delta_p', 'p']
 
         # Generate input columns based on inputs_to_use and add slope columns if add_slope is True
     input_columns = []
@@ -1704,11 +1306,9 @@ def process_sep_events(
                 # Plot and evaluate the SEP event
                 mae_loss, plotname = plot_and_evaluate_sep_event(
                     df, cme_start_times, event_id, model,
-                    input_columns, target_column, using_cme=using_cme,
-                    model_type=model_type, title=title,
-                    inputs_to_use=inputs_to_use, add_slope=add_slope,
-                    target_change=target_change,
-                    symlog1p=symlog1p,
+                    input_columns, using_cme=using_cme,
+                    title=title, inputs_to_use=inputs_to_use,
+                    add_slope=add_slope, outputs_to_use=outputs_to_use,
                     prefix=prefix)
 
                 print(f"Processed file: {file_name} with MAE: {mae_loss}")
@@ -1716,10 +1316,9 @@ def process_sep_events(
 
                 if show_avsp:
                     actual_ch, predicted_ch = plot_avsp_delta(
-                        df, model, input_columns, target_column,
-                        model_type=model_type,
+                        df, model, input_columns,
                         inputs_to_use=inputs_to_use, add_slope=add_slope,
-                        target_change=target_change, symlog1p=symlog1p)
+                        outputs_to_use=outputs_to_use)
 
                     avsp_data.append((event_id, actual_ch, predicted_ch))
             except Exception as e:
@@ -1731,11 +1330,14 @@ def process_sep_events(
     if show_avsp and avsp_data:
         # Plotting logic here...
         plt.figure(figsize=(10, 7))  # Adjust size as needed
-        # Use a colormap
-        colors = plt.cm.viridis(np.linspace(0, 1, len(avsp_data)))
+        # Flatten all actual values to find global min and max for color mapping
+        all_actual_values = np.concatenate([actual for _, actual, _ in avsp_data])
+        norm = plt.Normalize(all_actual_values.min(), all_actual_values.max())
+        cmap = plt.cm.viridis
 
-        for idx, (event_id, actual, predicted) in enumerate(avsp_data):
-            plt.scatter(actual, predicted, color=colors[idx], label=f'{event_id}', alpha=0.5, s=4)
+        # Create a scatter plot for each set of actual vs predicted values
+        for event_id, actual, predicted in avsp_data:
+            plt.scatter(actual, predicted, c=actual, cmap=cmap, norm=norm, label=f'{event_id}', alpha=0.5, s=4)
 
         # Add a diagonal line for perfect prediction
         min_val = min(min(actual.min(), predicted.min()) for _, actual, predicted in avsp_data)
@@ -1745,11 +1347,16 @@ def process_sep_events(
         plt.xlabel('Actual Changes')
         plt.ylabel('Predicted Changes')
         plt.title(f"{title}\n{prefix}_Actual_vs_Predicted_Changes")
+
+        # Create colorbar as the legend for actual values
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        plt.colorbar(sm, label='Actual Value')
         # plt.legend()
         plt.grid(True)
 
         # Save the plot
-        plot_filename = f"{prefix}_actual_vs_predicted_changes.png"
+        plot_filename = f"{title}_{prefix}_actual_vs_predicted_changes.png"
         plt.savefig(plot_filename)
         plt.close()
 
@@ -1777,14 +1384,15 @@ def plot_sample_with_cme(data: np.ndarray, cme_features_names: list = None, samp
         sample_index = np.random.randint(low=0, high=data.shape[0])
 
     if cme_features_names is None:
-        cme_features_names = ['VlogV_norm', 'CME_DONKI_speed_norm', 'Linear_Speed_norm', '2nd_order_speed_final_norm',
-                              '2nd_order_speed_20R_norm', 'CMEs_with_speed_over_1000_in_past_9hours_norm',
-                              'max_CME_speed_in_past_day_norm', 'CMEs_in_past_month_norm', 'CME_DONKI_longitude_norm',
-                              'CME_CDAW_MPA_norm', 'daily_sunspots_norm', 'DONKI_half_width_norm',
-                              'CME_DONKI_latitude_norm', 'Accelaration_norm', 'CPA_norm', 'CMEs_in_past_9hours_norm',
-                              'log_e0.5_max_intensity_norm', 'log_e1.8_max_intensity_norm', 'log_p_max_intensity_norm',
-                              'log_richardson_value_norm', 'log_diffusive_shock_norm', 'log_Type2_Viz_Area_norm',
-                              'Halo']
+        cme_features_names = [
+            'VlogV_norm', 'CME_DONKI_speed_norm', 'Linear_Speed_norm', '2nd_order_speed_final_norm',
+            '2nd_order_speed_20R_norm', 'CMEs_with_speed_over_1000_in_past_9hours_norm',
+            'max_CME_speed_in_past_day_norm', 'CMEs_in_past_month_norm', 'CME_DONKI_longitude_norm',
+            'CME_CDAW_MPA_norm', 'daily_sunspots_norm', 'DONKI_half_width_norm',
+            'CME_DONKI_latitude_norm', 'Accelaration_norm', 'CPA_norm', 'CMEs_in_past_9hours_norm',
+            'log_e0.5_max_intensity_norm', 'log_e1.8_max_intensity_norm', 'log_p_max_intensity_norm',
+            'log_richardson_value_norm', 'log_diffusive_shock_norm', 'log_Type2_Viz_Area_norm',
+            'Halo']
 
     # Extract the specific sample
     sample = data[sample_index]
@@ -1865,11 +1473,31 @@ def plot_sample_with_cme(data: np.ndarray, cme_start_index: int, cme_features_na
     plt.show()
 
 
+def process_predictions(predictions: np.ndarray) -> np.ndarray:
+    """
+    Processes model predictions to ensure compatibility with models that output either single or multiple channels.
+    In case of multiple channels, it extracts the predictions corresponding to the first channel.
+
+    Parameters:
+    - predictions (np.ndarray): The predictions made by the model. Can be either 1D or 2D (for models with multiple outputs).
+    Returns:
+    -
+    """
+    # Handle predictions based on their shape
+    if predictions.ndim > 1 and predictions.shape[1] > 1:
+        # More than one channel: select the first channel
+        processed_predictions = predictions[:, 0].flatten()
+    else:
+        # Single channel: just flatten it
+        processed_predictions = predictions.flatten()
+
+    return processed_predictions
+
+
 def evaluate_model(
         model: tf.keras.Model,
         X_test: np.ndarray or List[np.ndarray],
-        y_test: np.ndarray,
-        symlog1p: bool = False) -> float:
+        y_test: np.ndarray) -> float:
     """
     Evaluates a given model using Mean Absolute Error (MAE) on the provided test cme_files.
 
@@ -1885,9 +1513,9 @@ def evaluate_model(
     # Make predictions
     _, predictions = model.predict(X_test)
 
-    if symlog1p:
-        # Apply inverse symlog1p transformation to the target value
-        predictions = inverse_sym_log1p(predictions)
+    # Process predictions
+    predictions = process_predictions(predictions)
+    y_test = process_predictions(y_test)
 
     # Calculate MAE
     mae_loss = mean_absolute_error(y_test, predictions)
@@ -1895,9 +1523,42 @@ def evaluate_model(
     return mae_loss
 
 
+def reshape_X(
+        X: np.ndarray,
+        n_features_list: List[int],
+        inputs_to_use: List[str],
+        add_slope: bool = True,
+        model_type: str = 'mlp') -> Union[ndarray, ndarray, tuple]:
+    """
+    Reshapes the input sep_files for the MLP, CNN or RNN model based on the model type and input dimensions.
+
+    Parameters:
+    - X (np.ndarray): The input cme_files to reshape.
+    - n_features_list (List[int]): A list of input dimensions for the CNN or RNN model.
+    - inputs_to_use (List[str]): The list of input types to use.
+    - add_slope (bool): Whether to add slope features.
+    - model_type (str): The type of model used ('cnn' or 'rnn').
+
+    Returns:
+    - np.ndarray: The reshaped input cme_files.
+    """
+
+    if model_type == 'mlp':
+        return X
+    elif model_type == '1dcnn' or model_type == 'gru' or model_type == 'seq':
+        return prepare_seq_inputs(X, n_features_list, add_slope)
+    elif model_type == "hybrid":
+        return prepare_hybrid_inputs(X,
+                                     tsf_input_dims=n_features_list,
+                                     with_slope=add_slope,
+                                     mlp_input_dim=20 + len(inputs_to_use))
+    else:
+        raise ValueError("Invalid model_type. Must be 'mlp', 'cnn' or 'rnn'.")
+
+
 def prepare_hybrid_inputs(
         data: np.ndarray,
-        tsf_extractor_type: str = 'cnn',
+        tsf_extractor_type: str = 'seq',
         tsf_input_dims=None,
         with_slope: bool = False,
         mlp_input_dim: int = 23) -> Tuple[np.ndarray, ...]:
@@ -1917,10 +1578,8 @@ def prepare_hybrid_inputs(
     """
 
     # Prepare inputs for the TSF extractor
-    if tsf_extractor_type == 'cnn' or tsf_extractor_type == 'cnn-ch':
-        tsf_inputs = prepare_cnn_inputs(data, tsf_input_dims, with_slope)
-    elif tsf_extractor_type == 'rnn' or tsf_extractor_type == 'rnn-ch':
-        tsf_inputs = prepare_rnn_inputs(data, tsf_input_dims, with_slope)
+    if tsf_extractor_type == '1dcnn' or tsf_extractor_type == 'gru' or tsf_extractor_type == 'seq':
+        tsf_inputs = prepare_seq_inputs(data, tsf_input_dims, with_slope)
     else:
         raise ValueError("Invalid tsf_extractor_type. Must be 'cnn' or 'rnn'.")
 
@@ -1932,16 +1591,18 @@ def prepare_hybrid_inputs(
     return *tsf_inputs, mlp_input
 
 
-def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_slope: bool = False,
-                       use_ch: bool = True) -> Tuple:
+def prepare_seq_inputs(
+        data: np.ndarray,
+        seq_input_dims: List[int] = None,
+        with_slope: bool = False,
+        use_ch: bool = True) -> Tuple:
     """
-    Splits the input cme_files into parts for the CNN branches of the Y-shaped model,
-    dynamically based on the cnn_input_dims list. If with_slope is True,
-    the first half of cnn_input_dims are for regular inputs, and the second half are for slopes.
+    Prepares CNN inputs for the time series data, including regular and slope inputs if with_slope is True.
+
 
     Parameters:
     - cme_files (np.ndarray): The combined input cme_files array.
-    - cnn_input_dims (List[int]): The dimensions for each CNN input.
+    - seq_input_dims (List[int]): The dimensions for each cnn or rnn input.
     - with_slope (bool): Whether to add additional inputs for slopes.
     - use_ch (bool): Whether to use channel-wise concatenation.
 
@@ -1949,22 +1610,22 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
     Returns:
     - Tuple: Tuple of arrays, each for CNN inputs.
     """
-    if cnn_input_dims is None:
-        cnn_input_dims = [25, 24]  # Default dimensions for regular and slope inputs
+    if seq_input_dims is None:
+        seq_input_dims = [25, 24]  # Default dimensions for regular and slope inputs
 
     # Initialize a list to store CNN inputs
-    cnn_inputs = []
+    seq_inputs = []
 
     # Split input dimensions into regular and slope inputs if with_slope is True
     if with_slope:
-        half_len = len(cnn_input_dims) // 2
-        regular_dims = cnn_input_dims[:half_len]
-        slope_dims = cnn_input_dims[half_len:]
+        half_len = len(seq_input_dims) // 2
+        regular_dims = seq_input_dims[:half_len]
+        slope_dims = seq_input_dims[half_len:]
 
         # print(f"Regular dims: {regular_dims}")
         # print(f"Slope dims: {slope_dims}")
     else:
-        regular_dims = cnn_input_dims
+        regular_dims = seq_input_dims
         slope_dims = []
 
     if use_ch:
@@ -1972,14 +1633,14 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
         # For regular cme_files
         regular_channels = [data[:, start:start + dim].reshape(-1, dim, 1) for start, dim in
                             zip(range(0, sum(regular_dims), regular_dims[0]), regular_dims)]
-        cnn_input_regular = np.concatenate(regular_channels, axis=-1) if regular_channels else None
+        seq_input_regular = np.concatenate(regular_channels, axis=-1) if regular_channels else None
 
-        # print(f"Regular channels: {cnn_input_regular}")
-        # print(f"Regular channels shape: {cnn_input_regular.shape}")
+        # print(f"Regular channels: {seq_input_regular}")
+        # print(f"Regular channels shape: {seq_input_regular.shape}")
 
         # Add regular channels to inputs
-        if cnn_input_regular is not None:
-            cnn_inputs.append(cnn_input_regular)
+        if seq_input_regular is not None:
+            seq_inputs.append(seq_input_regular)
         # For slope cme_files, if with_slope is True
         if with_slope:
             slope_channels = [data[:, start:start + dim].reshape(-1, dim, 1) for start, dim in
@@ -1988,138 +1649,42 @@ def prepare_cnn_inputs(data: np.ndarray, cnn_input_dims: List[int] = None, with_
 
             # print(f"Slope channels: {slope_channels}")
 
-            cnn_input_slope = np.concatenate(slope_channels, axis=-1) if slope_channels else None
+            seq_input_slope = np.concatenate(slope_channels, axis=-1) if slope_channels else None
 
-            # print(f"Slope channels: {cnn_input_slope}")
-            # print(f"Slope channels shape: {cnn_input_slope.shape}")
+            # print(f"Slope channels: {seq_input_slope}")
+            # print(f"Slope channels shape: {seq_input_slope.shape}")
 
             # Add slope channels to inputs
-            if cnn_input_slope is not None:
-                cnn_inputs.append(cnn_input_slope)
+            if seq_input_slope is not None:
+                seq_inputs.append(seq_input_slope)
 
-        # print(f"Final CNN inputs: {cnn_inputs}")
+        # print(f"Final CNN inputs: {seq_inputs}")
 
-        # Check if all cnn_inputs have the same shape
-        if all(cnn_input.shape == cnn_inputs[0].shape for cnn_input in cnn_inputs):
+        # Check if all seq_inputs have the same shape
+        if all(seq_input.shape == seq_inputs[0].shape for seq_input in seq_inputs):
             # All inputs have the same shape, concatenate them along the second axis
-            concatenate_cnn_inputs = np.concatenate(cnn_inputs, axis=-1)
-            return (concatenate_cnn_inputs,)
+            concatenate_seq_inputs = np.concatenate(seq_inputs, axis=-1)
+            return (concatenate_seq_inputs,)
         else:
             # The inputs do not all have the same shape, return the tuple of original inputs
-            return tuple(cnn_inputs)
+            return tuple(seq_inputs)
     else:
         # Generate CNN inputs for regular cme_files
         start_index = 0
         for dim in regular_dims:
             end_index = start_index + dim
-            cnn_input = data[:, start_index:end_index].reshape((-1, dim, 1))
-            cnn_inputs.append(cnn_input)
+            seq_input = data[:, start_index:end_index].reshape((-1, dim, 1))
+            seq_inputs.append(seq_input)
             start_index = end_index
 
         # Generate CNN inputs for slope cme_files if with_slope is True
         for dim in slope_dims:
             end_index = start_index + dim
             slope_input = data[:, start_index:end_index].reshape((-1, dim, 1))
-            cnn_inputs.append(slope_input)
+            seq_inputs.append(slope_input)
             start_index = end_index
 
-        return tuple(cnn_inputs)
-
-
-def prepare_rnn_inputs(data: np.ndarray,
-                       rnn_input_dims: List[int] = None,
-                       with_slope: bool = False,
-                       use_ch: bool = True) -> Tuple:
-    """
-    Splits the input cme_files into parts for the RNN branches of the model,
-    dynamically based on the rnn_input_dims list. If with_slope is True,
-    the first half of rnn_input_dims are for regular inputs, and the second half are for slopes.
-
-    Parameters:
-    - cme_files (np.ndarray): The combined input cme_files array.
-    - rnn_input_dims (List[int]): The dimensions for each RNN input.
-    - with_slope (bool): Whether to add additional inputs for slopes.
-    - use_ch (bool): Whether to use channel-wise concatenation.
-
-    Returns:
-    - Tuple: Tuple of arrays, each for RNN inputs.
-    """
-
-    if rnn_input_dims is None:
-        rnn_input_dims = [25, 24]  # Default dimensions for regular and slope inputs
-
-    # Initialize a list to store rnn inputs
-    rnn_inputs = []
-
-    # Split input dimensions into regular and slope inputs if with_slope is True
-    if with_slope:
-        half_len = len(rnn_input_dims) // 2
-        regular_dims = rnn_input_dims[:half_len]
-        slope_dims = rnn_input_dims[half_len:]
-
-        # print(f"Regular dims: {regular_dims}")
-        # print(f"Slope dims: {slope_dims}")
-    else:
-        regular_dims = rnn_input_dims
-        slope_dims = []
-
-    if use_ch:
-        # Handle channel-wise concatenation
-        # For regular cme_files
-        regular_channels = [data[:, start:start + dim].reshape(-1, dim, 1) for start, dim in
-                            zip(range(0, sum(regular_dims), regular_dims[0]), regular_dims)]
-        rnn_input_regular = np.concatenate(regular_channels, axis=-1) if regular_channels else None
-
-        # print(f"Regular channels: {rnn_input_regular}")
-        # print(f"Regular channels shape: {rnn_input_regular.shape}")
-
-        # Add regular channels to inputs
-        if rnn_input_regular is not None:
-            rnn_inputs.append(rnn_input_regular)
-        # For slope cme_files, if with_slope is True
-        if with_slope:
-            slope_channels = [data[:, start:start + dim].reshape(-1, dim, 1) for start, dim in
-                              zip(range(sum(regular_dims), sum(regular_dims) + sum(slope_dims), slope_dims[0]),
-                                  slope_dims)]
-
-            # print(f"Slope channels: {slope_channels}")
-
-            rnn_input_slope = np.concatenate(slope_channels, axis=-1) if slope_channels else None
-
-            # print(f"Slope channels: {rnn_input_slope}")
-            # print(f"Slope channels shape: {rnn_input_slope.shape}")
-
-            # Add slope channels to inputs
-            if rnn_input_slope is not None:
-                rnn_inputs.append(rnn_input_slope)
-
-        # print(f"Final rnn inputs: {rnn_inputs}")
-
-        # Check if all rnn_inputs have the same shape
-        if all(rnn_input.shape == rnn_inputs[0].shape for rnn_input in rnn_inputs):
-            # All inputs have the same shape, concatenate them along the second axis
-            concatenate_rnn_inputs = np.concatenate(rnn_inputs, axis=-1)
-            return (concatenate_rnn_inputs,)
-        else:
-            # The inputs do not all have the same shape, return the tuple of original inputs
-            return tuple(rnn_inputs)
-    else:
-        # Generate rnn inputs for regular cme_files
-        start_index = 0
-        for dim in regular_dims:
-            end_index = start_index + dim
-            rnn_input = data[:, start_index:end_index].reshape((-1, dim, 1))
-            rnn_inputs.append(rnn_input)
-            start_index = end_index
-
-        # Generate rnn inputs for slope cme_files if with_slope is True
-        for dim in slope_dims:
-            end_index = start_index + dim
-            slope_input = data[:, start_index:end_index].reshape((-1, dim, 1))
-            rnn_inputs.append(slope_input)
-            start_index = end_index
-
-        return tuple(rnn_inputs)
+        return tuple(seq_inputs)
 
 
 def find_threshold_crossing_indices(values: np.ndarray, threshold: float) -> np.ndarray:
@@ -2315,48 +1880,6 @@ class PrintBatchMSE(Callback):
             # Print batch MSE
             batch_mse = logs.get('loss')
             print(f"Batch {batch + 1}, MSE: {batch_mse:.4f}")
-
-
-def sym_log1p(x: np.ndarray) -> np.ndarray:
-    """
-    Applies a symmetric logarithmic transformation to a given input array or scalar.
-
-    The transformation is defined as:
-    - For x > 0: log(x + 1)
-    - For x < 0: log(-x + 1)
-    - For x = 0: 0
-
-    This function is vectorized and can handle inputs as either scalars or np.ndarray.
-
-    Parameters:
-    - x (np.ndarray or scalar): The input array or scalar to transform.
-
-    Returns:
-    - np.ndarray or scalar: The transformed array or scalar.
-    """
-    # Apply transformation symmetrically for positive and negative values of x
-    return np.where(x > 0, np.log(x + 1), np.log(np.abs(x) + 1) * np.sign(x))
-
-
-def inverse_sym_log1p(y: np.ndarray) -> np.ndarray:
-    """
-    Reverses the symmetric logarithmic transformation applied by the sym_log1p function
-    to a given input array or scalar.
-
-    The inverse transformation is defined as:
-    - For y derived from y >= 0: exp(y) - 1
-    - For y derived from x < 0: -(exp(y) - 1)
-
-    This function is vectorized and can handle inputs as either scalars or np.ndarray.
-
-    Parameters:
-    - y (np.ndarray or scalar): The transformed array or scalar to reverse.
-
-    Returns:
-    - np.ndarray or scalar: The original array or scalar before the symmetric logarithmic transformation.
-    """
-    # Reverse the transformation
-    return np.where(y >= 0, np.exp(y) - 1, -np.exp(y) + 1)
 
 
 def compute_sample_weights(y_train, num_bins=100):

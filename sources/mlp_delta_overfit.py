@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import wandb
+from tensorflow.keras.activations import tanh, elu
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-from tensorflow.keras.optimizers import SGD
+from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
 
 from modules.training.DenseReweights import exDenseReweights
@@ -15,7 +16,8 @@ from modules.training.ts_modeling import (
     create_mlp,
     evaluate_model,
     process_sep_events,
-    get_loss)
+    get_loss,
+    reshape_X)
 
 
 def main():
@@ -29,6 +31,7 @@ def main():
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
+            outputs_to_use = ['delta_p']
 
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
@@ -44,11 +47,11 @@ def main():
             experiment_name = f'{title}_{current_time}'
 
             # Set the early stopping patience and learning rate as variables
-            seed = 123456789
+            seed = 456789
             tf.random.set_seed(seed)
             np.random.seed(seed)
-            patience = 50000  # higher patience
-            learning_rate = 1e-3  # og learning rate
+            patience = 1000  # higher patience
+            learning_rate = 5e-3  # og learning rate
             # initial_learning_rate = 3e-3
             # final_learning_rate = 3e-7
             # learning_rate_decay_factor = (final_learning_rate / initial_learning_rate) ** (1 / 3000)
@@ -62,18 +65,18 @@ def main():
 
             reduce_lr_on_plateau = ReduceLROnPlateau(
                 monitor='loss',
-                factor=0.75,
+                factor=0.5,
                 patience=500,
                 verbose=1,
-                min_delta=1e-6,
+                min_delta=1e-5,
                 min_lr=1e-10)
 
             weight_decay = 0  # higher weight decay
-            momentum_beta1 = 0.95  # higher momentum beta1
+            momentum_beta1 = 0.9  # higher momentum beta1
             batch_size = 4096
-            epochs = 500000  # higher epochs
+            epochs = 1500  # higher epochs
             hiddens = [
-                25000
+                512, 256, 256, 128, 128, 64, 32
             ]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
             loss_key = 'mse'
@@ -83,9 +86,10 @@ def main():
             alpha_rw = 1
             bandwidth = 0.0519
             repr_dim = 9
+            output_dim = len(outputs_to_use)
             dropout = 0
-            activation = None
-            norm = 'none'
+            activation = elu
+            norm = 'batch_norm'
 
             # Initialize wandb
             wandb.init(project="mlp-ts-delta-overfit", name=experiment_name, config={
@@ -109,9 +113,11 @@ def main():
                 "reciprocal_reweight": True,
                 "repr_dim": repr_dim,
                 "dropout": dropout,
-                "activation": 'leakyrelu',
+                "activation": 'elu',
                 "norm": norm,
-                'optimizer': 'sgd'
+                'optimizer': 'adamw',
+                'output_dim': output_dim,
+                'architecture': 'mlp',
             })
 
             # set the root directory
@@ -120,40 +126,19 @@ def main():
             X_train, y_train = build_dataset(root_dir + '/training',
                                              inputs_to_use=inputs_to_use,
                                              add_slope=add_slope,
-                                             target_change=target_change)
+                                             outputs_to_use=outputs_to_use)
             X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining',
                                                    inputs_to_use=inputs_to_use,
                                                    add_slope=add_slope,
-                                                   target_change=target_change)
+                                                   outputs_to_use=outputs_to_use)
             X_test, y_test = build_dataset(root_dir + '/testing',
                                            inputs_to_use=inputs_to_use,
                                            add_slope=add_slope,
-                                           target_change=target_change)
+                                           outputs_to_use=outputs_to_use)
             X_val, y_val = build_dataset(root_dir + '/validation',
                                          inputs_to_use=inputs_to_use,
                                          add_slope=add_slope,
-                                         target_change=target_change)
-
-            # Compute the sample weights
-            # y_subtrain_weights = compute_sample_weights(y_subtrain)
-            # y_train_weights = compute_sample_weights(y_train)
-            print(f'rebalancing the training set...')
-            min_norm_weight = 0.01 / len(y_train)
-            y_train_weights = exDenseReweights(
-                X_train, y_train,
-                alpha=alpha_rw, bw=bandwidth,
-                min_norm_weight=min_norm_weight,
-                debug=False).reweights
-            print(f'training set rebalanced.')
-
-            print(f'rebalancing the subtraining set...')
-            min_norm_weight = 0.01 / len(y_subtrain)
-            y_subtrain_weights = exDenseReweights(
-                X_subtrain, y_subtrain,
-                alpha=alpha_rw, bw=bandwidth,
-                min_norm_weight=min_norm_weight,
-                debug=False).reweights
-            print(f'subtraining set rebalanced.')
+                                         outputs_to_use=outputs_to_use)
 
             # print all cme_files shapes
             print(f'X_train.shape: {X_train.shape}')
@@ -164,6 +149,30 @@ def main():
             print(f'y_test.shape: {y_test.shape}')
             print(f'X_val.shape: {X_val.shape}')
             print(f'y_val.shape: {y_val.shape}')
+
+            # Compute the sample weights
+            delta_train = y_train[:, 0]
+            delta_subtrain = y_subtrain[:, 0]
+            print(f'delta_train.shape: {delta_train.shape}')
+            print(f'delta_subtrain.shape: {delta_subtrain.shape}')
+
+            print(f'rebalancing the training set...')
+            min_norm_weight = 0.01 / len(delta_train)
+            y_train_weights = exDenseReweights(
+                X_train, delta_train,
+                alpha=alpha_rw, bw=bandwidth,
+                min_norm_weight=min_norm_weight,
+                debug=False).reweights
+            print(f'training set rebalanced.')
+
+            print(f'rebalancing the subtraining set...')
+            min_norm_weight = 0.01 / len(delta_subtrain)
+            y_subtrain_weights = exDenseReweights(
+                X_subtrain, delta_subtrain,
+                alpha=alpha_rw, bw=bandwidth,
+                min_norm_weight=min_norm_weight,
+                debug=False).reweights
+            print(f'subtraining set rebalanced.')
 
             # print a sample of the training cme_files
             # print(f'X_train[0]: {X_train[0]}')
@@ -178,21 +187,54 @@ def main():
                 input_dim=n_features,
                 hiddens=hiddens,
                 repr_dim=repr_dim,
+                output_dim=output_dim,
                 dropout_rate=dropout,
                 activation=activation,
                 norm=norm
             )
             mlp_model_sep.summary()
 
+            print('Reshaping input for model')
+            X_subtrain = reshape_X(
+                X_subtrain,
+                [n_features],
+                inputs_to_use,
+                add_slope,
+                mlp_model_sep.name)
+
+            X_val = reshape_X(
+                X_val,
+                [n_features],
+                inputs_to_use,
+                add_slope,
+                mlp_model_sep.name)
+
+            X_train = reshape_X(
+                X_train,
+                [n_features],
+                inputs_to_use,
+                add_slope,
+                mlp_model_sep.name)
+
+            X_test = reshape_X(
+                X_test,
+                [n_features],
+                inputs_to_use,
+                add_slope,
+                mlp_model_sep.name)
+
             # Define the EarlyStopping callback
-            early_stopping = EarlyStopping(monitor='loss', patience=patience, verbose=1,
-                                           restore_best_weights=True)
+            early_stopping = EarlyStopping(
+                monitor='val_loss',
+                patience=patience,
+                verbose=1,
+                restore_best_weights=True)
 
             # Compile the model with the specified learning rate
-            mlp_model_sep.compile(optimizer=SGD(learning_rate=learning_rate,
-                                                # weight_decay=weight_decay,
-                                                # beta_1=momentum_beta1
-                                                ),
+            mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
+                                                  weight_decay=weight_decay,
+                                                  beta_1=momentum_beta1
+                                                  ),
                                   loss={'forecast_head': get_loss(loss_key)})
 
             # Train the model with the callback
@@ -220,6 +262,7 @@ def main():
                 input_dim=n_features,
                 hiddens=hiddens,
                 repr_dim=repr_dim,
+                output_dim=output_dim,
                 dropout_rate=dropout,
                 activation=activation,
                 norm=norm
@@ -227,10 +270,9 @@ def main():
 
             # Recreate the model architecture
             final_mlp_model_sep.compile(
-                optimizer=SGD(learning_rate=learning_rate,
-                            # weight_decay=weight_decay,
-                              # beta_1=momentum_beta1
-                              ),
+                optimizer=AdamW(learning_rate=learning_rate,
+                                weight_decay=weight_decay,
+                                beta_1=momentum_beta1),
                 loss={'forecast_head': get_loss(loss_key)})  # Compile the model just like before
             # Train on the full dataset
             final_mlp_model_sep.fit(
@@ -259,11 +301,10 @@ def main():
             filenames = process_sep_events(
                 test_directory,
                 final_mlp_model_sep,
-                model_type='mlp',
                 title=title,
                 inputs_to_use=inputs_to_use,
                 add_slope=add_slope,
-                target_change=target_change,
+                outputs_to_use=outputs_to_use,
                 show_avsp=True)
 
             # Log the plot to wandb
@@ -276,11 +317,10 @@ def main():
             filenames = process_sep_events(
                 test_directory,
                 final_mlp_model_sep,
-                model_type='mlp',
                 title=title,
                 inputs_to_use=inputs_to_use,
                 add_slope=add_slope,
-                target_change=target_change,
+                outputs_to_use=outputs_to_use,
                 show_avsp=True,
                 prefix='training')
 
@@ -294,11 +334,10 @@ def main():
             filenames = process_sep_events(
                 test_directory,
                 mlp_model_sep,
-                model_type='mlp',
                 title=title + '_nr',
                 inputs_to_use=inputs_to_use,
                 add_slope=add_slope,
-                target_change=target_change,
+                outputs_to_use=outputs_to_use,
                 show_avsp=True)
 
             # Log the plot to wandb
@@ -311,11 +350,10 @@ def main():
             filenames = process_sep_events(
                 test_directory,
                 mlp_model_sep,
-                model_type='mlp',
                 title=title + '_nr',
                 inputs_to_use=inputs_to_use,
                 add_slope=add_slope,
-                target_change=target_change,
+                outputs_to_use=outputs_to_use,
                 show_avsp=True,
                 prefix='training')
 
