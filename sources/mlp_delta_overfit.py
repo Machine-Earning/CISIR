@@ -50,7 +50,7 @@ def main():
             seed = 456789
             tf.random.set_seed(seed)
             np.random.seed(seed)
-            patience = 15000  # higher patience
+            patience = 5000  # higher patience
             learning_rate = 5e-3  # og learning rate
             # initial_learning_rate = 3e-3
             # final_learning_rate = 3e-7
@@ -71,23 +71,23 @@ def main():
                 min_delta=1e-5,
                 min_lr=1e-10)
 
-            weight_decay = 0  # higher weight decay
-            momentum_beta1 = 0.9  # higher momentum beta1
+            weight_decay = 1e-8  # higher weight decay
+            momentum_beta1 = 0.95  # higher momentum beta1
             batch_size = 4096
             epochs = 150000  # higher epochs
             hiddens = [
-                1024, 512, 512, 256, 256, 128, 128
+                512, 256, 128, 64
             ]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
             loss_key = 'var_mse'
             target_change = True
             # print_batch_mse_cb = PrintBatchMSE()
             rebalacing = True
-            alpha_rw = 1.3
+            alpha_rw = 1.5
             bandwidth = 0.0519
             repr_dim = 9
             output_dim = len(outputs_to_use)
-            dropout = 0
+            dropout = 0.5
             activation = None
             norm = 'batch_norm'
 
@@ -233,8 +233,7 @@ def main():
             # Compile the model with the specified learning rate
             mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
                                                   weight_decay=weight_decay,
-                                                  beta_1=momentum_beta1
-                                                  ),
+                                                  beta_1=momentum_beta1),
                                   loss={'forecast_head': get_loss(loss_key)})
 
             # Train the model with the callback
@@ -290,12 +289,6 @@ def main():
             # Log the MAE error to wandb
             wandb.log({"mae_error": error_mae})
 
-            # mae of original model
-            error_mae = evaluate_model(mlp_model_sep, X_test, y_test)
-            print(f'o_mae error: {error_mae}')
-            # Log the MAE error to wandb
-            wandb.log({"o_mae_error": error_mae})
-
             # Process SEP event files in the specified directory
             test_directory = root_dir + '/testing'
             filenames = process_sep_events(
@@ -328,39 +321,6 @@ def main():
             for filename in filenames:
                 log_title = os.path.basename(filename)
                 wandb.log({f'training_{log_title}': wandb.Image(filename)})
-
-            # Process SEP event files in the specified directory
-            test_directory = root_dir + '/testing'
-            filenames = process_sep_events(
-                test_directory,
-                mlp_model_sep,
-                title=title + '_nr',
-                inputs_to_use=inputs_to_use,
-                add_slope=add_slope,
-                outputs_to_use=outputs_to_use,
-                show_avsp=True)
-
-            # Log the plot to wandb
-            for filename in filenames:
-                log_title = os.path.basename(filename)
-                wandb.log({f'nr_testing_{log_title}': wandb.Image(filename)})
-
-            # Process SEP event files in the specified directory
-            test_directory = root_dir + '/subtraining'
-            filenames = process_sep_events(
-                test_directory,
-                mlp_model_sep,
-                title=title + '_nr',
-                inputs_to_use=inputs_to_use,
-                add_slope=add_slope,
-                outputs_to_use=outputs_to_use,
-                show_avsp=True,
-                prefix='training')
-
-            # Log the plot to wandb
-            for filename in filenames:
-                log_title = os.path.basename(filename)
-                wandb.log({f'nr_training_{log_title}': wandb.Image(filename)})
 
             # Finish the wandb run
             wandb.finish()

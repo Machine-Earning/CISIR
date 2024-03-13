@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import wandb
-from tensorflow.keras.activations import tanh
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
@@ -13,8 +12,6 @@ from wandb.keras import WandbCallback
 from modules.training.DenseReweights import exDenseReweights
 from modules.training.ts_modeling import (
     build_dataset,
-    create_mlp,
-    create_gru,
     create_1dcnn,
     evaluate_model,
     process_sep_events,
@@ -73,13 +70,13 @@ def main():
                 min_delta=1e-5,
                 min_lr=1e-10)
 
-            weight_decay = 0  # higher weight decay
-            momentum_beta1 = 0.9  # higher momentum beta1
-            batch_size = 2048
+            weight_decay = 1e-8  # higher weight decay
+            momentum_beta1 = 0.95  # higher momentum beta1
+            batch_size = 4096
             epochs = 15000  # higher epochs
             n_filters = 32
             kernel_size = 10
-            conv_layers = 24
+            conv_layers = 12
             # hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
             hiddens_str = f'filters{n_filters}_kernelsize{kernel_size}_convlayers{conv_layers}'
             loss_key = 'var_mse'
@@ -90,7 +87,7 @@ def main():
             bandwidth = 0.0519
             repr_dim = 9
             output_dim = len(outputs_to_use)
-            dropout = 0
+            dropout = 0.5
             activation = None
             norm = 'batch_norm'
 
@@ -242,8 +239,7 @@ def main():
             # Compile the model with the specified learning rate
             mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
                                                   weight_decay=weight_decay,
-                                                  beta_1=momentum_beta1
-                                                  ),
+                                                  beta_1=momentum_beta1),
                                   loss={'forecast_head': get_loss(loss_key)})
 
             # Train the model with the callback
@@ -301,12 +297,6 @@ def main():
             # Log the MAE error to wandb
             wandb.log({"mae_error": error_mae})
 
-            # mae of original model
-            error_mae = evaluate_model(mlp_model_sep, X_test, y_test)
-            print(f'o_mae error: {error_mae}')
-            # Log the MAE error to wandb
-            wandb.log({"o_mae_error": error_mae})
-
             # Process SEP event files in the specified directory
             test_directory = root_dir + '/testing'
             filenames = process_sep_events(
@@ -339,39 +329,6 @@ def main():
             for filename in filenames:
                 log_title = os.path.basename(filename)
                 wandb.log({f'training_{log_title}': wandb.Image(filename)})
-
-            # Process SEP event files in the specified directory
-            test_directory = root_dir + '/testing'
-            filenames = process_sep_events(
-                test_directory,
-                mlp_model_sep,
-                title=title + '_nr',
-                inputs_to_use=inputs_to_use,
-                add_slope=add_slope,
-                outputs_to_use=outputs_to_use,
-                show_avsp=True)
-
-            # Log the plot to wandb
-            for filename in filenames:
-                log_title = os.path.basename(filename)
-                wandb.log({f'nr_testing_{log_title}': wandb.Image(filename)})
-
-            # Process SEP event files in the specified directory
-            test_directory = root_dir + '/subtraining'
-            filenames = process_sep_events(
-                test_directory,
-                mlp_model_sep,
-                title=title + '_nr',
-                inputs_to_use=inputs_to_use,
-                add_slope=add_slope,
-                outputs_to_use=outputs_to_use,
-                show_avsp=True,
-                prefix='training')
-
-            # Log the plot to wandb
-            for filename in filenames:
-                log_title = os.path.basename(filename)
-                wandb.log({f'nr_training_{log_title}': wandb.Image(filename)})
 
             # Finish the wandb run
             wandb.finish()

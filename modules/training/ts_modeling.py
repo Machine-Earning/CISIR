@@ -1867,7 +1867,7 @@ def get_loss(loss_key: str = 'mse'):
         def var_mse(y_true, y_pred):
             mse_loss = tf.reduce_mean(tf.square(y_true - y_pred))
             variance_loss = -tf.reduce_mean(tf.square(y_pred - tf.reduce_mean(y_pred)))
-            total_loss = mse_loss + 0.085 * variance_loss  # Adjust the weighting factor as needed
+            total_loss = mse_loss + 0.08 * variance_loss  # Adjust the weighting factor as needed
             return total_loss
 
         return var_mse
