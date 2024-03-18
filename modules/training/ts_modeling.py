@@ -1703,45 +1703,118 @@ def find_threshold_crossing_indices(values: np.ndarray, threshold: float) -> np.
     return crossings + 1  # +1 to correct for the shift due to diff
 
 
-def find_shift_lag(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_ts: np.ndarray) -> float:
+# def find_shift_lag(
+#         timestamps: np.ndarray,
+#         actual_ts: np.ndarray,
+#         predicted_ts: np.ndarray) -> float:
+#     """
+#     Find the shift lag by calculating the MAE for various shifts of predicted data, both left (positive shifts)
+#     and right (negative shifts).
+#
+#     Parameters:
+#     - timestamps (np.ndarray): Timestamps for the time series data.
+#     - actual_ts (np.ndarray): The actual time series data.
+#     - predicted_ts (np.ndarray): The predicted time series data.
+#
+#     Returns:
+#     - float: The shift lag in minutes for the best alignment of predicted data to actual data. Positive lag indicates
+#       that the predicted series should be shifted earlier, and negative lag indicates a shift to later times.
+#     """
+#     min_mae = float('inf')
+#     best_shift = 0
+#     time_interval = (timestamps[1] - timestamps[0]) / np.timedelta64(1, 'm')  # Assuming uniform spacing
+#
+#     # Consider shifts up to a reasonable limit to avoid overfitting to noise
+#     max_shifts = min(len(actual_ts) // 2, 12)  # For example, limit to 10 shifts ( if data is 5-minute intervals)
+#
+#     # Loop for shifting left (positive shifts)
+#     for shift in range(1, max_shifts + 1):
+#         shifted_predicted_ts = np.roll(predicted_ts, -shift)
+#         mae = np.mean(np.abs(actual_ts[shift:] - shifted_predicted_ts[:-shift]))
+#         if mae < min_mae:
+#             min_mae = mae
+#             best_shift = shift
+#
+#     # Loop for shifting right (negative shifts)
+#     for shift in range(1, max_shifts + 1):
+#         shifted_predicted_ts = np.roll(predicted_ts, shift)
+#         mae = np.mean(np.abs(actual_ts[:-shift] - shifted_predicted_ts[shift:]))
+#         if mae < min_mae:
+#             min_mae = mae
+#             best_shift = -shift
+#
+#     # Convert the best shift to minutes
+#     shift_lag = best_shift * time_interval
+#     return shift_lag
+
+
+def find_shift_lag(
+        timestamps: np.ndarray,
+        actual_ts: np.ndarray,
+        predicted_ts: np.ndarray,
+        smoothing_window: int) -> float:
     """
-    Find the shift lag by calculating the MAE for various shifts of predicted data, both left (positive shifts)
-    and right (negative shifts).
+    Find the shift lag focusing on the onset to peak period by calculating the MAE for various shifts
+    of predicted data, considering the smoothed slope for onset detection.
 
     Parameters:
-    - timestamps (np.ndarray): Timestamps for the time series data.
+    - timestamps (np.ndarray): Timestamps for the time series data, 5 minutes apart.
     - actual_ts (np.ndarray): The actual time series data.
     - predicted_ts (np.ndarray): The predicted time series data.
+    - smoothing_window (int): The number of data points used for smoothing to detect the onset (1 hour equivalent).
 
     Returns:
-    - float: The shift lag in minutes for the best alignment of predicted data to actual data. Positive lag indicates
-      that the predicted series should be shifted earlier, and negative lag indicates a shift to later times.
+    - float: The shift lag in minutes for the best alignment of predicted data to actual data from onset to peak.
+             Positive lag indicates that the predicted series should be shifted earlier, and negative lag
+             indicates a shift to later times.
     """
+    # Convert smoothing window to the equivalent in terms of data points, given data points are 5 minutes apart
+    # Here, smoothing_window is expected in terms of hours, so convert to the number of 5-minute intervals
+    points_per_hour = 12  # 60 minutes / 5 minutes
+    smoothing_points = smoothing_window * points_per_hour
+
+    def smooth_data(data: np.ndarray) -> np.ndarray:
+        """
+        Smooths the data using a simple moving average over a specified window.
+        """
+        return np.convolve(data, np.ones(smoothing_points) / smoothing_points, mode='valid')
+
+    def find_onset_peak(data: np.ndarray) -> (int, int):
+        """
+        Finds the onset and peak of an event within the data based on slope analysis after smoothing.
+        """
+        smoothed_data = smooth_data(data)
+        slopes = np.diff(smoothed_data)
+
+        # Find the first positive slope as onset and the max value as peak
+        onset_idx = np.where(slopes > 0)[0][0]
+        peak_idx = np.argmax(smoothed_data) + (smoothing_points // 2)  # Adjusting for the convolution effect
+
+        return onset_idx, peak_idx
+
+    onset_actual, peak_actual = find_onset_peak(actual_ts)
+    onset_predicted, peak_predicted = find_onset_peak(predicted_ts)
+
     min_mae = float('inf')
     best_shift = 0
-    time_interval = (timestamps[1] - timestamps[0]) / np.timedelta64(1, 'm')  # Assuming uniform spacing
-
-    # Consider shifts up to a reasonable limit to avoid overfitting to noise
-    max_shifts = min(len(actual_ts) // 2, 12)  # For example, limit to 10 shifts ( if data is 5-minute intervals)
-
-    # Loop for shifting left (positive shifts)
-    for shift in range(1, max_shifts + 1):
-        shifted_predicted_ts = np.roll(predicted_ts, -shift)
-        mae = np.mean(np.abs(actual_ts[shift:] - shifted_predicted_ts[:-shift]))
-        if mae < min_mae:
-            min_mae = mae
-            best_shift = shift
-
-    # Loop for shifting right (negative shifts)
-    for shift in range(1, max_shifts + 1):
+    for shift in range(-len(predicted_ts), len(predicted_ts)):
         shifted_predicted_ts = np.roll(predicted_ts, shift)
-        mae = np.mean(np.abs(actual_ts[:-shift] - shifted_predicted_ts[shift:]))
-        if mae < min_mae:
-            min_mae = mae
-            best_shift = -shift
 
-    # Convert the best shift to minutes
-    shift_lag = best_shift * time_interval
+        # Adjusting calculation to ensure positive/negative lag interpretation is correct
+        onset_adjusted = max(0, onset_actual - shift) if shift < 0 else onset_actual
+        peak_adjusted = min(peak_actual, peak_actual - shift) if shift < 0 else peak_actual
+
+        valid_range_actual = slice(onset_adjusted, peak_adjusted)
+        valid_range_predicted = slice(onset_adjusted + shift, peak_adjusted + shift)
+
+        if valid_range_actual.stop - valid_range_actual.start > 0:
+            mae = np.mean(np.abs(actual_ts[valid_range_actual] - shifted_predicted_ts[valid_range_predicted]))
+            if mae < min_mae:
+                min_mae = mae
+                best_shift = shift
+
+    # Correcting the calculation of time shift in minutes
+    shift_lag = best_shift * 5  # Convert shift index to minutes considering 5-minute intervals
     return shift_lag
 
 
@@ -1780,8 +1853,11 @@ def find_shift_lag_with_correlation(timestamps: np.ndarray, actual_ts: np.ndarra
     return shift_lag
 
 
-def evaluate_lag_error(timestamps: np.ndarray, actual_ts: np.ndarray, predicted_ts: np.ndarray,
-                       threshold: float) -> Tuple[float, float, float]:
+def evaluate_lag_error(
+        timestamps: np.ndarray,
+        actual_ts: np.ndarray,
+        predicted_ts: np.ndarray,
+        threshold: float) -> Tuple[float, float, float]:
     """
     Evaluates the lag error for threshold crossings and the shift lag for the best alignment of predicted data to actual
     data. Also computes the average lag for the threshold crossings.

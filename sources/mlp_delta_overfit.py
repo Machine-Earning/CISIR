@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import wandb
-from tensorflow.keras.activations import tanh, elu
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
@@ -28,7 +27,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:  # , ['e0.5', 'p']]:
         for add_slope in [True]:  # , False]:
-            for alpha in [0.34, 0.38]:
+            for alpha in [.385]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
@@ -38,7 +37,7 @@ def main():
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'MLP_{inputs_str}_slope{str(add_slope)}_alpha{alpha:.2f}'
+                title = f'MLP_{inputs_str}_slope{str(add_slope)}_alpha{alpha:.3f}'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -72,12 +71,12 @@ def main():
                     min_delta=1e-5,
                     min_lr=1e-10)
 
-                weight_decay = 1e-6  # higher weight decay
-                momentum_beta1 = 0.95  # higher momentum beta1
+                weight_decay = 5e-5  # higher weight decay
+                momentum_beta1 = 0.97  # higher momentum beta1
                 batch_size = 4096
                 epochs = 50000  # higher epochs
                 hiddens = [
-                    2048, 1024, 512, 256, 128, 64
+                    3000, 1500, 750, 375, 187, 93, 46, 23, 11
                 ]
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 loss_key = 'mse'
@@ -85,7 +84,7 @@ def main():
                 # print_batch_mse_cb = PrintBatchMSE()
                 rebalacing = True
                 alpha_rw = alpha
-                bandwidth = 0.099 # 0.0519
+                bandwidth = 0.099  # 0.0519
                 repr_dim = 9
                 output_dim = len(outputs_to_use)
                 dropout = 0.5
@@ -229,7 +228,7 @@ def main():
                     monitor='val_loss',
                     patience=patience,
                     verbose=1,
-                    restore_best_weights=True,)
+                    restore_best_weights=True, )
 
                 # Compile the model with the specified learning rate
                 mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
