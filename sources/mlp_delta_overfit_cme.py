@@ -17,6 +17,7 @@ from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
     evaluate_model,
+    evaluate_model_cond,
     process_sep_events,
     get_loss,
     reshape_X)
@@ -341,6 +342,22 @@ def main():
                     for filename in filenames:
                         log_title = os.path.basename(filename)
                         wandb.log({f'training_{log_title}': wandb.Image(filename)})
+
+                    # evaluate the model on test cme_files
+                    above_threshold = 0.1
+                    error_mae_cond = evaluate_model_cond(
+                        final_mlp_model_sep, X_test, y_test, above_threshold=above_threshold)
+
+                    print(f'mae error delta >= 0.1 test: {error_mae_cond}')
+                    # Log the MAE error to wandb
+                    wandb.log({"mae_error_cond_test": error_mae_cond})
+
+                    # evaluate the model on training cme_files
+                    error_mae_cond_train = evaluate_model_cond(
+                        final_mlp_model_sep, X_train, y_train, above_threshold=above_threshold)
+
+                    print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
+                    # Log the MAE error to wandb
 
                     # Finish the wandb run
                     wandb.finish()
