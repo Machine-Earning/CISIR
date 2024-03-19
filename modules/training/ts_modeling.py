@@ -1,13 +1,11 @@
-import os
-import random
-import traceback
-from collections import Counter
-from typing import Tuple, List, Optional, Union
-
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import pandas as pd
+import random
 import tensorflow as tf
+import traceback
+from collections import Counter
 from matplotlib.lines import Line2D
 from numpy import ndarray
 from scipy.signal import correlate, correlation_lags
@@ -24,9 +22,13 @@ from tensorflow.keras.layers import (
     Dropout,
     LeakyReLU,
     BatchNormalization,
-    LayerNormalization)
+    LayerNormalization,
+    MaxPooling1D,
+    AveragePooling1D,
+)
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
+from typing import Tuple, List, Optional, Union
 
 from modules.training.cme_modeling import NormalizeLayer
 
@@ -48,9 +50,7 @@ tf.random.set_seed(seed_value)
 
 def create_1dcnn(
         input_dims: list,
-        filters: int = 32,
-        kernel_size: int = 10,
-        conv_layers: int = 2,
+        hiddens: list[tuple],
         repr_dim: int = 50,
         output_dim: int = 1,
         pds: bool = False,
@@ -65,11 +65,10 @@ def create_1dcnn(
 
     Parameters:
     - input_dims (list): List of input dimensions. Groups of similar dimensions represent separate channels.
-    - filters (int): The number of filters in each convolutional layer. Default is 32.
-    - kernel_size (int): The size of the kernel in the convolutional layers. Default is 10.
+    - hiddens (list[tuple]): List of tuples for CNN layers configuration.
+      Each tuple contains (filters, kernel_size, dilation_rate, pooling_type).
     - repr_dim (int): The number of units in the fully connected layer. Default is 50.
     - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
-    - conv_layers (int): The number of convolutional layers. Default is 2.
     - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
 
     Returns:
@@ -87,9 +86,13 @@ def create_1dcnn(
         input_layer = Input(shape=(dim, count), name=f'input_{dim}x{count}')
         x = input_layer
 
-        for _ in range(conv_layers):
-            x = Conv1D(filters=filters, kernel_size=kernel_size, padding='same',
-                       kernel_regularizer=l2(l2_reg) if l2_reg else None)(x)
+        for filters, kernel_size, dilation_rate, pool_type, pool_size in hiddens:
+            x = Conv1D(
+                filters=filters,
+                kernel_size=kernel_size,
+                padding='same',
+                dilation_rate=dilation_rate,
+                kernel_regularizer=l2(l2_reg) if l2_reg else None)(x)
 
             if norm == 'batch_norm':
                 x = BatchNormalization()(x)
@@ -101,6 +104,11 @@ def create_1dcnn(
             if dropout_rate > 0.0:
                 x = Dropout(dropout_rate)(x)
 
+            if pool_type == 'max':
+                x = MaxPooling1D(pool_size=pool_size)(x)
+            elif pool_type == 'avg':
+                x = AveragePooling1D(pool_size=pool_size)(x)
+
         flattened = Flatten()(x)
         branches.append(flattened)
         cnn_inputs.append(input_layer)
@@ -109,7 +117,6 @@ def create_1dcnn(
 
     dense = Dense(repr_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(concatenated)
     if pds:
-        # Assuming NormalizeLayer is defined elsewhere
         normalized_repr_layer = NormalizeLayer(name='normalize_layer')(dense)
         final_repr_output = normalized_repr_layer
     else:
@@ -123,9 +130,6 @@ def create_1dcnn(
 
     model = Model(inputs=cnn_inputs, outputs=model_output, name=name)
     return model
-
-
-#
 
 
 def create_gru(
@@ -1095,7 +1099,7 @@ def plot_and_evaluate_sep_event(
     plt.xlabel('Timestamp')
     plt.ylabel('Ln Flux lnIntensity')
     # plt.yscale('log')  # Set y-axis to logarithmic scale
-    plt.title(f'{title} - SEP Event {event_id} - MAE: {mae_loss:.4f}') #- Lag: {s_lag:.2f} minutes')
+    plt.title(f'{title} - SEP Event {event_id} - MAE: {mae_loss:.4f}')  # - Lag: {s_lag:.2f} minutes')
 
     # Extract handles and labels for the plot's elements
     handles, labels = plt.gca().get_legend_handles_labels()
@@ -1107,7 +1111,7 @@ def plot_and_evaluate_sep_event(
     plt.legend(handles=handles, labels=labels)
 
     # Save the plot to a file with the MAE in the file name
-    file_name = f'{title}_SEP_Event_{event_id}_{prefix}_MAE_{mae_loss:.4f}.png' #_Lag_{s_lag:.2f}.png'
+    file_name = f'{title}_SEP_Event_{event_id}_{prefix}_MAE_{mae_loss:.4f}.png'  # _Lag_{s_lag:.2f}.png'
     plt.savefig(file_name)
 
     # plt.show()

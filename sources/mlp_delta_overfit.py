@@ -27,7 +27,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:  # , ['e0.5', 'p']]:
         for add_slope in [True]:  # , False]:
-            for alpha in [.385]:
+            for alpha in [.38]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
@@ -37,7 +37,7 @@ def main():
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'MLP_{inputs_str}_slope{str(add_slope)}_alpha{alpha:.3f}'
+                title = f'MLP_{inputs_str}_slope{str(add_slope)}_alpha{alpha:.2f}'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -71,12 +71,12 @@ def main():
                     min_delta=1e-5,
                     min_lr=1e-10)
 
-                weight_decay = 5e-5  # higher weight decay
+                weight_decay = 1e-5  # higher weight decay
                 momentum_beta1 = 0.97  # higher momentum beta1
                 batch_size = 4096
                 epochs = 50000  # higher epochs
                 hiddens = [
-                    3000, 1500, 750, 375, 187, 93, 46, 23, 11
+                    2048, 1024, 512, 256, 128, 64, 32
                 ]
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 loss_key = 'mse'
@@ -288,6 +288,12 @@ def main():
                 print(f'mae error: {error_mae}')
                 # Log the MAE error to wandb
                 wandb.log({"mae_error": error_mae})
+
+                # evaluate the model on training cme_files
+                error_mae_train = evaluate_model(final_mlp_model_sep, X_train, y_train)
+                print(f'mae error train: {error_mae_train}')
+                # Log the MAE error to wandb
+                wandb.log({"train_mae_error": error_mae_train})
 
                 # Process SEP event files in the specified directory
                 test_directory = root_dir + '/testing'
