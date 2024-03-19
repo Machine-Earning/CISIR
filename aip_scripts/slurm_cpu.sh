@@ -19,4 +19,4 @@ echo "Running on $SLURM_NPROCS processors."
 
 echo "Current working directory is $(pwd)"
 
-srun python3 $1 # Run your Python script with file name as argument
+srun python3 -m $1 # Run your Python script with file name as argument

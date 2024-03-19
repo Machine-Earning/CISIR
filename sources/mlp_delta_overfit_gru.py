@@ -80,7 +80,7 @@ def main():
                 momentum_beta1 = 0.97  # higher momentum beta1
                 batch_size = 4096
                 epochs = 50000  # higher epochs
-                gru_units = 180
+                gru_units = 256
                 gru_layers = 6
                 hiddens_str = f'{gru_units}units_{gru_layers}layers'
                 loss_key = 'mse'
