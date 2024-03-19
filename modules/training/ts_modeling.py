@@ -1548,11 +1548,11 @@ def evaluate_model_cond(
     - float: The MAE loss of the model on the filtered test data.
     """
     # Make predictions
-    predictions = model.predict(X_test)
+    _, predictions = model.predict(X_test)
 
-    # Assuming model.predict returns a single array. If not, adjust accordingly.
-    if isinstance(predictions, (list, tuple)):
-        predictions = predictions[0]
+    # Process predictions
+    predictions = process_predictions(predictions)
+    y_test = process_predictions(y_test)
 
     # Filter y_test and predictions based on thresholds
     if below_threshold is not None and above_threshold is not None:
