@@ -82,7 +82,7 @@ def main():
                 epochs = 50000  # higher epochs
                 gru_units = 180
                 gru_layers = 6
-                hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
+                hiddens_str = f'{gru_units}units_{gru_layers}layers'
                 loss_key = 'mse'
                 target_change = ('delta_p' in outputs_to_use)
                 # print_batch_mse_cb = PrintBatchMSE()
