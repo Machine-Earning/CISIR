@@ -32,7 +32,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:  # , ['e0.5', 'p']]:
         for add_slope in [True]:  # , False]:
-            for alpha in [.38]:
+            for alpha in [.5]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
@@ -76,7 +76,7 @@ def main():
                     min_delta=1e-5,
                     min_lr=1e-10)
 
-                weight_decay = 1e-5  # higher weight decay
+                weight_decay = 1e-6  # higher weight decay
                 momentum_beta1 = 0.97  # higher momentum beta1
                 batch_size = 4096
                 epochs = 50000  # higher epochs
@@ -338,6 +338,22 @@ def main():
                 for filename in filenames:
                     log_title = os.path.basename(filename)
                     wandb.log({f'training_{log_title}': wandb.Image(filename)})
+
+                # evaluate the model on test cme_files
+                above_threshold = 0.1
+                error_mae_cond = evaluate_model_cond(
+                    final_mlp_model_sep, X_test, y_test, above_threshold=above_threshold)
+
+                print(f'mae error delta >= 0.1 test: {error_mae_cond}')
+                # Log the MAE error to wandb
+                wandb.log({"mae_error_cond_test": error_mae_cond})
+
+                # evaluate the model on training cme_files
+                error_mae_cond_train = evaluate_model_cond(
+                    final_mlp_model_sep, X_train, y_train, above_threshold=above_threshold)
+
+                print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
+                # Log the MAE error to wandb
 
                 # Finish the wandb run
                 wandb.finish()
