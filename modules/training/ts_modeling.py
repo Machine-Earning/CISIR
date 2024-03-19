@@ -1320,7 +1320,7 @@ def process_sep_events(
 
                 if show_avsp:
                     actual_ch, predicted_ch = plot_avsp_delta(
-                        df, model, input_columns,
+                        df, model, input_columns, using_cme=using_cme,
                         inputs_to_use=inputs_to_use, add_slope=add_slope,
                         outputs_to_use=outputs_to_use)
 
