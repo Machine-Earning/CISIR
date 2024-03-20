@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-# os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,6 +19,7 @@ from modules.training.ts_modeling import (
     create_mlp,
     create_gru,
     evaluate_model,
+    evaluate_model_cond,
     process_sep_events,
     get_loss,
     reshape_X)
@@ -32,7 +33,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:  # , ['e0.5', 'p']]:
         for add_slope in [True]:  # , False]:
-            for alpha in [.5]:
+            for alpha in [.55]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
@@ -80,8 +81,8 @@ def main():
                 momentum_beta1 = 0.97  # higher momentum beta1
                 batch_size = 4096
                 epochs = 50000  # higher epochs
-                gru_units = 256
-                gru_layers = 6
+                gru_units = 200
+                gru_layers = 7
                 hiddens_str = f'{gru_units}units_{gru_layers}layers'
                 loss_key = 'mse'
                 target_change = ('delta_p' in outputs_to_use)

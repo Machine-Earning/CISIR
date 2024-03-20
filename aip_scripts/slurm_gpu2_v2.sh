@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH --job-name=rep            # Job name
+#SBATCH --job-name=repl.pds           # Job name
 #SBATCH --nodes=1                     # Number of nodes
 #SBATCH --ntasks=1                    # Number of tasks
 #SBATCH --mem=32GB                    # Memory per node
 #SBATCH --time=infinite              # Time limit
 #SBATCH --partition=gpu2              # Partition, dynamically set
-#SBATCH --gres=gpu:1                # Number of GPUs per node
+#SBATCH --gres=gpu:4               # Number of GPUs per node
 #SBATCH --output=testjob.%J.out       # Output file
 #SBATCH --error=testjob.%J.err        # Error file
 
