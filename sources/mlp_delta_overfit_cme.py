@@ -29,9 +29,9 @@ def main():
     :return:
     """
 
-    for inputs_to_use in [['e0.5', 'e1.8', 'p']]:  # , ['e0.5', 'p']]:
-        for add_slope in [True]:  # , False]:
-            for alpha in [.38]:
+    for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
+        for add_slope in [True, False]:
+            for alpha in np.arange(0.1, 1.6, 0.25):
                 for cme_speed_threshold in [0, 500]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
@@ -98,7 +98,7 @@ def main():
                     cme_speed_threshold = cme_speed_threshold
 
                     # Initialize wandb
-                    wandb.init(project="mlp-ts-delta-overfit", name=experiment_name, config={
+                    wandb.init(project="nasa-ts-delta", name=experiment_name, config={
                         "inputs_to_use": inputs_to_use,
                         "add_slope": add_slope,
                         "patience": patience,
