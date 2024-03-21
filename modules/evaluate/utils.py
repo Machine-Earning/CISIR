@@ -130,11 +130,9 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
     """
     # Get representations from the model
     print('In plot_repr_correlation')
-    # Extract features using the trained extended model
-    if model_type == 'features_reg_dec':
-        representations, _, _ = model.predict(X)
-    elif model_type == 'features_reg' or model_type == 'features_dec':
-        representations, _ = model.predict(X)
+    # Extract features based on the model type
+    if model_type in ['features_reg_dec', 'features_reg', 'features_dec']:
+        representations = model.predict(X)[0]  # Assuming the first output is always features
     else:  # model_type == 'features'
         representations = model.predict(X)
 

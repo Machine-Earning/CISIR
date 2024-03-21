@@ -10,7 +10,7 @@ import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from wandb.keras import WandbCallback
 
-from modules.evaluate.utils import plot_tsne_pds, plot_repr_correlation
+from modules.evaluate.utils import plot_tsne_pds_delta, plot_repr_correlation
 from modules.training import cme_modeling
 from modules.training.ts_modeling import build_dataset, create_mlp
 
@@ -73,20 +73,21 @@ def main():
             hiddens = [2048, 1024, 512, 256, 128, 64, 32]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
             pds = True
-            # Callback for reducing learning rate when a metric has stopped improving
-            # reduce_lr_on_plateau_cb = ReduceLROnPlateau(
-            #     monitor='val_loss',  # Metric to monitor
-            #     factor=0.5,  # Factor by which the learning rate will be reduced. new_lr = lr * factor
-            #     patience=150,  # Number of epochs with no improvement after which learning rate will be reduced
-            #     verbose=1,  # If 1, prints a message when reducing the learning rate
-            #     mode='min',  # In 'min' mode, lr will reduce when the quantity monitored has stopped decreasing
-            #     min_delta=1e-4,  # Threshold for measuring the new optimum, to only focus on significant changes
-            #     cooldown=1,  # Number of epochs to wait before resuming normal operation after lr has been reduced
-            #     min_lr=1e-8  # Lower bound on the learning rate
-            # )
+            target_change = ('delta_p' in outputs_to_use)
+            repr_dim = 9
+            dropout_rate = 0.5
+            activation = None
+            norm = 'batch_norm'
+            reduce_lr_on_plateau = ReduceLROnPlateau(
+                monitor='loss',
+                factor=0.5,
+                patience=300,
+                verbose=1,
+                min_delta=1e-5,
+                min_lr=1e-10)
 
             # Initialize wandb
-            wandb.init(project="mlp-ts-pds-delta", name=experiment_name, config={
+            wandb.init(project="nasa-ts-pds-delta", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
                 "target_change": target_change,
@@ -101,31 +102,33 @@ def main():
                 "pds": pds,
                 "seed": SEED,
                 "stage": 1,
-                "reduce_lr_on_plateau": False
-
+                "reduce_lr_on_plateau": True,
+                "dropout": dropout_rate,
+                "activation": "LeakyReLU",
+                "norm": norm,
+                "optimizer": "adamw",
+                "architecture": "mlp",
             })
 
             # set the root directory
-            # root_dir = 'D:/College/Fall2023/electron_cme_v5/electron_cme_data_split'
             root_dir = "data/electron_cme_data_split"
-            # build the dataset
             # build the dataset
             X_train, y_train = build_dataset(root_dir + '/training',
                                              inputs_to_use=inputs_to_use,
                                              add_slope=add_slope,
-                                             target_change=target_change)
+                                             outputs_to_use=outputs_to_use)
             X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining',
                                                    inputs_to_use=inputs_to_use,
                                                    add_slope=add_slope,
-                                                   target_change=target_change)
+                                                   outputs_to_use=outputs_to_use)
             X_test, y_test = build_dataset(root_dir + '/testing',
                                            inputs_to_use=inputs_to_use,
                                            add_slope=add_slope,
-                                           target_change=target_change)
+                                           outputs_to_use=outputs_to_use)
             X_val, y_val = build_dataset(root_dir + '/validation',
                                          inputs_to_use=inputs_to_use,
                                          add_slope=add_slope,
-                                         target_change=target_change)
+                                         outputs_to_use=outputs_to_use)
 
             # print all cme_files shapes
             print(f'X_train.shape: {X_train.shape}')
@@ -146,8 +149,46 @@ def main():
             print(f'n_features: {n_features}')
 
             # create the model
-            mlp_model_sep = create_mlp(input_dim=n_features, hiddens=hiddens, output_dim=0, pds=pds)
+            mlp_model_sep = create_mlp(
+                input_dim=n_features,
+                hiddens=hiddens,
+                output_dim=0,
+                pds=pds,
+                repr_dim=repr_dim,
+                dropout_rate=dropout_rate,
+                activation=activation,
+                norm=norm
+            )
             mlp_model_sep.summary()
+
+            print('Reshaping input for model')
+            X_subtrain = reshape_X(
+                X_subtrain,
+                [n_features],
+                inputs_to_use,
+                add_slope,
+                mlp_model_sep.name)
+
+            X_val = reshape_X(
+                X_val,
+                [n_features],
+                inputs_to_use,
+                add_slope,
+                mlp_model_sep.name)
+
+            X_train = reshape_X(
+                X_train,
+                [n_features],
+                inputs_to_use,
+                add_slope,
+                mlp_model_sep.name)
+
+            X_test = reshape_X(
+                X_test,
+                [n_features],
+                inputs_to_use,
+                add_slope,
+                mlp_model_sep.name)
 
             mb.train_pds(mlp_model_sep,
                          X_subtrain, y_subtrain,
@@ -157,24 +198,26 @@ def main():
                          epochs=Options['epochs'],
                          batch_size=Options['batch_size'],
                          patience=Options['patience'], save_tag=current_time + "_features",
-                         callbacks_list=[WandbCallback()]) #, reduce_lr_on_plateau_cb])
+                         callbacks_list=[WandbCallback(save_model=False), reduce_lr_on_plateau])
 
-            file_path = plot_tsne_pds(mlp_model_sep,
-                                      X_train,
-                                      y_train,
-                                      title, 'training',
-                                      save_tag=current_time)
+            file_path = plot_tsne_pds_delta(mlp_model_sep,
+                                            X_train,
+                                            y_train,
+                                            title, 'training',
+                                            save_tag=current_time,
+                                            seed=SEED)
 
             # Log t-SNE plot for training
             # Log the training t-SNE plot to wandb
             wandb.log({'tsne_training_plot': wandb.Image(file_path)})
             print('file_path: ' + file_path)
 
-            file_path = plot_tsne_pds(mlp_model_sep,
-                                      X_test,
-                                      y_test,
-                                      title, 'testing',
-                                      save_tag=current_time)
+            file_path = plot_tsne_pds_delta(mlp_model_sep,
+                                            X_test,
+                                            y_test,
+                                            title, 'testing',
+                                            save_tag=current_time,
+                                            seed=SEED)
 
             # Log t-SNE plot for testing
             # Log the testing t-SNE plot to wandb
@@ -185,7 +228,6 @@ def main():
             # Log the representation correlation plot to wandb
             wandb.log({'representation_correlation_plot_train': wandb.Image(file_path)})
             print('file_path: ' + file_path)
-
 
             file_path = plot_repr_correlation(mlp_model_sep, X_test, y_test, title + "_test")
             # Log the representation correlation plot to wandb
