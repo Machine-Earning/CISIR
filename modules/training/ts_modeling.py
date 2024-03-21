@@ -288,7 +288,7 @@ def create_mlp(
     else:
         model_output = final_repr_output
 
-    model = Model(inputs=input_layer, outputs=model_output, name='mlp')
+    model = Model(inputs=input_layer, outputs=model_output, name=name)
     return model
 
 
@@ -300,26 +300,35 @@ def create_hybrid_model(
         final_hiddens=None,
         repr_dim: int = 10,
         output_dim: int = 1,
-        pds: bool = False
-
+        pds: bool = False,
+        l2_reg: float = None,
+        dropout_rate: float = 0.0,
+        activation=None,
+        norm: str = None,
+        name: str = 'hybrid'
 ) -> Model:
     """
-    Create a hybrid neural network model with a time series feature extraction branch (CNN or RNN)
-    and an MLP branch.
-    TODO: update but not urgent
+       Create a hybrid neural network model with a time series feature extraction branch (CNN or RNN)
+       and an MLP branch.
+       TODO: update but not urgent
 
-    Parameters:
-    - tsf_extractor (Model): A pre-built model for time series feature extraction (CNN or RNN).
-    - mlp_input_dim (int): The number of features for the MLP branch.
-    - output_dim (int): The dimension of the output layer.
-    - repr_dim (int): The number of features in the final representation vector.
-    - mlp_repr_dim (int): The number of features in the representation vector after the MLP branch.
-    - mlp_hiddens (List[int]): List of integers for the MLP hidden layers.
-    - final_hiddens (List[int]): List of integers for the hidden layers after concatenation.
-    - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
+       Parameters:
+        - tsf_extractor (Model): A pre-built model for time series feature extraction (CNN or RNN).
+        - mlp_input_dim (int): The number of features for the MLP branch.
+        - output_dim (int): The dimension of the output layer.
+        - repr_dim (int): The number of features in the final representation vector.
+        - mlp_repr_dim (int): The number of features in the representation vector after the MLP branch.
+        - mlp_hiddens (List[int]): List of integers for the MLP hidden layers.
+        - final_hiddens (List[int]): List of integers for the hidden layers after concatenation.
+        - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
+        - l2_reg (float): L2 regularization factor. Default is None (no regularization).
+        - dropout_rate (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
+        - activation: Optional activation function to use. If None, defaults to LeakyReLU.
+        - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None (no normalization).
+        - name (str): The name of the model. Default is 'hybrid'.
 
-    Returns:
-    - Model: A Keras model instance.
+        Returns:
+        - Model: A Keras model instance.
     """
 
     if final_hiddens is None:
@@ -327,14 +336,30 @@ def create_hybrid_model(
     if mlp_hiddens is None:
         mlp_hiddens = [18]
 
+    if activation is None:
+        activation = LeakyReLU()
+
     # MLP Branch
     mlp_input = Input(shape=(mlp_input_dim,), name='mlp_input')
     x_mlp = mlp_input
     for units in mlp_hiddens:
-        x_mlp = Dense(units)(x_mlp)
-        x_mlp = LeakyReLU()(x_mlp)
-    x_mlp = Dense(mlp_repr_dim)(x_mlp)
-    mlp_repr = LeakyReLU()(x_mlp)
+        x_mlp = Dense(units, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x_mlp)
+
+        if norm == 'batch_norm':
+            x_mlp = BatchNormalization()(x_mlp)
+        elif norm == 'layer_norm':
+            x_mlp = LayerNormalization()(x_mlp)
+
+        if callable(activation):
+            x_mlp = activation(x_mlp)
+        else:
+            x_mlp = LeakyReLU()(x_mlp)
+
+        if dropout_rate > 0.0:
+            x_mlp = Dropout(dropout_rate)(x_mlp)
+
+    x_mlp = Dense(mlp_repr_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x_mlp)
+    mlp_repr = activation(x_mlp) if callable(activation) else LeakyReLU()(x_mlp)
 
     # Concatenate the outputs of TSF Extractor and MLP branch
     concatenated = Concatenate()([tsf_extractor.output, mlp_repr])
@@ -342,22 +367,35 @@ def create_hybrid_model(
     # Additional MLP Layer(s) after concatenation
     x_combined = concatenated
     for units in final_hiddens:
-        x_combined = Dense(units)(x_combined)
-        x_combined = LeakyReLU()(x_combined)
+        x_combined = Dense(units, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x_combined)
+
+        if norm == 'batch_norm':
+            x_combined = BatchNormalization()(x_combined)
+        elif norm == 'layer_norm':
+            x_combined = LayerNormalization()(x_combined)
+
+        if callable(activation):
+            x_combined = activation(x_combined)
+        else:
+            x_combined = LeakyReLU()(x_combined)
+
+        if dropout_rate > 0.0:
+            x_combined = Dropout(dropout_rate)(x_combined)
 
     # Final representation layer
-    final_repr = Dense(repr_dim)(x_combined)
+    final_repr = Dense(repr_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x_combined)
     if pds:
-        # Normalize the final representation if PDS is enabled
-        final_repr = NormalizeLayer(name='normalize_layer')(LeakyReLU()(final_repr))
+        # Assuming NormalizeLayer is defined elsewhere for PDS normalization
+        final_repr = NormalizeLayer(name='normalize_layer')(
+            activation(final_repr) if callable(activation) else LeakyReLU()(final_repr))
     else:
-        final_repr = LeakyReLU(name='final_repr_layer')(final_repr)
+        final_repr = activation(final_repr) if callable(activation) else LeakyReLU(name='final_repr_layer')(final_repr)
 
     # Final output layer
     forecast_head = Dense(output_dim, activation='linear', name='forecast_head')(final_repr)
 
     # Create the model
-    model = Model(inputs=[tsf_extractor.input, mlp_input], outputs=[final_repr, forecast_head], name='hybrid')
+    model = Model(inputs=[tsf_extractor.input, mlp_input], outputs=[final_repr, forecast_head], name=name)
 
     return model
 

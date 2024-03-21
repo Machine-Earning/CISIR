@@ -16,6 +16,7 @@ from modules.training.DenseReweights import exDenseReweights
 from modules.training.ts_modeling import (
     build_dataset,
     create_1dcnn,
+    create_hybrid_model,
     evaluate_model,
     evaluate_model_cond,
     process_sep_events,
@@ -77,7 +78,7 @@ def main():
                         min_delta=1e-5,
                         min_lr=1e-10)
 
-                    weight_decay = 1e-5  # higher weight decay
+                    weight_decay = 1e-6  # higher weight decay
                     momentum_beta1 = 0.97  # higher momentum beta1
                     batch_size = 4096
                     epochs = 50000  # higher epochs
@@ -106,6 +107,11 @@ def main():
                     activation = None
                     norm = 'batch_norm'
                     cme_speed_threshold = cme_speed_threshold
+
+                    mlp_hiddens = [128, 64, 32]
+                    mlp_repr_dim = 9
+                    final_hiddens = [36, 18]
+                    final_repr_dim = 9
 
                     # Initialize wandb
                     wandb.init(project="nasa-ts-delta", name=experiment_name, config={
@@ -207,15 +213,33 @@ def main():
                         n_features = [25] * len(inputs_to_use)
                     print(f'n_features: {n_features}')
 
-                    # create the model
-                    mlp_model_sep = create_1dcnn(
+                    # calculating number of cme features
+                    n_cme_features = 20 + len(inputs_to_use)
+
+                    # create the model extractor
+                    extractor_model_sep = create_1dcnn(
                         input_dims=n_features,
                         hiddens=hiddens,
                         repr_dim=repr_dim,
-                        output_dim=output_dim,
+                        output_dim=0,
                         dropout_rate=dropout,
                         activation=activation,
                         norm=norm
+                    )
+                    extractor_model_sep.summary()
+                    # creating the hybrid model
+                    mlp_model_sep = create_hybrid_model(
+                        tsf_extractor=extractor_model_sep,
+                        mlp_input_dim=n_cme_features,
+                        output_dim=output_dim,
+                        mlp_hiddens=mlp_hiddens,
+                        mlp_repr_dim=mlp_repr_dim,
+                        final_hiddens=final_hiddens,
+                        repr_dim=final_repr_dim,
+                        dropout_rate=dropout,
+                        activation=activation,
+                        norm=norm,
+                        name='hybrid'
                     )
                     mlp_model_sep.summary()
 
@@ -225,28 +249,28 @@ def main():
                         n_features,
                         inputs_to_use,
                         add_slope,
-                        mlp_model_sep.name)
+                        'hybrid')
 
                     X_val = reshape_X(
                         X_val,
                         n_features,
                         inputs_to_use,
                         add_slope,
-                        mlp_model_sep.name)
+                        'hybrid')
 
                     X_train = reshape_X(
                         X_train,
                         n_features,
                         inputs_to_use,
                         add_slope,
-                        mlp_model_sep.name)
+                        'hybrid')
 
                     X_test = reshape_X(
                         X_test,
                         n_features,
                         inputs_to_use,
                         add_slope,
-                        mlp_model_sep.name)
+                        'hybrid')
 
                     # Define the EarlyStopping callback
                     early_stopping = EarlyStopping(
@@ -267,7 +291,11 @@ def main():
                                                 sample_weight=y_subtrain_weights,
                                                 epochs=epochs, batch_size=batch_size,
                                                 validation_data=(X_val, {'forecast_head': y_val}),
-                                                callbacks=[early_stopping, reduce_lr_on_plateau, WandbCallback()])
+                                                callbacks=[
+                                                    early_stopping,
+                                                    reduce_lr_on_plateau,
+                                                    WandbCallback(save_model=False)
+                                                ])
 
                     # Plot the training and validation loss
                     plt.figure(figsize=(12, 6))
@@ -278,18 +306,35 @@ def main():
                     plt.ylabel('Loss')
                     plt.legend()
                     # save the plot
-                    plt.savefig(f'mlp_loss_{title}.png')
+                    plt.savefig(f'cnn_loss_{title}.png')
 
                     # Determine the optimal number of epochs from early stopping
                     optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
-                    final_mlp_model_sep = create_1dcnn(
+
+                    # create the model extractor
+                    final_extractor_model_sep = create_1dcnn(
                         input_dims=n_features,
                         hiddens=hiddens,
                         repr_dim=repr_dim,
-                        output_dim=output_dim,
+                        output_dim=0,
                         dropout_rate=dropout,
                         activation=activation,
                         norm=norm
+                    )
+
+                    # creating the hybrid model
+                    final_mlp_model_sep = create_hybrid_model(
+                        tsf_extractor=final_extractor_model_sep,
+                        mlp_input_dim=n_cme_features,
+                        output_dim=output_dim,
+                        mlp_hiddens=mlp_hiddens,
+                        mlp_repr_dim=mlp_repr_dim,
+                        final_hiddens=final_hiddens,
+                        repr_dim=final_repr_dim,
+                        dropout_rate=dropout,
+                        activation=activation,
+                        norm=norm,
+                        name='hybrid'
                     )
 
                     # Recreate the model architecture
@@ -305,7 +350,7 @@ def main():
                         sample_weight=y_train_weights,
                         epochs=optimal_epochs,
                         batch_size=batch_size,
-                        callbacks=[reduce_lr_on_plateau, WandbCallback()],
+                        callbacks=[reduce_lr_on_plateau, WandbCallback(save_model=False)],
                         verbose=1)
 
                     # evaluate the model on test cme_files
@@ -329,7 +374,9 @@ def main():
                         inputs_to_use=inputs_to_use,
                         add_slope=add_slope,
                         outputs_to_use=outputs_to_use,
-                        show_avsp=True)
+                        show_avsp=True,
+                        using_cme=True,
+                        cme_speed_threshold=cme_speed_threshold)
 
                     # Log the plot to wandb
                     for filename in filenames:
@@ -346,7 +393,9 @@ def main():
                         add_slope=add_slope,
                         outputs_to_use=outputs_to_use,
                         show_avsp=True,
-                        prefix='training')
+                        using_cme=True,
+                        prefix='training',
+                        cme_speed_threshold=cme_speed_threshold)
 
                     # Log the plot to wandb
                     for filename in filenames:

@@ -288,7 +288,7 @@ def main():
                     sample_weight=y_train_weights,
                     epochs=optimal_epochs,
                     batch_size=batch_size,
-                    callbacks=[reduce_lr_on_plateau, WandbCallback()],
+                    callbacks=[reduce_lr_on_plateau, WandbCallback(save_model=False)],
                     verbose=1)
 
                 # evaluate the model on test cme_files
