@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-# os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -105,7 +105,7 @@ def main():
                     final_repr_dim = 9
 
                     # Initialize wandb
-                    wandb.init(project="mlp-ts-delta-overfit", name=experiment_name, config={
+                    wandb.init(project="nasa-ts-delta", name=experiment_name, config={
                         "inputs_to_use": inputs_to_use,
                         "add_slope": add_slope,
                         "patience": patience,
