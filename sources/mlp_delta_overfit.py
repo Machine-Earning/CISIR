@@ -1,7 +1,6 @@
 import os
 from datetime import datetime
 
-
 # Set the environment variable for CUDA (in case it is necessary)
 os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
@@ -22,8 +21,6 @@ from modules.training.ts_modeling import (
     process_sep_events,
     get_loss,
     reshape_X)
-
-
 
 
 def main():

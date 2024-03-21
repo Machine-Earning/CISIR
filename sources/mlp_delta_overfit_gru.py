@@ -31,9 +31,9 @@ def main():
     :return:
     """
 
-    for inputs_to_use in [['e0.5', 'e1.8', 'p']]:  # , ['e0.5', 'p']]:
-        for add_slope in [True]:  # , False]:
-            for alpha in [.55]:
+    for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
+        for add_slope in [True, False]:
+            for alpha in np.arange(0.1, 1.6, 0.25):
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
@@ -77,7 +77,7 @@ def main():
                     min_delta=1e-5,
                     min_lr=1e-10)
 
-                weight_decay = 1e-6  # higher weight decay
+                weight_decay = 1e-5  # higher weight decay
                 momentum_beta1 = 0.97  # higher momentum beta1
                 batch_size = 4096
                 epochs = 50000  # higher epochs
@@ -97,7 +97,7 @@ def main():
                 norm = 'layer_norm'
 
                 # Initialize wandb
-                wandb.init(project="mlp-ts-delta-overfit", name=experiment_name, config={
+                wandb.init(project="nasa-ts-delta", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
                     "add_slope": add_slope,
                     "patience": patience,
@@ -118,7 +118,7 @@ def main():
                     "reciprocal_reweight": True,
                     "repr_dim": repr_dim,
                     "dropout": dropout,
-                    "activation": 'leakyrelu',
+                    "activation": 'LeakyReLU',
                     "norm": norm,
                     'optimizer': 'adamw',
                     'output_dim': output_dim,

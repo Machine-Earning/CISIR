@@ -17,6 +17,7 @@ from modules.training.ts_modeling import (
     build_dataset,
     create_1dcnn,
     evaluate_model,
+    evaluate_model_cond,
     process_sep_events,
     get_loss,
     reshape_X)
@@ -28,9 +29,9 @@ def main():
     :return:
     """
 
-    for inputs_to_use in [['e0.5', 'e1.8', 'p']]:  # , ['e0.5', 'p']]:
-        for add_slope in [True]:  # , False]:
-            for alpha in [.38]:
+    for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
+        for add_slope in [True, False]:
+            for alpha in np.arange(0.1, 1.6, 0.25):
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
@@ -83,7 +84,7 @@ def main():
                     (64, 8, 1, 'max', 2),  # Conv2 + Pool: Start to reduce and capture features
                     (64, 7, 1, 'none', 0),  # Conv3: Further detail without reducing dimension
                     (128, 5, 1, 'none', 0),  # Conv4: Increase filters, capture more refined features
-                    (128, 5, 1, 'avg', 2),  # Conv5 + Pool: First average pooling to smoothly reduce dimension
+                    (128, 5, 1, 'max', 2),  # Conv5 + Pool: Reduce dimension and increase depth
                     (256, 3, 1, 'none', 0),  # Conv6: Increase depth without immediate pooling
                     (256, 3, 1, 'none', 0),  # Conv7: Continue with high capacity, no dimension reduction
                     (512, 3, 1, 'max', 2),  # Conv8 + Pool: Use max pooling for stronger feature selection
@@ -104,7 +105,7 @@ def main():
                 norm = 'batch_norm'
 
                 # Initialize wandb
-                wandb.init(project="mlp-ts-delta-overfit", name=experiment_name, config={
+                wandb.init(project="nasa-ts-delta", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
                     "add_slope": add_slope,
                     "patience": patience,
@@ -125,7 +126,7 @@ def main():
                     "reciprocal_reweight": True,
                     "repr_dim": repr_dim,
                     "dropout": dropout,
-                    "activation": 'leakyrelu',
+                    "activation": 'LeakyReLU',
                     "norm": norm,
                     'optimizer': 'adamw',
                     'output_dim': output_dim,
@@ -343,6 +344,22 @@ def main():
                 for filename in filenames:
                     log_title = os.path.basename(filename)
                     wandb.log({f'training_{log_title}': wandb.Image(filename)})
+
+                # evaluate the model on test cme_files
+                above_threshold = 0.1
+                error_mae_cond = evaluate_model_cond(
+                    final_mlp_model_sep, X_test, y_test, above_threshold=above_threshold)
+
+                print(f'mae error delta >= 0.1 test: {error_mae_cond}')
+                # Log the MAE error to wandb
+                wandb.log({"mae_error_cond_test": error_mae_cond})
+
+                # evaluate the model on training cme_files
+                error_mae_cond_train = evaluate_model_cond(
+                    final_mlp_model_sep, X_train, y_train, above_threshold=above_threshold)
+
+                print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
+                # Log the MAE error to wandb
 
                 # Finish the wandb run
                 wandb.finish()
