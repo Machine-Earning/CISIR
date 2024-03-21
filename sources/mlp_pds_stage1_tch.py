@@ -1,8 +1,9 @@
+import os
 import random
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-# os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import numpy as np
 import tensorflow as tf
@@ -12,7 +13,7 @@ from wandb.keras import WandbCallback
 
 from modules.evaluate.utils import plot_tsne_pds_delta, plot_repr_correlation
 from modules.training import cme_modeling
-from modules.training.ts_modeling import build_dataset, create_mlp
+from modules.training.ts_modeling import build_dataset, create_mlp, reshape_X
 
 # SEEDING
 SEED = 456789  # seed number
@@ -66,7 +67,7 @@ def main():
                 'batch_size': bs,  # Assuming batch_size is defined elsewhere
                 'epochs': 50000,
                 'patience': 5000,  # Updated to 50
-                'learning_rate': 5e-3,  # Updated to 3e-4
+                'learning_rate': 1e-1,  # Updated to 3e-4
                 'weight_decay': 1e-8,  # Added weight decay
                 'momentum_beta1': 0.97,  # Added momentum beta1
             }
