@@ -149,7 +149,7 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
     distances_repr_norm = scaler.fit_transform(distances_repr.reshape(-1, 1)).flatten()
 
     print('calculating the spearman rank correlation')
-    # Calculate Spearman's rank correlation coefficient
+    # Calculate pearson's rank correlation coefficient
     r, _ = pearsonr(distances_target_norm, distances_repr_norm)
 
     # Create scatter plot
@@ -207,6 +207,80 @@ def plot_shepard(features, tsne_result):
     print('Done with plot_shepard')
 
 
+def plot_tsne_extended_delta(
+        model,
+        X: np.ndarray,
+        y: np.ndarray,
+        title: str,
+        prefix: str,
+        model_type='features_reg',
+        show_plot=False,
+        save_tag=None,
+        seed=42) -> str:
+    """
+    Visualizes changes (e.g., in logIntensity) using t-SNE by coloring points based on their values.
+
+    Parameters:
+    - model: Trained feature extractor model.
+    - X: Input data (NumPy array or compatible).
+    - y: Target labels (NumPy array or compatible), representing changes.
+    - title: Title for the plot.
+    - prefix: Prefix for the file name.
+    - model_type: The type of model output to use ('features', 'features_reg', etc.).
+    - show_plot: If True, display the plot in addition to saving it.
+    - save_tag: Optional tag to append to the file name.
+    - seed: Random seed for t-SNE.
+
+    Returns:
+    - The file path of the saved t-SNE plot.
+    """
+
+    # Extract features based on the model type
+    if model_type in ['features_reg_dec', 'features_reg', 'features_dec']:
+        features = model.predict(X)[0]  # Assuming the first output is always features
+    else:  # model_type == 'features'
+        features = model.predict(X)
+
+    # Apply t-SNE
+    tsne = TSNE(n_components=2, random_state=seed)
+    tsne_result = tsne.fit_transform(features)
+
+    # Plot setup
+    fig, axs = plt.subplots(2, 1, figsize=(18, 16), gridspec_kw={'height_ratios': [2, 1]})  # Adjust size as needed
+    # Plot t-SNE on the first subplot
+    plt.sca(axs[0])
+    # Normalize y-values for color intensity
+    norm = plt.Normalize(y.min(), y.max())
+    cmap = plt.cm.jet  # Color map that spans across changes
+
+    # Scatter plot
+    sc = ax.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, alpha=0.6)
+    plt.colorbar(sc, label='Change in logIntensity')
+
+    # Title and labels
+    plt.title(f'{title}\n2D t-SNE Visualization')
+    # plt.xlabel('Dimension 1')
+    # plt.ylabel('Dimension 2')
+
+    # Plot Shepard plot on the second subplot
+    plt.sca(axs[1])
+    plot_shepard(features, tsne_result)
+
+    # Adjust the subplot layout
+    plt.tight_layout()
+
+    # Save the plot
+    file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
+    plt.savefig(file_path)
+
+    if show_plot:
+        plt.show()
+
+    plt.close()
+
+    return file_path
+
+
 def plot_tsne_extended(
         model, X, y,
         title, prefix,
@@ -235,12 +309,12 @@ def plot_tsne_extended(
     Returns:
     - Saves a 2D t-SNE plot to a file with a timestamp
     """
-    T = 1.57381089527  # 0.4535
-    # Define the thresholds
-    if threshold is None:
-        threshold = np.log(T / np.exp(2)) + 1e-4
-    if sep_threshold is None:
-        sep_threshold = np.log(T)
+    # T = 1.57381089527  # 0.4535
+    # # Define the thresholds
+    # if threshold is None:
+    #     threshold = np.log(T / np.exp(2)) + 1e-4
+    # if sep_threshold is None:
+    #     sep_threshold = np.log(T)
 
     # threshold = np.log(10 / np.exp(2)) + 1e-4
     # sep_threshold = np.log(10)
@@ -257,10 +331,10 @@ def plot_tsne_extended(
     tsne = TSNE(n_components=2, random_state=seed)
     tsne_result = tsne.fit_transform(features)
 
-    # Identify indices based on thresholds
-    above_sep_threshold_indices = np.where(y > sep_threshold)[0]
-    elevated_event_indices = np.where((y > threshold) & (y <= sep_threshold))[0]
-    below_threshold_indices = np.where(y <= threshold)[0]
+    # # Identify indices based on thresholds
+    # above_sep_threshold_indices = np.where(y > sep_threshold)[0]
+    # elevated_event_indices = np.where((y > threshold) & (y <= sep_threshold))[0]
+    # below_threshold_indices = np.where(y <= threshold)[0]
 
     # plt.figure(figsize=(12, 8))
     # Adjusted subplot layout
@@ -319,6 +393,73 @@ def plot_tsne_extended(
     if show_plot:
         plt.show()
 
+    plt.close()
+
+    return file_path
+
+
+def plot_tsne_pds_delta(
+        model,
+        X: np.ndarray,
+        y: np.ndarray,
+        title: str,
+        prefix: str,
+        save_tag: str = None,
+        seed: int = 42) -> str:
+    """
+    Visualizes the change in logIntensity using t-SNE and colors the points based on their change values.
+
+    Parameters:
+    - model: Trained feature extractor model.
+    - X: Input data (NumPy array or compatible).
+    - y: Target labels representing the change in logIntensity (NumPy array or compatible).
+    - title: Title for the plot.
+    - prefix: Prefix for the file name.
+    - save_tag: Optional tag to append to the file name.
+    - seed: Random seed for t-SNE for reproducibility.
+
+    Returns:
+    - The file path of the saved t-SNE plot.
+    """
+
+    # Extract features using the trained model
+    features = model.predict(X)
+
+    # Apply t-SNE
+    tsne = TSNE(n_components=2, random_state=seed)
+    tsne_result = tsne.fit_transform(features)
+
+    # Set up the plot
+    # plt.figure(figsize=(12, 8))
+    # Adjusted subplot layout
+    fig, axs = plt.subplots(2, 1, figsize=(18, 16), gridspec_kw={'height_ratios': [2, 1]})  # Adjust size as needed
+
+    # Plot t-SNE on the first subplot
+    plt.sca(axs[0])
+    # Normalize y-values for color intensity to reflect the magnitude of change
+    norm = plt.Normalize(y.min(), y.max())
+    cmap = plt.cm.jet  # Choosing a colormap that spans across negative and positive changes
+
+    # Scatter plot for all points with color intensity based on change in logIntensity
+    plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, alpha=0.6)
+    plt.colorbar(label='Change in logIntensity')
+
+    # Add title and axis labels
+    plt.title(f'{title}\nT-SNE Visualization')
+    # plt.xlabel('Dimension 1')
+    # plt.ylabel('Dimension 2')
+
+    print("Done with t-sne, starting with shepard...")
+    # Plot Shepard plot on the second subplot
+    plt.sca(axs[1])
+    plot_shepard(features, tsne_result)
+
+    # Adjust the subplot layout
+    plt.tight_layout()
+
+    # Save the plot
+    file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
+    plt.savefig(file_path)
     plt.close()
 
     return file_path

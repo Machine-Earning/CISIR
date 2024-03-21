@@ -1,6 +1,9 @@
 import random
 from datetime import datetime
 
+# Set the environment variable for CUDA (in case it is necessary)
+# os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+
 import numpy as np
 import tensorflow as tf
 import wandb
@@ -12,7 +15,7 @@ from modules.training import cme_modeling
 from modules.training.ts_modeling import build_dataset, create_mlp
 
 # SEEDING
-SEED = 42  # seed number
+SEED = 456789  # seed number
 
 # Set NumPy seed
 np.random.seed(SEED)
@@ -37,10 +40,12 @@ def main():
     # Define the dataset options, including the sharding policy
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [True]:
+        for add_slope in [True, False]:
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
+            outputs_to_use = ['delta_p']
+
             bs = 5000  # full dataset used
             print(f'batch size : {bs}')
 
@@ -48,7 +53,7 @@ def main():
             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
             # Construct the title
-            title = f'MLP_{inputs_str}_slope_{str(add_slope)}_PDS_bs_{bs}'
+            title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDS_bs{bs}'
 
             # Replace any other characters that are not suitable for filenames (if any)
             title = title.replace(' ', '_').replace(':', '_')
@@ -59,16 +64,15 @@ def main():
             # Set the early stopping patience and learning rate as variables
             Options = {
                 'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                'epochs': 10000,
-                'patience': 1000,  # Updated to 50
-                'learning_rate': 1e-3,  # Updated to 3e-4
-                'weight_decay': 0,  # Added weight decay
-                'momentum_beta1': 0.95,  # Added momentum beta1
+                'epochs': 50000,
+                'patience': 5000,  # Updated to 50
+                'learning_rate': 5e-3,  # Updated to 3e-4
+                'weight_decay': 1e-8,  # Added weight decay
+                'momentum_beta1': 0.97,  # Added momentum beta1
             }
-            hiddens = [2048, 4096, 4096, 2048]
+            hiddens = [2048, 1024, 512, 256, 128, 64, 32]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
             pds = True
-            target_change = True
             # Callback for reducing learning rate when a metric has stopped improving
             # reduce_lr_on_plateau_cb = ReduceLROnPlateau(
             #     monitor='val_loss',  # Metric to monitor
