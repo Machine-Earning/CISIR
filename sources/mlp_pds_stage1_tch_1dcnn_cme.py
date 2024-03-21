@@ -201,7 +201,7 @@ def main():
                     mlp_repr_dim=mlp_repr_dim,
                     final_hiddens=final_hiddens,
                     repr_dim=final_repr_dim,
-                    dropout_rate=dropout,
+                    dropout_rate=dropout_rate,
                     activation=activation,
                     norm=norm,
                     name='hybrid'
