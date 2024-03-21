@@ -138,7 +138,7 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
 
     print('calculating the pairwise distances')
     # Calculate pairwise distances in the target space and representation space
-    distances_target = pdist(y[:, np.newaxis], 'euclidean')
+    distances_target = pdist(y.reshape(-1, 1), 'euclidean')
     distances_repr = pdist(representations, 'euclidean')
 
     # Normalize distances to [0, 1] range for better comparison
@@ -247,13 +247,13 @@ def plot_tsne_extended_delta(
     fig, axs = plt.subplots(2, 1, figsize=(18, 16), gridspec_kw={'height_ratios': [2, 1]})  # Adjust size as needed
     # Plot t-SNE on the first subplot
     plt.sca(axs[0])
-    # Normalize y-values for color intensity
-    norm = plt.Normalize(y.min(), y.max())
-    cmap = plt.cm.jet  # Color map that spans across changes
+    # Normalize y-values for color intensity to reflect the magnitude of change
+    norm = plt.Normalize(-2, 3)
+    cmap = plt.cm.viridis  # Choosing a colormap that spans across negative and positive changes
 
     # Scatter plot
-    sc = ax.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, alpha=0.6)
-    plt.colorbar(sc, label='Change in logIntensity')
+    sc = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, alpha=0.4, s=3)
+    plt.colorbar(sc, label='Change in logIntensity', extend='both')
 
     # Title and labels
     plt.title(f'{title}\n2D t-SNE Visualization')
@@ -435,12 +435,12 @@ def plot_tsne_pds_delta(
     # Plot t-SNE on the first subplot
     plt.sca(axs[0])
     # Normalize y-values for color intensity to reflect the magnitude of change
-    norm = plt.Normalize(y.min(), y.max())
-    cmap = plt.cm.jet  # Choosing a colormap that spans across negative and positive changes
+    norm = plt.Normalize(-2, 3)
+    cmap = plt.cm.viridis  # Choosing a colormap that spans across negative and positive changes
 
     # Scatter plot for all points with color intensity based on change in logIntensity
-    plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, alpha=0.6)
-    plt.colorbar(label='Change in logIntensity')
+    sc = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, alpha=0.4, s=3)
+    plt.colorbar(sc, label='Change in logIntensity', extend='both')
 
     # Add title and axis labels
     plt.title(f'{title}\nT-SNE Visualization')
