@@ -3,7 +3,7 @@ import random
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import numpy as np
 import tensorflow as tf
