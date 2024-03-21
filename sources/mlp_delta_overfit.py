@@ -75,7 +75,7 @@ def main():
                     min_delta=1e-5,
                     min_lr=1e-10)
 
-                weight_decay = 1e-5  # higher weight decay
+                weight_decay = 1e-6  # higher weight decay
                 momentum_beta1 = 0.97  # higher momentum beta1
                 batch_size = 4096
                 epochs = 50000  # higher epochs
@@ -246,7 +246,11 @@ def main():
                                             sample_weight=y_subtrain_weights,
                                             epochs=epochs, batch_size=batch_size,
                                             validation_data=(X_val, {'forecast_head': y_val}),
-                                            callbacks=[early_stopping, reduce_lr_on_plateau, WandbCallback()])
+                                            callbacks=[
+                                                early_stopping,
+                                                reduce_lr_on_plateau,
+                                                WandbCallback(save_model=False)
+                                            ])
 
                 # Plot the training and validation loss
                 plt.figure(figsize=(12, 6))
