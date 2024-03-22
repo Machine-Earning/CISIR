@@ -204,7 +204,7 @@ def main():
                              learning_rate=Options['learning_rate'],
                              epochs=Options['epochs'],
                              batch_size=Options['batch_size'],
-                             patience=Options['patience'], save_tag=current_time + "_features",
+                             patience=Options['patience'], save_tag=current_time + title + "_features",
                              callbacks_list=[WandbCallback(save_model=False), reduce_lr_on_plateau])
 
                 file_path = plot_tsne_pds_delta(mlp_model_sep,
