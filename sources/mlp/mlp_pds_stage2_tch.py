@@ -25,6 +25,23 @@ from modules.training.ts_modeling import (
 
 mb = ModelBuilder()
 
+# Define the lookup dictionary
+weight_paths = {
+    True: '/home1/jmoukpe2016/keras-functional-api/model_weights_20240229-133949_slope_true_cme500.h5',
+    False: '/home1/jmoukpe2016/keras-functional-api/model_weights_20240229-133949_slope_false_cme-1.h5',
+}
+
+
+def get_weight_path(slope):
+    """
+    Retrieves the weight path based on the given slope and cme conditions.
+
+    :param slope: A boolean indicating whether slope is True or False.
+    :param cme: An integer that can be -1, 0, or 500, indicating the cme value.
+    :return: The corresponding weight path as a string, or None if not found.
+    """
+    return weight_paths.get(slope)
+
 
 def main():
     """
@@ -88,7 +105,7 @@ def main():
                     norm = 'batch_norm'
                     pds = True
                     # TODO: get the right one
-                    weight_path = '/home1/jmoukpe2016/keras-functional-api/model_weights_20240229-133949_features.h5'
+                    weight_path = get_weight_path(add_slope)
 
                     # Initialize wandb
                     wandb.init(project="nasa-ts-pds-delta-2", name=experiment_name, config={
