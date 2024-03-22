@@ -15,7 +15,16 @@ import tensorflow as tf
 from numpy import ndarray
 from tensorflow import Tensor
 from tensorflow.keras import layers, callbacks, Model
-
+from tensorflow.keras.layers import (
+    Input,
+    Flatten,
+    Dense,
+    Concatenate,
+    Dropout,
+    LeakyReLU,
+    BatchNormalization,
+    LayerNormalization,
+)
 
 def ydist(val1: float, val2: float) -> float:
     """
@@ -183,7 +192,8 @@ class ModelBuilder:
                       model: Model,
                       output_dim: int = 1,
                       hiddens: Optional[List[int]] = None,
-                      freeze_features: bool = True, pds: bool = False) -> Model:
+                      freeze_features: bool = True,
+                      pds: bool = False) -> Model:
         """
         Add a regression head with one output unit and a projection layer to an existing model,
         replacing the existing prediction layer and optionally the decoder layer.
@@ -226,6 +236,89 @@ class ModelBuilder:
 
         # Create the new extended model
         extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer])
+
+        # If freeze_features is False, make all layers trainable
+        if not freeze_features:
+            for layer in extended_model.layers:
+                layer.trainable = True
+
+        return extended_model
+
+    def add_proj_head(self,
+                      model: Model,
+                      output_dim: int = 1,
+                      hiddens: Optional[List[int]] = None,
+                      freeze_features: bool = True,
+                      pds: bool = False,
+                      l2_reg: float = None,
+                      dropout_rate: float = 0.0,
+                      activation=None,
+                      norm: str = None,
+                      name: str = 'mlp') -> Model:
+        """
+        Add a regression head with one output unit and a projection layer to an existing model,
+        replacing the existing prediction layer and optionally the decoder layer.
+
+        :param model: The existing model
+        :param output_dim: The dimensionality of the output of the regression head.
+        :param freeze_features: Whether to freeze the layers of the base model or not.
+        :param hiddens: List of integers representing the hidden layers for the projection.
+        :param pds: Whether to adapt the model for PDS representations.
+        :param l2_reg: L2 regularization factor.
+        :param dropout_rate: Dropout rate for adding dropout layers.
+        :param activation: Activation function to use. If None, defaults to LeakyReLU.
+        :param norm: Type of normalization ('batch_norm' or 'layer_norm').
+        :param name: Name of the model.
+        :return: The modified model with a projection layer and a regression head.
+        """
+
+        if hiddens is None:
+            hiddens = [6]
+
+        if activation is None:
+            activation = LeakyReLU()
+
+        print(f'Features are frozen: {freeze_features}')
+
+        # Determine the layer to be kept based on whether PDS representations are used
+        layer_to_keep = 'normalize_layer' if pds else 'repr_layer'
+
+        # Remove the last layer(s) to keep only the representation layer
+        new_base_model = Model(inputs=model.input, outputs=model.get_layer(layer_to_keep).output)
+
+        # If freeze_features is True, freeze the layers of the new base model
+        if freeze_features:
+            for layer in new_base_model.layers:
+                layer.trainable = False
+
+        # Extract the output of the last layer of the new base model (representation layer)
+        repr_output = new_base_model.output
+
+        # Projection Layer(s)
+        x_proj = repr_output
+        for i, nodes in enumerate(hiddens):
+            x_proj = Dense(
+                nodes, kernel_regularizer=l2(l2_reg) if l2_reg else None,
+                name=f"projection_layer_{i + 1}")(x_proj)
+
+            if norm == 'batch_norm':
+                x_proj = BatchNormalization(name=f"batch_norm_{i + 1}")(x_proj)
+            elif norm == 'layer_norm':
+                x_proj = LayerNormalization(name=f"layer_norm_{i + 1}")(x_proj)
+
+            if callable(activation):
+                x_proj = activation(x_proj)
+            else:
+                x_proj = LeakyReLU(name=f"activation_{i + 1}")(x_proj)
+
+            if dropout_rate > 0.0:
+                x_proj = Dropout(dropout_rate, name=f"dropout_{i + 1}")(x_proj)
+
+        # Add a Dense layer with one output unit for regression
+        output_layer = Dense(output_dim, activation='linear', name=f"forecast_head")(x_proj)
+
+        # Create the new extended model
+        extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer], name=name)
 
         # If freeze_features is False, make all layers trainable
         if not freeze_features:

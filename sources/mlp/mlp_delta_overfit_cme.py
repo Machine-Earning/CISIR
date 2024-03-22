@@ -260,15 +260,15 @@ def main():
                                                 ])
 
                     # Plot the training and validation loss
-                    plt.figure(figsize=(12, 6))
-                    plt.plot(history.history['loss'], label='Training Loss')
-                    plt.plot(history.history['val_loss'], label='Validation Loss')
-                    plt.title('Training and Validation Loss')
-                    plt.xlabel('Epochs')
-                    plt.ylabel('Loss')
-                    plt.legend()
-                    # save the plot
-                    plt.savefig(f'mlp_loss_{title}.png')
+                    # plt.figure(figsize=(12, 6))
+                    # plt.plot(history.history['loss'], label='Training Loss')
+                    # plt.plot(history.history['val_loss'], label='Validation Loss')
+                    # plt.title('Training and Validation Loss')
+                    # plt.xlabel('Epochs')
+                    # plt.ylabel('Loss')
+                    # plt.legend()
+                    # # save the plot
+                    # plt.savefig(f'mlp_loss_{title}.png')
 
                     # Determine the optimal number of epochs from early stopping
                     optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
