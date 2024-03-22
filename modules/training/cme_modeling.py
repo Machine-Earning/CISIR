@@ -291,6 +291,9 @@ class ModelBuilder:
             for layer in new_base_model.layers:
                 layer.trainable = False
 
+        # Count existing dropout layers to avoid naming conflicts
+        dropout_count = sum(1 for layer in model.layers if isinstance(layer, Dropout))
+
         # Extract the output of the last layer of the new base model (representation layer)
         repr_output = new_base_model.output
 
@@ -312,7 +315,7 @@ class ModelBuilder:
                 x_proj = LeakyReLU(name=f"activation_{i + 1}")(x_proj)
 
             if dropout_rate > 0.0:
-                x_proj = Dropout(dropout_rate, name=f"dropout_{i + 1}")(x_proj)
+                x_proj = Dropout(dropout_rate, name=f"dropout_{dropout_count + i + 1}")(x_proj)
 
         # Add a Dense layer with one output unit for regression
         output_layer = Dense(output_dim, activation='linear', name=f"forecast_head")(x_proj)
