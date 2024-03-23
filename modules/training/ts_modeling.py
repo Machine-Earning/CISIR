@@ -385,16 +385,20 @@ def create_hybrid_model(
     final_repr = Dense(repr_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x_combined)
     if pds:
         # Assuming NormalizeLayer is defined elsewhere for PDS normalization
-        final_repr = NormalizeLayer(name='normalize_layer')(
+        final_repr = NormalizeLayer(
+            name='normalize_layer')(
             activation(final_repr) if callable(activation) else LeakyReLU()(final_repr))
     else:
         final_repr = activation(final_repr) if callable(activation) else LeakyReLU(name='final_repr_layer')(final_repr)
 
-    # Final output layer
-    forecast_head = Dense(output_dim, activation='linear', name='forecast_head')(final_repr)
+    if output_dim > 0:
+        forecast_head = Dense(output_dim, activation='linear', name='forecast_head')(final_repr)
+        model_output = [final_repr, forecast_head]
+    else:
+        model_output = final_repr
 
     # Create the model
-    model = Model(inputs=[tsf_extractor.input, mlp_input], outputs=[final_repr, forecast_head], name=name)
+    model = Model(inputs=[tsf_extractor.input, mlp_input], outputs=model_output, name=name)
 
     return model
 
