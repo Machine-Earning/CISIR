@@ -10,7 +10,7 @@ import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
-
+import numpy as np
 from modules.evaluate.utils import plot_tsne_pds_delta, plot_tsne_extended_delta
 from modules.training.DenseReweights import exDenseReweights
 from modules.training.cme_modeling import ModelBuilder
@@ -27,8 +27,9 @@ mb = ModelBuilder()
 
 # Define the lookup dictionary
 weight_paths = {
-    True: '/home1/jmoukpe2016/keras-functional-api/model_weights_20240229-133949_slope_true_cme500.h5',
-    False: '/home1/jmoukpe2016/keras-functional-api/model_weights_20240229-133949_slope_false_cme-1.h5',
+    # slope
+    True: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322-135431MLP_e0_5_e1_8_p_slopeTrue_PDS_bs5000_features.h5',
+    False: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322-142301MLP_e0_5_e1_8_p_slopeFalse_PDS_bs5000_features.h5',
 }
 
 
