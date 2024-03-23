@@ -385,7 +385,7 @@ def main():
 
                     # Log t-SNE plot for testing
                     # Log the testing t-SNE plot to wandb
-                    stage2_file_path = plot_tsne_extended(final_mlp_model_sep,
+                    stage2_file_path = plot_tsne_extended_delta(final_mlp_model_sep,
                                                           X_test,
                                                           y_test,
                                                           title, 'stage2_testing',

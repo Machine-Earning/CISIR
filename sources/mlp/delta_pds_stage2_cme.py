@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -10,6 +10,7 @@ import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
+import numpy as np
 
 from modules.evaluate.utils import plot_tsne_pds_delta, plot_tsne_extended_delta
 from modules.training.DenseReweights import exDenseReweights
@@ -392,7 +393,7 @@ def main():
 
                         # Log t-SNE plot for testing
                         # Log the testing t-SNE plot to wandb
-                        stage2_file_path = plot_tsne_extended(final_mlp_model_sep,
+                        stage2_file_path = plot_tsne_extended_delta(final_mlp_model_sep,
                                                               X_test,
                                                               y_test,
                                                               title, 'stage2_testing',
