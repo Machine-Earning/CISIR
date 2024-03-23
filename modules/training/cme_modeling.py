@@ -188,61 +188,61 @@ class ModelBuilder:
 
         return model
 
-    def add_proj_head(self,
-                      model: Model,
-                      output_dim: int = 1,
-                      hiddens: Optional[List[int]] = None,
-                      freeze_features: bool = True,
-                      pds: bool = False) -> Model:
-        """
-        Add a regression head with one output unit and a projection layer to an existing model,
-        replacing the existing prediction layer and optionally the decoder layer.
-
-        :param model: The existing model
-        :param output_dim: The dimensionality of the output of the regression head.
-        :param freeze_features: Whether to freeze the layers of the base model or not.
-        :param hiddens: List of integers representing the hidden layers for the projection.
-        :param pds: Whether to adapt the model for PDS representations.
-        :return: The modified model with a projection layer and a regression head.
-        """
-
-        if hiddens is None:
-            hiddens = [6]
-
-        print(f'Features are frozen: {freeze_features}')
-
-        # Determine the layer to be kept based on whether PDS representations are used
-        layer_to_keep = 'normalize_layer' if pds else 'repr_layer'
-
-        # Remove the last layer(s) to keep only the representation layer
-        new_base_model = Model(inputs=model.input, outputs=model.get_layer(layer_to_keep).output)
-
-        # If freeze_features is True, freeze the layers of the new base model
-        if freeze_features:
-            for layer in new_base_model.layers:
-                layer.trainable = False
-
-        # Extract the output of the last layer of the new base model (representation layer)
-        repr_output = new_base_model.output
-
-        # Projection Layer(s)
-        x_proj = repr_output
-        for i, nodes in enumerate(hiddens):
-            x_proj = layers.Dense(nodes, name=f"projection_layer_{i + 1}")(x_proj)
-            x_proj = layers.LeakyReLU(name=f"projection_activation_{i + 1}")(x_proj)
-
-        # Add a Dense layer with one output unit for regression
-        output_layer = layers.Dense(output_dim, activation='linear', name="forecast_head")(x_proj)
-
-        # Create the new extended model
-        extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer])
-
-        # If freeze_features is False, make all layers trainable
-        if not freeze_features:
-            for layer in extended_model.layers:
-                layer.trainable = True
-
-        return extended_model
+    # def add_proj_head(self,
+    #                   model: Model,
+    #                   output_dim: int = 1,
+    #                   hiddens: Optional[List[int]] = None,
+    #                   freeze_features: bool = True,
+    #                   pds: bool = False) -> Model:
+    #     """
+    #     Add a regression head with one output unit and a projection layer to an existing model,
+    #     replacing the existing prediction layer and optionally the decoder layer.
+    #
+    #     :param model: The existing model
+    #     :param output_dim: The dimensionality of the output of the regression head.
+    #     :param freeze_features: Whether to freeze the layers of the base model or not.
+    #     :param hiddens: List of integers representing the hidden layers for the projection.
+    #     :param pds: Whether to adapt the model for PDS representations.
+    #     :return: The modified model with a projection layer and a regression head.
+    #     """
+    #
+    #     if hiddens is None:
+    #         hiddens = [6]
+    #
+    #     print(f'Features are frozen: {freeze_features}')
+    #
+    #     # Determine the layer to be kept based on whether PDS representations are used
+    #     layer_to_keep = 'normalize_layer' if pds else 'repr_layer'
+    #
+    #     # Remove the last layer(s) to keep only the representation layer
+    #     new_base_model = Model(inputs=model.input, outputs=model.get_layer(layer_to_keep).output)
+    #
+    #     # If freeze_features is True, freeze the layers of the new base model
+    #     if freeze_features:
+    #         for layer in new_base_model.layers:
+    #             layer.trainable = False
+    #
+    #     # Extract the output of the last layer of the new base model (representation layer)
+    #     repr_output = new_base_model.output
+    #
+    #     # Projection Layer(s)
+    #     x_proj = repr_output
+    #     for i, nodes in enumerate(hiddens):
+    #         x_proj = layers.Dense(nodes, name=f"projection_layer_{i + 1}")(x_proj)
+    #         x_proj = layers.LeakyReLU(name=f"projection_activation_{i + 1}")(x_proj)
+    #
+    #     # Add a Dense layer with one output unit for regression
+    #     output_layer = layers.Dense(output_dim, activation='linear', name="forecast_head")(x_proj)
+    #
+    #     # Create the new extended model
+    #     extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer])
+    #
+    #     # If freeze_features is False, make all layers trainable
+    #     if not freeze_features:
+    #         for layer in extended_model.layers:
+    #             layer.trainable = True
+    #
+    #     return extended_model
 
     def add_proj_head(self,
                       model: Model,
