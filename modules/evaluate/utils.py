@@ -249,7 +249,7 @@ def plot_tsne_extended_delta(
     plt.sca(axs[0])
     # Normalize y-values for color intensity to reflect the magnitude of change
     norm = plt.Normalize(-3, 3)
-    cmap = plt.cm.coolwarm  # Choosing a colormap that spans across negative and positive changes
+    cmap = plt.cm.Spectral  # Choosing a colormap that spans across negative and positive changes
 
     # Determine the size and alpha dynamically
     sizes = np.where((y > 0.5) | (y < -0.5), 50, 10)  # Larger size for rarer values
@@ -453,7 +453,7 @@ def plot_tsne_pds_delta(
     plt.sca(axs[0])
     # Normalize y-values for color intensity to reflect the magnitude of change
     norm = plt.Normalize(-3, 3)
-    cmap = plt.cm.coolwarm  # Choosing a colormap that spans across negative and positive changes
+    cmap = plt.cm.Spectral  # Choosing a colormap that spans across negative and positive changes
 
     # Determine the size and alpha dynamically
     sizes = np.where((y > 0.5) | (y < -0.5), 50, 10)  # Larger size for rarer values
