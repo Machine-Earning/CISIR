@@ -310,7 +310,6 @@ def create_hybrid_model(
     """
        Create a hybrid neural network model with a time series feature extraction branch (CNN or RNN)
        and an MLP branch.
-       TODO: update but not urgent
 
        Parameters:
         - tsf_extractor (Model): A pre-built model for time series feature extraction (CNN or RNN).
