@@ -248,12 +248,12 @@ def plot_tsne_extended_delta(
     # Plot t-SNE on the first subplot
     plt.sca(axs[0])
     # Normalize y-values for color intensity to reflect the magnitude of change
-    norm = plt.Normalize(-2, 3)
+    norm = plt.Normalize(-3, 3)
     cmap = plt.cm.coolwarm  # Choosing a colormap that spans across negative and positive changes
 
     # Determine the size and alpha dynamically
-    sizes = np.where((y > 0.1) | (y < -0.1), 50, 10)  # Larger size for rarer values
-    alphas = np.where((y > 0.1) | (y < -0.1), 1.0, 0.3)  # More opaque for rarer values
+    sizes = np.where((y > 0.5) | (y < -0.5), 50, 10)  # Larger size for rarer values
+    alphas = np.where((y > 0.5) | (y < -0.5), 1.0, 0.3)  # More opaque for rarer values
 
     # Scatter plot for all points with varying size and alpha based on change in logIntensity
     sc = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, s=sizes, alpha=alphas)
@@ -439,12 +439,12 @@ def plot_tsne_pds_delta(
     # Plot t-SNE on the first subplot
     plt.sca(axs[0])
     # Normalize y-values for color intensity to reflect the magnitude of change
-    norm = plt.Normalize(-2, 3)
+    norm = plt.Normalize(-3, 3)
     cmap = plt.cm.coolwarm  # Choosing a colormap that spans across negative and positive changes
 
     # Determine the size and alpha dynamically
-    sizes = np.where((y > 0.1) | (y < -0.1), 50, 10)  # Larger size for rarer values
-    alphas = np.where((y > 0.1) | (y < -0.1), 1.0, 0.3)  # More opaque for rarer values
+    sizes = np.where((y > 0.5) | (y < -0.5), 50, 10)  # Larger size for rarer values
+    alphas = np.where((y > 0.5) | (y < -0.5), 1.0, 0.3)  # More opaque for rarer values
 
     # Scatter plot for all points with varying size and alpha based on change in logIntensity
     sc = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, s=sizes, alpha=alphas)
