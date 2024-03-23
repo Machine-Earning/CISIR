@@ -251,8 +251,12 @@ def plot_tsne_extended_delta(
     norm = plt.Normalize(-2, 3)
     cmap = plt.cm.viridis  # Choosing a colormap that spans across negative and positive changes
 
-    # Scatter plot
-    sc = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, alpha=0.6)
+    # Determine the size and alpha dynamically
+    sizes = np.where((y > 0.1) | (y < -0.1), 50, 10)  # Larger size for rarer values
+    alphas = np.where((y > 0.1) | (y < -0.1), 1.0, 0.3)  # More opaque for rarer values
+
+    # Scatter plot for all points with varying size and alpha based on change in logIntensity
+    sc = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, s=sizes, alpha=alphas)
     plt.colorbar(sc, label='Change in logIntensity', extend='both')
 
     # Title and labels
@@ -438,8 +442,12 @@ def plot_tsne_pds_delta(
     norm = plt.Normalize(-2, 3)
     cmap = plt.cm.viridis  # Choosing a colormap that spans across negative and positive changes
 
-    # Scatter plot for all points with color intensity based on change in logIntensity
-    sc = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, alpha=0.6)
+    # Determine the size and alpha dynamically
+    sizes = np.where((y > 0.1) | (y < -0.1), 50, 10)  # Larger size for rarer values
+    alphas = np.where((y > 0.1) | (y < -0.1), 1.0, 0.3)  # More opaque for rarer values
+
+    # Scatter plot for all points with varying size and alpha based on change in logIntensity
+    sc = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, s=sizes, alpha=alphas)
     plt.colorbar(sc, label='Change in logIntensity', extend='both')
 
     # Add title and axis labels
