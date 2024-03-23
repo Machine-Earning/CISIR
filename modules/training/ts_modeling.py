@@ -1376,18 +1376,18 @@ def process_sep_events(
         # Plotting logic here...
         plt.figure(figsize=(10, 7))  # Adjust size as needed
         # Flatten all actual values to find global min and max for color mapping
-        all_actual_values = np.concatenate([actual for _, actual, _ in avsp_data])
-        norm = plt.Normalize(all_actual_values.min(), all_actual_values.max())
-        cmap = plt.cm.viridis
+        # all_actual_values = np.concatenate([actual for _, actual, _ in avsp_data])
+        norm = plt.Normalize(-3, 3)
+        cmap = plt.cm.Spectral
 
         # Create a scatter plot for each set of actual vs predicted values
         for event_id, actual, predicted in avsp_data:
-            plt.scatter(actual, predicted, c=actual, cmap=cmap, norm=norm, label=f'{event_id}', alpha=0.5, s=7)
+            plt.scatter(actual, predicted, c=actual, cmap=cmap, norm=norm, label=f'{event_id}', alpha=0.6, s=8)
 
         # Add a diagonal line for perfect prediction
-        min_val = min(min(actual.min(), predicted.min()) for _, actual, predicted in avsp_data)
-        max_val = max(max(actual.max(), predicted.max()) for _, actual, predicted in avsp_data)
-        plt.plot([min_val, max_val], [min_val, max_val], 'k--', label='Perfect Prediction')
+        # min_val = min(min(actual.min(), predicted.min()) for _, actual, predicted in avsp_data)
+        # max_val = max(max(actual.max(), predicted.max()) for _, actual, predicted in avsp_data)
+        plt.plot([-3, 3], [-3, 3], 'k--', label='Perfect Prediction')
 
         plt.xlabel('Actual Changes')
         plt.ylabel('Predicted Changes')
@@ -1396,7 +1396,7 @@ def process_sep_events(
         # Create colorbar as the legend for actual values
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
         sm.set_array([])
-        plt.colorbar(sm, label='Actual Value')
+        plt.colorbar(sm, label='Actual Value', extend='both')
         # plt.legend()
         plt.grid(True)
 

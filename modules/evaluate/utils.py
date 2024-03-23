@@ -255,9 +255,22 @@ def plot_tsne_extended_delta(
     sizes = np.where((y > 0.5) | (y < -0.5), 50, 10)  # Larger size for rarer values
     alphas = np.where((y > 0.5) | (y < -0.5), 1.0, 0.3)  # More opaque for rarer values
 
-    # Scatter plot for all points with varying size and alpha based on change in logIntensity
-    sc = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, s=sizes, alpha=alphas)
-    plt.colorbar(sc, label='Change in logIntensity', extend='both')
+    # # Scatter plot for all points with varying size and alpha based on change in logIntensity
+    # sc = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, s=sizes, alpha=alphas)
+    # plt.colorbar(sc, label='Change in logIntensity', extend='both')
+
+    # Sort points by size (or another metric) to ensure larger points are plotted last (on top)
+    sort_order = np.argsort(sizes)  # This gives indices that would sort the array
+
+    # Scatter plot for common points first
+    common_points = sort_order[sizes[sort_order] == 10]
+    plt.scatter(tsne_result[common_points, 0], tsne_result[common_points, 1], c=y[common_points], cmap=cmap, norm=norm,
+                s=sizes[common_points], alpha=alphas[common_points])
+
+    # Scatter plot for rarer, larger points on top
+    rare_points = sort_order[sizes[sort_order] == 50]
+    plt.scatter(tsne_result[rare_points, 0], tsne_result[rare_points, 1], c=y[rare_points], cmap=cmap, norm=norm,
+                s=sizes[rare_points], alpha=alphas[rare_points])
 
     # Title and labels
     plt.title(f'{title}\n2D t-SNE Visualization')
@@ -446,9 +459,22 @@ def plot_tsne_pds_delta(
     sizes = np.where((y > 0.5) | (y < -0.5), 50, 10)  # Larger size for rarer values
     alphas = np.where((y > 0.5) | (y < -0.5), 1.0, 0.3)  # More opaque for rarer values
 
-    # Scatter plot for all points with varying size and alpha based on change in logIntensity
-    sc = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, s=sizes, alpha=alphas)
-    plt.colorbar(sc, label='Change in logIntensity', extend='both')
+    # # Scatter plot for all points with varying size and alpha based on change in logIntensity
+    # sc = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, s=sizes, alpha=alphas)
+    # plt.colorbar(sc, label='Change in logIntensity', extend='both')
+
+    # Sort points by size (or another metric) to ensure larger points are plotted last (on top)
+    sort_order = np.argsort(sizes)  # This gives indices that would sort the array
+
+    # Scatter plot for common points first
+    common_points = sort_order[sizes[sort_order] == 10]
+    plt.scatter(tsne_result[common_points, 0], tsne_result[common_points, 1], c=y[common_points], cmap=cmap, norm=norm,
+                s=sizes[common_points], alpha=alphas[common_points])
+
+    # Scatter plot for rarer, larger points on top
+    rare_points = sort_order[sizes[sort_order] == 50]
+    plt.scatter(tsne_result[rare_points, 0], tsne_result[rare_points, 1], c=y[rare_points], cmap=cmap, norm=norm,
+                s=sizes[rare_points], alpha=alphas[rare_points])
 
     # Add title and axis labels
     plt.title(f'{title}\nT-SNE Visualization')
