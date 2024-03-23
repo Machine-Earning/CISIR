@@ -81,6 +81,7 @@ def main():
                 epochs = 50000  # higher epochs
                 hiddens = [
                     2048, 1024, 512, 256, 128, 64, 32
+                    # 512, 256, 128, 64, 32
                 ]
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 loss_key = 'mse'
