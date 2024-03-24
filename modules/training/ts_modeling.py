@@ -340,12 +340,14 @@ def create_mlp(
 
     for i, units in enumerate(hiddens):
         if i % skipped_layers == 0 and i > 0 and residual:
-            # Apply residual/skip connection
-            if x.shape[-1] != residual_layer.shape[-1]:
-                # Projection to match dimensions if they differ
-                residual_layer = Dense(units, kernel_regularizer=l2(l2_reg) if l2_reg else None)(residual_layer)
-            x = Add()([x, residual_layer])
-            residual_layer = x  # Update residual_layer with the new combined output
+            if residual_layer is not None:
+                # Check if projection is needed
+                if x.shape[-1] != residual_layer.shape[-1]:
+                    # Correct projection to match 'x' dimensions
+                    residual_layer = Dense(x.shape[-1], kernel_regularizer=l2(l2_reg) if l2_reg else None,
+                                           use_bias=False)(residual_layer)
+                x = Add()([x, residual_layer])
+            residual_layer = x  # Update the starting point for the next residual connection
         else:
             if i % skipped_layers == 0 or residual_layer is None:
                 residual_layer = x
