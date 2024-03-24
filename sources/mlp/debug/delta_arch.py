@@ -94,7 +94,7 @@ def main():
                         min_lr=1e-10)
 
                     weight_decay = 1e-6  # higher weight decay
-                    momentum_beta1 = 0.97  # higher momentum beta1
+                    momentum_beta1 = 0.9  # higher momentum beta1
                     batch_size = 4096
                     epochs = 50000  # higher epochs
                     # hiddens = [
