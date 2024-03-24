@@ -25,6 +25,7 @@ from tensorflow.keras.layers import (
     LayerNormalization,
     MaxPooling1D,
     AveragePooling1D,
+    Add,
 )
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
@@ -217,24 +218,101 @@ def create_gru(
     return model
 
 
+# def create_mlp(
+#         input_dim: int = 25,
+#         output_dim: int = 1,
+#         hiddens=None,
+#         repr_dim: int = 9,
+#         pds: bool = False,
+#         l2_reg: float = None,
+#         dropout_rate: float = 0.0,
+#         activation=None,
+#         norm: str = None,
+#         name: str = 'mlp'
+# ) -> Model:
+#     """
+#     Create an MLP model with fully connected dense layers, optional dropout, and configurable activation functions,
+#     with the option to include batch normalization or layer normalization.
+#
+#     Parameters:
+#     - input_dim (int): The number of features in the input data.
+#     - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
+#     - hiddens (list): A list of integers where each integer is the number of units in a hidden layer.
+#     - repr_dim (int): The number of features in the final representation vector.
+#     - pds (bool): If True, the model will use PDS and there will have its representations normalized.
+#     - l2_reg (float): L2 regularization factor. Default is None (no regularization).
+#     - dropout_rate (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
+#     - activation: Optional activation function to use. If None, defaults to LeakyReLU.
+#     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None (no normalization).
+#
+#     Returns:
+#     - Model: A Keras model instance.
+#     """
+#
+#     if hiddens is None:
+#         hiddens = [50]
+#
+#     if activation is None:
+#         activation = LeakyReLU()
+#
+#     input_layer = Input(shape=(input_dim,))
+#     x = input_layer
+#
+#     for units in hiddens:
+#         x = Dense(units, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x)
+#
+#         if norm == 'batch_norm':
+#             x = BatchNormalization()(x)
+#         elif norm == 'layer_norm':
+#             x = LayerNormalization()(x)
+#
+#         if callable(activation):
+#             x = activation(x)
+#         else:
+#             x = LeakyReLU()(x)
+#
+#         if dropout_rate > 0.0:
+#             x = Dropout(dropout_rate)(x)
+#
+#     dense = Dense(repr_dim)(x)
+#     if pds:
+#         # Assuming NormalizeLayer is defined elsewhere
+#         repr_layer = activation(dense) if callable(activation) else LeakyReLU()(dense)
+#         normalized_repr_layer = NormalizeLayer(name='normalize_layer')(repr_layer)  # Custom normalization layer for PDS
+#         final_repr_output = normalized_repr_layer
+#     else:
+#         final_repr_output = activation(dense) if callable(activation) else LeakyReLU(name='repr_layer')(dense)
+#
+#     if output_dim > 0:
+#         output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+#         model_output = [final_repr_output, output_layer]
+#     else:
+#         model_output = final_repr_output
+#
+#     model = Model(inputs=input_layer, outputs=model_output, name=name)
+#     return model
+
+
 def create_mlp(
         input_dim: int = 25,
         output_dim: int = 1,
         hiddens=None,
+        skipped_layers: int = 2,
         repr_dim: int = 9,
         pds: bool = False,
         l2_reg: float = None,
         dropout_rate: float = 0.0,
         activation=None,
         norm: str = None,
+        residual: bool = False,
         name: str = 'mlp'
 ) -> Model:
     """
     Create an MLP model with fully connected dense layers, optional dropout, and configurable activation functions,
-    with the option to include batch normalization or layer normalization.
+    with the option to include residual connections, batch normalization, or layer normalization.
 
     Parameters:
-    - input_dim (int): The number of features in the input data.
+   - input_dim (int): The number of features in the input data.
     - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
     - hiddens (list): A list of integers where each integer is the number of units in a hidden layer.
     - repr_dim (int): The number of features in the final representation vector.
@@ -243,21 +321,35 @@ def create_mlp(
     - dropout_rate (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
     - activation: Optional activation function to use. If None, defaults to LeakyReLU.
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None (no normalization).
+    - skipped_layers (int): Number of layers between residual connections.
+    - residual (bool): If True, add residual connections for every 'skipped_layers' hidden layers.
 
     Returns:
     - Model: A Keras model instance.
     """
 
     if hiddens is None:
-        hiddens = [50]
+        hiddens = [50, 50]  # Default hidden layers configuration
 
     if activation is None:
         activation = LeakyReLU()
 
     input_layer = Input(shape=(input_dim,))
     x = input_layer
+    residual_layer = None
 
-    for units in hiddens:
+    for i, units in enumerate(hiddens):
+        if i % skipped_layers == 0 and i > 0 and residual:
+            # Apply residual/skip connection
+            if x.shape[-1] != residual_layer.shape[-1]:
+                # Projection to match dimensions if they differ
+                residual_layer = Dense(units, kernel_regularizer=l2(l2_reg) if l2_reg else None)(residual_layer)
+            x = Add()([x, residual_layer])
+            residual_layer = x  # Update residual_layer with the new combined output
+        else:
+            if i % skipped_layers == 0 or residual_layer is None:
+                residual_layer = x
+
         x = Dense(units, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x)
 
         if norm == 'batch_norm':
@@ -273,6 +365,7 @@ def create_mlp(
         if dropout_rate > 0.0:
             x = Dropout(dropout_rate)(x)
 
+    # Final representation layer
     dense = Dense(repr_dim)(x)
     if pds:
         # Assuming NormalizeLayer is defined elsewhere
