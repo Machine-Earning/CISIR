@@ -214,7 +214,9 @@ def main():
                         output_dim=output_dim,
                         dropout_rate=dropout,
                         activation=activation,
-                        norm=norm
+                        norm=norm,
+                        residual=residual,
+                        skipped_layers=skipped_layers
                     )
                     mlp_model_sep.summary()
 
@@ -292,7 +294,9 @@ def main():
                         output_dim=output_dim,
                         dropout_rate=dropout,
                         activation=activation,
-                        norm=norm
+                        norm=norm,
+                        residual=residual,
+                        skipped_layers=skipped_layers
                     )
 
                     # Recreate the model architecture
