@@ -115,7 +115,7 @@ def main():
                     activation = None
                     norm = 'batch_norm'
                     residual = True
-                    skipped_layers = 3
+                    skipped_layers = 2
 
                     # Initialize wandb
                     wandb.init(project="mlp-ts-delta-debug", name=experiment_name, config={
