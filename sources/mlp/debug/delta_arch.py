@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -114,7 +114,7 @@ def main():
                     dropout = 0.5
                     activation = None
                     norm = 'batch_norm'
-                    residual = True
+                    residual = False
                     skipped_layers = 3
 
                     # Initialize wandb
