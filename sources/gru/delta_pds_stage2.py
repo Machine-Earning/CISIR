@@ -10,37 +10,29 @@ import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
-
+import numpy as np
 from modules.evaluate.utils import plot_tsne_pds_delta, plot_tsne_extended_delta
 from modules.training.DenseReweights import exDenseReweights
 from modules.training.cme_modeling import ModelBuilder
 from modules.training.ts_modeling import (
     build_dataset,
-    create_mlp,
+    create_gru,
     evaluate_model,
     evaluate_model_cond,
     process_sep_events,
     get_loss,
     reshape_X)
+from modules.training.utils import get_weight_path
 
 mb = ModelBuilder()
 
 # Define the lookup dictionary
 weight_paths = {
-    True: '/home1/jmoukpe2016/keras-functional-api/model_weights_20240229-133949_slope_true_cme500.h5',
-    False: '/home1/jmoukpe2016/keras-functional-api/model_weights_20240229-133949_slope_false_cme-1.h5',
+    True: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322'
+          '-145739GRU_e0_5_e1_8_p_slopeTrue_PDS_bs5000_features.h5',
+    False: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322'
+           '-164540GRU_e0_5_e1_8_p_slopeFalse_PDS_bs5000_features.h5',
 }
-
-
-def get_weight_path(slope):
-    """
-    Retrieves the weight path based on the given slope and cme conditions.
-
-    :param slope: A boolean indicating whether slope is True or False.
-    :param cme: An integer that can be -1, 0, or 500, indicating the cme value.
-    :return: The corresponding weight path as a string, or None if not found.
-    """
-    return weight_paths.get(slope)
 
 
 def main():
@@ -61,7 +53,7 @@ def main():
                     inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                     # Construct the title
-                    title = f'MLP_PDS_Stage2_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}'
+                    title = f'GRU_PDS_Stage2_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}'
 
                     # Replace any other characters that are not suitable for filenames (if any)
                     title = title.replace(' ', '_').replace(':', '_')
@@ -87,9 +79,8 @@ def main():
                     momentum_beta1 = 0.9  # higher momentum beta1
                     batch_size = 4096
                     epochs = 50000  # higher epochs
-                    hiddens = [
-                        2048, 1024, 512, 256, 128, 64, 32
-                    ]
+                    gru_units = 200
+                    gru_layers = 7
                     proj_hiddens = [6]
                     hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                     loss_key = 'mse'
@@ -102,10 +93,10 @@ def main():
                     output_dim = len(outputs_to_use)
                     dropout = 0.5
                     activation = None
-                    norm = 'batch_norm'
+                    norm = 'layer_norm'
                     pds = True
-                    # TODO: get the right one
-                    weight_path = get_weight_path(add_slope)
+
+                    weight_path = get_weight_path(weight_paths, add_slope)
 
                     # Initialize wandb
                     wandb.init(project="nasa-ts-pds-delta-2", name=experiment_name, config={
@@ -133,7 +124,7 @@ def main():
                         "norm": norm,
                         'optimizer': 'adamw',
                         'output_dim': output_dim,
-                        'architecture': 'mlp',
+                        'architecture': 'gru',
                         "freeze": freeze,
                         "pds": pds,
                         "stage": 2,
@@ -195,13 +186,18 @@ def main():
                     print(f'subtraining set rebalanced.')
 
                     # get the number of features
-                    n_features = X_train.shape[1]
+                    if add_slope:
+                        # n_features = [25] * len(inputs_to_use) * 2
+                        n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
+                    else:
+                        n_features = [25] * len(inputs_to_use)
                     print(f'n_features: {n_features}')
 
                     # create the model
-                    mlp_model_sep_stage1 = create_mlp(
-                        input_dim=n_features,
-                        hiddens=hiddens,
+                    mlp_model_sep_stage1 = create_gru(
+                        input_dims=n_features,
+                        gru_units=gru_units,
+                        gru_layers=gru_layers,
                         output_dim=0,
                         pds=pds,
                         repr_dim=repr_dim,
@@ -248,35 +244,35 @@ def main():
                         dropout_rate=dropout,
                         activation=activation,
                         norm=norm,
-                        name='mlp'
+                        name='gru'
                     )
                     mlp_model_sep.summary()
 
                     print('Reshaping input for model')
                     X_subtrain = reshape_X(
                         X_subtrain,
-                        [n_features],
+                        n_features,
                         inputs_to_use,
                         add_slope,
                         mlp_model_sep.name)
 
                     X_val = reshape_X(
                         X_val,
-                        [n_features],
+                        n_features,
                         inputs_to_use,
                         add_slope,
                         mlp_model_sep.name)
 
                     X_train = reshape_X(
                         X_train,
-                        [n_features],
+                        n_features,
                         inputs_to_use,
                         add_slope,
                         mlp_model_sep.name)
 
                     X_test = reshape_X(
                         X_test,
-                        [n_features],
+                        n_features,
                         inputs_to_use,
                         add_slope,
                         mlp_model_sep.name)
@@ -319,9 +315,10 @@ def main():
 
                     # Determine the optimal number of epochs from early stopping
                     optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
-                    final_mlp_model_sep_stage1 = create_mlp(
-                        input_dim=n_features,
-                        hiddens=hiddens,
+                    final_mlp_model_sep_stage1 = create_gru(
+                        input_dims=n_features,
+                        gru_units=gru_units,
+                        gru_layers=gru_layers,
                         output_dim=0,
                         pds=pds,
                         repr_dim=repr_dim,
@@ -341,7 +338,7 @@ def main():
                         dropout_rate=dropout,
                         activation=activation,
                         norm=norm,
-                        name='mlp'
+                        name='gru'
                     )
 
                     final_mlp_model_sep.compile(
@@ -384,12 +381,12 @@ def main():
 
                     # Log t-SNE plot for testing
                     # Log the testing t-SNE plot to wandb
-                    stage2_file_path = plot_tsne_extended(final_mlp_model_sep,
-                                                          X_test,
-                                                          y_test,
-                                                          title, 'stage2_testing',
-                                                          save_tag=current_time,
-                                                          seed=seed)
+                    stage2_file_path = plot_tsne_extended_delta(final_mlp_model_sep,
+                                                                X_test,
+                                                                y_test,
+                                                                title, 'stage2_testing',
+                                                                save_tag=current_time,
+                                                                seed=seed)
                     wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage2_file_path)})
                     print('stage2_file_path: ' + stage2_file_path)
 

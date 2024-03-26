@@ -23,27 +23,21 @@ from modules.training.ts_modeling import (
     process_sep_events,
     get_loss,
     reshape_X)
+from modules.training.utils import get_weight_path
 
 mb = ModelBuilder()
 
 # Define the lookup dictionary
 weight_paths = {
-    (True, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322-135444MLP_e0_5_e1_8_p_slopeTrue_PDS_bs5000_CME0_features.h5',
-    (True, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322-142422MLP_e0_5_e1_8_p_slopeTrue_PDS_bs5000_CME500_features.h5',
-    (False, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322-145352MLP_e0_5_e1_8_p_slopeFalse_PDS_bs5000_CME0_features.h5',
-    (False, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322-152405MLP_e0_5_e1_8_p_slopeFalse_PDS_bs5000_CME500_features.h5',
+    (True, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322'
+               '-135444MLP_e0_5_e1_8_p_slopeTrue_PDS_bs5000_CME0_features.h5',
+    (True, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322'
+                 '-142422MLP_e0_5_e1_8_p_slopeTrue_PDS_bs5000_CME500_features.h5',
+    (False, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322'
+                '-145352MLP_e0_5_e1_8_p_slopeFalse_PDS_bs5000_CME0_features.h5',
+    (False, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322'
+                  '-152405MLP_e0_5_e1_8_p_slopeFalse_PDS_bs5000_CME500_features.h5',
 }
-
-
-def get_weight_path(slope, cme):
-    """
-    Retrieves the weight path based on the given slope and cme conditions.
-
-    :param slope: A boolean indicating whether slope is True or False.
-    :param cme: An integer that can be -1, 0, or 500, indicating the cme value.
-    :return: The corresponding weight path as a string, or None if not found.
-    """
-    return weight_paths.get((slope, cme))
 
 
 def main():
@@ -109,8 +103,7 @@ def main():
                         norm = 'batch_norm'
                         pds = True
                         cme_speed_threshold = cme_speed_threshold
-                        # TODO: get the right one
-                        weight_path = get_weight_path(add_slope, cme_speed_threshold)
+                        weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
                         # Initialize wandb
                         wandb.init(project="nasa-ts-pds-delta-2", name=experiment_name, config={
                             "inputs_to_use": inputs_to_use,
@@ -219,8 +212,8 @@ def main():
                             norm=norm
                         )
                         mlp_model_sep_stage1.summary()
-                        # load the weights from the first stage
 
+                        # load the weights from the first stage
                         print(f'weights loading from: {weight_path}')
                         mlp_model_sep_stage1.load_weights(weight_path)
                         # print the save
@@ -394,11 +387,11 @@ def main():
                         # Log t-SNE plot for testing
                         # Log the testing t-SNE plot to wandb
                         stage2_file_path = plot_tsne_extended_delta(final_mlp_model_sep,
-                                                              X_test,
-                                                              y_test,
-                                                              title, 'stage2_testing',
-                                                              save_tag=current_time,
-                                                              seed=seed)
+                                                                    X_test,
+                                                                    y_test,
+                                                                    title, 'stage2_testing',
+                                                                    save_tag=current_time,
+                                                                    seed=seed)
                         wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage2_file_path)})
                         print('stage2_file_path: ' + stage2_file_path)
 

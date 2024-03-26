@@ -2,6 +2,7 @@ import random
 
 import matplotlib.pyplot as plt
 import numpy as np
+from typing import Dict
 
 
 def plot_sorted_distributions(y_train, y_val, y_test, title='Sorted Distributions'):
@@ -123,6 +124,21 @@ def find_rand_bs_2(y, left_threshold, right_threshold, num_trials=1000, early_ex
     raise ValueError("Failed to determine a suitable batch size within the specified trials.")
 
 
+def get_weight_path(weight_paths: Dict, slope: bool, cme: int = None):
+    """
+    Retrieves the weight path based on the given slope and cme conditions.
+
+    :param weight_paths:  A dictionary containing the weight paths for different slope and cme conditions.
+    :param slope: A boolean indicating whether slope is True or False.
+    :param cme: An integer that can be -1, 0, or 500, indicating the cme value.
+    :return: The corresponding weight path as a string, or None if not found.
+    """
+    if cme is None:
+        return weight_paths.get(slope)
+    else:
+        return weight_paths.get((slope, cme))
+
+
 if __name__ == '__main__':
     # Generate random target values
     training_set_path = 'D:/College/Fall2023/sep-forecasting-research/data/electron_cme_data_split/training'
@@ -134,7 +150,6 @@ if __name__ == '__main__':
         inputs_to_use=['e0.5', 'p'],
         add_slope=False,
         target_change=True)
-
 
     # Find the minimum batch size
     # find the minimum batch size for the training set that satisfies the condition, using the optimized function

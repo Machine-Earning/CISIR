@@ -10,39 +10,35 @@ import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
+import numpy as np
 
 from modules.evaluate.utils import plot_tsne_pds_delta, plot_tsne_extended_delta
 from modules.training.DenseReweights import exDenseReweights
 from modules.training.cme_modeling import ModelBuilder
 from modules.training.ts_modeling import (
     build_dataset,
-    create_mlp,
+    create_1dcnn,
+    create_hybrid_model,
     evaluate_model,
     evaluate_model_cond,
     process_sep_events,
     get_loss,
     reshape_X)
+from modules.training.utils import get_weight_path
 
 mb = ModelBuilder()
 
 # Define the lookup dictionary
 weight_paths = {
-    (True, 0): '/home1/jmoukpe2016/keras-functional-api/model_weights_20240229-133949_slope_true_cme0.h5',
-    (True, 500): '/home1/jmoukpe2016/keras-functional-api/model_weights_20240229-133949_slope_true_cme500.h5',
-    (False, 0): '/home1/jmoukpe2016/keras-functional-api/model_weights_20240229-133949_slope_false_cme0.h5',
-    (False, 500): '/home1/jmoukpe2016/keras-functional-api/model_weights_20240229-133949_slope_false_cme500.h5',
+    (True, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240323'
+               '-0805591DCNN_e0_5_e1_8_p_slopeTrue_PDS_bs5000_CME0_features.h5',
+    (True, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240323'
+                 '-0936381DCNN_e0_5_e1_8_p_slopeTrue_PDS_bs5000_CME500_features.h5',
+    (False, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240323'
+                '-1056091DCNN_e0_5_e1_8_p_slopeFalse_PDS_bs5000_CME0_features.h5',
+    (False, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240323'
+                  '-1209281DCNN_e0_5_e1_8_p_slopeFalse_PDS_bs5000_CME500_features.h5',
 }
-
-
-def get_weight_path(slope, cme):
-    """
-    Retrieves the weight path based on the given slope and cme conditions.
-
-    :param slope: A boolean indicating whether slope is True or False.
-    :param cme: An integer that can be -1, 0, or 500, indicating the cme value.
-    :return: The corresponding weight path as a string, or None if not found.
-    """
-    return weight_paths.get((slope, cme))
 
 
 def main():
@@ -64,7 +60,7 @@ def main():
                         inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                         # Construct the title
-                        title = f'MLP_PDS_Stage2_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                        title = f'1DCNN_PDS_Stage2_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
 
                         # Replace any other characters that are not suitable for filenames (if any)
                         title = title.replace(' ', '_').replace(':', '_')
@@ -91,9 +87,22 @@ def main():
                         batch_size = 4096
                         epochs = 50000  # higher epochs
                         hiddens = [
-                            2048, 1024, 512, 256, 128, 64, 32
+                            (32, 10, 1, 'none', 0),  # Conv1: Start with broad features
+                            (64, 8, 1, 'max', 2),  # Conv2 + Pool: Start to reduce and capture features
+                            (64, 7, 1, 'none', 0),  # Conv3: Further detail without reducing dimension
+                            (128, 5, 1, 'none', 0),  # Conv4: Increase filters, capture more refined features
+                            (128, 5, 1, 'max', 2),  # Conv5 + Pool: Reduce dimension and increase depth
+                            (256, 3, 1, 'none', 0),  # Conv6: Increase depth without immediate pooling
+                            (256, 3, 1, 'none', 0),  # Conv7: Continue with high capacity, no dimension reduction
+                            (512, 3, 1, 'max', 2),  # Conv8 + Pool: Use max pooling for stronger feature selection
+                            (512, 3, 1, 'none', 0),  # Conv9: Maintain capacity, focusing on detailed features
+                            # Note: Assuming a reduction towards dense layers after Conv9
                         ]
                         proj_hiddens = [6]
+                        mlp_hiddens = [128, 64, 32]
+                        mlp_repr_dim = 9
+                        final_hiddens = [36, 18]
+                        final_repr_dim = 9
                         hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                         loss_key = 'mse'
                         target_change = ('delta_p' in outputs_to_use)
@@ -108,8 +117,7 @@ def main():
                         norm = 'batch_norm'
                         pds = True
                         cme_speed_threshold = cme_speed_threshold
-                        # TODO: get the right one
-                        weight_path = get_weight_path(add_slope, cme_speed_threshold)
+                        weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
                         # Initialize wandb
                         wandb.init(project="nasa-ts-pds-delta-2", name=experiment_name, config={
                             "inputs_to_use": inputs_to_use,
@@ -136,7 +144,7 @@ def main():
                             "norm": norm,
                             'optimizer': 'adamw',
                             'output_dim': output_dim,
-                            'architecture': 'mlp',
+                            'architecture': '1dcnn',
                             "freeze": freeze,
                             "pds": pds,
                             "stage": 2,
@@ -203,12 +211,19 @@ def main():
                         print(f'subtraining set rebalanced.')
 
                         # get the number of features
-                        n_features = X_train.shape[1]
+                        if add_slope:
+                            # n_features = [25] * len(inputs_to_use) * 2
+                            n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
+                        else:
+                            n_features = [25] * len(inputs_to_use)
                         print(f'n_features: {n_features}')
 
+                        # calculating number of cme features
+                        n_cme_features = 20 + len(inputs_to_use)
+
                         # create the model
-                        mlp_model_sep_stage1 = create_mlp(
-                            input_dim=n_features,
+                        extractor_model_sep = create_1dcnn(
+                            input_dims=n_features,
                             hiddens=hiddens,
                             output_dim=0,
                             pds=pds,
@@ -217,9 +232,25 @@ def main():
                             activation=activation,
                             norm=norm
                         )
-                        mlp_model_sep_stage1.summary()
-                        # load the weights from the first stage
+                        extractor_model_sep.summary()
 
+                        mlp_model_sep_stage1 = create_hybrid_model(
+                            tsf_extractor=extractor_model_sep,
+                            mlp_input_dim=n_cme_features,
+                            output_dim=0,
+                            pds=pds,
+                            mlp_hiddens=mlp_hiddens,
+                            mlp_repr_dim=mlp_repr_dim,
+                            final_hiddens=final_hiddens,
+                            repr_dim=final_repr_dim,
+                            dropout_rate=dropout,
+                            activation=activation,
+                            norm=norm,
+                            name='hybrid'
+                        )
+                        mlp_model_sep_stage1.summary()
+
+                        # load the weights from the first stage
                         print(f'weights loading from: {weight_path}')
                         mlp_model_sep_stage1.load_weights(weight_path)
                         # print the save
@@ -256,38 +287,38 @@ def main():
                             dropout_rate=dropout,
                             activation=activation,
                             norm=norm,
-                            name='mlp'
+                            name='hybrid'
                         )
                         mlp_model_sep.summary()
 
                         print('Reshaping input for model')
                         X_subtrain = reshape_X(
                             X_subtrain,
-                            [n_features],
+                            n_features,
                             inputs_to_use,
                             add_slope,
-                            mlp_model_sep.name)
+                            'hybrid')
 
                         X_val = reshape_X(
                             X_val,
-                            [n_features],
+                            n_features,
                             inputs_to_use,
                             add_slope,
-                            mlp_model_sep.name)
+                            'hybrid')
 
                         X_train = reshape_X(
                             X_train,
-                            [n_features],
+                            n_features,
                             inputs_to_use,
                             add_slope,
-                            mlp_model_sep.name)
+                            'hybrid')
 
                         X_test = reshape_X(
                             X_test,
-                            [n_features],
+                            n_features,
                             inputs_to_use,
                             add_slope,
-                            mlp_model_sep.name)
+                            'hybrid')
 
                         # Define the EarlyStopping callback
                         early_stopping = EarlyStopping(
@@ -327,8 +358,8 @@ def main():
 
                         # Determine the optimal number of epochs from early stopping
                         optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
-                        final_mlp_model_sep_stage1 = create_mlp(
-                            input_dim=n_features,
+                        final_extractor_model_sep = create_1dcnn(
+                            input_dims=n_features,
                             hiddens=hiddens,
                             output_dim=0,
                             pds=pds,
@@ -337,6 +368,22 @@ def main():
                             activation=activation,
                             norm=norm
                         )
+
+                        final_mlp_model_sep_stage1 = create_hybrid_model(
+                            tsf_extractor=final_extractor_model_sep,
+                            mlp_input_dim=n_cme_features,
+                            output_dim=0,
+                            pds=pds,
+                            mlp_hiddens=mlp_hiddens,
+                            mlp_repr_dim=mlp_repr_dim,
+                            final_hiddens=final_hiddens,
+                            repr_dim=final_repr_dim,
+                            dropout_rate=dropout,
+                            activation=activation,
+                            norm=norm,
+                            name='hybrid'
+                        )
+
                         final_mlp_model_sep_stage1.load_weights(weight_path)
 
                         # Recreate the model architecture for final_mlp_model_sep
@@ -349,7 +396,7 @@ def main():
                             dropout_rate=dropout,
                             activation=activation,
                             norm=norm,
-                            name='mlp'
+                            name='hybrid'
                         )
 
                         final_mlp_model_sep.compile(
@@ -392,12 +439,12 @@ def main():
 
                         # Log t-SNE plot for testing
                         # Log the testing t-SNE plot to wandb
-                        stage2_file_path = plot_tsne_extended(final_mlp_model_sep,
-                                                              X_test,
-                                                              y_test,
-                                                              title, 'stage2_testing',
-                                                              save_tag=current_time,
-                                                              seed=seed)
+                        stage2_file_path = plot_tsne_extended_delta(final_mlp_model_sep,
+                                                                    X_test,
+                                                                    y_test,
+                                                                    title, 'stage2_testing',
+                                                                    save_tag=current_time,
+                                                                    seed=seed)
                         wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage2_file_path)})
                         print('stage2_file_path: ' + stage2_file_path)
 
