@@ -262,28 +262,28 @@ def main():
                         n_features,
                         inputs_to_use,
                         add_slope,
-                        mlp_model_sep.name)
+                        '1dcnn')
 
                     X_val = reshape_X(
                         X_val,
                         n_features,
                         inputs_to_use,
                         add_slope,
-                        mlp_model_sep.name)
+                        '1dcnn')
 
                     X_train = reshape_X(
                         X_train,
                         n_features,
                         inputs_to_use,
                         add_slope,
-                        mlp_model_sep.name)
+                        '1dcnn')
 
                     X_test = reshape_X(
                         X_test,
                         n_features,
                         inputs_to_use,
                         add_slope,
-                        mlp_model_sep.name)
+                        '1dcnn')
 
                     # Define the EarlyStopping callback
                     early_stopping = EarlyStopping(
