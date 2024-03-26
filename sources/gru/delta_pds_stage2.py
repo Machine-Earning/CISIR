@@ -82,7 +82,7 @@ def main():
                     gru_units = 200
                     gru_layers = 7
                     proj_hiddens = [6]
-                    hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
+                    hiddens_str = f'{gru_units}units_{gru_layers}layers'
                     loss_key = 'mse'
                     target_change = ('delta_p' in outputs_to_use)
                     # print_batch_mse_cb = PrintBatchMSE()

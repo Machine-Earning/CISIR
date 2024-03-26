@@ -93,7 +93,7 @@ def main():
                         mlp_repr_dim = 9
                         final_hiddens = [36, 18]
                         final_repr_dim = 9
-                        hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
+                        hiddens_str = f'{gru_units}units_{gru_layers}layers'
                         loss_key = 'mse'
                         target_change = ('delta_p' in outputs_to_use)
                         # print_batch_mse_cb = PrintBatchMSE()
