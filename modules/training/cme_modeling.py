@@ -862,17 +862,17 @@ class ModelBuilder:
                      y_val: np.ndarray,
                      X_train: np.ndarray,
                      y_train: np.ndarray,
-                     sample_joint_weights: Optional[np.ndarray] = None,
-                     sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
-                     val_sample_joint_weights: Optional[np.ndarray] = None,
-                     val_sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
+                     subtrain_sample_joint_weights: Optional[np.ndarray] = None,
+                     subtrain_sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
                      train_sample_joint_weights: Optional[np.ndarray] = None,
                      train_sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
                      learning_rate: float = 1e-3,
                      epochs: int = 100,
                      batch_size: int = 32,
                      patience: int = 9,
-                     save_tag: Optional[str] = None) -> dict:
+                     save_tag: Optional[str] = None,
+                     callbacks_list=None,
+                     verbose: int = 1) -> dict:
         """
         Custom training loop to train the model and returns the training history.
 
@@ -885,17 +885,54 @@ class ModelBuilder:
         :param y_subtrain: The training labels.
         :param X_val: Validation features.
         :param y_val: Validation labels.
-        :param sample_joint_weights: The reweighting factors for pairs of labels in training set.
-        :param sample_joint_weights_indices: Indices of the reweighting factors in training set.
-        :param val_sample_joint_weights: The reweighting factors for pairs of labels in validation set.
-        :param val_sample_joint_weights_indices: Indices of the reweighting factors in validation set.
+        :param subtrain_sample_joint_weights: The reweighting factors for pairs of labels in training set.
+        :param subtrain_sample_joint_weights_indices: Indices of the reweighting factors in training set.
+        :param train_sample_joint_weights: The reweighting factors for pairs of labels in training set.
+        :param train_sample_joint_weights_indices: Indices of the reweighting factors in training set.
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
         :param batch_size: The batch size for training.
         :param patience: The number of epochs with no improvement to wait before early stopping.
         :param save_tag: Tag to use for saving experiments.
+        :param callbacks_list: List of callback instances to apply during training.
+        :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
+
+
         :return: The training history as a dictionary.
         """
+
+        if callbacks_list is None:
+            callbacks_list = []
+
+        # Initialize early stopping and model checkpointing if not explicitly provided
+        if not any(isinstance(cb, callbacks.EarlyStopping) for cb in callbacks_list):
+            early_stopping_cb = callbacks.EarlyStopping(
+                monitor='val_loss', patience=patience, restore_best_weights=True)
+            callbacks_list.append(early_stopping_cb)
+
+        if not any(isinstance(cb, callbacks.ModelCheckpoint) for cb in callbacks_list):
+            checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_{str(save_tag)}.h5", save_weights_only=True)
+            callbacks_list.append(checkpoint_cb)
+
+        # Setting up callback environment
+        params = {
+            'epochs': epochs,
+            'steps': None,
+            'verbose': verbose,
+            'do_validation': True,
+            'metrics': ['loss', 'val_loss'],
+        }
+        for cb in callbacks_list:
+            cb.set_model(model)
+            cb.set_params(params)
+
+        logs = {}
+        # Signal the beginning of training
+        for cb in callbacks_list:
+            cb.on_train_begin(logs=logs)
+
+        # Save initial weights for retraining on full training set after best epoch found
+        initial_weights = model.get_weights()
 
         # Initialize early stopping and best epoch variables
         best_val_loss = float('inf')
@@ -913,18 +950,20 @@ class ModelBuilder:
         history = {'loss': [], 'val_loss': []}
 
         for epoch in range(epochs):
+            for cb in callbacks_list:
+                cb.on_epoch_begin(epoch, logs=logs)
             train_loss = self.train_for_one_epoch(
                 model, optimizer, self.pds_loss_dl_vec,
                 X_subtrain, y_subtrain,
                 batch_size=batch_size if batch_size > 0 else len(y_subtrain),
-                joint_weights=sample_joint_weights,
-                joint_weight_indices=sample_joint_weights_indices)
+                joint_weights=subtrain_sample_joint_weights,
+                joint_weight_indices=subtrain_sample_joint_weights_indices)
 
             val_loss = self.train_for_one_epoch(
                 model, optimizer, self.pds_loss_dl_vec, X_val, y_val,
                 batch_size=batch_size if batch_size > 0 else len(y_val),
-                joint_weights=val_sample_joint_weights,
-                joint_weight_indices=val_sample_joint_weights_indices, training=False)
+                joint_weights=None,
+                joint_weight_indices=None, training=False)
 
             # Log and save epoch losses
             history['loss'].append(train_loss)
@@ -945,6 +984,14 @@ class ModelBuilder:
                     print("Early stopping triggered.")
                     break
 
+            logs = {'loss': train_loss, 'val_loss': val_loss}  # Update logs with your training and validation loss
+
+            for cb in callbacks_list:
+                cb.on_epoch_end(epoch, logs=logs)
+
+        for cb in callbacks_list:
+            cb.on_train_end(logs=logs)
+
         # Plotting the losses
         plt.plot(history['loss'], label='Training Loss')
         plt.plot(history['val_loss'], label='Validation Loss')
@@ -960,6 +1007,9 @@ class ModelBuilder:
         # Reset history for retraining
         retrain_history = {'loss': []}
 
+        # Reset model weights to initial state before retraining
+        model.set_weights(initial_weights)
+
         # NOTE: test if this fixes the issue
         # Retrain up to the best epoch
         for epoch in range(best_epoch):
@@ -973,11 +1023,13 @@ class ModelBuilder:
 
             # Log the retrain loss
             retrain_history['loss'].append(retrain_loss)
-
             print(f"Retrain Epoch {epoch + 1}/{best_epoch}, Loss: {retrain_loss}")
+
 
         # Save the final model
         model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
+        # print where the model weights are saved
+        print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
 
         return history
 
