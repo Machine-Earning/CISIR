@@ -31,7 +31,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for add_slope in [True, False]:
-            for alpha in np.arange(0.1, 1.6, 0.25):
+            for alpha in np.arange(0, 1, 0.1):
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
@@ -80,8 +80,16 @@ def main():
                 batch_size = 4096
                 epochs = 50000  # higher epochs
                 hiddens = [
-                    2048, 1024, 512, 256, 128, 64, 32
-                    # 512, 256, 128, 64, 32
+                    1024, 512,
+                    1024, 512,
+                    512, 256,
+                    512, 256,
+                    128, 64,
+                    128, 64,
+                    64, 32,
+                    64, 32,
+                    32, 16,
+                    32, 16
                 ]
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 loss_key = 'mse'
@@ -95,6 +103,8 @@ def main():
                 dropout = 0.5
                 activation = None
                 norm = 'batch_norm'
+                residual = True
+                skipped_layers = 2
 
                 # Initialize wandb
                 wandb.init(project="nasa-ts-delta", name=experiment_name, config={
@@ -123,6 +133,8 @@ def main():
                     'optimizer': 'adamw',
                     'output_dim': output_dim,
                     'architecture': 'mlp',
+                    'residual': residual,
+                    'skipped_layers': skipped_layers
                 })
 
                 # set the root directory
@@ -195,7 +207,9 @@ def main():
                     output_dim=output_dim,
                     dropout_rate=dropout,
                     activation=activation,
-                    norm=norm
+                    norm=norm,
+                    residual=residual,
+                    skipped_layers=skipped_layers
                 )
                 mlp_model_sep.summary()
 
@@ -273,7 +287,9 @@ def main():
                     output_dim=output_dim,
                     dropout_rate=dropout,
                     activation=activation,
-                    norm=norm
+                    norm=norm,
+                    residual=residual,
+                    skipped_layers=skipped_layers
                 )
 
                 # Recreate the model architecture

@@ -51,7 +51,7 @@ tf.random.set_seed(seed_value)
 
 def create_1dcnn(
         input_dims: list,
-        hiddens: list[tuple],
+        hiddens: List[tuple],
         repr_dim: int = 50,
         output_dim: int = 1,
         pds: bool = False,
@@ -131,6 +131,178 @@ def create_1dcnn(
 
     model = Model(inputs=cnn_inputs, outputs=model_output, name=name)
     return model
+
+
+def create_gru_with_addition_skips(
+        input_dims: list = None,
+        gru_units: int = 64,
+        gru_layers: int = 2,
+        repr_dim: int = 50,
+        output_dim: int = 1,
+        pds: bool = False,
+        l2_reg: float = None,
+        dropout_rate: float = 0.0,
+        activation=None,
+        norm: str = None,
+        skipped_layers: int = 2,  # New parameter for skip connections
+        name: str = 'gru'
+) -> Model:
+    """
+    Create a GRU model with addition-based skip connections.
+    """
+
+    if input_dims is None:
+        input_dims = [25, 25, 25]  # Default input dimensions
+
+    if activation is None:
+        activation = LeakyReLU()  # Default to LeakyReLU if no activation is specified
+
+    dim_counts = Counter(input_dims)
+    rnn_branches = []
+    gru_inputs = []
+
+    for dim, count in dim_counts.items():
+        input_layer = Input(shape=(None, count), name=f'input_{dim}x{count}')
+        x = input_layer
+        skip_connection = None  # Initialize skip connection storage
+
+        for layer in range(gru_layers):
+            if layer % skipped_layers == 0 and layer > 0:
+                # Prepare for addition-based skip connection
+                if skip_connection is not None:
+                    x = Add()([x, skip_connection])
+
+            x = GRU(units=gru_units,
+                    return_sequences=True if layer < gru_layers - 1 else False,
+                    kernel_regularizer=l2(l2_reg) if l2_reg else None)(x)
+
+            if norm == 'batch_norm':
+                x = BatchNormalization()(x)
+            elif norm == 'layer_norm':
+                x = LayerNormalization()(x)
+
+            if callable(activation):
+                x = activation(x)
+            else:
+                x = LeakyReLU()(x)  # Fallback if activation is not callable, for safety
+
+            if dropout_rate > 0.0:
+                x = Dropout(dropout_rate)(x)
+
+            if layer % skipped_layers == 0 or skip_connection is None:
+                skip_connection = x  # Update skip connection after applying activation
+
+        flattened = Flatten()(x)
+        rnn_branches.append(flattened)
+        gru_inputs.append(input_layer)
+
+    concatenated = Concatenate()(rnn_branches) if len(rnn_branches) > 1 else rnn_branches[0]
+
+    dense = Dense(repr_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(concatenated)
+    if callable(activation):
+        final_repr_output = activation(dense)
+    else:
+        final_repr_output = LeakyReLU()(dense)
+
+    if pds:
+        # Assuming NormalizeLayer is defined elsewhere
+        normalized_repr_layer = NormalizeLayer(name='normalize_layer')(
+            final_repr_output)  # Custom normalization layer for PDS
+        final_repr_output = normalized_repr_layer
+
+    if output_dim > 0:
+        output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+        model_output = [final_repr_output, output_layer]
+    else:
+        model_output = final_repr_output
+
+    return Model(inputs=gru_inputs, outputs=model_output, name=name)
+
+
+def create_gru_with_concatenation_skips(
+        input_dims: list = None,
+        gru_units: int = 64,
+        gru_layers: int = 2,
+        repr_dim: int = 50,
+        output_dim: int = 1,
+        pds: bool = False,
+        l2_reg: float = None,
+        dropout_rate: float = 0.0,
+        activation=None,
+        norm: str = None,
+        skipped_layers: int = 2,  # New parameter for skip connections
+        name: str = 'gru_concat'
+) -> Model:
+    """
+    Create a GRU model with concatenation-based skip connections.
+    """
+    if input_dims is None:
+        input_dims = [25, 25, 25]  # Default input dimensions
+
+    if activation is None:
+        activation = LeakyReLU  # Default to LeakyReLU if no activation is specified
+
+    dim_counts = Counter(input_dims)
+    rnn_branches = []
+    gru_inputs = []
+
+    for dim, count in dim_counts.items():
+        input_layer = Input(shape=(None, count), name=f'input_{dim}x{count}')
+        x = input_layer
+        skip_connection = None  # Initialize skip connection storage
+
+        for layer in range(gru_layers):
+            if layer % skipped_layers == 0 and layer > 0 and skip_connection is not None:
+                # Concatenate skip connection with current layer output
+                x = Concatenate()([x, skip_connection])
+                # After concatenation, you might need to adjust the dimensionality
+                # For simplicity, this is not included here but could involve a Dense layer or adjusting GRU units
+
+            x = GRU(units=gru_units,
+                    return_sequences=True if layer < gru_layers - 1 else False,
+                    kernel_regularizer=l2(l2_reg) if l2_reg else None)(x)
+
+            if norm == 'batch_norm':
+                x = BatchNormalization()(x)
+            elif norm == 'layer_norm':
+                x = LayerNormalization()(x)
+
+            if callable(activation):
+                x = activation()(x)
+            else:
+                x = LeakyReLU()(x)  # Fallback if activation is not callable, for safety
+
+            if dropout_rate > 0.0:
+                x = Dropout(dropout_rate)(x)
+
+            if layer % skipped_layers == 0:
+                skip_connection = x  # Update skip connection to current x
+
+        flattened = Flatten()(x)
+        rnn_branches.append(flattened)
+        gru_inputs.append(input_layer)
+
+    concatenated = Concatenate()(rnn_branches) if len(rnn_branches) > 1 else rnn_branches[0]
+
+    # Adjust the Dense layer's input size if necessary due to concatenation
+    dense = Dense(repr_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(concatenated)
+    if callable(activation):
+        final_repr_output = activation()(dense)
+    else:
+        final_repr_output = LeakyReLU()(dense)
+
+    if pds:
+        # Assuming NormalizeLayer is a custom layer defined elsewhere
+        normalized_repr_layer = NormalizeLayer(name='normalize_layer')(final_repr_output)
+        final_repr_output = normalized_repr_layer
+
+    if output_dim > 0:
+        output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+        model_output = [final_repr_output, output_layer]
+    else:
+        model_output = final_repr_output
+
+    return Model(inputs=gru_inputs, outputs=model_output, name=name)
 
 
 def create_gru(
@@ -216,81 +388,6 @@ def create_gru(
 
     model = Model(inputs=gru_inputs, outputs=model_output, name=name)
     return model
-
-
-# def create_mlp(
-#         input_dim: int = 25,
-#         output_dim: int = 1,
-#         hiddens=None,
-#         repr_dim: int = 9,
-#         pds: bool = False,
-#         l2_reg: float = None,
-#         dropout_rate: float = 0.0,
-#         activation=None,
-#         norm: str = None,
-#         name: str = 'mlp'
-# ) -> Model:
-#     """
-#     Create an MLP model with fully connected dense layers, optional dropout, and configurable activation functions,
-#     with the option to include batch normalization or layer normalization.
-#
-#     Parameters:
-#     - input_dim (int): The number of features in the input data.
-#     - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
-#     - hiddens (list): A list of integers where each integer is the number of units in a hidden layer.
-#     - repr_dim (int): The number of features in the final representation vector.
-#     - pds (bool): If True, the model will use PDS and there will have its representations normalized.
-#     - l2_reg (float): L2 regularization factor. Default is None (no regularization).
-#     - dropout_rate (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
-#     - activation: Optional activation function to use. If None, defaults to LeakyReLU.
-#     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None (no normalization).
-#
-#     Returns:
-#     - Model: A Keras model instance.
-#     """
-#
-#     if hiddens is None:
-#         hiddens = [50]
-#
-#     if activation is None:
-#         activation = LeakyReLU()
-#
-#     input_layer = Input(shape=(input_dim,))
-#     x = input_layer
-#
-#     for units in hiddens:
-#         x = Dense(units, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x)
-#
-#         if norm == 'batch_norm':
-#             x = BatchNormalization()(x)
-#         elif norm == 'layer_norm':
-#             x = LayerNormalization()(x)
-#
-#         if callable(activation):
-#             x = activation(x)
-#         else:
-#             x = LeakyReLU()(x)
-#
-#         if dropout_rate > 0.0:
-#             x = Dropout(dropout_rate)(x)
-#
-#     dense = Dense(repr_dim)(x)
-#     if pds:
-#         # Assuming NormalizeLayer is defined elsewhere
-#         repr_layer = activation(dense) if callable(activation) else LeakyReLU()(dense)
-#         normalized_repr_layer = NormalizeLayer(name='normalize_layer')(repr_layer)  # Custom normalization layer for PDS
-#         final_repr_output = normalized_repr_layer
-#     else:
-#         final_repr_output = activation(dense) if callable(activation) else LeakyReLU(name='repr_layer')(dense)
-#
-#     if output_dim > 0:
-#         output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
-#         model_output = [final_repr_output, output_layer]
-#     else:
-#         model_output = final_repr_output
-#
-#     model = Model(inputs=input_layer, outputs=model_output, name=name)
-#     return model
 
 
 def create_mlp(

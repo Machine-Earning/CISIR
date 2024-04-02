@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,7 +15,7 @@ from wandb.keras import WandbCallback
 from modules.training.DenseReweights import exDenseReweights
 from modules.training.ts_modeling import (
     build_dataset,
-    create_gru,
+    create_mlp,
     evaluate_model,
     evaluate_model_cond,
     process_sep_events,
@@ -30,8 +30,8 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [True, False]:
-            for alpha in np.arange(0.1, 1.6, 0.25):
+        for add_slope in [False]:
+            for alpha in np.arange(0.1, 1.0, 0.1):
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
@@ -41,7 +41,7 @@ def main():
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'GRU_{inputs_str}_slope{str(add_slope)}_alpha{alpha:.2f}'
+                title = f'MLP_{inputs_str}_slope{str(add_slope)}_alpha{alpha:.2f}'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -79,20 +79,32 @@ def main():
                 momentum_beta1 = 0.9  # higher momentum beta1
                 batch_size = 4096
                 epochs = 50000  # higher epochs
-                gru_units = 200
-                gru_layers = 7
-                hiddens_str = f'{gru_units}units_{gru_layers}layers'
+                hiddens = [
+                    1024, 512,
+                    1024, 512,
+                    512, 256,
+                    512, 256,
+                    128, 64,
+                    128, 64,
+                    64, 32,
+                    64, 32,
+                    32, 16,
+                    32, 16
+                ]
+                hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 loss_key = 'mse'
                 target_change = ('delta_p' in outputs_to_use)
                 # print_batch_mse_cb = PrintBatchMSE()
                 rebalacing = True
                 alpha_rw = alpha
-                bandwidth = 0.099
+                bandwidth = 0.099  # 0.0519
                 repr_dim = 9
                 output_dim = len(outputs_to_use)
                 dropout = 0.5
                 activation = None
-                norm = 'layer_norm'
+                norm = 'batch_norm'
+                residual = True
+                skipped_layers = 2
 
                 # Initialize wandb
                 wandb.init(project="nasa-ts-delta", name=experiment_name, config={
@@ -120,7 +132,9 @@ def main():
                     "norm": norm,
                     'optimizer': 'adamw',
                     'output_dim': output_dim,
-                    'architecture': 'gru'
+                    'architecture': 'mlp',
+                    'residual': residual,
+                    'skipped_layers': skipped_layers
                 })
 
                 # set the root directory
@@ -182,52 +196,48 @@ def main():
                 # print(f'y_train[0]: {y_train[0]}')
 
                 # get the number of features
-                # get the number of features
-                if add_slope:
-                    # n_features = [25] * len(inputs_to_use) * 2
-                    n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
-                else:
-                    n_features = [25] * len(inputs_to_use)
+                n_features = X_train.shape[1]
                 print(f'n_features: {n_features}')
 
                 # create the model
-                mlp_model_sep = create_gru(
-                    input_dims=n_features,
-                    gru_units=gru_units,
-                    gru_layers=gru_layers,
+                mlp_model_sep = create_mlp(
+                    input_dim=n_features,
+                    hiddens=hiddens,
                     repr_dim=repr_dim,
                     output_dim=output_dim,
                     dropout_rate=dropout,
                     activation=activation,
-                    norm=norm
+                    norm=norm,
+                    residual=residual,
+                    skipped_layers=skipped_layers
                 )
                 mlp_model_sep.summary()
 
                 print('Reshaping input for model')
                 X_subtrain = reshape_X(
                     X_subtrain,
-                    n_features,
+                    [n_features],
                     inputs_to_use,
                     add_slope,
                     mlp_model_sep.name)
 
                 X_val = reshape_X(
                     X_val,
-                    n_features,
+                    [n_features],
                     inputs_to_use,
                     add_slope,
                     mlp_model_sep.name)
 
                 X_train = reshape_X(
                     X_train,
-                    n_features,
+                    [n_features],
                     inputs_to_use,
                     add_slope,
                     mlp_model_sep.name)
 
                 X_test = reshape_X(
                     X_test,
-                    n_features,
+                    [n_features],
                     inputs_to_use,
                     add_slope,
                     mlp_model_sep.name)
@@ -237,7 +247,7 @@ def main():
                     monitor='val_loss',
                     patience=patience,
                     verbose=1,
-                    restore_best_weights=True)
+                    restore_best_weights=True, )
 
                 # Compile the model with the specified learning rate
                 mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
@@ -258,27 +268,28 @@ def main():
                                             ])
 
                 # Plot the training and validation loss
-                plt.figure(figsize=(12, 6))
-                plt.plot(history.history['loss'], label='Training Loss')
-                plt.plot(history.history['val_loss'], label='Validation Loss')
-                plt.title('Training and Validation Loss')
-                plt.xlabel('Epochs')
-                plt.ylabel('Loss')
-                plt.legend()
-                # save the plot
-                plt.savefig(f'mlp_loss_{title}.png')
+                # plt.figure(figsize=(12, 6))
+                # plt.plot(history.history['loss'], label='Training Loss')
+                # plt.plot(history.history['val_loss'], label='Validation Loss')
+                # plt.title('Training and Validation Loss')
+                # plt.xlabel('Epochs')
+                # plt.ylabel('Loss')
+                # plt.legend()
+                # # save the plot
+                # plt.savefig(f'mlp_loss_{title}.png')
 
                 # Determine the optimal number of epochs from early stopping
                 optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
-                final_mlp_model_sep = create_gru(
-                    input_dims=n_features,
-                    gru_units=gru_units,
-                    gru_layers=gru_layers,
+                final_mlp_model_sep = create_mlp(
+                    input_dim=n_features,
+                    hiddens=hiddens,
                     repr_dim=repr_dim,
                     output_dim=output_dim,
                     dropout_rate=dropout,
                     activation=activation,
-                    norm=norm
+                    norm=norm,
+                    residual=residual,
+                    skipped_layers=skipped_layers
                 )
 
                 # Recreate the model architecture
@@ -304,10 +315,10 @@ def main():
                 wandb.log({"mae_error": error_mae})
 
                 # evaluate the model on training cme_files
-                error_mae = evaluate_model(final_mlp_model_sep, X_train, y_train)
-                print(f'training mae error: {error_mae}')
+                error_mae_train = evaluate_model(final_mlp_model_sep, X_train, y_train)
+                print(f'mae error train: {error_mae_train}')
                 # Log the MAE error to wandb
-                wandb.log({"train_mae_error": error_mae})
+                wandb.log({"train_mae_error": error_mae_train})
 
                 # Process SEP event files in the specified directory
                 test_directory = root_dir + '/testing'
