@@ -1805,6 +1805,66 @@ def evaluate_model_cond(
 
     return mae_loss
 
+def evaluate_model_dummy(y_test: np.ndarray) -> float:
+    """
+    Evaluates dummy predictions (always 0) using Mean Absolute Error (MAE) on the provided test data.
+
+    Parameters:
+    - y_test (np.ndarray): True target values for the test set.
+
+    Returns:
+    - float: The MAE loss for the dummy predictions.
+    """
+    # Create dummy predictions, an array of zeros with the same shape as y_test
+    dummy_predictions = np.zeros_like(y_test)
+
+    # Assume process_predictions is a function you use to preprocess your predictions and true labels.
+    # If you have such a function, apply it here. Otherwise, you can directly calculate MAE.
+    # dummy_predictions = process_predictions(dummy_predictions)
+    # y_test = process_predictions(y_test)
+
+    # Calculate MAE
+    mae_loss = mean_absolute_error(y_test, dummy_predictions)
+
+    return mae_loss
+def evaluate_model_cond_dummy(
+        y_test: np.ndarray,
+        below_threshold: float = None,
+        above_threshold: float = None) -> float:
+    """
+    Evaluates dummy predictions (always 0) using Mean Absolute Error (MAE) on the provided test data,
+    with an option to conditionally calculate MAE based on specified thresholds.
+
+    Parameters:
+    - y_test (np.ndarray): True target values for the test set.
+    - below_threshold (float, optional): The lower bound threshold for y_test to be included in MAE calculation.
+    - above_threshold (float, optional): The upper bound threshold for y_test to be included in MAE calculation.
+
+    Returns:
+    - float: The MAE loss for the dummy predictions on the filtered test data.
+    """
+    # Create dummy predictions, an array of zeros with the same shape as y_test
+    dummy_predictions = np.zeros_like(y_test)
+
+    # Filter y_test based on thresholds
+    if below_threshold is not None and above_threshold is not None:
+        mask = (y_test >= above_threshold) | (y_test <= below_threshold)
+    elif below_threshold is not None:
+        mask = y_test <= below_threshold
+    elif above_threshold is not None:
+        mask = y_test >= above_threshold
+    else:
+        mask = np.ones_like(y_test, dtype=bool)
+
+    filtered_y_test = y_test[mask]
+    filtered_dummy_predictions = dummy_predictions[mask]  # This remains zeros but matches the filtered_y_test's shape
+
+    # Calculate MAE
+    mae_loss = mean_absolute_error(filtered_y_test, filtered_dummy_predictions)
+
+    return mae_loss
+
+
 
 def reshape_X(
         X: np.ndarray,
