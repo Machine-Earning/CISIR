@@ -14,7 +14,7 @@ from wandb.keras import WandbCallback
 from modules.evaluate.utils import plot_tsne_pds_delta, plot_repr_correlation
 from modules.training import cme_modeling
 from modules.training.ts_modeling import build_dataset, create_mlp, reshape_X
-from modules.training.DenseReweights import exDenseJointReweights
+from modules.reweighting.exDenseJointReweightsGPU import exDenseJointReweightsGPU
 
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 
@@ -184,7 +184,7 @@ def main():
                 print(f'rebalancing the training set...')
                 min_norm_weight = 0.01 / len(delta_train)
 
-                train_jweights = exDenseJointReweights(
+                train_jweights = exDenseJointReweightsGPU(
                     X_train, delta_train,
                     alpha=alpha_rw, bw=bandwidth,
                     min_norm_weight=min_norm_weight, debug=False)
@@ -197,7 +197,7 @@ def main():
                 print(f'rebalancing the subtraining set...')
                 min_norm_weight = 0.01 / len(delta_subtrain)
 
-                subtrain_jweights = exDenseJointReweights(
+                subtrain_jweights = exDenseJointReweightsGPU(
                     X_subtrain, delta_subtrain,
                     alpha=alpha_rw, bw=bandwidth,
                     min_norm_weight=min_norm_weight, debug=False)
