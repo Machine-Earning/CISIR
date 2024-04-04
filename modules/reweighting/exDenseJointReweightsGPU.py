@@ -9,7 +9,47 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray
 from scipy.stats import gaussian_kde
-import cupy as cp
+import tensorflow as tf
+
+
+def adjust_bandwidth(kde: gaussian_kde, factor: Union[float, int]) -> None:
+    """
+    Adjust the bandwidth of a given KDE object by a multiplicative factor.
+
+    Parameters:
+    - kde (gaussian_kde): The KDE object whose bandwidth needs to be adjusted.
+    - factor (float|int): The factor by which to adjust the bandwidth.
+
+    Returns:
+    - None: The function modifies the KDE object in-place.
+    """
+    # Obtain the original bandwidth (factor)
+    original_bw = kde.factor
+
+    # Calculate the adjusted bandwidth
+    adjusted_bw = original_bw * factor
+
+    # Set the adjusted bandwidth back into the KDE object
+    kde.set_bandwidth(bw_method=adjusted_bw)
+
+
+def compute_joint_hist_density(ya_values, yb_values, bins=30):
+    """
+    Computes the joint histogram density for a set of ya and yb values.
+
+    :param ya_values: NumPy array of ya values to be binned.
+    :param yb_values: NumPy array of yb values to be binned.
+    :param bins: Number of bins or a sequence defining the bin edges.
+    :return: Joint histogram density as a 2D NumPy array.
+    """
+    hist, x_edges, y_edges = np.histogram2d(ya_values, yb_values, bins=bins, density=True)
+
+    # Create 2D array representing the bin centers
+    x_centers = (x_edges[:-1] + x_edges[1:]) / 2
+    y_centers = (y_edges[:-1] + y_edges[1:]) / 2
+    X, Y = np.meshgrid(x_centers, y_centers)
+
+    return hist, X, Y
 
 
 class exDenseJointReweightsGPU:
@@ -75,26 +115,6 @@ class exDenseJointReweightsGPU:
             print('joint indices', self.jindices[:12])
             print('joint reweights: ', self.jreweights[:12])
             self.plot_density_kde_jreweights()
-
-    def adjust_bandwidth(self, kde: gaussian_kde, factor: Union[float, int]) -> None:
-        """
-        Adjust the bandwidth of a given KDE object by a multiplicative factor.
-
-        Parameters:
-        - kde (gaussian_kde): The KDE object whose bandwidth needs to be adjusted.
-        - factor (float|int): The factor by which to adjust the bandwidth.
-
-        Returns:
-        - None: The function modifies the KDE object in-place.
-        """
-        # Obtain the original bandwidth (factor)
-        original_bw = kde.factor
-
-        # Calculate the adjusted bandwidth
-        adjusted_bw = original_bw * factor
-
-        # Set the adjusted bandwidth back into the KDE object
-        kde.set_bandwidth(bw_method=adjusted_bw)
 
     def preprocess_jreweighting(self, y: ndarray) -> Tuple[ndarray, List[Tuple[int, int]]]:
         """
@@ -226,24 +246,6 @@ class exDenseJointReweightsGPU:
         """
         return self.kde.evaluate(ya) * self.kde.evaluate(yb)
 
-    def compute_joint_hist_density(self, ya_values, yb_values, bins=30):
-        """
-        Computes the joint histogram density for a set of ya and yb values.
-
-        :param ya_values: NumPy array of ya values to be binned.
-        :param yb_values: NumPy array of yb values to be binned.
-        :param bins: Number of bins or a sequence defining the bin edges.
-        :return: Joint histogram density as a 2D NumPy array.
-        """
-        hist, x_edges, y_edges = np.histogram2d(ya_values, yb_values, bins=bins, density=True)
-
-        # Create 2D array representing the bin centers
-        x_centers = (x_edges[:-1] + x_edges[1:]) / 2
-        y_centers = (y_edges[:-1] + y_edges[1:]) / 2
-        X, Y = np.meshgrid(x_centers, y_centers)
-
-        return hist, X, Y
-
     def plot_density_kde_jreweights(self):
         """
         Plot the joint label density, joint KDE, and joint reweights as separate subplots.
@@ -254,7 +256,7 @@ class exDenseJointReweightsGPU:
         ya_values = Y1.ravel()
         yb_values = Y2.ravel()
 
-        joint_hist_density, X, Y = self.compute_joint_hist_density(ya_values, yb_values)
+        joint_hist_density, X, Y = compute_joint_hist_density(ya_values, yb_values)
         joint_kde_values = self.compute_joint_kde(ya_values, yb_values)
         joint_reweights = self.normalized_jreweight(ya_values, yb_values, self.alpha)
 

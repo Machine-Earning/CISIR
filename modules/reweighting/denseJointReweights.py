@@ -11,6 +11,7 @@ from numpy import ndarray
 from scipy.stats import gaussian_kde
 
 
+
 class DenseJointReweights:
     """
     Class for generating synthetic regression datasets.
