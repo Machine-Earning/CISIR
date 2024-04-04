@@ -11,6 +11,46 @@ from numpy import ndarray
 from scipy.stats import gaussian_kde
 
 
+def adjust_bandwidth(kde: gaussian_kde, factor: Union[float, int]) -> None:
+    """
+    Adjust the bandwidth of a given KDE object by a multiplicative factor.
+
+    Parameters:
+    - kde (gaussian_kde): The KDE object whose bandwidth needs to be adjusted.
+    - factor (float|int): The factor by which to adjust the bandwidth.
+
+    Returns:
+    - None: The function modifies the KDE object in-place.
+    """
+    # Obtain the original bandwidth (factor)
+    original_bw = kde.factor
+
+    # Calculate the adjusted bandwidth
+    adjusted_bw = original_bw * factor
+
+    # Set the adjusted bandwidth back into the KDE object
+    kde.set_bandwidth(bw_method=adjusted_bw)
+
+
+def compute_joint_hist_density(ya_values, yb_values, bins=30):
+    """
+    Computes the joint histogram density for a set of ya and yb values.
+
+    :param ya_values: NumPy array of ya values to be binned.
+    :param yb_values: NumPy array of yb values to be binned.
+    :param bins: Number of bins or a sequence defining the bin edges.
+    :return: Joint histogram density as a 2D NumPy array.
+    """
+    hist, x_edges, y_edges = np.histogram2d(ya_values, yb_values, bins=bins, density=True)
+
+    # Create 2D array representing the bin centers
+    x_centers = (x_edges[:-1] + x_edges[1:]) / 2
+    y_centers = (y_edges[:-1] + y_edges[1:]) / 2
+    X, Y = np.meshgrid(x_centers, y_centers)
+
+    return hist, X, Y
+
+
 class exDenseJointReweights:
     """
     Class for generating synthetic regression datasets.
@@ -43,10 +83,12 @@ class exDenseJointReweights:
 
         The target values (y) are calculated as the L2 norm (Euclidean norm) of the input features.
 
-        :param n_train: Number of training instances.
-        :param n_test: Number of testing instances.
-        :param n_features: Number of input features.
+        :param X: Training instances.
+        :param y: Training labels.
+        :param bw: bandwidth for the KDE.
         :param alpha: reweighing coefficient
+        :param min_norm_weight: minimum normalized weight
+        :param debug: whether to activate debugging logs
         """
 
         self.yb = None
@@ -72,26 +114,6 @@ class exDenseJointReweights:
             print('joint indices', self.jindices[:12])
             print('joint reweights: ', self.jreweights[:12])
             self.plot_density_kde_jreweights()
-
-    def adjust_bandwidth(self, kde: gaussian_kde, factor: Union[float, int]) -> None:
-        """
-        Adjust the bandwidth of a given KDE object by a multiplicative factor.
-
-        Parameters:
-        - kde (gaussian_kde): The KDE object whose bandwidth needs to be adjusted.
-        - factor (float|int): The factor by which to adjust the bandwidth.
-
-        Returns:
-        - None: The function modifies the KDE object in-place.
-        """
-        # Obtain the original bandwidth (factor)
-        original_bw = kde.factor
-
-        # Calculate the adjusted bandwidth
-        adjusted_bw = original_bw * factor
-
-        # Set the adjusted bandwidth back into the KDE object
-        kde.set_bandwidth(bw_method=adjusted_bw)
 
     def preprocess_jreweighting(self, y: ndarray) -> Tuple[ndarray, List[Tuple[int, int]]]:
         """
@@ -127,48 +149,48 @@ class exDenseJointReweights:
         index_pairs = list(zip(i, j))
 
         print('joint reweighting done')
-
+        # should return to cpu
         return normalized_joint_factors, index_pairs
 
-    def normalized_jreweight(self, ya: ndarray, yb: ndarray, alpha: float, epsilon: float = 1e-7) -> ndarray:
+    def normalized_jreweight(self, ya: ndarray, yb: ndarray, alpha: float) -> ndarray:
         """
         Calculate the normalized reweighting factor for joint labels ya and yb.
 
-        :param ya, yb: The y-values as NumPy arrays.
+        :param ya: The y-values as NumPy arrays.
+        :param yb: The y-values as NumPy arrays.
         :param alpha: Parameter to adjust the reweighting.
-        :param epsilon: A small constant to avoid zero reweighting.
         :return: The normalized reweighting factor for the labels as a NumPy array.
         """
         # Ensure average reweight is not zero to avoid division by zero
         if self.avg_jreweight == 0:
             raise ValueError("Average reweighting factor should not be zero.")
 
-        jreweight_factor = self.jreweight(ya, yb, alpha, epsilon)
+        jreweight_factor = self.jreweight(ya, yb, alpha)
         normalized_joint_factor = jreweight_factor / self.avg_jreweight
 
         return normalized_joint_factor
 
-    def find_avg_jreweight(self, ya: ndarray, yb: ndarray, alpha: float, epsilon: float = 1e-7) -> float:
+    def find_avg_jreweight(self, ya: ndarray, yb: ndarray, alpha: float):
         """
         Find the average reweighting factor for joint labels ya and yb.
-        :param ya, yb: labels.
+        :param ya: labels.
+        :param yb: labels.
         :param alpha: Parameter to adjust the reweighting.
-        :param epsilon: A small constant to avoid zero reweighting.
         :return: The average reweighting factor.
         """
 
-        total_jreweight = np.sum(self.jreweight(ya, yb, alpha, epsilon))
+        total_jreweight = np.sum(self.jreweight(ya, yb, alpha))
         count = len(ya)
 
         self.avg_jreweight = total_jreweight / count if count > 0 else 0
 
-    def jreweight(self, ya: ndarray, yb: ndarray, alpha: float, epsilon: float = 1e-7) -> ndarray:
+    def jreweight(self, ya: ndarray, yb: ndarray, alpha: float) -> ndarray:
         """
         Calculate the reweighting factor for joint labels ya and yb.
 
-        :param ya, yb: The y-values of the cme_files points as NumPy arrays.
+        :param ya: The y-values of the cme_files points as NumPy arrays.
+        :param yb: The y-values of the cme_files points as NumPy arrays.
         :param alpha: Parameter to adjust the reweighting.
-        :param epsilon: A small constant to avoid zero reweighting.
         :return: The reweighting factor for the labels as a NumPy array.
         """
         # Compute the joint density
@@ -221,24 +243,6 @@ class exDenseJointReweights:
         """
         return self.kde.evaluate(ya) * self.kde.evaluate(yb)
 
-    def compute_joint_hist_density(self, ya_values, yb_values, bins=30):
-        """
-        Computes the joint histogram density for a set of ya and yb values.
-
-        :param ya_values: NumPy array of ya values to be binned.
-        :param yb_values: NumPy array of yb values to be binned.
-        :param bins: Number of bins or a sequence defining the bin edges.
-        :return: Joint histogram density as a 2D NumPy array.
-        """
-        hist, x_edges, y_edges = np.histogram2d(ya_values, yb_values, bins=bins, density=True)
-
-        # Create 2D array representing the bin centers
-        x_centers = (x_edges[:-1] + x_edges[1:]) / 2
-        y_centers = (y_edges[:-1] + y_edges[1:]) / 2
-        X, Y = np.meshgrid(x_centers, y_centers)
-
-        return hist, X, Y
-
     def plot_density_kde_jreweights(self):
         """
         Plot the joint label density, joint KDE, and joint reweights as separate subplots.
@@ -249,7 +253,7 @@ class exDenseJointReweights:
         ya_values = Y1.ravel()
         yb_values = Y2.ravel()
 
-        joint_hist_density, X, Y = self.compute_joint_hist_density(ya_values, yb_values)
+        joint_hist_density, X, Y = compute_joint_hist_density(ya_values, yb_values)
         joint_kde_values = self.compute_joint_kde(ya_values, yb_values)
         joint_reweights = self.normalized_jreweight(ya_values, yb_values, self.alpha)
 

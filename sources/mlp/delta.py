@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,7 +12,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
 
-from modules.training.DenseReweights import exDenseReweights
+from modules.reweighting.exDenseReweights import exDenseReweights
 from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
