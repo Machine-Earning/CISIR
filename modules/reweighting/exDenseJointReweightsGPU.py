@@ -128,14 +128,13 @@ class exDenseJointReweightsGPU:
 
         # Step 1: Find all unique pairs of ya and yb
         print('starting joint reweighting on GPU')
-        y_gpu = cp.asarray(y)
+        y_tensor = tf.constant(y)
         n = len(y)
-        # i, j = np.triu_indices(n, k=1)  # Get upper triangle indices, excluding diagonal
-        i, j = cp.triu_indices(n, k=1)
-        self.ya, self.yb = y_gpu[i], y_gpu[j]  # Get the unique pairs of ya and yb
-        # Convert to NumPy arrays for efficient numerical operations
-        # self.ya = np.array(self.ya)
-        # self.yb = np.array(self.yb)
+        i, j = tf.meshgrid(tf.range(n), tf.range(n), indexing='ij')
+        mask = tf.greater(i, j)  # Upper triangle mask
+        i = tf.boolean_mask(i, mask)
+        j = tf.boolean_mask(j, mask)
+        self.ya, self.yb = tf.gather(y_tensor, i), tf.gather(y_tensor, j)  # Get the unique pairs of ya and yb
 
         # Step 2: Find min and max joint PDF values and store them
         print('finding min and max joint pdf')
@@ -149,20 +148,23 @@ class exDenseJointReweightsGPU:
         print('calculating normalized joint reweight')
         normalized_joint_factors = self.normalized_jreweight(self.ya, self.yb, self.alpha)
         # Create a list of index pairs corresponding to ya and yb
-        index_pairs = list(zip(i.tolist(), j.tolist()))
+        index_pairs = list(zip(i.numpy(), j.numpy()))
 
         print('joint reweighting done')
+        normalized_joint_factors = normalized_joint_factors.numpy()
+        self.ya = self.ya.numpy()
+        self.yb = self.yb.numpy()
 
         return normalized_joint_factors, index_pairs
 
-    def normalized_jreweight(self, ya: ndarray, yb: ndarray, alpha: float) -> ndarray:
+    def normalized_jreweight(self, ya: tf.Tensor, yb: tf.Tensor, alpha: float) -> tf.Tensor:
         """
         Calculate the normalized reweighting factor for joint labels ya and yb.
 
-        :param ya: The y-values as NumPy arrays.
-        :param yb: The y-values as NumPy arrays.
+        :param ya: The y-values as TensorFlow tensors.
+        :param yb: The y-values as TensorFlow tensors.
         :param alpha: Parameter to adjust the reweighting.
-        :return: The normalized reweighting factor for the labels as a NumPy array.
+        :return: The normalized reweighting factor for the labels as a TensorFlow tensor.
         """
         # Ensure average reweight is not zero to avoid division by zero
         if self.avg_jreweight == 0:
@@ -173,7 +175,7 @@ class exDenseJointReweightsGPU:
 
         return normalized_joint_factor
 
-    def find_avg_jreweight(self, ya: cp.ndarray, yb: cp.ndarray, alpha: float):
+    def find_avg_jreweight(self, ya: tf.Tensor, yb: tf.Tensor, alpha: float):
         """
         Find the average reweighting factor for joint labels ya and yb.
         :param ya: labels.
@@ -182,19 +184,19 @@ class exDenseJointReweightsGPU:
         :return: The average reweighting factor.
         """
 
-        total_jreweight = cp.sum(self.jreweight(ya, yb, alpha))
-        count = len(ya)
+        total_jreweight = tf.reduce_sum(self.jreweight(ya, yb, alpha))
+        count = tf.size(ya)
 
-        self.avg_jreweight = total_jreweight / count if count > 0 else 0
+        self.avg_jreweight = total_jreweight / tf.cast(count, tf.float16) if count > 0 else 0
 
-    def jreweight(self, ya: cp.ndarray, yb: cp.ndarray, alpha: float) -> cp.ndarray:
+    def jreweight(self, ya: tf.Tensor, yb: tf.Tensor, alpha: float) -> tf.Tensor:
         """
         Calculate the reweighting factor for joint labels ya and yb.
 
-        :param ya: The y-values of the cme_files points as NumPy arrays.
-        :param yb: The y-values of the cme_files points as NumPy arrays.
+        :param ya: The y-values of the cme_files points as TensorFlow tensors.
+        :param yb: The y-values of the cme_files points as TensorFlow tensors.
         :param alpha: Parameter to adjust the reweighting.
-        :return: The reweighting factor for the labels as a NumPy array.
+        :return: The reweighting factor for the labels as a TensorFlow tensor.
         """
         # Compute the joint density
         joint_density = self.jpdf(ya, yb)
@@ -203,20 +205,16 @@ class exDenseJointReweightsGPU:
         normalized_jpdf = (joint_density - self.min_jpdf) / (self.max_jpdf - self.min_jpdf)
 
         # Compute the reweighting factor
-        # if self.min_norm_weight is not None:
-        #     epsilon = self.min_norm_weight ** 2
-
         jreweighting_factor = (1 / (normalized_jpdf + 1e-8)) ** alpha
-        # jreweighting_factor = np.maximum(1 - alpha * normalized_jpdf, epsilon)
 
         return jreweighting_factor
 
-    def find_min_max_jpdf(self, ya: cp.ndarray, yb: cp.ndarray) -> None:
+    def find_min_max_jpdf(self, ya: tf.Tensor, yb: tf.Tensor) -> None:
         """
-        Find the minimum and maximum joint PDF values for a given NumPy array of labels ya and yb.
+        Find the minimum and maximum joint PDF values for a given TensorFlow tensor of labels ya and yb.
 
-        :param ya: A NumPy array containing labels for the first variable.
-        :param yb: A NumPy array containing labels for the second variable.
+        :param ya: A TensorFlow tensor containing labels for the first variable.
+        :param yb: A TensorFlow tensor containing labels for the second variable.
         :return: None. Updates self.min_jpdf and self.max_jpdf.
         """
         joint_pdf_values = self.jpdf(ya, yb)
@@ -224,8 +222,8 @@ class exDenseJointReweightsGPU:
         # all the possible pairings of original ya and yb
         # and this ya and yb will admit duplicates
 
-        self.min_jpdf = cp.min(joint_pdf_values)
-        self.max_jpdf = cp.max(joint_pdf_values)
+        self.min_jpdf = tf.reduce_min(joint_pdf_values)
+        self.max_jpdf = tf.reduce_max(joint_pdf_values)
 
     def compute_joint_kde(self, ya_values, yb_values):
         """
@@ -236,15 +234,17 @@ class exDenseJointReweightsGPU:
         kde_yb = self.kde.evaluate(yb_values)
         return kde_ya * kde_yb
 
-    def jpdf(self, ya: cp.ndarray, yb: cp.ndarray) -> cp.ndarray:
+    def jpdf(self, ya: tf.Tensor, yb: tf.Tensor) -> tf.Tensor:
         """
         Joint Probability Density Function for labels ya and yb.
 
-        :param ya: The y value for the first variable as a NumPy array.
-        :param yb: The y value for the second variable as a NumPy array.
-        :return: The joint probability density as a NumPy array.
+        :param ya: The y value for the first variable as a TensorFlow tensor.
+        :param yb: The y value for the second variable as a TensorFlow tensor.
+        :return: The joint probability density as a TensorFlow tensor.
         """
-        return self.kde.evaluate(ya) * self.kde.evaluate(yb)
+        kde_ya = tf.convert_to_tensor(self.kde.evaluate(ya.numpy()))
+        kde_yb = tf.convert_to_tensor(self.kde.evaluate(yb.numpy()))
+        return kde_ya * kde_yb
 
     def plot_density_kde_jreweights(self):
         """
