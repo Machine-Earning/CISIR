@@ -3,7 +3,7 @@ import random
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import numpy as np
 import tensorflow as tf
@@ -14,6 +14,12 @@ from wandb.keras import WandbCallback
 from modules.evaluate.utils import plot_tsne_pds_delta, plot_repr_correlation
 from modules.training import cme_modeling
 from modules.training.ts_modeling import build_dataset, create_mlp, reshape_X
+
+from tensorflow.keras.mixed_precision import experimental as mixed_precision
+
+# Set up mixed precision
+policy = mixed_precision.Policy('mixed_float16')
+mixed_precision.set_policy(policy)
 
 # SEEDING
 SEED = 456789  # seed number
@@ -47,7 +53,7 @@ def main():
             # add_slope = True
             outputs_to_use = ['delta_p']
 
-            bs = 5000  # full dataset used
+            bs = 10000  # full dataset used
             print(f'batch size : {bs}')
 
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -67,11 +73,24 @@ def main():
                 'batch_size': bs,  # Assuming batch_size is defined elsewhere
                 'epochs': 50000,
                 'patience': 5000,  # Updated to 50
-                'learning_rate': 1e-1,  # Updated to 3e-4
+                'learning_rate': 1e-2,  # Updated to 3e-4
                 'weight_decay': 1e-8,  # Added weight decay
                 'momentum_beta1': 0.97,  # Added momentum beta1
             }
-            hiddens = [2048, 1024, 512, 256, 128, 64, 32]
+            hiddens = [
+                2048, 1024,
+                    2048, 1024,
+                    1024, 512,
+                    1024, 512,
+                    512, 256,
+                    512, 256,
+                    128, 64,
+                    128, 64,
+                    64, 32,
+                    64, 32,
+                    32, 16,
+                    32, 16
+            ]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
             pds = True
             target_change = ('delta_p' in outputs_to_use)
@@ -86,6 +105,9 @@ def main():
                 verbose=1,
                 min_delta=1e-5,
                 min_lr=1e-10)
+            residual = True
+            skipped_layers = 2
+
 
             # Initialize wandb
             wandb.init(project="nasa-ts-pds-delta", name=experiment_name, config={
@@ -109,6 +131,9 @@ def main():
                 "norm": norm,
                 "optimizer": "adamw",
                 "architecture": "mlp",
+                "residual": residual,
+                "skipped_layers": skipped_layers
+
             })
 
             # set the root directory
@@ -158,7 +183,9 @@ def main():
                 repr_dim=repr_dim,
                 dropout_rate=dropout_rate,
                 activation=activation,
-                norm=norm
+                norm=norm,
+                residual=residual,
+                skipped_layers=skipped_layers
             )
             mlp_model_sep.summary()
 
