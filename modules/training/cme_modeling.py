@@ -1948,12 +1948,12 @@ class ModelBuilder:
 
         # Apply sample weights if provided
         if sample_weights is not None:
-            # Convert sample_weights to a lookup table
-            keys = tf.constant(list(sample_weights.keys()), dtype=tf.float32)
+            # Convert sample_weights keys to strings
+            keys = tf.constant(list(map(str, sample_weights.keys())), dtype=tf.string)
             values = tf.constant(list(sample_weights.values()), dtype=tf.float32)
             table = tf.lookup.StaticHashTable(tf.lookup.KeyValueTensorInitializer(keys, values), default_value=1.0)
             # Lookup the weights for each y_true value
-            weights = table.lookup(tf.reshape(y_true, [-1]))
+            weights = table.lookup(tf.as_string(tf.reshape(y_true, [-1])))
             weights_matrix = weights[:, None] * weights[None, :]
             # Apply the weights to the pairwise loss
             pairwise_loss *= weights_matrix
