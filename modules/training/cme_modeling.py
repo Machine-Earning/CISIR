@@ -1955,6 +1955,8 @@ class ModelBuilder:
             # Lookup the weights for each y_true value
             weights = table.lookup(tf.as_string(tf.reshape(y_true, [-1])))
             weights_matrix = weights[:, None] * weights[None, :]
+            # Cast weights_matrix to the same data type as z_diff_squared
+            weights_matrix = tf.cast(weights_matrix, dtype=z_diff_squared.dtype)
             # Apply the weights to the pairwise loss
             pairwise_loss *= weights_matrix
 
