@@ -3,7 +3,7 @@ import random
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import numpy as np
 import tensorflow as tf
@@ -19,8 +19,8 @@ from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 
 # Set up mixed precision
-policy = mixed_precision.Policy('mixed_float16')
-mixed_precision.set_policy(policy)
+# policy = mixed_precision.Policy('mixed_float16')
+# mixed_precision.set_policy(policy)
 
 # SEEDING
 SEED = 456789  # seed number
@@ -55,7 +55,7 @@ def main():
                 # add_slope = True
                 outputs_to_use = ['delta_p']
 
-                bs = 20000  # full dataset used
+                bs = 12000  # full dataset used
                 print(f'batch size : {bs}')
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
