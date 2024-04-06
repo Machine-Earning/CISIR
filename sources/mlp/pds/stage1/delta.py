@@ -15,11 +15,11 @@ from modules.evaluate.utils import plot_tsne_delta, plot_repr_correlation
 from modules.training import cme_modeling
 from modules.training.ts_modeling import build_dataset, create_mlp, reshape_X
 
-from tensorflow.keras.mixed_precision import experimental as mixed_precision
-
-# Set up mixed precision
-policy = mixed_precision.Policy('mixed_float16')
-mixed_precision.set_policy(policy)
+# from tensorflow.keras.mixed_precision import experimental as mixed_precision
+#
+# # Set up mixed precision
+# policy = mixed_precision.Policy('mixed_float16')
+# mixed_precision.set_policy(policy)
 
 # SEEDING
 SEED = 456789  # seed number
@@ -53,7 +53,7 @@ def main():
             # add_slope = True
             outputs_to_use = ['delta_p']
 
-            bs = 10000  # full dataset used
+            bs = 12000  # full dataset used
             print(f'batch size : {bs}')
 
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -79,17 +79,17 @@ def main():
             }
             hiddens = [
                 2048, 1024,
-                    2048, 1024,
-                    1024, 512,
-                    1024, 512,
-                    512, 256,
-                    512, 256,
-                    128, 64,
-                    128, 64,
-                    64, 32,
-                    64, 32,
-                    32, 16,
-                    32, 16
+                2048, 1024,
+                1024, 512,
+                1024, 512,
+                512, 256,
+                512, 256,
+                128, 64,
+                128, 64,
+                64, 32,
+                64, 32,
+                32, 16,
+                32, 16
             ]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
             pds = True
@@ -108,9 +108,8 @@ def main():
             residual = True
             skipped_layers = 2
 
-
             # Initialize wandb
-            wandb.init(project="nasa-ts-pds-delta", name=experiment_name, config={
+            wandb.init(project="nasa-ts-pds-delta-re", name=experiment_name, config={
                 "inputs_to_use": inputs_to_use,
                 "add_slope": add_slope,
                 "target_change": target_change,
@@ -228,16 +227,26 @@ def main():
                          patience=Options['patience'], save_tag=current_time + title + "_features",
                          callbacks_list=[WandbCallback(save_model=False), reduce_lr_on_plateau])
 
-            file_path = plot_tsne_delta(mlp_model_sep, X_train, y_train, title, 'training', save_tag=current_time,
-                                        seed=SEED)
+            file_path = plot_tsne_delta(
+                mlp_model_sep,
+                X_train, y_train, title,
+                'training',
+                model_type='features',
+                save_tag=current_time,
+                seed=SEED)
 
             # Log t-SNE plot for training
             # Log the training t-SNE plot to wandb
             wandb.log({'tsne_training_plot': wandb.Image(file_path)})
             print('file_path: ' + file_path)
 
-            file_path = plot_tsne_delta(mlp_model_sep, X_test, y_test, title, 'testing', save_tag=current_time,
-                                        seed=SEED)
+            file_path = plot_tsne_delta(
+                mlp_model_sep,
+                X_test, y_test, title,
+                'testing',
+                model_type='features',
+                save_tag=current_time,
+                seed=SEED)
 
             # Log t-SNE plot for testing
             # Log the testing t-SNE plot to wandb

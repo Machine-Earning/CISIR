@@ -48,7 +48,7 @@ def main():
                 # add_slope = True
                 outputs_to_use = ['delta_p']
 
-                bs = 5000  # full dataset used
+                bs = 12000  # full dataset used
                 print(f'batch size : {bs}')
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -68,11 +68,24 @@ def main():
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
                     'epochs': 50000,
                     'patience': 5000,  # Updated to 50
-                    'learning_rate': 1e-1,  # Updated to 3e-4
+                    'learning_rate': 1e-2,  # Updated to 3e-4
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.97,  # Added momentum beta1
                 }
-                hiddens = [2048, 1024, 512, 256, 128, 64, 32]
+                hiddens = [
+                    2048, 1024,
+                    2048, 1024,
+                    1024, 512,
+                    1024, 512,
+                    512, 256,
+                    512, 256,
+                    128, 64,
+                    128, 64,
+                    64, 32,
+                    64, 32,
+                    32, 16,
+                    32, 16
+                ]
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 pds = True
                 target_change = ('delta_p' in outputs_to_use)
@@ -87,6 +100,8 @@ def main():
                     verbose=1,
                     min_delta=1e-5,
                     min_lr=1e-10)
+                residual = True
+                skipped_layers = 2
 
                 # Initialize wandb
                 wandb.init(project="nasa-ts-pds-delta", name=experiment_name, config={
@@ -110,7 +125,9 @@ def main():
                     "norm": norm,
                     "optimizer": "adamw",
                     "architecture": "mlp",
-                    'cme_speed_threshold': cme_speed_threshold
+                    'cme_speed_threshold': cme_speed_threshold,
+                    "residual": residual,
+                    "skipped_layers": skipped_layers
                 })
 
                 # set the root directory
@@ -164,7 +181,9 @@ def main():
                     repr_dim=repr_dim,
                     dropout_rate=dropout_rate,
                     activation=activation,
-                    norm=norm
+                    norm=norm,
+                    residual=residual,
+                    skipped_layers=skipped_layers
                 )
                 mlp_model_sep.summary()
 
@@ -207,16 +226,26 @@ def main():
                              patience=Options['patience'], save_tag=current_time + title + "_features",
                              callbacks_list=[WandbCallback(save_model=False), reduce_lr_on_plateau])
 
-                file_path = plot_tsne_delta(mlp_model_sep, X_train, y_train, title, 'training', save_tag=current_time,
-                                            seed=SEED)
+                file_path = plot_tsne_delta(
+                    mlp_model_sep,
+                    X_train, y_train, title,
+                    'training',
+                    model_type='features',
+                    save_tag=current_time,
+                    seed=SEED)
 
                 # Log t-SNE plot for training
                 # Log the training t-SNE plot to wandb
                 wandb.log({'tsne_training_plot': wandb.Image(file_path)})
                 print('file_path: ' + file_path)
 
-                file_path = plot_tsne_delta(mlp_model_sep, X_test, y_test, title, 'testing', save_tag=current_time,
-                                            seed=SEED)
+                file_path = plot_tsne_delta(
+                    mlp_model_sep,
+                    X_test, y_test, title,
+                    'testing',
+                    model_type='features',
+                    save_tag=current_time,
+                    seed=SEED)
 
                 # Log t-SNE plot for testing
                 # Log the testing t-SNE plot to wandb

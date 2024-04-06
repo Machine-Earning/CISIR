@@ -63,7 +63,7 @@ def main():
                     inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                     # Construct the title
-                    title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDS_bs{bs}_CME{cme_speed_threshold}'
+                    title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDS_bs{bs}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
 
                     # Replace any other characters that are not suitable for filenames (if any)
                     title = title.replace(' ', '_').replace(':', '_')
@@ -76,7 +76,7 @@ def main():
                         'batch_size': bs,  # Assuming batch_size is defined elsewhere
                         'epochs': 50000,
                         'patience': 5000,  # Updated to 50
-                        'learning_rate': 1e-1,  # Updated to 3e-4
+                        'learning_rate': 1e-2,  # Updated to 3e-4
                         'weight_decay': 1e-8,  # Added weight decay
                         'momentum_beta1': 0.97,  # Added momentum beta1
                     }
