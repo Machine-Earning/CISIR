@@ -969,15 +969,7 @@ class ModelBuilder:
         initial_weights = model.get_weights()
 
         # Initialize early stopping and best epoch variables
-        best_val_loss = float('inf')
         best_epoch = 0
-        epochs_without_improvement = 0
-
-        # Initialize TensorBoard
-        # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        # tensorboard_cb = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
-        #
-        # print("Run the command line:\n tensorboard --logdir logs/fit")
 
         # Optimizer and history initialization
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
@@ -1004,19 +996,6 @@ class ModelBuilder:
 
             print(f"Epoch {epoch + 1}/{epochs}, Loss: {train_loss}, Validation Loss: {val_loss}")
 
-            # Early stopping logic
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                best_epoch = epoch
-                epochs_without_improvement = 0
-                # Save the model weights
-                model.save_weights(f"best_model_weights_{str(save_tag)}.h5")
-            else:
-                epochs_without_improvement += 1
-                if epochs_without_improvement >= patience:
-                    print("Early stopping triggered.")
-                    break
-
             logs = {'loss': train_loss, 'val_loss': val_loss}  # Update logs with your training and validation loss
 
             for cb in callbacks_list:
@@ -1026,14 +1005,14 @@ class ModelBuilder:
             cb.on_train_end(logs=logs)
 
         # Plotting the losses
-        plt.plot(history['loss'], label='Training Loss')
-        plt.plot(history['val_loss'], label='Validation Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.title('Training and Validation Loss Over Epochs')
-        plt.legend()
-        plt.savefig(f"training_plot_{str(save_tag)}.png")
-        plt.close()
+        # plt.plot(history['loss'], label='Training Loss')
+        # plt.plot(history['val_loss'], label='Validation Loss')
+        # plt.xlabel('Epoch')
+        # plt.ylabel('Loss')
+        # plt.title('Training and Validation Loss Over Epochs')
+        # plt.legend()
+        # plt.savefig(f"training_plot_{str(save_tag)}.png")
+        # plt.close()
 
         # Retraining on the combined dataset
         print(f"Retraining to the best epoch: {best_epoch}")
@@ -1043,9 +1022,13 @@ class ModelBuilder:
         # Reset model weights to initial state before retraining
         model.set_weights(initial_weights)
 
-        # NOTE: test if this fixes the issue
+        # Remove early stopping callback before retraining
+        callbacks_list = [cb for cb in callbacks_list if not isinstance(cb, callbacks.EarlyStopping)]
         # Retrain up to the best epoch
         for epoch in range(best_epoch):
+            for cb in callbacks_list:
+                cb.on_epoch_begin(epoch, logs=logs)
+
             retrain_loss = self.train_for_one_epoch(
                 model, optimizer,
                 self.pds_loss_dl_vec,
@@ -1056,6 +1039,14 @@ class ModelBuilder:
             # Log the retrain loss
             retrain_history['loss'].append(retrain_loss)
             print(f"Retrain Epoch {epoch + 1}/{best_epoch}, Loss: {retrain_loss}")
+
+            logs = {'loss': retrain_loss}  # Update logs with retrain loss
+
+            for cb in callbacks_list:
+                cb.on_epoch_end(epoch, logs=logs)
+
+        for cb in callbacks_list:
+            cb.on_train_end(logs=logs)
 
         # Save the final model
         model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
