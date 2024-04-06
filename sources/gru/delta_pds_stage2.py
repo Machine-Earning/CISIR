@@ -11,7 +11,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
 import numpy as np
-from modules.evaluate.utils import plot_tsne_pds_delta, plot_tsne_extended_delta
+from modules.evaluate.utils import plot_tsne_delta, plot_tsne_delta
 from modules.training.DenseReweights import exDenseReweights
 from modules.training.cme_modeling import ModelBuilder
 from modules.training.ts_modeling import (
@@ -215,23 +215,15 @@ def main():
 
                     # Log t-SNE plot for training
                     # Log the training t-SNE plot to wandb
-                    stage1_file_path = plot_tsne_pds_delta(mlp_model_sep_stage1,
-                                                           X_train,
-                                                           y_train,
-                                                           title, 'stage1_training',
-                                                           save_tag=current_time,
-                                                           seed=seed)
+                    stage1_file_path = plot_tsne_delta(mlp_model_sep_stage1, X_train, y_train, title, 'stage1_training',
+                                                       save_tag=current_time, seed=seed)
                     wandb.log({'stage1_tsne_training_plot': wandb.Image(stage1_file_path)})
                     print('stage1_file_path: ' + stage1_file_path)
 
                     # Log t-SNE plot for testing
                     # Log the testing t-SNE plot to wandb
-                    stage1_file_path = plot_tsne_pds_delta(mlp_model_sep_stage1,
-                                                           X_test,
-                                                           y_test,
-                                                           title, 'stage1_testing',
-                                                           save_tag=current_time,
-                                                           seed=seed)
+                    stage1_file_path = plot_tsne_delta(mlp_model_sep_stage1, X_test, y_test, title, 'stage1_testing',
+                                                       save_tag=current_time, seed=seed)
                     wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
                     print('stage1_file_path: ' + stage1_file_path)
 
@@ -370,23 +362,15 @@ def main():
 
                     # Log t-SNE plot for training
                     # Log the training t-SNE plot to wandb
-                    stage2_file_path = plot_tsne_extended_delta(final_mlp_model_sep,
-                                                                X_train,
-                                                                y_train,
-                                                                title, 'stage2_training',
-                                                                save_tag=current_time,
-                                                                seed=seed)
+                    stage2_file_path = plot_tsne_delta(final_mlp_model_sep, X_train, y_train, title, 'stage2_training',
+                                                       save_tag=current_time, seed=seed)
                     wandb.log({'stage2_tsne_training_plot': wandb.Image(stage2_file_path)})
                     print('stage2_file_path: ' + stage2_file_path)
 
                     # Log t-SNE plot for testing
                     # Log the testing t-SNE plot to wandb
-                    stage2_file_path = plot_tsne_extended_delta(final_mlp_model_sep,
-                                                                X_test,
-                                                                y_test,
-                                                                title, 'stage2_testing',
-                                                                save_tag=current_time,
-                                                                seed=seed)
+                    stage2_file_path = plot_tsne_delta(final_mlp_model_sep, X_test, y_test, title, 'stage2_testing',
+                                                       save_tag=current_time, seed=seed)
                     wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage2_file_path)})
                     print('stage2_file_path: ' + stage2_file_path)
 

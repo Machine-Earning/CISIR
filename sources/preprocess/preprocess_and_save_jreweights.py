@@ -11,7 +11,7 @@ import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from wandb.keras import WandbCallback
 
-from modules.evaluate.utils import plot_tsne_pds_delta, plot_repr_correlation
+from modules.evaluate.utils import plot_tsne_delta, plot_repr_correlation
 from modules.training import cme_modeling
 from modules.training.ts_modeling import build_dataset, create_mlp, reshape_X
 from modules.reweighting.exDenseReweightsD import exDenseJointReweightsGPU

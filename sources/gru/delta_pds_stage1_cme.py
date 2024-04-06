@@ -11,7 +11,7 @@ import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from wandb.keras import WandbCallback
 
-from modules.evaluate.utils import plot_tsne_pds_delta, plot_repr_correlation
+from modules.evaluate.utils import plot_tsne_delta, plot_repr_correlation
 from modules.training import cme_modeling
 from modules.training.ts_modeling import build_dataset, create_gru, create_hybrid_model, reshape_X
 
@@ -238,24 +238,16 @@ def main():
                              patience=Options['patience'], save_tag=current_time + title + "_features",
                              callbacks_list=[WandbCallback(save_model=False), reduce_lr_on_plateau])
 
-                file_path = plot_tsne_pds_delta(mlp_model_sep,
-                                                X_train,
-                                                y_train,
-                                                title, 'training',
-                                                save_tag=current_time,
-                                                seed=SEED)
+                file_path = plot_tsne_delta(mlp_model_sep, X_train, y_train, title, 'training', save_tag=current_time,
+                                            seed=SEED)
 
                 # Log t-SNE plot for training
                 # Log the training t-SNE plot to wandb
                 wandb.log({'tsne_training_plot': wandb.Image(file_path)})
                 print('file_path: ' + file_path)
 
-                file_path = plot_tsne_pds_delta(mlp_model_sep,
-                                                X_test,
-                                                y_test,
-                                                title, 'testing',
-                                                save_tag=current_time,
-                                                seed=SEED)
+                file_path = plot_tsne_delta(mlp_model_sep, X_test, y_test, title, 'testing', save_tag=current_time,
+                                            seed=SEED)
 
                 # Log t-SNE plot for testing
                 # Log the testing t-SNE plot to wandb
