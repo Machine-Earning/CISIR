@@ -50,7 +50,7 @@ def main():
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for add_slope in [True, False]:
             for cme_speed_threshold in [0, 500]:
-                for alpha in np.arange(0, 1, 0.1):
+                for alpha in np.arange(0.1, 1, 0.1):
                     # PARAMS
                     # inputs_to_use = ['e0.5']
                     # add_slope = True

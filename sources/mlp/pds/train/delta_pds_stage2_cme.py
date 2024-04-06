@@ -50,7 +50,7 @@ def main():
         for add_slope in [True, False]:
             for freeze in [False, True]:
                 for cme_speed_threshold in [0, 500]:
-                    for alpha in np.arange(0.1, 1.6, 0.25):
+                    for alpha in np.arange(0.1, 1, 0.1):
                         # PARAMS
                         # inputs_to_use = ['e0.5']
                         # add_slope = True
@@ -86,7 +86,18 @@ def main():
                         batch_size = 4096
                         epochs = 50000  # higher epochs
                         hiddens = [
-                            2048, 1024, 512, 256, 128, 64, 32
+                            2048, 1024,
+                    2048, 1024,
+                    1024, 512,
+                    1024, 512,
+                    512, 256,
+                    512, 256,
+                    128, 64,
+                    128, 64,
+                    64, 32,
+                    64, 32,
+                    32, 16,
+                    32, 16
                         ]
                         proj_hiddens = [6]
                         hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
@@ -104,6 +115,8 @@ def main():
                         pds = True
                         cme_speed_threshold = cme_speed_threshold
                         weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
+                        residual = True
+                        skipped_layers = 2
                         # Initialize wandb
                         wandb.init(project="nasa-ts-pds-delta-2", name=experiment_name, config={
                             "inputs_to_use": inputs_to_use,
@@ -135,7 +148,9 @@ def main():
                             "pds": pds,
                             "stage": 2,
                             "stage1_weights": weight_path,
-                            "cme_speed_threshold": cme_speed_threshold
+                            "cme_speed_threshold": cme_speed_threshold,
+                            "residual": residual,
+                            "skipped_layers": skipped_layers
                         })
 
                         # set the root directory
@@ -209,7 +224,9 @@ def main():
                             repr_dim=repr_dim,
                             dropout_rate=dropout,
                             activation=activation,
-                            norm=norm
+                            norm=norm,
+                            residual=residual,
+                            skipped_layers=skipped_layers
                         )
                         mlp_model_sep_stage1.summary()
 
@@ -221,15 +238,24 @@ def main():
 
                         # Log t-SNE plot for training
                         # Log the training t-SNE plot to wandb
-                        stage1_file_path = plot_tsne_delta(mlp_model_sep_stage1, X_train, y_train, title,
-                                                           'stage1_training', save_tag=current_time, seed=seed)
+                        stage1_file_path = plot_tsne_delta(
+                            mlp_model_sep_stage1, 
+                            X_train, y_train, title,
+                            'stage1_training', 
+                            model_type='features',
+                            save_tag=current_time, seed=seed)
                         wandb.log({'stage1_tsne_training_plot': wandb.Image(stage1_file_path)})
                         print('stage1_file_path: ' + stage1_file_path)
 
                         # Log t-SNE plot for testing
                         # Log the testing t-SNE plot to wandb
-                        stage1_file_path = plot_tsne_delta(mlp_model_sep_stage1, X_test, y_test, title,
-                                                           'stage1_testing', save_tag=current_time, seed=seed)
+                        stage1_file_path = plot_tsne_delta(
+                            mlp_model_sep_stage1, 
+                            X_test, y_test, title,
+                            'stage1_testing',
+                            model_type='features',
+                            save_tag=current_time, seed=seed)
+                        
                         wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
                         print('stage1_file_path: ' + stage1_file_path)
 
@@ -242,6 +268,8 @@ def main():
                             dropout_rate=dropout,
                             activation=activation,
                             norm=norm,
+                            residual=residual,
+                            skipped_layers=skipped_layers
                             name='mlp'
                         )
                         mlp_model_sep.summary()
@@ -321,7 +349,9 @@ def main():
                             repr_dim=repr_dim,
                             dropout_rate=dropout,
                             activation=activation,
-                            norm=norm
+                            norm=norm,
+                            residual=residual,
+                            skipped_layers=skipped_layers
                         )
                         final_mlp_model_sep_stage1.load_weights(weight_path)
 
@@ -335,6 +365,8 @@ def main():
                             dropout_rate=dropout,
                             activation=activation,
                             norm=norm,
+                            residual=residual,
+                            skipped_layers=skipped_layers
                             name='mlp'
                         )
 
@@ -367,15 +399,23 @@ def main():
 
                         # Log t-SNE plot for training
                         # Log the training t-SNE plot to wandb
-                        stage2_file_path = plot_tsne_delta(final_mlp_model_sep, X_train, y_train, title,
-                                                           'stage2_training', save_tag=current_time, seed=seed)
+                        stage2_file_path = plot_tsne_delta(
+                            final_mlp_model_sep, 
+                            X_train, y_train, title,
+                            'stage2_training', 
+                            model_type='features_reg',
+                            save_tag=current_time, seed=seed)
                         wandb.log({'stage2_tsne_training_plot': wandb.Image(stage2_file_path)})
                         print('stage2_file_path: ' + stage2_file_path)
 
                         # Log t-SNE plot for testing
                         # Log the testing t-SNE plot to wandb
-                        stage2_file_path = plot_tsne_delta(final_mlp_model_sep, X_test, y_test, title, 'stage2_testing',
-                                                           save_tag=current_time, seed=seed)
+                        stage2_file_path = plot_tsne_delta(
+                            final_mlp_model_sep, 
+                            X_test, y_test, title, 
+                            'stage2_testing',
+                            model_type='features_reg',
+                            save_tag=current_time, seed=seed)
                         wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage2_file_path)})
                         print('stage2_file_path: ' + stage2_file_path)
 

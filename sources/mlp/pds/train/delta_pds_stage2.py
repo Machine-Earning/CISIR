@@ -45,7 +45,7 @@ def main():
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for add_slope in [True, False]:
             for freeze in [False, True]:
-                for alpha in np.arange(0.1, 1.6, 0.25):
+                for alpha in np.arange(0.1, 1.0, 0.1):
                     # PARAMS
                     # inputs_to_use = ['e0.5']
                     # add_slope = True
@@ -81,7 +81,18 @@ def main():
                     batch_size = 4096
                     epochs = 50000  # higher epochs
                     hiddens = [
-                        2048, 1024, 512, 256, 128, 64, 32
+                        2048, 1024,
+                    2048, 1024,
+                    1024, 512,
+                    1024, 512,
+                    512, 256,
+                    512, 256,
+                    128, 64,
+                    128, 64,
+                    64, 32,
+                    64, 32,
+                    32, 16,
+                    32, 16
                     ]
                     proj_hiddens = [6]
                     hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
@@ -98,6 +109,8 @@ def main():
                     norm = 'batch_norm'
                     pds = True
                     weight_path = get_weight_path(weight_paths, add_slope)
+                    residual = True
+                    skipped_layers = 2
 
                     # Initialize wandb
                     wandb.init(project="nasa-ts-pds-delta-2", name=experiment_name, config={
@@ -129,7 +142,9 @@ def main():
                         "freeze": freeze,
                         "pds": pds,
                         "stage": 2,
-                        "stage1_weights": weight_path
+                        "stage1_weights": weight_path,
+                        "residual": residual,
+                        "skipped_layers": skipped_layers
                     })
 
                     # set the root directory
@@ -199,7 +214,9 @@ def main():
                         repr_dim=repr_dim,
                         dropout_rate=dropout,
                         activation=activation,
-                        norm=norm
+                        norm=norm,
+                        residual=residual,
+                        skipped_layers=skipped_layers
                     )
                     mlp_model_sep_stage1.summary()
                     # load the weights from the first stage
@@ -241,6 +258,8 @@ def main():
                         dropout_rate=dropout,
                         activation=activation,
                         norm=norm,
+                        residual=residual,
+                        skipped_layers=skipped_layers
                         name='mlp'
                     )
                     mlp_model_sep.summary()
@@ -320,7 +339,9 @@ def main():
                         repr_dim=repr_dim,
                         dropout_rate=dropout,
                         activation=activation,
-                        norm=norm
+                        norm=norm,
+                        residual=residual,
+                        skipped_layers=skipped_layers
                     )
                     final_mlp_model_sep_stage1.load_weights(weight_path)
 
@@ -334,6 +355,8 @@ def main():
                         dropout_rate=dropout,
                         activation=activation,
                         norm=norm,
+                        residual=residual,
+                        skipped_layers=skipped_layers
                         name='mlp'
                     )
 
