@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 # imports
 import tensorflow as tf
+from keras.regularizers import l2
 from numpy import ndarray
 from tensorflow import Tensor
 from tensorflow.keras import layers, callbacks, Model
@@ -24,6 +25,7 @@ from tensorflow.keras.layers import (
     LeakyReLU,
     BatchNormalization,
     LayerNormalization,
+    Add
 )
 
 
@@ -194,7 +196,12 @@ class ModelBuilder:
     #                   output_dim: int = 1,
     #                   hiddens: Optional[List[int]] = None,
     #                   freeze_features: bool = True,
-    #                   pds: bool = False) -> Model:
+    #                   pds: bool = False,
+    #                   l2_reg: float = None,
+    #                   dropout_rate: float = 0.0,
+    #                   activation=None,
+    #                   norm: str = None,
+    #                   name: str = 'mlp') -> Model:
     #     """
     #     Add a regression head with one output unit and a projection layer to an existing model,
     #     replacing the existing prediction layer and optionally the decoder layer.
@@ -204,11 +211,19 @@ class ModelBuilder:
     #     :param freeze_features: Whether to freeze the layers of the base model or not.
     #     :param hiddens: List of integers representing the hidden layers for the projection.
     #     :param pds: Whether to adapt the model for PDS representations.
+    #     :param l2_reg: L2 regularization factor.
+    #     :param dropout_rate: Dropout rate for adding dropout layers.
+    #     :param activation: Activation function to use. If None, defaults to LeakyReLU.
+    #     :param norm: Type of normalization ('batch_norm' or 'layer_norm').
+    #     :param name: Name of the model.
     #     :return: The modified model with a projection layer and a regression head.
     #     """
     #
     #     if hiddens is None:
     #         hiddens = [6]
+    #
+    #     if activation is None:
+    #         activation = LeakyReLU()
     #
     #     print(f'Features are frozen: {freeze_features}')
     #
@@ -223,20 +238,37 @@ class ModelBuilder:
     #         for layer in new_base_model.layers:
     #             layer.trainable = False
     #
+    #     # Count existing dropout layers to avoid naming conflicts
+    #     dropout_count = sum(1 for layer in model.layers if isinstance(layer, Dropout))
+    #
     #     # Extract the output of the last layer of the new base model (representation layer)
     #     repr_output = new_base_model.output
     #
     #     # Projection Layer(s)
     #     x_proj = repr_output
     #     for i, nodes in enumerate(hiddens):
-    #         x_proj = layers.Dense(nodes, name=f"projection_layer_{i + 1}")(x_proj)
-    #         x_proj = layers.LeakyReLU(name=f"projection_activation_{i + 1}")(x_proj)
+    #         x_proj = Dense(
+    #             nodes, kernel_regularizer=l2(l2_reg) if l2_reg else None,
+    #             name=f"projection_layer_{i + 1}")(x_proj)
+    #
+    #         if norm == 'batch_norm':
+    #             x_proj = BatchNormalization(name=f"batch_norm_{i + 1}")(x_proj)
+    #         elif norm == 'layer_norm':
+    #             x_proj = LayerNormalization(name=f"layer_norm_{i + 1}")(x_proj)
+    #
+    #         if callable(activation):
+    #             x_proj = activation(x_proj)
+    #         else:
+    #             x_proj = LeakyReLU(name=f"activation_{i + 1}")(x_proj)
+    #
+    #         if dropout_rate > 0.0:
+    #             x_proj = Dropout(dropout_rate, name=f"proj_dropout_{dropout_count + i + 1}")(x_proj)
     #
     #     # Add a Dense layer with one output unit for regression
-    #     output_layer = layers.Dense(output_dim, activation='linear', name="forecast_head")(x_proj)
+    #     output_layer = Dense(output_dim, activation='linear', name=f"forecast_head")(x_proj)
     #
     #     # Create the new extended model
-    #     extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer])
+    #     extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer], name=name)
     #
     #     # If freeze_features is False, make all layers trainable
     #     if not freeze_features:
@@ -255,6 +287,8 @@ class ModelBuilder:
                       dropout_rate: float = 0.0,
                       activation=None,
                       norm: str = None,
+                      residual: bool = False,
+                      skipped_layers: int = 2,
                       name: str = 'mlp') -> Model:
         """
         Add a regression head with one output unit and a projection layer to an existing model,
@@ -269,6 +303,8 @@ class ModelBuilder:
         :param dropout_rate: Dropout rate for adding dropout layers.
         :param activation: Activation function to use. If None, defaults to LeakyReLU.
         :param norm: Type of normalization ('batch_norm' or 'layer_norm').
+        :param residual: Whether to add residual connections for every 'skipped_layers' hidden layers.
+        :param skipped_layers: Number of layers between residual connections.
         :param name: Name of the model.
         :return: The modified model with a projection layer and a regression head.
         """
@@ -300,7 +336,22 @@ class ModelBuilder:
 
         # Projection Layer(s)
         x_proj = repr_output
+        residual_layer = None
+
         for i, nodes in enumerate(hiddens):
+            if i % skipped_layers == 0 and i > 0 and residual:
+                if residual_layer is not None:
+                    # Check if projection is needed
+                    if x_proj.shape[-1] != residual_layer.shape[-1]:
+                        # Correct projection to match 'x_proj' dimensions
+                        residual_layer = Dense(x_proj.shape[-1], kernel_regularizer=l2(l2_reg) if l2_reg else None,
+                                               use_bias=False)(residual_layer)
+                    x_proj = Add()([x_proj, residual_layer])
+                residual_layer = x_proj  # Update the starting point for the next residual connection
+            else:
+                if i % skipped_layers == 0 or residual_layer is None:
+                    residual_layer = x_proj
+
             x_proj = Dense(
                 nodes, kernel_regularizer=l2(l2_reg) if l2_reg else None,
                 name=f"projection_layer_{i + 1}")(x_proj)
