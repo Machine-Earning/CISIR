@@ -113,7 +113,7 @@ def main():
                 skipped_layers = 2
 
                 # Initialize wandb
-                wandb.init(project="nasa-ts-pds-delta", name=experiment_name, config={
+                wandb.init(project="nasa-ts-pds-delta-re", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
                     "add_slope": add_slope,
                     "target_change": target_change,

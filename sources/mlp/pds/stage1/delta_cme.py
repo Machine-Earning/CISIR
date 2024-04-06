@@ -41,8 +41,8 @@ def main():
     # Define the dataset options, including the sharding policy
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [True, False]:
-            for cme_speed_threshold in [0, 500]:
+        for cme_speed_threshold in [0, 500]:
+            for add_slope in [True, False]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
@@ -104,7 +104,7 @@ def main():
                 skipped_layers = 2
 
                 # Initialize wandb
-                wandb.init(project="nasa-ts-pds-delta", name=experiment_name, config={
+                wandb.init(project="nasa-ts-pds-delta-re", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
                     "add_slope": add_slope,
                     "target_change": target_change,
