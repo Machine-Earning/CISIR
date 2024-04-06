@@ -54,10 +54,6 @@ def main():
         bandwidth = 0.099
         alpha_rw = alpha
 
-
-        # Initialize wandb
-
-
         # set the root directory
         root_dir = "data/electron_cme_data_split"
         # build the dataset
@@ -124,6 +120,7 @@ def main():
         subtrain_sample_joint_weights_indices = subtrain_jweights.jindices
 
         print(f'done rebalancing the subtraining set...')
+        # save the file to disk
 
 
 
