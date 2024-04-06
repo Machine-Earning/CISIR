@@ -275,7 +275,7 @@ def plot_tsne_delta(
     rare_points = sort_order[rare_points_mask]
 
     # Proceed with your scatter plot as planned
-    plt.scatter(
+    sc = plt.scatter(
         tsne_result[common_points, 0],
         tsne_result[common_points, 1],
         c=y[common_points],
@@ -292,6 +292,9 @@ def plot_tsne_delta(
         norm=norm,
         s=sizes[rare_points],
         alpha=alphas[rare_points])
+
+    # Add a color bar
+    cbar = plt.colorbar(sc, ax=axs[0], label='Change in logIntensity', extend='both')
 
     # Title and labels
     plt.title(f'{title}\n2D t-SNE Visualization')
