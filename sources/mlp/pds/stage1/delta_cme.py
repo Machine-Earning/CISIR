@@ -70,7 +70,7 @@ def main():
                     'patience': 5000,  # Updated to 50
                     'learning_rate': 1e-2,  # Updated to 3e-4
                     'weight_decay': 1e-8,  # Added weight decay
-                    'momentum_beta1': 0.97,  # Added momentum beta1
+                    'momentum_beta1': 0.9,  # Added momentum beta1
                 }
                 hiddens = [
                     2048, 1024,
