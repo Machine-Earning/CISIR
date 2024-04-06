@@ -1949,8 +1949,8 @@ class ModelBuilder:
         # Apply sample weights if provided
         if sample_weights is not None:
             # Convert sample_weights to a lookup table
-            keys = tf.constant(list(sample_weights.keys()), dtype=z_diff_squared.dtype)
-            values = tf.constant(list(sample_weights.values()), dtype=z_diff_squared.dtype)
+            keys = tf.constant(list(sample_weights.keys()), dtype=tf.float32)
+            values = tf.constant(list(sample_weights.values()), dtype=tf.float32)
             table = tf.lookup.StaticHashTable(tf.lookup.KeyValueTensorInitializer(keys, values), default_value=1.0)
             # Lookup the weights for each y_true value
             weights = table.lookup(tf.reshape(y_true, [-1]))
