@@ -446,7 +446,8 @@ class ModelBuilder:
                             verbose=verbose)
 
         # Get the best epoch from early stopping
-        best_epoch = np.argmin(history.history['val_loss']) + 1
+        best_epoch = early_stopping_cb.stopped_epoch - patience + 1  # Adjust for the offset
+        # best_epoch = np.argmin(history.history['val_loss']) + 1
 
         # Plot training loss and validation loss
         plt.plot(history.history['loss'], label='Training Loss')
@@ -939,10 +940,9 @@ class ModelBuilder:
             callbacks_list = []
 
         # Initialize early stopping and model checkpointing if not explicitly provided
-        if not any(isinstance(cb, callbacks.EarlyStopping) for cb in callbacks_list):
-            early_stopping_cb = callbacks.EarlyStopping(
-                monitor='val_loss', patience=patience, restore_best_weights=True)
-            callbacks_list.append(early_stopping_cb)
+        early_stopping_cb = callbacks.EarlyStopping(
+            monitor='val_loss', patience=patience, restore_best_weights=True)
+        callbacks_list.append(early_stopping_cb)
 
         if not any(isinstance(cb, callbacks.ModelCheckpoint) for cb in callbacks_list):
             checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_{str(save_tag)}.h5", save_weights_only=True)
@@ -967,9 +967,6 @@ class ModelBuilder:
 
         # Save initial weights for retraining on full training set after best epoch found
         initial_weights = model.get_weights()
-
-        # Initialize early stopping and best epoch variables
-        best_epoch = 0
 
         # Optimizer and history initialization
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
@@ -1003,6 +1000,8 @@ class ModelBuilder:
 
         for cb in callbacks_list:
             cb.on_train_end(logs=logs)
+
+        best_epoch = early_stopping_cb.stopped_epoch - patience + 1  # Adjust for the offset
 
         # Plotting the losses
         # plt.plot(history['loss'], label='Training Loss')
