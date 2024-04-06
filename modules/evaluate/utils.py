@@ -263,7 +263,7 @@ def plot_tsne_extended_delta(
     sort_order = np.argsort(sizes)  # This gives indices that would sort the array
 
     # Instead of directly indexing with the boolean condition, use it to create a mask and then apply.
-    common_points_mask = sizes[sort_order] == 10
+    common_points_mask = sizes[sort_order] == 12
     rare_points_mask = sizes[sort_order] == 50
 
     # Now, apply these masks to the sorted indices to get the correct indices for common and rare points.
@@ -484,7 +484,7 @@ def plot_tsne_pds_delta(
     sort_order = np.argsort(sizes)  # This gives indices that would sort the array
 
     # Instead of directly indexing with the boolean condition, use it to create a mask and then apply.
-    common_points_mask = sizes[sort_order] == 10
+    common_points_mask = sizes[sort_order] == 12
     rare_points_mask = sizes[sort_order] == 50
 
     # Now, apply these masks to the sorted indices to get the correct indices for common and rare points.
@@ -505,7 +505,7 @@ def plot_tsne_pds_delta(
         tsne_result[rare_points, 0],
         tsne_result[rare_points, 1],
         c=y[rare_points],
-        cmap=cmap, 
+        cmap=cmap,
         norm=norm,
         s=sizes[rare_points],
         alpha=alphas[rare_points])
