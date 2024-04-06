@@ -14,7 +14,7 @@ from wandb.keras import WandbCallback
 from modules.evaluate.utils import plot_tsne_pds_delta, plot_repr_correlation
 from modules.training import cme_modeling
 from modules.training.ts_modeling import build_dataset, create_mlp, reshape_X
-from modules.reweighting.exDenseJointReweightsGPU import exDenseJointReweightsGPU
+from modules.reweighting.exDenseReweightsD import exDenseJointReweightsGPU
 
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 

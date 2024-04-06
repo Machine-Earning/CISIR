@@ -14,7 +14,7 @@ from wandb.keras import WandbCallback
 from modules.evaluate.utils import plot_tsne_pds_delta, plot_repr_correlation
 from modules.training import cme_modeling
 from modules.training.ts_modeling import build_dataset, create_mlp, reshape_X
-from modules.reweighting.exDenseJointReweightsGPU import exDenseJointReweightsGPU
+from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 
@@ -184,27 +184,19 @@ def main():
                 print(f'rebalancing the training set...')
                 min_norm_weight = 0.01 / len(delta_train)
 
-                train_jweights = exDenseJointReweightsGPU(
+                train_weights_dict = exDenseReweightsD(
                     X_train, delta_train,
                     alpha=alpha_rw, bw=bandwidth,
-                    min_norm_weight=min_norm_weight, debug=False)
-
-                # The train_jweights object contains the combined joint reweighting info
-                train_sample_joint_weights = train_jweights.jreweights
-                train_sample_joint_weights_indices = train_jweights.jindices
+                    min_norm_weight=min_norm_weight, debug=False).label_reweight_dict
                 print(f'done rebalancing the training set...')
 
                 print(f'rebalancing the subtraining set...')
                 min_norm_weight = 0.01 / len(delta_subtrain)
 
-                subtrain_jweights = exDenseJointReweightsGPU(
+                subtrain_weights_dict = exDenseReweightsD(
                     X_subtrain, delta_subtrain,
                     alpha=alpha_rw, bw=bandwidth,
-                    min_norm_weight=min_norm_weight, debug=False)
-
-                # The subtrain_jweights object contains the combined joint reweighting info
-                subtrain_sample_joint_weights = subtrain_jweights.jreweights
-                subtrain_sample_joint_weights_indices = subtrain_jweights.jindices
+                    min_norm_weight=min_norm_weight, debug=False).label_reweight_dict
 
                 print(f'done rebalancing the subtraining set...')
 
@@ -256,10 +248,8 @@ def main():
                                 X_subtrain, y_subtrain,
                                 X_val, y_val,
                                 X_train, y_train,
-                                subtrain_sample_joint_weights=subtrain_sample_joint_weights,
-                                subtrain_sample_joint_weights_indices=subtrain_sample_joint_weights_indices,
-                                train_sample_joint_weights=train_sample_joint_weights,
-                                train_sample_joint_weights_indices=train_sample_joint_weights_indices,
+                                subtrain_label_weights_dict=subtrain_weights_dict,
+                                train_label_weights_dict=train_weights_dict,
                                 learning_rate=Options['learning_rate'],
                                 epochs=Options['epochs'],
                                 batch_size=Options['batch_size'],

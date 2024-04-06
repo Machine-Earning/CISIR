@@ -6,7 +6,7 @@
 import time
 from itertools import cycle
 # types for type hinting
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -614,16 +614,12 @@ class ModelBuilder:
 
         return history, entire_training_loss
 
-    def process_batch_weights(self,
-                              batch_indices: np.ndarray,
-                              joint_weights: np.ndarray,
-                              joint_weight_indices: List[Tuple[int, int]]) -> np.ndarray:
+    def process_batch_weights(self, batch_indices: np.ndarray, label_weights_dict: Dict[float, float]) -> np.ndarray:
         """
         Process a batch of indices to return the corresponding joint weights.
 
         :param batch_indices: A batch of sample indices.
-        :param joint_weights: An array containing all joint weights for the dataset.
-        :param joint_weight_indices: A list of tuples, each containing a pair of indices for which a joint weight exists.
+        :param label_weights_dict: Dictionary containing label weights.
         :return: An array containing joint weights corresponding to the batch of indices.
         """
         # Convert list of tuples into a dictionary for O(1) lookup
@@ -633,7 +629,7 @@ class ModelBuilder:
         for i in batch_indices:
             for j in batch_indices:
                 if i < j:  # Only consider pairs (i, j) where i < j
-                    weight = weight_dict.get((i, j))
+                    weight = label_weights_dict
                     if weight is not None:
                         batch_weights.append(weight)
 
@@ -685,8 +681,7 @@ class ModelBuilder:
                             X: np.ndarray,
                             y: np.ndarray,
                             batch_size: int,
-                            joint_weights: Optional[np.ndarray] = None,
-                            joint_weight_indices: Optional[List[Tuple[int, int]]] = None,
+                            label_weights_dict: Optional[Dict[float, float]] = None,
                             training: bool = True) -> float:
         """
         Train or evaluate the model for one epoch.
@@ -697,8 +692,7 @@ class ModelBuilder:
         :param X: The feature set.
         :param y: The labels.
         :param batch_size: The batch size for training or evaluation.
-        :param joint_weights: Optional array containing all joint weights for the dataset.
-        :param joint_weight_indices: Optional list of tuples, each containing a pair of indices for which a joint weight exists.
+        :param label_weights_dict: Dictionary containing label weights.
         :param training: Whether to apply training (True) or run evaluation (False).
         :return: The average loss for the epoch.
         """
@@ -713,18 +707,12 @@ class ModelBuilder:
                 # can't form a pair so skip
                 continue
 
-            # Get the corresponding joint weights for this batch
-            batch_weights = None
-            if joint_weights is not None and joint_weight_indices is not None:
-                batch_weights = self.process_batch_weights(
-                    np.arange(batch_idx, batch_idx + batch_size), joint_weights, joint_weight_indices)
-
             # print(f"batch_weights: {batch_weights}")
             # print(f"batch_y: {batch_y}")
             # print(f"batch_X: {batch_X}")
             with tf.GradientTape() as tape:
                 predictions = model(batch_X, training=training)
-                loss = loss_fn(batch_y, predictions, sample_weights=batch_weights)
+                loss = loss_fn(batch_y, predictions, sample_weights=label_weights_dict)
 
             if training:
                 gradients = tape.gradient(loss, model.trainable_variables)
@@ -862,10 +850,8 @@ class ModelBuilder:
                      y_val: np.ndarray,
                      X_train: np.ndarray,
                      y_train: np.ndarray,
-                     subtrain_sample_joint_weights: Optional[np.ndarray] = None,
-                     subtrain_sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
-                     train_sample_joint_weights: Optional[np.ndarray] = None,
-                     train_sample_joint_weights_indices: Optional[List[Tuple[int, int]]] = None,
+                     subtrain_label_weights_dict: Optional[Dict[float, float]] = None,
+                     train_label_weights_dict: Optional[Dict[float, float]] = None,
                      learning_rate: float = 1e-3,
                      epochs: int = 100,
                      batch_size: int = 32,
@@ -876,19 +862,15 @@ class ModelBuilder:
         """
         Custom training loop to train the model and returns the training history.
 
-        :param X_train:
-        :param y_train:
-        :param train_sample_joint_weights:
-        :param train_sample_joint_weights_indices:
+        :param X_train: training and validation sets together
+        :param y_train: labels of training and validation sets together
         :param model: The TensorFlow model to train.
         :param X_subtrain: The training feature set.
         :param y_subtrain: The training labels.
         :param X_val: Validation features.
         :param y_val: Validation labels.
-        :param subtrain_sample_joint_weights: The reweighting factors for pairs of labels in training set.
-        :param subtrain_sample_joint_weights_indices: Indices of the reweighting factors in training set.
-        :param train_sample_joint_weights: The reweighting factors for pairs of labels in training set.
-        :param train_sample_joint_weights_indices: Indices of the reweighting factors in training set.
+        :param subtrain_label_weights_dict: Dictionary containing label weights for the subtrain set.
+        :param train_label_weights_dict: Dictionary containing label weights for the train set.
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
         :param batch_size: The batch size for training.
@@ -956,14 +938,12 @@ class ModelBuilder:
                 model, optimizer, self.pds_loss_dl_vec,
                 X_subtrain, y_subtrain,
                 batch_size=batch_size if batch_size > 0 else len(y_subtrain),
-                joint_weights=subtrain_sample_joint_weights,
-                joint_weight_indices=subtrain_sample_joint_weights_indices)
+                label_weights_dict=subtrain_label_weights_dict)
 
             val_loss = self.train_for_one_epoch(
                 model, optimizer, self.pds_loss_dl_vec, X_val, y_val,
                 batch_size=batch_size if batch_size > 0 else len(y_val),
-                joint_weights=None,
-                joint_weight_indices=None, training=False)
+                label_weights_dict=None, training=False)
 
             # Log and save epoch losses
             history['loss'].append(train_loss)
@@ -1018,8 +998,7 @@ class ModelBuilder:
                 self.pds_loss_dl_vec,
                 X_train, y_train,
                 batch_size=batch_size if batch_size > 0 else len(y_train),
-                joint_weights=train_sample_joint_weights,
-                joint_weight_indices=train_sample_joint_weights_indices)
+                label_weights_dict=train_label_weights_dict)
 
             # Log the retrain loss
             retrain_history['loss'].append(retrain_loss)
@@ -1949,7 +1928,7 @@ class ModelBuilder:
 
         :param y_true: A batch of true label values, shape of [batch_size, 1].
         :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
-        :param sample_weights: A batch of sample weights, shape of [batch_size, 1].
+        :param sample_weights: A dictionary mapping label values to their corresponding reweight.
         :param reduction: The type of reduction to apply to the loss.
         :return: The weighted average error for all unique combinations of the samples in the batch.
         """
@@ -1958,32 +1937,31 @@ class ModelBuilder:
         # Compute pairwise differences for z_pred and y_true using broadcasting
         y_true_diff = y_true - tf.transpose(y_true)
         z_pred_diff = z_pred[:, tf.newaxis, :] - z_pred[tf.newaxis, :, :]
-
         # Calculate squared L2 norm for z_pred differences
         z_diff_squared = tf.reduce_sum(tf.square(z_pred_diff), axis=-1)
-
         # Calculate squared differences for y_true
         y_diff_squared = tf.square(y_true_diff)
-
         # Compute the loss for each pair
         pairwise_loss = 0.5 * tf.square(z_diff_squared - y_diff_squared)
 
         # Apply sample weights if provided
         if sample_weights is not None:
-            # Expand the flat array of sample weights into a matrix
-            weights_matrix = self.expand_sample_weights_to_matrix(sample_weights, batch_size)
+            # Convert sample_weights to a lookup table
+            keys = tf.constant(list(sample_weights.keys()), dtype=tf.float32)
+            values = tf.constant(list(sample_weights.values()), dtype=tf.float32)
+            table = tf.lookup.StaticHashTable(tf.lookup.KeyValueTensorInitializer(keys, values), default_value=1.0)
+            # Lookup the weights for each y_true value
+            weights = table.lookup(tf.reshape(y_true, [-1]))
+            weights_matrix = weights[:, None] * weights[None, :]
             # Apply the weights to the pairwise loss
             pairwise_loss *= weights_matrix
 
         # Mask to exclude self-comparisons (where i == j)
         mask = 1 - tf.eye(batch_size, dtype=tf.float32)
-
         # Apply mask to exclude self-comparisons from the loss calculation
         pairwise_loss_masked = pairwise_loss * mask
-
         # Sum over all unique pairs
         total_error = tf.reduce_sum(pairwise_loss_masked)
-
         # Number of unique comparisons, excluding self-pairs
         num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=tf.float32)
 
@@ -1995,33 +1973,33 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
-    def expand_sample_weights_to_matrix(self, sample_weights, batch_size):
-        """
-        Expands a flat array of sample weights for unique pairs into a symmetric matrix.
-
-        :param sample_weights: A 1D tensor of sample weights for unique pairs.
-        :param batch_size: The number of samples in the batch.
-        :return weights_matrix: A 2D tensor of sample weights for all pairs in the batch.
-        """
-        # Ensure sample_weights is a 1D tensor
-        sample_weights = tf.reshape(sample_weights, [-1])
-
-        # Generate indices for the rows and columns
-        rows, cols = tf.meshgrid(tf.range(batch_size), tf.range(batch_size), indexing='ij')
-
-        # Identify the indices of the upper triangle (excluding the diagonal)
-        upper_tri_indices = tf.where(rows < cols)
-
-        # Create a matrix of zeros with the same shape as the desired output
-        weights_matrix = tf.zeros((batch_size, batch_size), dtype=sample_weights.dtype)
-
-        # Update the weights_matrix with sample_weights at the upper triangle indices
-        weights_matrix = tf.tensor_scatter_nd_update(weights_matrix, upper_tri_indices, sample_weights)
-
-        # Since the weights for the pairs are symmetric, we can add the transpose to fill in the lower triangle
-        weights_matrix += tf.transpose(weights_matrix)
-
-        return weights_matrix
+    # def expand_sample_weights_to_matrix(self, sample_weights, batch_size):
+    #     """
+    #     Expands a flat array of sample weights for unique pairs into a symmetric matrix.
+    #
+    #     :param sample_weights: A 1D tensor of sample weights for unique pairs.
+    #     :param batch_size: The number of samples in the batch.
+    #     :return weights_matrix: A 2D tensor of sample weights for all pairs in the batch.
+    #     """
+    #     # Ensure sample_weights is a 1D tensor
+    #     sample_weights = tf.reshape(sample_weights, [-1])
+    #
+    #     # Generate indices for the rows and columns
+    #     rows, cols = tf.meshgrid(tf.range(batch_size), tf.range(batch_size), indexing='ij')
+    #
+    #     # Identify the indices of the upper triangle (excluding the diagonal)
+    #     upper_tri_indices = tf.where(rows < cols)
+    #
+    #     # Create a matrix of zeros with the same shape as the desired output
+    #     weights_matrix = tf.zeros((batch_size, batch_size), dtype=sample_weights.dtype)
+    #
+    #     # Update the weights_matrix with sample_weights at the upper triangle indices
+    #     weights_matrix = tf.tensor_scatter_nd_update(weights_matrix, upper_tri_indices, sample_weights)
+    #
+    #     # Since the weights for the pairs are symmetric, we can add the transpose to fill in the lower triangle
+    #     weights_matrix += tf.transpose(weights_matrix)
+    #
+    #     return weights_matrix
 
     def update_pair_counts(self, label1, label2):
         label1 = label1[0]

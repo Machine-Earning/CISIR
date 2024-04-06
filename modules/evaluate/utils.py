@@ -262,15 +262,32 @@ def plot_tsne_extended_delta(
     # Sort points by size (or another metric) to ensure larger points are plotted last (on top)
     sort_order = np.argsort(sizes)  # This gives indices that would sort the array
 
-    # Scatter plot for common points first
-    common_points = sort_order[sizes[sort_order] == 10]
-    plt.scatter(tsne_result[common_points, 0], tsne_result[common_points, 1], c=y[common_points], cmap=cmap, norm=norm,
-                s=sizes[common_points], alpha=alphas[common_points])
+    # Instead of directly indexing with the boolean condition, use it to create a mask and then apply.
+    common_points_mask = sizes[sort_order] == 10
+    rare_points_mask = sizes[sort_order] == 50
 
-    # Scatter plot for rarer, larger points on top
-    rare_points = sort_order[sizes[sort_order] == 50]
-    plt.scatter(tsne_result[rare_points, 0], tsne_result[rare_points, 1], c=y[rare_points], cmap=cmap, norm=norm,
-                s=sizes[rare_points], alpha=alphas[rare_points])
+    # Now, apply these masks to the sorted indices to get the correct indices for common and rare points.
+    common_points = sort_order[common_points_mask]
+    rare_points = sort_order[rare_points_mask]
+
+    # Proceed with your scatter plot as planned
+    plt.scatter(
+        tsne_result[common_points, 0],
+        tsne_result[common_points, 1],
+        c=y[common_points],
+        cmap=cmap,
+        norm=norm,
+        s=sizes[common_points],
+        alpha=alphas[common_points])
+
+    plt.scatter(
+        tsne_result[rare_points, 0],
+        tsne_result[rare_points, 1],
+        c=y[rare_points],
+        cmap=cmap,
+        norm=norm,
+        s=sizes[rare_points],
+        alpha=alphas[rare_points])
 
     # Title and labels
     plt.title(f'{title}\n2D t-SNE Visualization')
@@ -466,15 +483,32 @@ def plot_tsne_pds_delta(
     # Sort points by size (or another metric) to ensure larger points are plotted last (on top)
     sort_order = np.argsort(sizes)  # This gives indices that would sort the array
 
-    # Scatter plot for common points first
-    common_points = sort_order[sizes[sort_order] == 10]
-    plt.scatter(tsne_result[common_points, 0], tsne_result[common_points, 1], c=y[common_points], cmap=cmap, norm=norm,
-                s=sizes[common_points], alpha=alphas[common_points])
+    # Instead of directly indexing with the boolean condition, use it to create a mask and then apply.
+    common_points_mask = sizes[sort_order] == 10
+    rare_points_mask = sizes[sort_order] == 50
 
-    # Scatter plot for rarer, larger points on top
-    rare_points = sort_order[sizes[sort_order] == 50]
-    plt.scatter(tsne_result[rare_points, 0], tsne_result[rare_points, 1], c=y[rare_points], cmap=cmap, norm=norm,
-                s=sizes[rare_points], alpha=alphas[rare_points])
+    # Now, apply these masks to the sorted indices to get the correct indices for common and rare points.
+    common_points = sort_order[common_points_mask]
+    rare_points = sort_order[rare_points_mask]
+
+    # Proceed with your scatter plot as planned
+    plt.scatter(
+        tsne_result[common_points, 0],
+        tsne_result[common_points, 1],
+        c=y[common_points],
+        cmap=cmap,
+        norm=norm,
+        s=sizes[common_points],
+        alpha=alphas[common_points])
+
+    plt.scatter(
+        tsne_result[rare_points, 0],
+        tsne_result[rare_points, 1],
+        c=y[rare_points],
+        cmap=cmap, 
+        norm=norm,
+        s=sizes[rare_points],
+        alpha=alphas[rare_points])
 
     # Add title and axis labels
     plt.title(f'{title}\nT-SNE Visualization')
