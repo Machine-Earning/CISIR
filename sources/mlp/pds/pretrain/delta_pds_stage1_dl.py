@@ -16,7 +16,7 @@ from modules.training import cme_modeling
 from modules.training.ts_modeling import build_dataset, create_mlp, reshape_X
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
-from tensorflow.keras.mixed_precision import experimental as mixed_precision
+# from tensorflow.keras.mixed_precision import experimental as mixed_precision
 
 # Set up mixed precision
 # policy = mixed_precision.Policy('mixed_float16')
