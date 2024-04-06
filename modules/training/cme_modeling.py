@@ -26,6 +26,7 @@ from tensorflow.keras.layers import (
     LayerNormalization,
 )
 
+
 def ydist(val1: float, val2: float) -> float:
     """
     Computes the squared distance between two label values.
@@ -929,6 +930,7 @@ class ModelBuilder:
 
         # Optimizer and history initialization
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        model.compile(optimizer=optimizer)  # Set the optimizer for the model
         history = {'loss': [], 'val_loss': []}
 
         for epoch in range(epochs):
@@ -1003,7 +1005,6 @@ class ModelBuilder:
             # Log the retrain loss
             retrain_history['loss'].append(retrain_loss)
             print(f"Retrain Epoch {epoch + 1}/{best_epoch}, Loss: {retrain_loss}")
-
 
         # Save the final model
         model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
