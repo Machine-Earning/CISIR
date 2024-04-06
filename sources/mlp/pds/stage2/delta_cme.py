@@ -391,7 +391,7 @@ def main():
                         # Log the MAE error to wandb
                         wandb.log({"mae_error": error_mae})
 
-                        # evaluate the model on train cme_files
+                        # evaluate the model on stage2 cme_files
                         error_mae_train = evaluate_model(final_mlp_model_sep, X_train, y_train)
                         print(f'mae error train: {error_mae_train}')
                         # Log the MAE error to wandb

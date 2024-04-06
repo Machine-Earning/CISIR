@@ -403,7 +403,7 @@ class ModelBuilder:
         :param X_train: training and validation sets together
         :param y_train: labels of training and validation sets together
         :param save_tag: tag to use for saving experiments
-        :param model: The TensorFlow model to train.
+        :param model: The TensorFlow model to stage2.
         :param X_subtrain: The training feature set.
         :param y_subtrain: The training labels.
         :param X_val: Validation features.
@@ -436,7 +436,7 @@ class ModelBuilder:
         # Compile the model
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
 
-        # First train the model with a validation set to determine the best epoch
+        # First stage2 the model with a validation set to determine the best epoch
         history = model.fit(X_subtrain, y_subtrain,
                             epochs=epochs,
                             batch_size=batch_size if batch_size > 0 else len(y_subtrain),
@@ -500,7 +500,7 @@ class ModelBuilder:
         :param train_ds: training and validation sets together
         :param save_tag: tag to use for saving experiments
         :param model: The TensorFlow model to subtrain for best epoch
-        :param final_model: The TensorFlow model to train on the entire training set
+        :param final_model: The TensorFlow model to stage2 on the entire training set
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
         :param patience: The number of epochs with no improvement to wait before early stopping.
@@ -525,7 +525,7 @@ class ModelBuilder:
         # Compile the model
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
 
-        # First train the model with a validation set to determine the best epoch
+        # First stage2 the model with a validation set to determine the best epoch
         history = model.fit(subtrain_ds,
                             epochs=epochs,
                             # batch_size=batch_size if batch_size > 0 else len(y_subtrain),
@@ -586,7 +586,7 @@ class ModelBuilder:
         :param X_train:
         :param y_train:
         :param save_tag: tag to use for saving experiments
-        :param model: The TensorFlow model to train.
+        :param model: The TensorFlow model to stage2.
         :param X_subtrain: The training feature set.
         :param y_subtrain: The training labels.
         :param X_val: Validation features.
@@ -625,7 +625,7 @@ class ModelBuilder:
         # Compile the model
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
 
-        # First train the model with a validation set to determine the best epoch
+        # First stage2 the model with a validation set to determine the best epoch
         history = model.fit(X_subtrain, y_subtrain,
                             epochs=epochs,
                             batch_size=batch_size if batch_size > 0 else len(y_subtrain),
@@ -738,7 +738,7 @@ class ModelBuilder:
         """
         Train or evaluate the model for one epoch.
         processing the batches with indices is what making it slow
-        :param model: The model to train or evaluate.
+        :param model: The model to stage2 or evaluate.
         :param optimizer: The optimizer to use.
         :param loss_fn: The loss function to use.
         :param X: The feature set.
@@ -799,7 +799,7 @@ class ModelBuilder:
         processing the batches with indices is what making it slow
         :param with_ae:
         :param with_reg:
-        :param model: The model to train.
+        :param model: The model to stage2.
         :param optimizer: The optimizer to use.
         :param primary_loss_fn: The primary loss function to use.
         :param X: The feature set.
@@ -912,17 +912,17 @@ class ModelBuilder:
                      callbacks_list=None,
                      verbose: int = 1) -> dict:
         """
-        Custom training loop to train the model and returns the training history.
+        Custom training loop to stage2 the model and returns the training history.
 
         :param X_train: training and validation sets together
         :param y_train: labels of training and validation sets together
-        :param model: The TensorFlow model to train.
+        :param model: The TensorFlow model to stage2.
         :param X_subtrain: The training feature set.
         :param y_subtrain: The training labels.
         :param X_val: Validation features.
         :param y_val: Validation labels.
         :param subtrain_label_weights_dict: Dictionary containing label weights for the subtrain set.
-        :param train_label_weights_dict: Dictionary containing label weights for the train set.
+        :param train_label_weights_dict: Dictionary containing label weights for the stage2 set.
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
         :param batch_size: The batch size for training.
@@ -1084,14 +1084,14 @@ class ModelBuilder:
     #                     patience: int = 9,
     #                     save_tag: Optional[str] = None) -> dict:
     #     """
-    #     Custom training loop to train the model and returns the training history.
+    #     Custom training loop to stage2 the model and returns the training history.
     #     Per epoch batch size variation
     #
     #     :param train_sample_joint_weights_indices:
     #     :param train_sample_joint_weights:
     #     :param y_train:
     #     :param X_train:
-    #     :param model: The TensorFlow model to train.
+    #     :param model: The TensorFlow model to stage2.
     #     :param X_subtrain: The training feature set.
     #     :param y_subtrain: The training labels.
     #     :param X_val: Validation features.
@@ -1225,7 +1225,7 @@ class ModelBuilder:
                            patience: int = 9,
                            save_tag: Optional[str] = None) -> dict:
         """
-        Custom training loop to train the model and returns the training history.
+        Custom training loop to stage2 the model and returns the training history.
 
         :param y_train:
         :param X_train:
@@ -1236,7 +1236,7 @@ class ModelBuilder:
         :param with_reg:
         :param sample_weights:
         :param val_sample_weights:
-        :param model: The TensorFlow model to train.
+        :param model: The TensorFlow model to stage2.
         :param X_subtrain: The training feature set.
         :param y_subtrain: The training labels.
         :param X_val: Validation features.
@@ -1398,7 +1398,7 @@ class ModelBuilder:
 
         :param y_train:
         :param X_train:
-        :param model: The TensorFlow model to train.
+        :param model: The TensorFlow model to stage2.
         :param X_subtrain: The training feature set.
         :param y_subtrain: The training labels.
         :param X_val: Validation features.
@@ -1437,7 +1437,7 @@ class ModelBuilder:
         # Compile the model
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
 
-        # First train the model with a validation set to determine the best epoch
+        # First stage2 the model with a validation set to determine the best epoch
         history = model.fit(train_gen,
                             steps_per_epoch=train_steps,
                             validation_data=val_gen,
@@ -1490,7 +1490,7 @@ class ModelBuilder:
     #     """
     #     Trains the model and returns the training history.
     #     TODO: fix this issue where loss values are not correct
-    #     :param model: The TensorFlow model to train.
+    #     :param model: The TensorFlow model to stage2.
     #     :param X_subtrain: The training feature set.
     #     :param y_subtrain: The training labels.
     #     :param X_val: Validation features.
@@ -1531,7 +1531,7 @@ class ModelBuilder:
     #     # Compile the model
     #     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_fast)
     #
-    #     # First train the model with a validation set to determine the best epoch
+    #     # First stage2 the model with a validation set to determine the best epoch
     #     history = model.fit(X_subtrain, y_subtrain,
     #                         epochs=epochs,
     #                         batch_size=batch_size,
@@ -1677,7 +1677,7 @@ class ModelBuilder:
         :param sample_weights: Sample weights for training set.
         :param sample_val_weights: Sample weights for validation set.
         :param learning_rate: Learning rate for Adam optimizer.
-        :param n_epochs: Number of epochs to train each branch for coefficient estimation.
+        :param n_epochs: Number of epochs to stage2 each branch for coefficient estimation.
         :param batch_size: Batch size.
         :return: Estimated gamma and lambda coefficients.
         """
@@ -1769,7 +1769,7 @@ class ModelBuilder:
         :param y_subtrain: Training labels.
         :param sample_weights: Sample weights for training set.
         :param learning_rate: Learning rate for Adam optimizer.
-        :param n_epochs: Number of epochs to train each branch for lambda estimation.
+        :param n_epochs: Number of epochs to stage2 each branch for lambda estimation.
         :param batch_size: Batch size.
         :return: Estimated lambda coefficient.
         """
