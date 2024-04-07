@@ -29,14 +29,10 @@ mb = ModelBuilder()
 
 # Define the lookup dictionary
 weight_paths = {
-    (True, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322'
-               '-135444MLP_e0_5_e1_8_p_slopeTrue_PDS_bs5000_CME0_features.h5',
-    (True, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322'
-                 '-142422MLP_e0_5_e1_8_p_slopeTrue_PDS_bs5000_CME500_features.h5',
-    (False, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322'
-                '-145352MLP_e0_5_e1_8_p_slopeFalse_PDS_bs5000_CME0_features.h5',
-    (False, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322'
-                  '-152405MLP_e0_5_e1_8_p_slopeFalse_PDS_bs5000_CME500_features.h5',
+    (True, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-154808MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_CME0_features.h5',
+    (True, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-183733MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_CME500_features.h5',
+    (False, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-171125MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_CME0_features.h5',
+    (False, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-200720MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_CME500_features.h5',
 }
 
 
@@ -47,7 +43,7 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [True, False]:
+        for add_slope in [False, True]:
             for freeze in [False, True]:
                 for cme_speed_threshold in [0, 500]:
                     for alpha in np.arange(0.1, 1, 0.1):
@@ -269,7 +265,7 @@ def main():
                             activation=activation,
                             norm=norm,
                             residual=residual,
-                            skipped_layers=skipped_layers
+                            skipped_layers=skipped_layers,
                             name='mlp'
                         )
                         mlp_model_sep.summary()
@@ -366,7 +362,7 @@ def main():
                             activation=activation,
                             norm=norm,
                             residual=residual,
-                            skipped_layers=skipped_layers
+                            skipped_layers=skipped_layers,
                             name='mlp'
                         )
 

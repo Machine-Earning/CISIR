@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -29,10 +29,8 @@ mb = ModelBuilder()
 # Define the lookup dictionary
 weight_paths = {
     # slope
-    True: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322'
-          '-135431MLP_e0_5_e1_8_p_slopeTrue_PDS_bs5000_features.h5',
-    False: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240322'
-           '-142301MLP_e0_5_e1_8_p_slopeFalse_PDS_bs5000_features.h5',
+    True: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-154749MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_features.h5',
+    False: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-171128MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_features.h5',
 }
 
 
@@ -259,7 +257,7 @@ def main():
                         activation=activation,
                         norm=norm,
                         residual=residual,
-                        skipped_layers=skipped_layers
+                        skipped_layers=skipped_layers,
                         name='mlp'
                     )
                     mlp_model_sep.summary()
@@ -356,7 +354,7 @@ def main():
                         activation=activation,
                         norm=norm,
                         residual=residual,
-                        skipped_layers=skipped_layers
+                        skipped_layers=skipped_layers,
                         name='mlp'
                     )
 
