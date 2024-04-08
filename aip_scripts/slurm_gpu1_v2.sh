@@ -3,7 +3,7 @@
 #SBATCH --job-name=repl.pds            # Job name
 #SBATCH --nodes=1                     # Number of nodes
 #SBATCH --ntasks=1                    # Number of tasks
-#SBATCH --mem=64GB                    # Memory per node
+#SBATCH --mem=128GB                    # Memory per node
 #SBATCH --time=infinite              # Time limit
 #SBATCH --partition=gpu1              # Partition, dynamically set
 #SBATCH --gres=gpu:2                # Number of GPUs per node
