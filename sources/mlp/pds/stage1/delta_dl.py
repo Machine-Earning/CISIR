@@ -49,7 +49,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for add_slope in [True, False]:
-            for alpha in np.arange(0.1, 1, 0.1):
+            for alpha in [0.6, 0.7, 0.1]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
@@ -73,7 +73,7 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                    'epochs': 50000,
+                    'epochs': 6000,
                     'patience': 2000,  # Updated to 50
                     'learning_rate': .1,  # Updated to 3e-4
                     'weight_decay': 1e-6,  # Added weight decay
