@@ -1,8 +1,62 @@
+import glob
+import os
 import random
+from typing import Dict
+from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
-from typing import Dict
+import pandas as pd
+
+
+def trim_background(directory_path: str, threshold: float = 0.1) -> List[str]:
+    """
+    Processes all CSV files in a given directory, trimming rows based on a 'Proton Intensity' condition.
+    Each file is saved with a '_trim' suffix in its name after the rows not meeting the specified condition are removed.
+
+    Parameters:
+    - directory_path: str - The path to the directory containing CSV files to be processed.
+    - threshold: float - The proton intensity threshold used for trimming.
+
+    Returns:
+    - List[str]: A list of filenames for the trimmed files.
+    """
+    # Find all CSV files in the specified directory
+    csv_files = glob.glob(os.path.join(directory_path, '*.csv'))
+
+    trimmed_files = []  # To store the paths of trimmed files
+
+    for file_path in csv_files:
+        data = pd.read_csv(file_path)
+
+        # Convert 'Target Timestamp' to datetime objects
+        data['Target Timestamp'] = pd.to_datetime(data['Target Timestamp'])
+
+        rows_to_keep = []
+
+        # Iterate through each row
+        for i, row in data.iterrows():
+            future_timestamp = row['Target Timestamp'] + pd.Timedelta(hours=3)
+            future_intensity = data.loc[data['Target Timestamp'] == future_timestamp, 'Proton Intensity']
+
+            if not future_intensity.empty and future_intensity.iloc[0] > threshold:
+                rows_to_keep.append(i)
+
+        # Filter the DataFrame
+        filtered_data = data.iloc[rows_to_keep]
+
+        # Construct the new filename with '_trim' suffix
+        trimmed_file_path = os.path.splitext(file_path)[0] + '_trim.csv'
+        filtered_data.to_csv(trimmed_file_path, index=False)
+        trimmed_files.append(trimmed_file_path)
+
+    return trimmed_files
+
+
+# Example usage:
+# directory_path = '/path/to/your/csv/files'
+# trimmed_files = trim_background(directory_path)
+# print(trimmed_files)
 
 
 def plot_sorted_distributions(y_train, y_val, y_test, title='Sorted Distributions'):
@@ -143,24 +197,31 @@ if __name__ == '__main__':
     # Generate random target values
     training_set_path = 'D:/College/Fall2023/sep-forecasting-research/data/electron_cme_data_split/training'
 
-    from modules.training.ts_modeling import build_dataset
+    # from modules.training.ts_modeling import build_dataset
+    #
+    # X_train, y_train = build_dataset(
+    #     training_set_path,
+    #     inputs_to_use=['e0.5', 'p'],
+    #     add_slope=False,
+    #     target_change=True)
+    #
+    # # Find the minimum batch size
+    # # find the minimum batch size for the training set that satisfies the condition, using the optimized function
+    # # min_batch_size = find_rand_bs(y_train, threshold=4.9, num_trials=2000,
+    # #                                                   early_exit_ratio=0.99)
+    #
+    # min_batch_size = find_rand_bs_2(
+    #     y_train,
+    #     left_threshold=-1,
+    #     right_threshold=1,
+    #     num_trials=10000,
+    #     early_exit_ratio=0.99)
+    #
+    # print(f"Minimum batch size: {min_batch_size}")
 
-    X_train, y_train = build_dataset(
-        training_set_path,
-        inputs_to_use=['e0.5', 'p'],
-        add_slope=False,
-        target_change=True)
-
-    # Find the minimum batch size
-    # find the minimum batch size for the training set that satisfies the condition, using the optimized function
-    # min_batch_size = find_rand_bs(y_train, threshold=4.9, num_trials=2000,
-    #                                                   early_exit_ratio=0.99)
-
-    min_batch_size = find_rand_bs_2(
-        y_train,
-        left_threshold=-1,
-        right_threshold=1,
-        num_trials=10000,
-        early_exit_ratio=0.99)
-
-    print(f"Minimum batch size: {min_batch_size}")
+    root_path = "D:/College/Spring2024/SEP Forecasting Research/Dataset/electron_cme_v4/electron_cme_data_split/"
+    subpaths = ['training', 'subtraining', 'validation', 'testing']
+    for subpath in subpaths:
+        path = root_path + subpath
+        trimmed_files = trim_background(path)
+        print(trimmed_files)
