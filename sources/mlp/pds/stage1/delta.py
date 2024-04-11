@@ -47,13 +47,13 @@ def main():
     # Define the dataset options, including the sharding policy
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [True, False]:
+        for add_slope in [False, True]:
             # PARAMS
             # inputs_to_use = ['e0.5']
             # add_slope = True
             outputs_to_use = ['delta_p']
 
-            bs = 12000  # full dataset used
+            bs = 10000  # full dataset used
             print(f'batch size : {bs}')
 
             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -71,7 +71,7 @@ def main():
             # Set the early stopping patience and learning rate as variables
             Options = {
                 'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                'epochs': 50000,
+                'epochs': 10000,
                 'patience': 2000,  # Updated to 50
                 'learning_rate': .1,  # Updated to 3e-4
                 'weight_decay': 1e-6,  # Added weight decay

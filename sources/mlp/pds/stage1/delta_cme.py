@@ -3,7 +3,7 @@ import random
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import numpy as np
 import tensorflow as tf
@@ -41,14 +41,14 @@ def main():
     # Define the dataset options, including the sharding policy
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for cme_speed_threshold in [0, 500]:
-            for add_slope in [True, False]:
+        for cme_speed_threshold in [0]:
+            for add_slope in [True]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
                 outputs_to_use = ['delta_p']
 
-                bs = 12000  # full dataset used
+                bs = 10000  # full dataset used
                 print(f'batch size : {bs}')
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'

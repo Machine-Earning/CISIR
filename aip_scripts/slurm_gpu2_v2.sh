@@ -1,14 +1,14 @@
 #!/bin/bash
 
-#SBATCH --job-name=pds.2             # Job name
+#SBATCH --job-name=sep.f             # Job name
 #SBATCH --nodes=1                       # Number of nodes gpu5, gpu6, gpu7, gpu8 (max 4 for partition gpu2). if using two nodes then gpu[06-07]
 #SBATCH --ntasks=1                      # Number of tasks needs to greater or equal to the number of nodes
 #SBATCH --mem=128GB                      # Memory per node
 #SBATCH --time=infinite                 # Time limit
 #SBATCH --partition=gpu2                # Partition, dynamically set
 #SBATCH --gres=gpu:2                    # Number of GPUs per node (max 4)
-#SBATCH --output=pds.2.%J.out         # Output file
-#SBATCH --error=pds.2.%J.err          # Error file
+#SBATCH --output=sep.f.%J.out         # Output file
+#SBATCH --error=sep.f.%J.err          # Error file
 
 echo "Starting at date $(date)"
 

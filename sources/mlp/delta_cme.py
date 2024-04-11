@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-# os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -30,9 +30,9 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [True, False]:
+        for add_slope in [False, True]:
             for cme_speed_threshold in [0, 500]:
-                for alpha in np.arange(0.1, 1, 0.1):
+                for alpha in np.arange(0.2, 1, 0.1):
                     # PARAMS
                     # inputs_to_use = ['e0.5']
                     # add_slope = True
@@ -56,7 +56,7 @@ def main():
                     tf.random.set_seed(seed)
                     np.random.seed(seed)
                     patience = 5000  # higher patience
-                    learning_rate = 5e-3  # og learning rate
+                    learning_rate = 5e-2  # og learning rate
                     # initial_learning_rate = 3e-3
                     # final_learning_rate = 3e-7
                     # learning_rate_decay_factor = (final_learning_rate / initial_learning_rate) ** (1 / 3000)
@@ -81,6 +81,8 @@ def main():
                     batch_size = 4096
                     epochs = 50000  # higher epochs
                     hiddens = [
+                        2048, 1024,
+                        2048, 1024,
                         1024, 512,
                         1024, 512,
                         512, 256,
@@ -109,7 +111,7 @@ def main():
                     skipped_layers = 2
 
                     # Initialize wandb
-                    wandb.init(project="nasa-ts-delta", name=experiment_name, config={
+                    wandb.init(project="nasa-ts-delta-nd", name=experiment_name, config={
                         "inputs_to_use": inputs_to_use,
                         "add_slope": add_slope,
                         "patience": patience,
