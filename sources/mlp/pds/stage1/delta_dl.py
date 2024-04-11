@@ -48,14 +48,14 @@ def main():
     # Define the dataset options, including the sharding policy
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [True, False]:
-            for alpha in [0.6, 0.7, 0.1]:
+        for add_slope in [False]:
+            for alpha in [0.6]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
                 outputs_to_use = ['delta_p']
 
-                bs = 12000  # full dataset used
+                bs = 5000  # full dataset used
                 print(f'batch size : {bs}')
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
