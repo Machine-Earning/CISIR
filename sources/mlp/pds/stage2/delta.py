@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -29,8 +29,10 @@ mb = ModelBuilder()
 # Define the lookup dictionary
 weight_paths = {
     # slope
-    True: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-154749MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_features.h5',
-    False: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-171128MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_features.h5',
+    # True: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-154749MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_features.h5',
+    True: '/home1/jmoukpe2016/keras-functional-api/model_weights_20240409-103252MLP_e0_5_e1_8_p_slopeTrue_PDS_bs5000_alpha0.60_features.h5',
+    # False: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-171128MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_features.h5',
+    False: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240409-130917MLP_e0_5_e1_8_p_slopeFalse_PDS_bs5000_alpha0.60_features.h5'
 }
 
 
@@ -41,9 +43,9 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [True, False]:
+        for add_slope in [False]:
             for freeze in [False, True]:
-                for alpha in np.arange(0.1, 1.0, 0.1):
+                for alpha in [0.6]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
                     # add_slope = True
@@ -64,7 +66,7 @@ def main():
                     seed = 456789
                     tf.random.set_seed(seed)
                     np.random.seed(seed)
-                    patience = 5000  # higher patience
+                    patience = 2000  # higher patience
                     learning_rate = 5e-3  # og learning rate
                     reduce_lr_on_plateau = ReduceLROnPlateau(
                         monitor='loss',
