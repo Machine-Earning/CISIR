@@ -1516,7 +1516,7 @@ def process_sep_events(
 
     # Iterate over files in the directory
     for file_name in os.listdir(directory):
-        if file_name.endswith('_ie.csv'):
+        if file_name.endswith('_ie_trim.csv'):
             try:
                 file_path = os.path.join(directory, file_name)
 
