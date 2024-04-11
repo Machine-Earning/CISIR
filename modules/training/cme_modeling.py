@@ -40,7 +40,7 @@ def ydist(val1: float, val2: float) -> float:
     return (val1 - val2) ** 2
 
 
-def zdist(vec1: Tensor, vec2: Tensor) -> float:
+def zdist(vec1: Tensor, vec2: Tensor) -> Tensor:
     """
     Computes the squared L2 norm distance between two input feature vectors.
 
