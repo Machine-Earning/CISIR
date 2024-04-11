@@ -11,12 +11,13 @@ import pandas as pd
 
 def trim_background(directory_path: str, threshold: float = 0.1) -> List[str]:
     """
-    Processes all CSV files in a given directory, trimming rows based on a 'Proton Intensity' condition.
-    Each file is saved with a '_trim' suffix in its name after the rows not meeting the specified condition are removed.
+    Processes all CSV files in a given directory, trimming the beginning of each file based on a 'Proton Intensity' condition.
+    Trimming stops when the first row meeting a specified 'Proton Intensity' threshold is found. The trimmed files are saved
+    with a '_trim' suffix in their name.
 
     Parameters:
     - directory_path: str - The path to the directory containing CSV files to be processed.
-    - threshold: float - The proton intensity threshold used for trimming.
+    - threshold: float - The proton intensity threshold used to determine the point of trimming.
 
     Returns:
     - List[str]: A list of filenames for the trimmed files.
@@ -32,7 +33,8 @@ def trim_background(directory_path: str, threshold: float = 0.1) -> List[str]:
         # Convert 'Target Timestamp' to datetime objects
         data['Target Timestamp'] = pd.to_datetime(data['Target Timestamp'])
 
-        rows_to_keep = []
+        # Initialize an empty list to store the index of the row where trimming should stop
+        stop_index = None
 
         # Iterate through each row
         for i, row in data.iterrows():
@@ -40,10 +42,11 @@ def trim_background(directory_path: str, threshold: float = 0.1) -> List[str]:
             future_intensity = data.loc[data['Target Timestamp'] == future_timestamp, 'Proton Intensity']
 
             if not future_intensity.empty and future_intensity.iloc[0] > threshold:
-                rows_to_keep.append(i)
+                stop_index = i  # Found the row meeting the condition, mark it for stopping the trim
+                break  # Exit the loop as soon as the condition is met
 
-        # Filter the DataFrame
-        filtered_data = data.iloc[rows_to_keep]
+        # If a stopping condition is found, trim the DataFrame up to that point; else, use the original data
+        filtered_data = data.iloc[stop_index:] if stop_index is not None else data
 
         # Construct the new filename with '_trim' suffix
         trimmed_file_path = os.path.splitext(file_path)[0] + '_trim.csv'
@@ -51,12 +54,6 @@ def trim_background(directory_path: str, threshold: float = 0.1) -> List[str]:
         trimmed_files.append(trimmed_file_path)
 
     return trimmed_files
-
-
-# Example usage:
-# directory_path = '/path/to/your/csv/files'
-# trimmed_files = trim_background(directory_path)
-# print(trimmed_files)
 
 
 def plot_sorted_distributions(y_train, y_val, y_test, title='Sorted Distributions'):
@@ -195,7 +192,7 @@ def get_weight_path(weight_paths: Dict, slope: bool, cme: int = None):
 
 if __name__ == '__main__':
     # Generate random target values
-    training_set_path = 'D:/College/Fall2023/sep-forecasting-research/data/electron_cme_data_split/training'
+    # training_set_path = 'D:/College/Fall2023/sep-forecasting-research/data/electron_cme_data_split/training'
 
     # from modules.training.ts_modeling import build_dataset
     #
@@ -219,7 +216,7 @@ if __name__ == '__main__':
     #
     # print(f"Minimum batch size: {min_batch_size}")
 
-    root_path = "D:/College/Spring2024/SEP Forecasting Research/Dataset/electron_cme_v4/electron_cme_data_split/"
+    root_path = "D:/College/Spring2024/SEP Forecasting Research/Dataset/electron_cme_v4/electron_cme_data_split_trim/"
     subpaths = ['training', 'subtraining', 'validation', 'testing']
     for subpath in subpaths:
         path = root_path + subpath

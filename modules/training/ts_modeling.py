@@ -730,7 +730,7 @@ def build_dataset(
     all_inputs, all_targets = [], []
 
     for file_name in os.listdir(directory_path):
-        if file_name.endswith('_ie.csv'):
+        if file_name.endswith('_ie_trim.csv'):
             file_path = os.path.join(directory_path, file_name)
             X, y = load_file_data(
                 file_path,
