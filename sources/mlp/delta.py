@@ -30,8 +30,8 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [False, True]:
-            for alpha in np.arange(0.2, 1, 0.1):
+        for alpha in np.arange(0, 1, 0.05):
+            for add_slope in [False, True]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
@@ -54,7 +54,7 @@ def main():
                 seed = 456789
                 tf.random.set_seed(seed)
                 np.random.seed(seed)
-                patience = 5000  # higher patience
+                patience = 2000  # higher patience
                 learning_rate = 5e-2  # og learning rate
                 # initial_learning_rate = 3e-3
                 # final_learning_rate = 3e-7
