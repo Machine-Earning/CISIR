@@ -172,8 +172,10 @@ def main():
                 # Compute the sample weights
                 delta_train = y_train[:, 0]
                 delta_subtrain = y_subtrain[:, 0]
+                delta_val = y_val[:, 0]
                 print(f'delta_train.shape: {delta_train.shape}')
                 print(f'delta_subtrain.shape: {delta_subtrain.shape}')
+                print(f'delta_val.shape: {delta_val.shape}')
 
                 print(f'rebalancing the training set...')
                 min_norm_weight = 0.01 / len(delta_train)
@@ -193,9 +195,13 @@ def main():
                     debug=False).reweights
                 print(f'subtraining set rebalanced.')
 
-                # print a sample of the training cme_files
-                # print(f'X_train[0]: {X_train[0]}')
-                # print(f'y_train[0]: {y_train[0]}')
+                print(f'rebalancing the validation set...')
+                min_norm_weight = 0.01 / len(delta_val)
+                y_val_weights = exDenseReweights(
+                    X_val, delta_val,
+                    alpha=alpha_rw, bw=bandwidth,
+                    min_norm_weight=min_norm_weight,
+                    debug=False).reweights
 
                 # get the number of features
                 n_features = X_train.shape[1]
@@ -262,23 +268,12 @@ def main():
                                             {'forecast_head': y_subtrain},
                                             sample_weight=y_subtrain_weights,
                                             epochs=epochs, batch_size=batch_size,
-                                            validation_data=(X_val, {'forecast_head': y_val}),
+                                            validation_data=(X_val, {'forecast_head': y_val}, y_val_weights),
                                             callbacks=[
                                                 early_stopping,
                                                 reduce_lr_on_plateau,
                                                 WandbCallback(save_model=False)
                                             ])
-
-                # Plot the training and validation loss
-                # plt.figure(figsize=(12, 6))
-                # plt.plot(history.history['loss'], label='Training Loss')
-                # plt.plot(history.history['val_loss'], label='Validation Loss')
-                # plt.title('Training and Validation Loss')
-                # plt.xlabel('Epochs')
-                # plt.ylabel('Loss')
-                # plt.legend()
-                # # save the plot
-                # plt.savefig(f'mlp_loss_{title}.png')
 
                 # Determine the optimal number of epochs from early stopping
                 optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset

@@ -59,16 +59,6 @@ def main():
                     np.random.seed(seed)
                     patience = 2000  # higher patience
                     learning_rate = 5e-2  # og learning rate
-                    # initial_learning_rate = 3e-3
-                    # final_learning_rate = 3e-7
-                    # learning_rate_decay_factor = (final_learning_rate / initial_learning_rate) ** (1 / 3000)
-                    # steps_per_epoch = int(20000 / 8)
-
-                    # learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
-                    #     initial_learning_rate=initial_learning_rate,
-                    #     decay_steps=steps_per_epoch,
-                    #     decay_rate=learning_rate_decay_factor,
-                    #     staircase=True)
 
                     reduce_lr_on_plateau = ReduceLROnPlateau(
                         monitor='loss',
@@ -181,8 +171,10 @@ def main():
                     # Compute the sample weights
                     delta_train = y_train[:, 0]
                     delta_subtrain = y_subtrain[:, 0]
+                    delta_val = y_val[:, 0]
                     print(f'delta_train.shape: {delta_train.shape}')
                     print(f'delta_subtrain.shape: {delta_subtrain.shape}')
+                    print(f'delta_val.shape: {delta_val.shape}')
 
                     print(f'rebalancing the training set...')
                     min_norm_weight = 0.01 / len(delta_train)
@@ -201,6 +193,15 @@ def main():
                         min_norm_weight=min_norm_weight,
                         debug=False).reweights
                     print(f'subtraining set rebalanced.')
+
+                    print(f'rebalancing the validation set...')
+                    min_norm_weight = 0.01 / len(delta_val)
+                    y_val_weights = exDenseReweights(
+                        X_val, delta_val,
+                        alpha=alpha_rw, bw=bandwidth,
+                        min_norm_weight=min_norm_weight,
+                        debug=False).reweights
+                    print(f'validation set rebalanced.')
 
                     # print a sample of the training cme_files
                     # print(f'X_train[0]: {X_train[0]}')
@@ -271,23 +272,12 @@ def main():
                                                 {'forecast_head': y_subtrain},
                                                 sample_weight=y_subtrain_weights,
                                                 epochs=epochs, batch_size=batch_size,
-                                                validation_data=(X_val, {'forecast_head': y_val}),
+                                                validation_data=(X_val, {'forecast_head': y_val}, y_val_weights),
                                                 callbacks=[
                                                     early_stopping,
                                                     reduce_lr_on_plateau,
                                                     WandbCallback(save_model=False)
                                                 ])
-
-                    # Plot the training and validation loss
-                    # plt.figure(figsize=(12, 6))
-                    # plt.plot(history.history['loss'], label='Training Loss')
-                    # plt.plot(history.history['val_loss'], label='Validation Loss')
-                    # plt.title('Training and Validation Loss')
-                    # plt.xlabel('Epochs')
-                    # plt.ylabel('Loss')
-                    # plt.legend()
-                    # # save the plot
-                    # plt.savefig(f'mlp_loss_{title}.png')
 
                     # Determine the optimal number of epochs from early stopping
                     optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
