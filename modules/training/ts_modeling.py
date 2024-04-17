@@ -1214,7 +1214,7 @@ def plot_and_evaluate_sep_event(
     Returns:
     - Tuple[float, str]: A tuple containing the MAE loss and the plot title.
     """
-    global actual_changes, predicted_changes, delta_count
+    global actual_changes, predicted_changes, delta_count, selected_changes, mask
     e18_intensity_log = None
 
     if add_slope:
@@ -1285,6 +1285,9 @@ def plot_and_evaluate_sep_event(
         predictions_plot = p_t_log + predictions
         if show_changes:
             actual_changes = df['delta_log_Intensity'].values - 1  # offset by 1
+            actual_changes_nooffset = df['delta_log_Intensity'].values
+            mask = (actual_changes_nooffset >= -0.01) & (actual_changes_nooffset <= 0.01)
+            selected_changes = actual_changes_nooffset[mask]
             predicted_changes = predictions - 1  # offset by 1
     else:
         predictions_plot = predictions
@@ -1314,22 +1317,22 @@ def plot_and_evaluate_sep_event(
     if 'p' in inputs_to_use and 'delta_p' in outputs_to_use and show_changes:
         plt.scatter(timestamps, actual_changes, color='gray', label='Actual Changes', alpha=0.5, s=ssz)
         plt.scatter(timestamps, predicted_changes, color='purple', label='Predicted Changes', alpha=0.5, s=ssz)
-    # Add a black horizontal line at log(0.05) on the y-axis and create a handle for the legend
-        # Create a mask for actual changes between -0.01 and 0.01
-        mask = (actual_changes >= -0.01) & (actual_changes <= 0.01)
+        # Add a black horizontal line at log(0.05) on the y-axis and create a handle for the legend
+
         # print count of changes before mask and after mask
         print(f"Count of changes before mask: {len(actual_changes)}")
-        print(f"Count of changes after mask: {np.sum(mask)}")
-        
+        print(f"Count of changes after mask: {len(selected_changes)}")
+        # print(f'Display masked: {actual_changes.flatten()[mask]}')
+
         # Plot the actual changes within the range, offset by -2
-        plt.scatter(timestamps[mask], actual_changes[mask] - 2, color='green', label='within range',
+        plt.scatter(timestamps[mask], selected_changes - 2, color='green', label='delta in (-0.01, 0.01)',
                     alpha=0.5, s=ssz)
 
         # Count the number of actual changes within the range
         delta_count = np.sum(mask)
         # Extract handles and labels for the plot's elements
         handles, labels = plt.gca().get_legend_handles_labels()
-        labels[-1] += f' (Count: {delta_count})'
+        labels.extend(f' (Count: {delta_count})')
 
     plt.axhline(y=threshold_value, color='black', linestyle='--', linewidth=lw, label='Threshold')
 
