@@ -1214,7 +1214,7 @@ def plot_and_evaluate_sep_event(
     Returns:
     - Tuple[float, str]: A tuple containing the MAE loss and the plot title.
     """
-    global actual_changes, predicted_changes
+    global actual_changes, predicted_changes, delta_count
     e18_intensity_log = None
 
     if add_slope:
@@ -1315,6 +1315,15 @@ def plot_and_evaluate_sep_event(
         plt.scatter(timestamps, actual_changes, color='gray', label='Actual Changes', alpha=0.5, s=ssz)
         plt.scatter(timestamps, predicted_changes, color='purple', label='Predicted Changes', alpha=0.5, s=ssz)
     # Add a black horizontal line at log(0.05) on the y-axis and create a handle for the legend
+        # Create a mask for actual changes between -0.01 and 0.01
+        mask = (actual_changes > -0.01) & (actual_changes < 0.01)
+
+        # Plot the actual changes within the range, offset by -2
+        plt.scatter(timestamps[mask], actual_changes[mask] - 2, color='green', label='Actual Changes within Range',
+                    alpha=0.5, s=ssz)
+
+        # Count the number of actual changes within the range
+        delta_count = np.sum(mask)
 
     plt.axhline(y=threshold_value, color='black', linestyle='--', linewidth=lw, label='Threshold')
 
@@ -1336,7 +1345,7 @@ def plot_and_evaluate_sep_event(
 
     # Extract handles and labels for the plot's elements
     handles, labels = plt.gca().get_legend_handles_labels()
-
+    labels[-1] += f' (Count: {delta_count})'
     # Add custom legend handles for the threshold and CME lines
     handles.extend([cme_line])
     labels.extend(["CME Start Time"])
