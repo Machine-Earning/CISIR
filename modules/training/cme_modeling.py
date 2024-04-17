@@ -480,6 +480,51 @@ class ModelBuilder:
 
         return history  # , entire_training_loss
 
+    def overtrain_pds(self,
+                      model: Model,
+                      X_train: ndarray,
+                      y_train: ndarray,
+                      learning_rate: float = 1e-3,
+                      epochs: int = 100,
+                      batch_size: int = 32,
+                      save_tag=None,
+                      callbacks_list=None,
+                      verbose: int = 1):
+        """
+            Trains the model and returns the training history.
+
+            :param X_train: training and validation sets together
+            :param y_train: labels of training and validation sets together
+            :param save_tag: tag to use for saving experiments
+            :param model: The TensorFlow model to stage2.
+            :param learning_rate: The learning rate for the Adam optimizer.
+            :param epochs: The maximum number of epochs for training.
+            :param batch_size: The batch size for training.
+            :param callbacks_list: List of callback instances to apply during training.
+            :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
+
+
+            :return: The training history as a History object.
+            """
+
+        # Compile the model
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            loss=self.pds_loss_vec
+        )
+
+        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
+        model.fit(X_train, y_train,
+                  epochs=epochs,
+                  batch_size=batch_size if batch_size > 0 else len(y_train),
+                  callbacks=callbacks_list,
+                  verbose=verbose)
+
+        # save the model weights
+        model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
+        # print where the model weights are saved
+        print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
+
     def train_pds_distributed(self,
                               model: Model,
                               final_model: Model,
