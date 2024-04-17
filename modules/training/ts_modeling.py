@@ -1479,6 +1479,7 @@ def process_sep_events(
         cme_speed_threshold: float = 0,
         outputs_to_use: List[str] = None,
         show_avsp: bool = False,
+        show_error_hist: bool = True,
         prefix: str = 'testing') -> List[str]:
     """
     Processes SEP event files in the specified directory, normalizes flux intensities, predicts proton intensities,
@@ -1494,6 +1495,7 @@ def process_sep_events(
     - outputs_to_use (List[str]): List of output types to include in the dataset. Default is ['p'].
     - cme_speed_threshold (float): The threshold for CME speed. CMEs with speeds below this threshold will be excluded.
     - show_avsp (bool): Whether to show the Actual vs Predicted delta plot. Default is False.
+    - show_error_hist (bool): Whether to show the error histogram. Default is True.
     - prefix (str): The prefix to use for the plot file names. Default is 'testing'.
 
     Returns:
@@ -1582,44 +1584,85 @@ def process_sep_events(
                 continue
 
     if show_avsp and avsp_data:
-        # Plotting logic here...
-        plt.figure(figsize=(10, 7))  # Adjust size as needed
-        # Flatten all actual values to find global min and max for color mapping
-        # all_actual_values = np.concatenate([actual for _, actual, _ in avsp_data])
-        norm = plt.Normalize(-2.5, 2.5)
-        cmap = plt.cm.viridis  # Choose a colormap
+        plot_file_location = plot_actual_vs_predicted(avsp_data, title, prefix)
+        print(f"Saved plot to: {plot_file_location}")
+        plot_names.append(plot_file_location)
 
-        # Create a scatter plot for each set of actual vs predicted values
-        for event_id, actual, predicted in avsp_data:
-            plt.scatter(actual, predicted, c=actual, cmap=cmap, norm=norm, label=f'{event_id}', alpha=0.7, s=12)
-
-        # Add a diagonal line for perfect prediction
-        # min_val = min(min(actual.min(), predicted.min()) for _, actual, predicted in avsp_data)
-        # max_val = max(max(actual.max(), predicted.max()) for _, actual, predicted in avsp_data)
-        plt.plot([-2.5, 2.5], [-2.5, 2.5], 'k--', label='Perfect Prediction')
-
-        plt.xlabel('Actual Changes')
-        plt.ylabel('Predicted Changes')
-        plt.title(f"{title}\n{prefix}_Actual_vs_Predicted_Changes")
-
-        # Create colorbar as the legend for actual values
-        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-        sm.set_array([])
-        plt.colorbar(sm, label='Actual Value', extend='both')
-        # plt.legend()
-        plt.grid(True)
-
-        # Save the plot
-        plot_filename = f"{title}_{prefix}_actual_vs_predicted_changes.png"
-        plt.savefig(plot_filename)
-        plt.close()
-
-        # Return the file location
-        file_location = os.path.abspath(plot_filename)
-        print(f"Saved plot to: {file_location}")
-        plot_names.append(file_location)
+        if show_error_hist:
+            histogram_path = plot_error_dist(avsp_data, f"{title} Error Distribution", prefix)
+            print(f"Saved histogram plot to: {histogram_path}")
+            plot_names.append(histogram_path)
 
     return plot_names
+
+
+def plot_error_dist(avsp_data: List[Tuple[str, np.ndarray, np.ndarray]], title: str, prefix: str) -> str:
+    """
+    Plots a histogram of error values derived from actual vs. predicted data pairs.
+
+    Parameters:
+    - avsp_data (List[Tuple[str, np.ndarray, np.ndarray]]): List of tuples containing event_id, actual data, and predicted data.
+    - title (str): The title for the histogram plot.
+    - prefix (str): Prefix for naming the plot file.
+
+    Returns:
+    - str: File path of the saved plot.
+    """
+    # Extract all errors from the avsp_data
+    errors = []
+    for _, actual, predicted in avsp_data:
+        errors.extend(actual - predicted)  # Compute error as actual - predicted
+
+    # Define the bin width and calculate the range of bins
+    bin_width = 0.02
+    bin_range = np.arange(min(errors), max(errors) + bin_width, bin_width)
+
+    # Create and display the histogram
+    plt.figure(figsize=(10, 6))
+    plt.hist(errors, bins=bin_range, color='blue', edgecolor='black', alpha=0.7)
+    plt.xlabel('Error')
+    plt.ylabel('Frequency')
+    plt.title(title)
+    plt.grid(True)
+
+    plot_filename = f"{prefix}_error_distribution.png"
+    plt.savefig(plot_filename)
+    plt.close()
+
+    return os.path.abspath(plot_filename)
+
+
+def plot_actual_vs_predicted(avsp_data: List[tuple], title: str, prefix: str):
+    """
+    Plots actual vs predicted values for SEP events.
+
+    Parameters:
+    - avsp_data (List[tuple]): List of tuples containing event_id, actual data, and predicted data.
+    - title (str): The title of the plot.
+    - prefix (str): Prefix for the plot file names.
+    """
+    plt.figure(figsize=(10, 7))  # Adjust size as needed
+    norm = plt.Normalize(-2.5, 2.5)
+    cmap = plt.cm.viridis
+
+    for event_id, actual, predicted in avsp_data:
+        plt.scatter(actual, predicted, c=actual, cmap=cmap, norm=norm, label=f'{event_id}', alpha=0.7, s=12)
+
+    plt.plot([-2.5, 2.5], [-2.5, 2.5], 'k--', label='Perfect Prediction')
+    plt.xlabel('Actual Changes')
+    plt.ylabel('Predicted Changes')
+    plt.title(f"{title}\n{prefix}_Actual_vs_Predicted_Changes")
+
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    plt.colorbar(sm, label='Actual Value', extend='both')
+    plt.grid(True)
+
+    plot_filename = f"{title}_{prefix}_actual_vs_predicted_changes.png"
+    plt.savefig(plot_filename)
+    plt.close()
+
+    return os.path.abspath(plot_filename)
 
 
 def plot_sample_with_cme(data: np.ndarray, cme_features_names: list = None, sample_index: int = None) -> None:
@@ -1822,6 +1865,7 @@ def evaluate_model_cond(
 
     return mae_loss
 
+
 def evaluate_model_dummy(y_test: np.ndarray) -> float:
     """
     Evaluates dummy predictions (always 0) using Mean Absolute Error (MAE) on the provided test data.
@@ -1844,6 +1888,8 @@ def evaluate_model_dummy(y_test: np.ndarray) -> float:
     mae_loss = mean_absolute_error(y_test, dummy_predictions)
 
     return mae_loss
+
+
 def evaluate_model_cond_dummy(
         y_test: np.ndarray,
         below_threshold: float = None,
@@ -1880,7 +1926,6 @@ def evaluate_model_cond_dummy(
     mae_loss = mean_absolute_error(filtered_y_test, filtered_dummy_predictions)
 
     return mae_loss
-
 
 
 def reshape_X(
