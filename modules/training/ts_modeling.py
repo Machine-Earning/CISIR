@@ -1316,14 +1316,20 @@ def plot_and_evaluate_sep_event(
         plt.scatter(timestamps, predicted_changes, color='purple', label='Predicted Changes', alpha=0.5, s=ssz)
     # Add a black horizontal line at log(0.05) on the y-axis and create a handle for the legend
         # Create a mask for actual changes between -0.01 and 0.01
-        mask = (actual_changes > -0.01) & (actual_changes < 0.01)
-
+        mask = (actual_changes >= -0.01) & (actual_changes <= 0.01)
+        # print count of changes before mask and after mask
+        print(f"Count of changes before mask: {len(actual_changes)}")
+        print(f"Count of changes after mask: {np.sum(mask)}")
+        
         # Plot the actual changes within the range, offset by -2
-        plt.scatter(timestamps[mask], actual_changes[mask] - 2, color='green', label='Actual Changes within Range',
+        plt.scatter(timestamps[mask], actual_changes[mask] - 2, color='green', label='within range',
                     alpha=0.5, s=ssz)
 
         # Count the number of actual changes within the range
         delta_count = np.sum(mask)
+        # Extract handles and labels for the plot's elements
+        handles, labels = plt.gca().get_legend_handles_labels()
+        labels[-1] += f' (Count: {delta_count})'
 
     plt.axhline(y=threshold_value, color='black', linestyle='--', linewidth=lw, label='Threshold')
 
@@ -1345,7 +1351,6 @@ def plot_and_evaluate_sep_event(
 
     # Extract handles and labels for the plot's elements
     handles, labels = plt.gca().get_legend_handles_labels()
-    labels[-1] += f' (Count: {delta_count})'
     # Add custom legend handles for the threshold and CME lines
     handles.extend([cme_line])
     labels.extend(["CME Start Time"])
