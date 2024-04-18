@@ -1,14 +1,14 @@
 #!/bin/bash
 
-#SBATCH --job-name=sep.f            # Job name
+#SBATCH --job-name=sep.f.cme            # Job name
 #SBATCH --nodes=1                     # Number of nodes
 #SBATCH --ntasks=1                    # Number of tasks
 #SBATCH --mem=128GB                    # Memory per node
 #SBATCH --time=infinite              # Time limit
 #SBATCH --partition=gpu1              # Partition, dynamically set
 #SBATCH --gres=gpu:2                # Number of GPUs per node
-#SBATCH --output=sep.f.%J.out       # Output file
-#SBATCH --error=sep.f.%J.err        # Error file
+#SBATCH --output=sep.cme.%J.out       # Output file
+#SBATCH --error=sep.cme.%J.err        # Error file
 
 echo "Starting at date $(date)"
 

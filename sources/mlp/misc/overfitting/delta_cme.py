@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import numpy as np
 import tensorflow as tf
@@ -54,20 +54,20 @@ def main():
                     tf.random.set_seed(seed)
                     np.random.seed(seed)
                     # patience = 2000  # higher patience
-                    learning_rate = 5e-2  # og learning rate
+                    learning_rate = 1e-2  # og learning rate
 
                     reduce_lr_on_plateau = ReduceLROnPlateau(
                         monitor='loss',
                         factor=0.5,
-                        patience=500,
+                        patience=1000,
                         verbose=1,
                         min_delta=1e-5,
                         min_lr=1e-10)
 
-                    # weight_decay = 1e-6  # higher weight decay
+                    weight_decay = 1e-8  # higher weight decay
                     momentum_beta1 = 0.9  # higher momentum beta1
-                    batch_size = 4096
-                    epochs = 10000  # higher epochs
+                    batch_size = 2048
+                    epochs = 25000  # higher epochs
                     hiddens = [
                         2048, 1024,
                         2048, 1024,
@@ -101,7 +101,7 @@ def main():
                         "add_slope": add_slope,
                         # "patience": patience,
                         "learning_rate": learning_rate,
-                        # "weight_decay": weight_decay,
+                        "weight_decay": weight_decay,
                         "momentum_beta1": momentum_beta1,
                         "batch_size": batch_size,
                         "epochs": epochs,
@@ -195,7 +195,11 @@ def main():
 
                     # Recreate the model architecture
                     final_mlp_model_sep.compile(
-                        optimizer=AdamW(learning_rate=learning_rate, beta_1=momentum_beta1),
+                        optimizer=AdamW(
+                            learning_rate=learning_rate, 
+                            beta_1=momentum_beta1,
+                            weight_decay=weight_decay
+                        ),
                         loss={'forecast_head': get_loss(loss_key)}
                     )
                     # Train on the full dataset

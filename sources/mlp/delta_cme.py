@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -31,10 +31,8 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0, 500]:
-            for alpha in np.arange(0, 1, 0.05):
+            for alpha in np.arange(0.35, 0.6, 0.05):
                 for add_slope in [False, True]:
-            
-                
                     # PARAMS
                     # inputs_to_use = ['e0.5']
                     # add_slope = True
@@ -58,7 +56,7 @@ def main():
                     tf.random.set_seed(seed)
                     np.random.seed(seed)
                     patience = 2000  # higher patience
-                    learning_rate = 5e-2  # og learning rate
+                    learning_rate = 1e-2  # og learning rate
 
                     reduce_lr_on_plateau = ReduceLROnPlateau(
                         monitor='loss',

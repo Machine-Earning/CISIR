@@ -42,13 +42,13 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
-            for add_slope in [False]:
+            for add_slope in [True]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
                 outputs_to_use = ['delta_p']
 
-                bs = 8192  # full dataset used
+                bs = 4096  # full dataset used
                 print(f'batch size : {bs}')
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -67,11 +67,13 @@ def main():
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
                     'epochs': 25000,
-                    'learning_rate': 5e-2,  # Updated to 3e-4
+                    'learning_rate': 1e-2,  # Updated to 3e-4
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.9,  # Added momentum beta1
                 }
                 hiddens = [
+                    4096, 2048,
+                    4096, 2048,
                     2048, 1024,
                     2048, 1024,
                     1024, 512,
@@ -95,7 +97,7 @@ def main():
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor='loss',
                     factor=0.5,
-                    patience=500,
+                    patience=1000,
                     verbose=1,
                     min_delta=1e-5,
                     min_lr=1e-10)

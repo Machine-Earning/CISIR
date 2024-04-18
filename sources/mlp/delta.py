@@ -30,8 +30,10 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for alpha in np.arange(0, 1, 0.05):
-            for add_slope in [False, True]:
+        # for alpha in np.arange(0.2, 0.6, 0.05):
+        for alpha in [0.2]:
+            # for add_slope in [False, True]:
+            for add_slope in [False]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
@@ -55,7 +57,7 @@ def main():
                 tf.random.set_seed(seed)
                 np.random.seed(seed)
                 patience = 2000  # higher patience
-                learning_rate = 5e-2  # og learning rate
+                learning_rate = 1e-2  # og learning rate
                 # initial_learning_rate = 3e-3
                 # final_learning_rate = 3e-7
                 # learning_rate_decay_factor = (final_learning_rate / initial_learning_rate) ** (1 / 3000)
@@ -90,8 +92,6 @@ def main():
                     128, 64,
                     64, 32,
                     64, 32,
-                    32, 16,
-                    32, 16
                 ]
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 loss_key = 'mse'
@@ -100,7 +100,7 @@ def main():
                 rebalacing = True
                 alpha_rw = alpha
                 bandwidth = 0.099  # 0.0519
-                repr_dim = 9
+                repr_dim = 32
                 output_dim = len(outputs_to_use)
                 dropout = 0.5
                 activation = None
