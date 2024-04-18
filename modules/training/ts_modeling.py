@@ -1320,8 +1320,8 @@ def plot_and_evaluate_sep_event(
         # Add a black horizontal line at log(0.05) on the y-axis and create a handle for the legend
 
         # print count of changes before mask and after mask
-        print(f"Count of changes before mask: {len(actual_changes)}")
-        print(f"Count of changes after mask: {len(selected_changes)}")
+        # print(f"Count of changes before mask: {len(actual_changes)}")
+        # print(f"Count of changes after mask: {len(selected_changes)}")
         # print(f'Display masked: {actual_changes.flatten()[mask]}')
 
         # Plot the actual changes within the range, offset by -2
@@ -1790,6 +1790,60 @@ def process_predictions(predictions: np.ndarray) -> np.ndarray:
 
     return processed_predictions
 
+
+def plot_error_hist(
+        model: Model,
+        X_test: np.ndarray,
+        y_test: np.ndarray,
+        sample_weights: Optional[np.ndarray],
+        title: str,
+        prefix: str) -> str:
+    """
+    Plots a histogram of the sum of prediction errors for a test dataset using a trained model.
+    Optionally weights these sums if sample weights are provided.
+
+    :param model: The trained model to evaluate.
+    :param X_test: The test features.
+    :param y_test: The true target values for the test set.
+    :param sample_weights: The sample weights for the test set.
+    :param title: The title of the plot.
+    :param prefix: The prefix for the plot file name.
+
+    :return: The file path of the saved plot.
+    """
+    # Predict the outputs
+    _, predictions = model.predict(X_test)
+    # Process predictions
+    predictions = process_predictions(predictions)
+    y_test = process_predictions(y_test)
+    # Calculate squared errors
+    squared_errors = (predictions - y_test) ** 2
+    # Calculate weighted squared errors if sample weights are provided
+    if sample_weights is not None:
+        weighted_squared_errors = squared_errors * sample_weights
+    else:
+        weighted_squared_errors = squared_errors
+
+    # Binning by label values with an interval width of 0.2, adjust the range as needed
+    label_bins = np.arange(y_test.min(), y_test.max() + 0.2, 0.2)
+    # Sum of squared errors per bin
+    sums, bin_edges = np.histogram(y_test, bins=label_bins, weights=weighted_squared_errors)
+    # Bin centers for plotting
+    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+    # Plotting the sum of squared errors histogram
+    plt.figure(figsize=(10, 6))
+    plt.bar(bin_centers, sums, width=np.diff(bin_edges), color='blue', edgecolor='black', align='center')
+    plt.xlabel('True Label Values')
+    plt.ylabel('Sum of Squared Errors')
+    plt.title(title)
+    plt.grid(True)
+
+    # save the plot
+    plot_filename = f"{prefix}_sum_of_squared_errors_histogram.png"
+    plt.savefig(plot_filename)
+    plt.close()
+
+    return os.path.abspath(plot_filename)
 
 def evaluate_model(
         model: tf.keras.Model,
