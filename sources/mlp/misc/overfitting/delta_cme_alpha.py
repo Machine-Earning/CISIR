@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import numpy as np
 import tensorflow as tf
@@ -67,8 +67,8 @@ def main():
 
                     weight_decay = 1e-8  # higher weight decay
                     momentum_beta1 = 0.9  # higher momentum beta1
-                    batch_size = 4096
-                    epochs = 5 # higher epochs
+                    batch_size = 8192
+                    epochs = 15000 # higher epochs
                     hiddens = [
                         2048, 1024,
                         2048, 1024,
@@ -78,17 +78,17 @@ def main():
                         512, 256,
                         128, 64,
                         128, 64,
-                        64, 32,
-                        64, 32,
-                        32, 32,
-                        32, 32
+                        64, 64,
+                        64, 64,
+                        64, 64,
+                        64, 64
                     ]
                     hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                     loss_key = 'mse'
                     target_change = ('delta_p' in outputs_to_use)
                     alpha_rw = alpha
                     bandwidth = 0.099
-                    repr_dim = 32
+                    repr_dim = 64
                     output_dim = len(outputs_to_use)
                     dropout = 0.5
                     activation = None
@@ -300,6 +300,14 @@ def main():
                         title=title,
                         prefix='training')
                     wandb.log({"training_error_hist": wandb.Image(filename)})
+
+                    filename = plot_error_hist(
+                        final_mlp_model_sep,
+                        X_train, y_train,
+                        sample_weights=y_train_weights,
+                        title=title,
+                        prefix='training_weighted')
+                    wandb.log({"training_weighted_error_hist": wandb.Image(filename)})
 
                     # Finish the wandb run
                     wandb.finish()

@@ -82,15 +82,15 @@ def main():
                     512, 256,
                     128, 64,
                     128, 64,
-                    64, 32,
-                    64, 32,
-                    32, 32,
-                    32, 32
+                    64, 64,
+                    64, 64,
+                    64, 64,
+                    64, 64
                 ]
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 pds = True
                 target_change = ('delta_p' in outputs_to_use)
-                repr_dim = 32
+                repr_dim = 64
                 dropout_rate = 0.5
                 activation = None
                 norm = 'batch_norm'
