@@ -66,7 +66,7 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                    'epochs': 25000,
+                    'epochs': 50000,
                     'learning_rate': 1e-2,  # Updated to 3e-4
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.9,  # Added momentum beta1
@@ -80,17 +80,17 @@ def main():
                     1024, 512,
                     512, 256,
                     512, 256,
-                    128, 64,
-                    128, 64,
-                    64, 64,
-                    64, 64,
-                    64, 64,
-                    64, 64
+                    256, 128,
+                    256, 128,
+                    128, 128,
+                    128, 128,
+                    128, 128,
+                    128, 128
                 ]
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 pds = True
                 target_change = ('delta_p' in outputs_to_use)
-                repr_dim = 64
+                repr_dim = 128
                 dropout_rate = 0.5
                 activation = None
                 norm = 'batch_norm'

@@ -8,7 +8,7 @@ from scipy.spatial.distance import pdist
 from scipy.stats import pearsonr
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import MinMaxScaler
-
+from scipy.stats import gaussian_kde
 from modules.evaluate import evaluation as eval
 from modules.training import seploader as sepl
 
@@ -116,7 +116,8 @@ def split_combined_joint_weights_indices(
 
 def plot_repr_correlation(model, X, y, title, model_type='features'):
     """
-    Plots the correlation between distances in target values and distances in the representation space.
+    Plots the correlation between distances in target values and distances in the representation space, 
+    with point density indicated by color.
 
     Parameters:
     - model: The trained model used to transform input features into a representation space.
@@ -126,45 +127,40 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
     - model_type: The type of model to use (features, features_reg, features_dec, features_reg_dec).
 
     Returns:
-    - Plots the representation distance correlation plot.
+    - Plots the representation distance correlation plot with density coloring.
     """
-    # Get representations from the model
     print('In plot_repr_correlation')
-    # Extract features based on the model type
     if model_type in ['features_reg_dec', 'features_reg', 'features_dec']:
         representations = model.predict(X)[0]  # Assuming the first output is always features
-    else:  # model_type == 'features'
+    else:
         representations = model.predict(X)
 
     print('calculating the pairwise distances')
-    # Calculate pairwise distances in the target space and representation space
     distances_target = pdist(y.reshape(-1, 1), 'euclidean')
     distances_repr = pdist(representations, 'euclidean')
 
-    # Normalize distances to [0, 1] range for better comparison
     scaler = MinMaxScaler()
     distances_target_norm = scaler.fit_transform(distances_target.reshape(-1, 1)).flatten()
     distances_repr_norm = scaler.fit_transform(distances_repr.reshape(-1, 1)).flatten()
 
-    print('calculating the spearman rank correlation')
-    # Calculate pearson's rank correlation coefficient
+    print('calculating the spearman rank correlation and density')
     r, _ = pearsonr(distances_target_norm, distances_repr_norm)
+    xy = np.vstack([distances_target_norm, distances_repr_norm])
+    z = gaussian_kde(xy)(xy)  # Calculate density values
 
-    # Create scatter plot
+    print('plotting with density colors')
     plt.figure(figsize=(8, 6))
-    plt.scatter(distances_target_norm, distances_repr_norm, alpha=0.5, s=1)
+    scatter = plt.scatter(distances_target_norm, distances_repr_norm, c=z, s=15, edgecolor='', cmap='viridis', alpha=0.5)
+    plt.colorbar(scatter, label='Density')
     plt.plot([0, 1], [0, 1], 'k--')  # Perfect fit diagonal
     plt.xlabel('Normalized Distance in Target Space')
     plt.ylabel('Normalized Distance in Representation Space')
     plt.title(f'{title}\nRepresentation Space Correlation (pearson r= {r:.2f})')
     plt.grid(True)
-    # plt.show()
-    # save the plot
-    file_path = f"representation_correlation_{title}.png"
-    plt.savefig(file_path)
+    plt.savefig(f"representation_correlation_density_{title}.png")
     plt.close()
 
-    return file_path
+    return f"representation_correlation_density_{title}.png"
 
 
 def plot_shepard(features, tsne_result):
@@ -251,9 +247,11 @@ def plot_tsne_delta(
     norm = plt.Normalize(-2.5, 2.5)
     cmap = plt.cm.coolwarm  # Choosing a colormap that spans across negative and positive changes
 
+    lower_thr, upper_thr = -0.1, 0.1 
+
     # Determine the size and alpha dynamically
-    sizes = np.where((y > 0.5) | (y < -0.5), 50, 12)  # Larger size for rarer values
-    alphas = np.where((y > 0.5) | (y < -0.5), 1.0, 0.3)  # More opaque for rarer values
+    sizes = np.where((y > upper_thr) | (y < lower_thr), 50, 12)  # Larger size for rarer values
+    alphas = np.where((y > upper_thr) | (y < lower_thr), 1.0, 0.3)  # More opaque for rarer values
 
     # Ensure sizes and alphas are 1-dimensional arrays
     sizes = sizes.ravel()
