@@ -6,7 +6,7 @@
 #SBATCH --mem=128GB                      # Memory per node
 #SBATCH --time=infinite                 # Time limit
 #SBATCH --partition=gpu2                # Partition, dynamically set
-#SBATCH --gres=gpu:2                    # Number of GPUs per node (max 4)
+#SBATCH --gres=gpu:3                    # Number of GPUs per node (max 4)
 #SBATCH --output=sep.f.%J.out         # Output file
 #SBATCH --error=sep.f.%J.err          # Error file
 
