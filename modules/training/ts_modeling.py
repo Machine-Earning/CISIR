@@ -1480,6 +1480,7 @@ def process_sep_events(
         outputs_to_use: List[str] = None,
         show_avsp: bool = False,
         show_error_hist: bool = True,
+        show_error_concentration: bool = True,
         prefix: str = 'testing') -> List[str]:
     """
     Processes SEP event files in the specified directory, normalizes flux intensities, predicts proton intensities,
@@ -1593,6 +1594,11 @@ def process_sep_events(
             print(f"Saved histogram plot to: {histogram_path}")
             plot_names.append(histogram_path)
 
+        if show_error_concentration:
+            concentration_path = plot_error_concentration(avsp_data, f"{title} Error Concentration", prefix)
+            print(f"Saved concentration plot to: {concentration_path}")
+            plot_names.append(concentration_path)
+
     return plot_names
 
 
@@ -1626,6 +1632,58 @@ def plot_error_dist(avsp_data: List[Tuple[str, np.ndarray, np.ndarray]], title: 
     plt.grid(True)
 
     plot_filename = f"{prefix}_error_distribution.png"
+    plt.savefig(plot_filename)
+    plt.close()
+
+    return os.path.abspath(plot_filename)
+
+
+def plot_error_concentration(avsp_data: List[Tuple[str, np.ndarray, np.ndarray]], title: str, prefix: str) -> str:
+    """
+    Plots a heatmap showing the concentration of errors across label bins.
+
+    Parameters:
+    - avsp_data (List[Tuple[str, np.ndarray, np.ndarray]]): List of tuples containing event_id, actual data, and predicted data.
+    - title (str): The title for the heatmap plot.
+    - prefix (str): Prefix for naming the plot file.
+
+    Returns:
+    - str: File path of the saved plot.
+    """
+    # Extract all errors and labels
+    errors = []
+    labels = []
+    for _, actual, predicted in avsp_data:
+        error = actual - predicted  # Compute error as actual - predicted
+        errors.extend(error)
+        labels.extend(actual)
+
+    # Define the bin widths and ranges for errors and labels
+    error_bin_width = 0.1
+    label_bin_width = 0.4
+    error_bins = np.arange(min(errors), max(errors) + error_bin_width, error_bin_width)
+    label_bins = np.arange(min(labels), max(labels) + label_bin_width, label_bin_width)
+
+    # Create a 2D histogram of errors and labels
+    counts, xedges, yedges = np.histogram2d(errors, labels, bins=[error_bins, label_bins])
+
+    # Plot the heatmap
+    plt.figure(figsize=(12, 8))
+    heatmap = plt.pcolormesh(xedges, yedges, counts.T, cmap='hot')
+    plt.colorbar(heatmap, label='Frequency')
+
+    # Adding frequency labels to each cell
+    for i in range(len(xedges) - 1):
+        for j in range(len(yedges) - 1):
+            plt.text(xedges[i] + error_bin_width / 2, yedges[j] + label_bin_width / 2, f'{int(counts[i][j])}',
+                     color='white', ha='center', va='center')
+
+    plt.xlabel('Error')
+    plt.ylabel('Label')
+    plt.title(title)
+    plt.grid(True, linestyle='--', alpha=0.7)
+
+    plot_filename = f"{prefix}_error_concentration.png"
     plt.savefig(plot_filename)
     plt.close()
 
@@ -1844,6 +1902,7 @@ def plot_error_hist(
     plt.close()
 
     return os.path.abspath(plot_filename)
+
 
 def evaluate_model(
         model: tf.keras.Model,

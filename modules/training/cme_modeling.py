@@ -6,7 +6,7 @@
 import time
 from itertools import cycle
 # types for type hinting
-from typing import Tuple, List, Optional, Dict
+from typing import Tuple, List, Optional, Dict, Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -1098,6 +1098,94 @@ class ModelBuilder:
         print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
 
         return history
+
+    def overtrain_pds_dl(self,
+                         model: tf.keras.Model,
+                         X_train: np.ndarray,
+                         y_train: np.ndarray,
+                         train_label_weights_dict: Optional[Dict[float, float]] = None,
+                         learning_rate: float = 1e-3,
+                         epochs: int = 100,
+                         batch_size: int = 32,
+                         save_tag: Optional[str] = None,
+                         callbacks_list=None,
+                         verbose: int = 1) -> Dict[str, List[Any]]:
+        """
+        Custom training loop to stage2 the model and returns the training history.
+
+        :param X_train: training and validation sets together
+        :param y_train: labels of training and validation sets together
+        :param model: The TensorFlow model to stage2.
+        :param train_label_weights_dict: Dictionary containing label weights for the stage2 set.
+        :param learning_rate: The learning rate for the Adam optimizer.
+        :param epochs: The maximum number of epochs for training.
+        :param batch_size: The batch size for training.
+        :param save_tag: Tag to use for saving experiments.
+        :param callbacks_list: List of callback instances to apply during training.
+        :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
+
+
+        :return: The training history as a dictionary.
+        """
+
+        if callbacks_list is None:
+            callbacks_list = []
+
+        # Setting up callback environment
+        params = {
+            'epochs': epochs,
+            'steps': None,
+            'verbose': verbose,
+            'do_validation': False,
+            'metrics': ['loss'],
+        }
+        for cb in callbacks_list:
+            cb.set_model(model)
+            cb.set_params(params)
+
+        logs = {}
+        # Signal the beginning of training
+        for cb in callbacks_list:
+            cb.on_train_begin(logs=logs)
+
+        # Optimizer and history initialization
+        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        model.compile(optimizer=optimizer)  # Set the optimizer for the model
+
+        # Retraining on the combined dataset
+        # Reset history for retraining
+        retrain_history = {'loss': []}
+
+        # Retrain up to the best epoch
+        for epoch in range(epochs):
+            for cb in callbacks_list:
+                cb.on_epoch_begin(epoch, logs=logs)
+
+            retrain_loss = self.train_for_one_epoch(
+                model, optimizer,
+                self.pds_loss_dl_vec,
+                X_train, y_train,
+                batch_size=batch_size if batch_size > 0 else len(y_train),
+                label_weights_dict=train_label_weights_dict)
+
+            # Log the retrain loss
+            retrain_history['loss'].append(retrain_loss)
+            print(f"Retrain Epoch {epoch + 1}/{epochs}, Loss: {retrain_loss}")
+
+            logs = {'loss': retrain_loss}  # Update logs with retrain loss
+
+            for cb in callbacks_list:
+                cb.on_epoch_end(epoch, logs=logs)
+
+        for cb in callbacks_list:
+            cb.on_train_end(logs=logs)
+
+        # Save the final model
+        model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
+        # print where the model weights are saved
+        print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
+
+        return retrain_history
 
     # def train_pds_dl_bs(self,
     #                     model: tf.keras.Model,
