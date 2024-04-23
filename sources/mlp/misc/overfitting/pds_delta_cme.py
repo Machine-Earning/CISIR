@@ -3,7 +3,7 @@ import random
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import numpy as np
 import tensorflow as tf
@@ -80,17 +80,17 @@ def main():
                         1024, 512,
                         512, 256,
                         512, 256,
-                        128, 64,
-                        128, 64,
-                        128, 64,
-                        128, 64,
-                        64, 64,
-                        64, 64
+                        256, 128,
+                        256, 128,
+                        128, 128,
+                        128, 128,
+                        128, 128,
+                        128, 128
                 ]
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 pds = True
                 target_change = ('delta_p' in outputs_to_use)
-                repr_dim = 64
+                repr_dim = 128
                 dropout_rate = 0.5
                 activation = None
                 norm = 'batch_norm'
