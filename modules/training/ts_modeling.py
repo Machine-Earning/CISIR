@@ -1669,14 +1669,14 @@ def plot_error_concentration(avsp_data: List[Tuple[str, np.ndarray, np.ndarray]]
 
     # Plot the heatmap
     plt.figure(figsize=(12, 8))
-    heatmap = plt.pcolormesh(xedges, yedges, counts.T, cmap='hot')
+    heatmap = plt.pcolormesh(xedges, yedges, counts.T, cmap='Greys')
     plt.colorbar(heatmap, label='Frequency')
 
     # Adding frequency labels to each cell
     for i in range(len(xedges) - 1):
         for j in range(len(yedges) - 1):
             plt.text(xedges[i] + error_bin_width / 2, yedges[j] + label_bin_width / 2, f'{int(counts[i][j])}',
-                     color='white', ha='center', va='center')
+                     color='tab:blue', ha='center', va='center')
 
     plt.xlabel('Error')
     plt.ylabel('Label')
