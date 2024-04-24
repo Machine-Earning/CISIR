@@ -74,14 +74,12 @@ def main():
                     # Set the early stopping patience and learning rate as variables
                     Options = {
                         'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                        'epochs': 15000,
+                        'epochs': 25000,
                         'learning_rate': 1e-2,  # Updated to 3e-4
                         'weight_decay': 1e-8,  # Added weight decay
                         'momentum_beta1': 0.9,  # Added momentum beta1
                     }
                     hiddens = [
-                        4096, 2048,
-                        4096, 2048,
                         2048, 1024,
                         2048, 1024,
                         1024, 512,
@@ -90,10 +88,10 @@ def main():
                         512, 256,
                         128, 64,
                         128, 64,
-                        64, 32,
-                        64, 32,
-                        32, 32,
-                        32, 32
+                        64, 64,
+                        64, 64,
+                        64, 64,
+                        64, 64
                     ]
                     hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                     pds = True

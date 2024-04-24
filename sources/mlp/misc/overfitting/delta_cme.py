@@ -67,7 +67,7 @@ def main():
                     weight_decay = 1e-8  # higher weight decay
                     momentum_beta1 = 0.9  # higher momentum beta1
                     batch_size = 2048
-                    epochs = 25000  # higher epochs
+                    epochs = 35000  # higher epochs
                     hiddens = [
                         2048, 1024,
                         2048, 1024,
@@ -75,18 +75,18 @@ def main():
                         1024, 512,
                         512, 256,
                         512, 256,
-                        128, 64,
-                        128, 64,
-                        128, 64,
-                        124, 64,
-                        64, 64,
-                        64, 64
+                        256, 128,
+                        256, 128,
+                        256, 128,
+                        128, 128,
+                        128, 128,
+                        128, 128
                     ]
                     hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                     loss_key = 'mse'
                     target_change = ('delta_p' in outputs_to_use)
 
-                    repr_dim = 64
+                    repr_dim = 128
                     output_dim = len(outputs_to_use)
                     dropout = 0.5
                     activation = None

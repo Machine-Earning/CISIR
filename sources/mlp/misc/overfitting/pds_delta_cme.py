@@ -3,7 +3,7 @@ import random
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import numpy as np
 import tensorflow as tf
@@ -66,31 +66,29 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                    'epochs': 20000,
+                    'epochs': 25000,
                     'learning_rate': 1e-2,  # Updated to 3e-4
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.9,  # Added momentum beta1
                 }
                 hiddens = [
-                        4096, 2048,
-                        4096, 2048,
-                        2048, 1024,
-                        2048, 1024,
-                        1024, 512,
-                        1024, 512,
-                        512, 256,
-                        512, 256,
-                        256, 128,
-                        256, 128,
-                        128, 128,
-                        128, 128,
-                        128, 128,
-                        128, 128
+                    2048, 1024,
+                    2048, 1024,
+                    1024, 512,
+                    1024, 512,
+                    512, 256,
+                    512, 256,
+                    128, 64,
+                    128, 64,
+                    64, 64,
+                    64, 64,
+                    64, 64,
+                    64, 64
                 ]
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 pds = True
                 target_change = ('delta_p' in outputs_to_use)
-                repr_dim = 128
+                repr_dim = 9
                 dropout_rate = 0.5
                 activation = None
                 norm = 'batch_norm'
@@ -128,7 +126,8 @@ def main():
                     "architecture": "mlp",
                     'cme_speed_threshold': cme_speed_threshold,
                     "residual": residual,
-                    "skipped_layers": skipped_layers
+                    "skipped_layers": skipped_layers,
+                    "repr_dim": repr_dim
                 })
 
                 # set the root directory
