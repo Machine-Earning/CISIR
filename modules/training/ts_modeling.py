@@ -1676,7 +1676,7 @@ def plot_error_concentration(avsp_data: List[Tuple[str, np.ndarray, np.ndarray]]
     for i in range(len(xedges) - 1):
         for j in range(len(yedges) - 1):
             plt.text(xedges[i] + error_bin_width / 2, yedges[j] + label_bin_width / 2, f'{int(counts[i][j])}',
-                     color='tab:blue', ha='center', va='center')
+                     color='tab:blue', ha='center', va='center', fontsize=8)
 
     plt.xlabel('Error')
     plt.ylabel('Label')
