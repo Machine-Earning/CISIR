@@ -3,7 +3,7 @@ import random
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import numpy as np
 import tensorflow as tf
@@ -50,7 +50,7 @@ def main():
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
             for add_slope in [True]:
-                for alpha in [0.3]:
+                for alpha in [0.2]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
                     # add_slope = True
@@ -63,7 +63,7 @@ def main():
                     inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                     # Construct the title
-                    title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDS_bs{bs}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                    title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDS_bs{bs}_alpha{alpha:.2f}_CME{cme_speed_threshold}_dsv3'
 
                     # Replace any other characters that are not suitable for filenames (if any)
                     title = title.replace(' ', '_').replace(':', '_')
@@ -74,7 +74,7 @@ def main():
                     # Set the early stopping patience and learning rate as variables
                     Options = {
                         'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                        'epochs': 25000,
+                        'epochs': 10000,
                         'learning_rate': 1e-2,  # Updated to 3e-4
                         'weight_decay': 1e-8,  # Added weight decay
                         'momentum_beta1': 0.9,  # Added momentum beta1
@@ -96,7 +96,7 @@ def main():
                     hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                     pds = True
                     target_change = ('delta_p' in outputs_to_use)
-                    repr_dim = 32
+                    repr_dim = 64
                     dropout_rate = 0.5
                     activation = None
                     norm = 'batch_norm'
@@ -137,11 +137,12 @@ def main():
                         "alpha": alpha_rw,
                         "bandwidth": bandwidth,
                         "residual": residual,
-                        "skipped_layers": skipped_layers
+                        "skipped_layers": skipped_layers,
+                        "repr_dim": repr_dim
                     })
 
                     # set the root directory
-                    root_dir = "data/electron_cme_data_split"
+                    root_dir = "data/electron_cme_data_split_v3"
                     # build the dataset
                     X_train, y_train = build_dataset(
                         root_dir + '/training',
@@ -236,6 +237,16 @@ def main():
                             WandbCallback(save_model=False),
                             reduce_lr_on_plateau
                         ])
+                    
+                    file_path = plot_repr_correlation(mlp_model_sep, X_val, y_val, title + "_training")
+                    # Log the representation correlation plot to wandb
+                    wandb.log({'representation_correlation_plot_train': wandb.Image(file_path)})
+                    print('file_path: ' + file_path)
+
+                    file_path = plot_repr_correlation(mlp_model_sep, X_test, y_test, title + "_test")
+                    # Log the representation correlation plot to wandb
+                    wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
+                    print('file_path: ' + file_path)
 
                     file_path = plot_tsne_delta(
                         mlp_model_sep,
@@ -263,15 +274,7 @@ def main():
                     wandb.log({'tsne_testing_plot': wandb.Image(file_path)})
                     print('file_path: ' + file_path)
 
-                    file_path = plot_repr_correlation(mlp_model_sep, X_val, y_val, title + "_training")
-                    # Log the representation correlation plot to wandb
-                    wandb.log({'representation_correlation_plot_train': wandb.Image(file_path)})
-                    print('file_path: ' + file_path)
-
-                    file_path = plot_repr_correlation(mlp_model_sep, X_test, y_test, title + "_test")
-                    # Log the representation correlation plot to wandb
-                    wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
-                    print('file_path: ' + file_path)
+                    
 
                     # Finish the wandb run
                     wandb.finish()

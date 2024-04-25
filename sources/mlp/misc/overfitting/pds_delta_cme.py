@@ -3,7 +3,7 @@ import random
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import numpy as np
 import tensorflow as tf
@@ -55,7 +55,7 @@ def main():
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDS_bs{bs}_CME{cme_speed_threshold}'
+                title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDS_bs{bs}_CME{cme_speed_threshold}_dsv3'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -88,7 +88,7 @@ def main():
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 pds = True
                 target_change = ('delta_p' in outputs_to_use)
-                repr_dim = 9
+                repr_dim = 64
                 dropout_rate = 0.5
                 activation = None
                 norm = 'batch_norm'
@@ -131,7 +131,7 @@ def main():
                 })
 
                 # set the root directory
-                root_dir = "data/electron_cme_data_split"
+                root_dir = "data/electron_cme_data_split_v3"
                 # build the dataset
                 X_train, y_train = build_dataset(
                     root_dir + '/training',

@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import numpy as np
 import tensorflow as tf
@@ -29,7 +29,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
-            for alpha in [0]:
+            for alpha in [0, 0.1, 0.2, 0.3]:
                 for add_slope in [False]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
@@ -40,7 +40,7 @@ def main():
                     inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                     # Construct the title
-                    title = f'MLP_{inputs_str}_slope{str(add_slope)}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                    title = f'MLP_{inputs_str}_slope{str(add_slope)}_alpha{alpha:.2f}_CME{cme_speed_threshold}_dsv3'
 
                     # Replace any other characters that are not suitable for filenames (if any)
                     title = title.replace(' ', '_').replace(':', '_')
@@ -66,8 +66,8 @@ def main():
 
                     weight_decay = 1e-8  # higher weight decay
                     momentum_beta1 = 0.9  # higher momentum beta1
-                    batch_size = 2048
-                    epochs = 35000  # higher epochs
+                    batch_size = 4096
+                    epochs = 25000  # higher epochs
                     hiddens = [
                         2048, 1024,
                         2048, 1024,
@@ -125,7 +125,7 @@ def main():
                     })
 
                     # set the root directory
-                    root_dir = 'data/electron_cme_data_split'
+                    root_dir = 'data/electron_cme_data_split_v3'
                     # build the dataset
                     X_train, y_train = build_dataset(
                         root_dir + '/training',
