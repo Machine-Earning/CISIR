@@ -1654,7 +1654,7 @@ def plot_error_concentration(avsp_data: List[Tuple[str, np.ndarray, np.ndarray]]
     errors = []
     labels = []
     for _, actual, predicted in avsp_data:
-        error = actual - predicted  # Compute error as actual - predicted
+        error = predicted - actual  # Compute error as actual - predicted
         errors.extend(error)
         labels.extend(actual)
 
