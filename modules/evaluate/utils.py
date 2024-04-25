@@ -247,7 +247,7 @@ def plot_tsne_delta(
     norm = plt.Normalize(-2.5, 2.5)
     cmap = plt.cm.coolwarm  # Choosing a colormap that spans across negative and positive changes
 
-    lower_thr, upper_thr = -0.1, 0.1 
+    lower_thr, upper_thr = -0.5, 0.5
 
     # Determine the size and alpha dynamically
     sizes = np.where((y > upper_thr) | (y < lower_thr), 50, 12)  # Larger size for rarer values
