@@ -11,7 +11,7 @@ from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
 import numpy as np
 
-from modules.evaluate.utils import plot_tsne_delta, plot_repr_correlation
+from modules.evaluate.utils import plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density
 from modules.training.DenseReweights import exDenseReweights
 from modules.training.cme_modeling import ModelBuilder
 from modules.training.ts_modeling import (
@@ -240,6 +240,16 @@ def main():
                         file_path = plot_repr_correlation(mlp_model_sep_stage1, X_test, y_test, title + "_test")
                         # Log the representation correlation plot to wandb
                         wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
+                        print('file_path: ' + file_path)
+
+                        file_path = plot_repr_corr_density(mlp_model_sep_stage1, X_val, y_val, title + "_training")
+                        # Log the representation correlation plot to wandb
+                        wandb.log({'representation_correlation_density_plot_train': wandb.Image(file_path)})
+                        print('file_path: ' + file_path)
+
+                        file_path = plot_repr_corr_density(mlp_model_sep_stage1, X_test, y_test, title + "_test")
+                        # Log the representation correlation plot to wandb
+                        wandb.log({'representation_correlation_density_plot_test': wandb.Image(file_path)})
                         print('file_path: ' + file_path)
 
                         # Log t-SNE plot for training
