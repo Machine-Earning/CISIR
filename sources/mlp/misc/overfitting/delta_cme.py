@@ -29,7 +29,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
-            for alpha in [0.3]:
+            for alpha in [0, 0.2, 0.4, 0.6, 0.8, 1]:
                 for add_slope in [False]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
@@ -40,7 +40,7 @@ def main():
                     inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                     # Construct the title
-                    title = f'MLP_{inputs_str}_slope{str(add_slope)}_alpha{alpha:.2f}_CME{cme_speed_threshold}_dsv4'
+                    title = f'MLP_{inputs_str}_slope{str(add_slope)}_alpha{alpha:.2f}_CME{cme_speed_threshold}_dsv5'
 
                     # Replace any other characters that are not suitable for filenames (if any)
                     title = title.replace(' ', '_').replace(':', '_')
@@ -125,7 +125,7 @@ def main():
                     })
 
                     # set the root directory
-                    root_dir = 'data/electron_cme_data_split_v4'
+                    root_dir = 'data/electron_cme_data_split_v5'
                     # build the dataset
                     X_train, y_train = build_dataset(
                         root_dir + '/training',
@@ -153,7 +153,7 @@ def main():
                     print(f'n_features: {n_features}')
 
                     # create the model
-                    mlp_model_sep = create_mlp(
+                    model_sep = create_mlp(
                         input_dim=n_features,
                         hiddens=hiddens,
                         repr_dim=repr_dim,
@@ -164,24 +164,24 @@ def main():
                         residual=residual,
                         skipped_layers=skipped_layers
                     )
-                    mlp_model_sep.summary()
+                    model_sep.summary()
 
                     X_train = reshape_X(
                         X_train,
                         [n_features],
                         inputs_to_use,
                         add_slope,
-                        mlp_model_sep.name)
+                        model_sep.name)
 
                     X_test = reshape_X(
                         X_test,
                         [n_features],
                         inputs_to_use,
                         add_slope,
-                        mlp_model_sep.name)
+                        model_sep.name)
 
                     # Determine the optimal number of epochs from early stopping
-                    final_mlp_model_sep = create_mlp(
+                    final_model_sep = create_mlp(
                         input_dim=n_features,
                         hiddens=hiddens,
                         repr_dim=repr_dim,
@@ -194,7 +194,7 @@ def main():
                     )
 
                     # Recreate the model architecture
-                    final_mlp_model_sep.compile(
+                    final_model_sep.compile(
                         optimizer=AdamW(
                             learning_rate=learning_rate, 
                             beta_1=momentum_beta1,
@@ -203,7 +203,7 @@ def main():
                         loss={'forecast_head': get_loss(loss_key)}
                     )
                     # Train on the full dataset
-                    final_mlp_model_sep.fit(
+                    final_model_sep.fit(
                         X_train,
                         {'forecast_head': y_train},
                         epochs=epochs,
@@ -212,13 +212,13 @@ def main():
                         verbose=1)
 
                     # evaluate the model on test cme_files
-                    error_mae = evaluate_model(final_mlp_model_sep, X_test, y_test)
+                    error_mae = evaluate_model(final_model_sep, X_test, y_test)
                     print(f'mae error: {error_mae}')
                     # Log the MAE error to wandb
                     wandb.log({"mae_error": error_mae})
 
                     # evaluate the model on training cme_files
-                    error_mae_train = evaluate_model(final_mlp_model_sep, X_train, y_train)
+                    error_mae_train = evaluate_model(final_model_sep, X_train, y_train)
                     print(f'mae error train: {error_mae_train}')
                     # Log the MAE error to wandb
                     wandb.log({"train_mae_error": error_mae_train})
@@ -227,7 +227,7 @@ def main():
                     test_directory = root_dir + '/testing'
                     filenames = process_sep_events(
                         test_directory,
-                        final_mlp_model_sep,
+                        final_model_sep,
                         title=title,
                         inputs_to_use=inputs_to_use,
                         add_slope=add_slope,
@@ -245,7 +245,7 @@ def main():
                     test_directory = root_dir + '/training'
                     filenames = process_sep_events(
                         test_directory,
-                        final_mlp_model_sep,
+                        final_model_sep,
                         title=title,
                         inputs_to_use=inputs_to_use,
                         add_slope=add_slope,
@@ -263,7 +263,7 @@ def main():
                     # evaluate the model on test cme_files
                     above_threshold = 0.1
                     error_mae_cond = evaluate_model_cond(
-                        final_mlp_model_sep, X_test, y_test, above_threshold=above_threshold)
+                        final_model_sep, X_test, y_test, above_threshold=above_threshold)
 
                     print(f'mae error delta >= 0.1 test: {error_mae_cond}')
                     # Log the MAE error to wandb
@@ -271,7 +271,7 @@ def main():
 
                     # evaluate the model on training cme_files
                     error_mae_cond_train = evaluate_model_cond(
-                        final_mlp_model_sep, X_train, y_train, above_threshold=above_threshold)
+                        final_model_sep, X_train, y_train, above_threshold=above_threshold)
 
                     print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
                     # Log the MAE error to wandb

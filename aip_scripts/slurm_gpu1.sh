@@ -7,8 +7,8 @@
 #SBATCH --time=infinite              # Time limit
 #SBATCH --partition=gpu1              # Partition, dynamically set
 #SBATCH --gres=gpu:2                # Number of GPUs per node
-#SBATCH --output=pds.%J.out       # Output file
-#SBATCH --error=pds.%J.err        # Error file
+#SBATCH --output=./logs/%x.%J.out       # Output file
+#SBATCH --error=./logs/%x.%J.err        # Error file
 
 echo "Starting at date $(date)"
 
