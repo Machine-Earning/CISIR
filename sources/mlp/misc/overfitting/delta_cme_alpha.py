@@ -30,7 +30,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
-            for alpha in [0.9]:
+            for alpha in [0, 0.2, 0.4, 0.6, 0.8, 1]:
                 for add_slope in [False]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
@@ -68,7 +68,7 @@ def main():
                     weight_decay = 1e-8  # higher weight decay
                     momentum_beta1 = 0.9  # higher momentum beta1
                     batch_size = 4096
-                    epochs = 15000 # higher epochs
+                    epochs = 25000 # higher epochs
                     hiddens = [
                         2048, 1024,
                         2048, 1024,
@@ -76,19 +76,19 @@ def main():
                         1024, 512,
                         512, 256,
                         512, 256,
-                        128, 64,
-                        128, 64,
-                        64, 64,
-                        64, 64,
-                        64, 64,
-                        64, 64
+                        256, 128,
+                        256, 128,
+                        256, 128,
+                        128, 128,
+                        128, 128,
+                        128, 128
                     ]
                     hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                     loss_key = 'mse'
                     target_change = ('delta_p' in outputs_to_use)
                     alpha_rw = alpha
-                    bandwidth = 0.099
-                    repr_dim = 64
+                    bandwidth = 4.42e-2 
+                    repr_dim = 128
                     output_dim = len(outputs_to_use)
                     dropout = 0.5
                     activation = None
@@ -124,11 +124,12 @@ def main():
                         'architecture': 'mlp',
                         'cme_speed_threshold': cme_speed_threshold,
                         'residual': residual,
-                        'skipped_layers': skipped_layers
+                        'skipped_layers': skipped_layers,
+                        'ds_version': 5
                     })
 
                     # set the root directory
-                    root_dir = 'data/electron_cme_data_split'
+                    root_dir = 'data/electron_cme_data_split_v5'
                     # build the dataset
                     X_train, y_train = build_dataset(
                         root_dir + '/training',
@@ -169,7 +170,7 @@ def main():
                     print(f'training set rebalanced.')
 
                     # create the model
-                    mlp_model_sep = create_mlp(
+                    model_sep = create_mlp(
                         input_dim=n_features,
                         hiddens=hiddens,
                         repr_dim=repr_dim,
@@ -180,24 +181,24 @@ def main():
                         residual=residual,
                         skipped_layers=skipped_layers
                     )
-                    mlp_model_sep.summary()
+                    model_sep.summary()
 
                     X_train = reshape_X(
                         X_train,
                         [n_features],
                         inputs_to_use,
                         add_slope,
-                        mlp_model_sep.name)
+                        model_sep.name)
 
                     X_test = reshape_X(
                         X_test,
                         [n_features],
                         inputs_to_use,
                         add_slope,
-                        mlp_model_sep.name)
+                        model_sep.name)
 
                     # Determine the optimal number of epochs from early stopping
-                    final_mlp_model_sep = create_mlp(
+                    final_model_sep = create_mlp(
                         input_dim=n_features,
                         hiddens=hiddens,
                         repr_dim=repr_dim,
@@ -210,7 +211,7 @@ def main():
                     )
 
                     # Recreate the model architecture
-                    final_mlp_model_sep.compile(
+                    final_model_sep.compile(
                         optimizer=AdamW(
                             learning_rate=learning_rate, 
                             beta_1=momentum_beta1,
@@ -219,7 +220,7 @@ def main():
                         loss={'forecast_head': get_loss(loss_key)}
                     )
                     # Train on the full dataset
-                    final_mlp_model_sep.fit(
+                    final_model_sep.fit(
                         X_train,
                         {'forecast_head': y_train},
                         sample_weight=y_train_weights,
@@ -229,13 +230,13 @@ def main():
                         verbose=1)
 
                     # evaluate the model on test cme_files
-                    error_mae = evaluate_model(final_mlp_model_sep, X_test, y_test)
+                    error_mae = evaluate_model(final_model_sep, X_test, y_test)
                     print(f'mae error: {error_mae}')
                     # Log the MAE error to wandb
                     wandb.log({"mae_error": error_mae})
 
                     # evaluate the model on training cme_files
-                    error_mae_train = evaluate_model(final_mlp_model_sep, X_train, y_train)
+                    error_mae_train = evaluate_model(final_model_sep, X_train, y_train)
                     print(f'mae error train: {error_mae_train}')
                     # Log the MAE error to wandb
                     wandb.log({"train_mae_error": error_mae_train})
@@ -244,7 +245,7 @@ def main():
                     test_directory = root_dir + '/testing'
                     filenames = process_sep_events(
                         test_directory,
-                        final_mlp_model_sep,
+                        final_model_sep,
                         title=title,
                         inputs_to_use=inputs_to_use,
                         add_slope=add_slope,
@@ -262,7 +263,7 @@ def main():
                     test_directory = root_dir + '/training'
                     filenames = process_sep_events(
                         test_directory,
-                        final_mlp_model_sep,
+                        final_model_sep,
                         title=title,
                         inputs_to_use=inputs_to_use,
                         add_slope=add_slope,
@@ -280,7 +281,7 @@ def main():
                     # evaluate the model on test cme_files
                     above_threshold = 0.1
                     error_mae_cond = evaluate_model_cond(
-                        final_mlp_model_sep, X_test, y_test, above_threshold=above_threshold)
+                        final_model_sep, X_test, y_test, above_threshold=above_threshold)
 
                     print(f'mae error delta >= 0.1 test: {error_mae_cond}')
                     # Log the MAE error to wandb
@@ -288,13 +289,13 @@ def main():
 
                     # evaluate the model on training cme_files
                     error_mae_cond_train = evaluate_model_cond(
-                        final_mlp_model_sep, X_train, y_train, above_threshold=above_threshold)
+                        final_model_sep, X_train, y_train, above_threshold=above_threshold)
 
                     print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
                     # Log the MAE error to wandb
 
                     filename = plot_error_hist(
-                        final_mlp_model_sep,
+                        final_model_sep,
                         X_train, y_train,
                         sample_weights=None,
                         title=title,
@@ -302,7 +303,7 @@ def main():
                     wandb.log({"training_error_hist": wandb.Image(filename)})
 
                     filename = plot_error_hist(
-                        final_mlp_model_sep,
+                        final_model_sep,
                         X_train, y_train,
                         sample_weights=y_train_weights,
                         title=title,
