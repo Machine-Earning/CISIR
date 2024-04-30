@@ -5,11 +5,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from scipy.spatial.distance import pdist
+from scipy.stats import gaussian_kde
 from scipy.stats import pearsonr
+from sklearn.preprocessing import MinMaxScaler
 # from sklearn.manifold import TSNE
 from tsnecuda import TSNE
-from sklearn.preprocessing import MinMaxScaler
-from scipy.stats import gaussian_kde
+import itertools
 from modules.evaluate import evaluation as eval
 from modules.training import seploader as sepl
 
@@ -115,6 +116,66 @@ def split_combined_joint_weights_indices(
     return np.array(train_weights), train_indices, np.array(val_weights), val_indices
 
 
+def plot_repr_corr_density(model, X, y, title, model_type='features'):
+    """
+    Plots a heatmap showing the concentration of points in the representation space and target value space.
+
+    Parameters:
+    - model: The trained model used to transform input features into a representation space.
+    - X: Input features (NumPy array or compatible).
+    - y: Target values (NumPy array or compatible).
+    - title: Title for the plot.
+
+    Returns:
+    - str: File path of the saved plot.
+    """
+    # Predict representations
+    print('In plot_repr_correlation_density')
+    if model_type in ['features_reg_dec', 'features_reg', 'features_dec']:
+        representations = model.predict(X)[0]  # Assuming the first output is always features
+    else:
+        representations = model.predict(X)
+
+    # Calculate distances
+    distances_target = pdist(y.reshape(-1, 1), 'euclidean')
+    distances_repr = pdist(representations, 'euclidean')
+
+    # Normalize distances
+    scaler = MinMaxScaler()
+    distances_target_norm = scaler.fit_transform(distances_target.reshape(-1, 1)).flatten()
+    distances_repr_norm = scaler.fit_transform(distances_repr.reshape(-1, 1)).flatten()
+
+    # Define bins for normalized distances
+    bin_width = 0.05
+    bins = np.arange(0, 1 + bin_width, bin_width)
+
+    # Create a 2D histogram of normalized distances
+    counts, xedges, yedges = np.histogram2d(distances_target_norm, distances_repr_norm, bins=[bins, bins])
+
+    # Plot the heatmap
+    plt.figure(figsize=(12, 8))
+    heatmap = plt.pcolormesh(xedges, yedges, counts.T, cmap='Greys')
+    plt.colorbar(heatmap, label='Frequency')
+
+    # Adding frequency labels to each cell
+    for i in range(len(xedges) - 1):
+        for j in range(len(yedges) - 1):
+            if counts[i][j] > 0:  # Only add labels to non-zero cells
+                plt.text(xedges[i] + bin_width / 2, yedges[j] + bin_width / 2, f'{int(counts[i][j])}',
+                         color='tab:blue', ha='center', va='center', fontsize=8)
+    #
+    plt.xlabel('Normalized Distance in Target Space')
+    plt.ylabel('Normalized Distance in Representation Space')
+    plt.title(title)
+    plt.grid(True, linestyle='--', alpha=0.7)
+
+    plot_filename = f"{title.replace(' ', '_').lower()}_density_plot.png"
+    plt.savefig(plot_filename)
+    plt.close()
+
+    return plot_filename
+
+
 def plot_repr_correlation(model, X, y, title, model_type='features'):
     """
     Plots the correlation between distances in target values and distances in the representation space, 
@@ -151,7 +212,8 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
 
     print('plotting with density colors')
     plt.figure(figsize=(8, 6))
-    scatter = plt.scatter(distances_target_norm, distances_repr_norm, c=z, s=15, edgecolor='', cmap='viridis', alpha=0.5)
+    scatter = plt.scatter(distances_target_norm, distances_repr_norm, c=z, s=15, edgecolor='', cmap='viridis',
+                          alpha=0.5)
     plt.colorbar(scatter, label='Density')
     plt.plot([0, 1], [0, 1], 'k--')  # Perfect fit diagonal
     plt.xlabel('Normalized Distance in Target Space')
@@ -162,6 +224,63 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
     plt.close()
 
     return f"representation_correlation_density_{title}.png"
+
+
+def plot_repr_correlation_colored(model, X, y, title, model_type='features'):
+    """
+    Plots the correlation between distances in target values and distances in the representation space,
+    with color and marker variations based on the category of the label. Labels are categorized into 'BB', 'BS/SB', and 'SS' with specific colors and markers for each.
+
+    Parameters:
+    - model: The trained model used to transform input features into a representation space.
+    - X: Input features (NumPy array or compatible).
+    - y: Target values (NumPy array or compatible).
+    - title: Title for the plot.
+    - model_type: The type of model to use (features, features_reg, features_dec, features_reg_dec).
+
+    Returns:
+    - Plots the representation distance correlation plot with categorized coloring and markers.
+    """
+    print('In plot_repr_correlation_colored')
+    if model_type in ['features_reg_dec', 'features_reg', 'features_dec']:
+        representations = model.predict(X)[0]  # Assuming the first output is always features
+    else:
+        representations = model.predict(X)
+
+    print('calculating the pairwise distances')
+    distances_target = pdist(y.reshape(-1, 1), 'euclidean')
+    distances_repr = pdist(representations, 'euclidean')
+
+    scaler = MinMaxScaler()
+    distances_target_norm = scaler.fit_transform(distances_target.reshape(-1, 1)).flatten()
+    distances_repr_norm = scaler.fit_transform(distances_repr.reshape(-1, 1)).flatten()
+
+    categories = np.where(np.abs(y) <= 0.5, 'B', 'S')
+    indices = np.arange(len(y))
+    index_pairs = list(itertools.combinations(indices, 2))
+    pair_categories = np.array([f'{min(categories[i], categories[j])}{max(categories[i], categories[j])}' for i, j in index_pairs])
+
+    r, _ = pearsonr(distances_target_norm, distances_repr_norm)
+
+    print('plotting with specified markers and colors')
+    plt.figure(figsize=(8, 6))
+    mask_bb = pair_categories == 'BB'
+    plt.scatter(distances_target_norm[mask_bb], distances_repr_norm[mask_bb], c='gray', s=10, marker='o', label='BB', alpha=0.5)
+    mask_bs_sb = np.logical_or(pair_categories == 'BS', pair_categories == 'SB')
+    plt.scatter(distances_target_norm[mask_bs_sb], distances_repr_norm[mask_bs_sb], c='blue', s=30, marker='d', label='BS/SB', alpha=0.5)
+    mask_ss = pair_categories == 'SS'
+    plt.scatter(distances_target_norm[mask_ss], distances_repr_norm[mask_ss], c='red', s=50, marker='x', label='SS', alpha=0.5)
+
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.xlabel('Normalized Distance in Target Space')
+    plt.ylabel('Normalized Distance in Representation Space')
+    plt.title(f'{title}\nRepresentation Space Correlation (pearson r= {r:.2f})')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(f"representation_correlation_density_colored_{title}.png")
+    plt.close()
+
+    return f"representation_correlation_density_colored_{title}.png"
 
 
 def plot_shepard(features, tsne_result):
