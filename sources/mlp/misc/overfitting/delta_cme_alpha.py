@@ -30,7 +30,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
-            for alpha in [0, 0.2, 0.4, 0.6, 0.8, 1]:
+            for alpha in [0.25, 0.275, 0.3, 0.325, 0.35, 0.375]:
                 for add_slope in [False]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
