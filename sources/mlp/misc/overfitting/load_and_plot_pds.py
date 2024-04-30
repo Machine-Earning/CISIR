@@ -55,7 +55,7 @@ def main():
                         inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                         # Construct the title
-                        title = f'MLP_PDS_Stage2_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}_dsv3'
+                        title = f'MLP_PDS_Stage2_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
 
                         # Replace any other characters that are not suitable for filenames (if any)
                         title = title.replace(' ', '_').replace(':', '_')
@@ -150,7 +150,7 @@ def main():
                         })
 
                         # set the root directory
-                        root_dir = 'data/electron_cme_data_split_v3'
+                        root_dir = 'data/electron_cme_data_split_v5'
                         # build the dataset
                         X_train, y_train = build_dataset(root_dir + '/training',
                                                          inputs_to_use=inputs_to_use,
