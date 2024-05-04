@@ -30,7 +30,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
-            for alpha in [0.6]:
+            for alpha in [0.38]:
                 for add_slope in [False]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
@@ -60,7 +60,7 @@ def main():
                     reduce_lr_on_plateau = ReduceLROnPlateau(
                         monitor='loss',
                         factor=0.5,
-                        patience=1250,
+                        patience=1000,
                         verbose=1,
                         min_delta=1e-5,
                         min_lr=1e-10)
@@ -68,7 +68,7 @@ def main():
                     weight_decay = 1e-8  # higher weight decay
                     momentum_beta1 = 0.9  # higher momentum beta1
                     batch_size = 4096
-                    epochs = 60000 # higher epochs
+                    epochs = 25000 # higher epochs
                     hiddens = [
                         2048, 1024,
                         2048, 1024,
