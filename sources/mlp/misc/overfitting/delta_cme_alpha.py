@@ -32,7 +32,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
-            for alpha in [0, 0.38]:
+            for alpha in [0, 0.38, 0.6]:
                 for add_slope in [False]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
@@ -70,7 +70,7 @@ def main():
                     weight_decay = 1e-8  # higher weight decay
                     momentum_beta1 = 0.9  # higher momentum beta1
                     batch_size = 4096
-                    epochs = 10000  # higher epochs
+                    epochs = 50000  # higher epochs
                     hiddens = [
                         2048, 1024,
                         2048, 1024,
@@ -331,7 +331,7 @@ def main():
                         final_model_sep,
                         X_train_filtered, y_train_filtered, title,
                         'training',
-                        model_type='features',
+                        model_type='features_reg',
                         save_tag=current_time, seed=seed)
                     wandb.log({'stage1_tsne_training_plot': wandb.Image(stage1_file_path)})
                     print('stage1_file_path: ' + stage1_file_path)
@@ -341,7 +341,7 @@ def main():
                         final_model_sep,
                         X_test_filtered, y_test_filtered, title,
                         'testing',
-                        model_type='features',
+                        model_type='features_reg',
                         save_tag=current_time, seed=seed)
                     wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
                     print('stage1_file_path: ' + stage1_file_path)
