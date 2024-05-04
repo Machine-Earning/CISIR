@@ -160,9 +160,9 @@ def plot_repr_corr_density(model, X, y, title, model_type='features'):
     # Adding frequency labels to each cell
     for i in range(len(xedges) - 1):
         for j in range(len(yedges) - 1):
-            if counts[i][j] > 0:  # Only add labels to non-zero cells
-                plt.text(xedges[i] + bin_width / 2, yedges[j] + bin_width / 2, f'{int(counts[i][j])}',
-                         color='tab:blue', ha='center', va='center', fontsize=8)
+            # if counts[i][j] > 0:  # Only add labels to non-zero cells
+            plt.text(xedges[i] + bin_width / 2, yedges[j] + bin_width / 2, f'{int(counts[i][j])}',
+                        color='tab:blue', ha='center', va='center', fontsize=8)
     #
     plt.xlabel('Normalized Distance in Target Space')
     plt.ylabel('Normalized Distance in Representation Space')
@@ -264,7 +264,7 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
     print('plotting with density colors')
     plt.figure(figsize=(8, 6))
     scatter = plt.scatter(distances_target_norm, distances_repr_norm, c=z, s=5, edgecolor='none', cmap='viridis',
-                          alpha=0.5)
+                          alpha=0.6)
     plt.colorbar(scatter, label='Density')
     plt.plot([0, 1], [0, 1], 'k--')  # Perfect fit diagonal
     plt.xlabel('Normalized Distance in Target Space')
@@ -407,7 +407,7 @@ def plot_tsne_delta(
         features = model.predict(X)
 
     # Apply t-SNE
-    tsne = TSNE(n_components=2, random_state=seed)
+    tsne = TSNE(n_components=2, random_seed=seed)
     tsne_result = tsne.fit_transform(features)
 
     # Plot setup
