@@ -312,14 +312,18 @@ def plot_repr_corr_colored(model, X, y, title, model_type='features'):
     pair_categories = np.array([f'{min(categories[i], categories[j])}{max(categories[i], categories[j])}' for i, j in index_pairs])
 
     r, _ = pearsonr(distances_target_norm, distances_repr_norm)
+    print('Categories:', np.unique(pair_categories, return_counts=True))
 
+
+    print('plotting with specified markers and colors')
     print('plotting with specified markers and colors')
     plt.figure(figsize=(8, 6))
     mask_bb = pair_categories == 'BB'
-    plt.scatter(distances_target_norm[mask_bb], distances_repr_norm[mask_bb], c='gray', s=10, marker='o', label='BB', alpha=0.5)
     mask_bs_sb = np.logical_or(pair_categories == 'BS', pair_categories == 'SB')
-    plt.scatter(distances_target_norm[mask_bs_sb], distances_repr_norm[mask_bs_sb], c='blue', s=30, marker='d', label='BS/SB', alpha=0.5)
     mask_ss = pair_categories == 'SS'
+
+    plt.scatter(distances_target_norm[mask_bb], distances_repr_norm[mask_bb], c='gray', s=10, marker='o', label='BB', alpha=0.5)
+    plt.scatter(distances_target_norm[mask_bs_sb], distances_repr_norm[mask_bs_sb], c='blue', s=30, marker='d', label='BS/SB', alpha=0.5)
     plt.scatter(distances_target_norm[mask_ss], distances_repr_norm[mask_ss], c='red', s=50, marker='x', label='SS', alpha=0.5)
 
     plt.plot([0, 1], [0, 1], 'k--')

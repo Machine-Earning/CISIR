@@ -100,9 +100,9 @@ def main():
                     weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
                     residual = True
                     skipped_layers = 2
-                    N = 500
-                    lower_threshold = -0.7
-                    upper_threshold = 0.7
+                    N = 1000
+                    lower_threshold = -0.5
+                    upper_threshold = 0.5
                     # Initialize wandb
                     wandb.init(project="nasa-ts-delta-overfit", name=experiment_name, config={
                         "inputs_to_use": inputs_to_use,
