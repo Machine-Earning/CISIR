@@ -555,7 +555,6 @@ def investigate_tsne_delta(
     # Determine which points to highlight
     highlight_mask = (np.abs(predictions) <= pred_upper_bound) & (np.abs(y) >= actual_lower_bound)
 
-
     # Determine the size and alpha dynamically
     sizes = np.where((y > upper_thr) | (y < lower_thr), 50, 12)  # Larger size for rarer values
     alphas = np.where((y > upper_thr) | (y < lower_thr), 1.0, 0.3)  # More opaque for rarer values
@@ -580,7 +579,7 @@ def investigate_tsne_delta(
     # Now, apply these masks to the sorted indices to get the correct indices for common and rare points.
     common_points = sort_order[common_points_mask]
     rare_points = sort_order[rare_points_mask]
-    markers_sorted = markers[sort_order] # TODO: test this
+    markers_sorted = markers[sort_order]  # TODO: test this
 
     # Proceed with your scatter plot as planned
     sc = plt.scatter(

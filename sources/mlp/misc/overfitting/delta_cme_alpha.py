@@ -70,7 +70,7 @@ def main():
                     weight_decay = 1e-8  # higher weight decay
                     momentum_beta1 = 0.9  # higher momentum beta1
                     batch_size = 4096
-                    epochs = 25000 # higher epochs
+                    epochs = 10000  # higher epochs
                     hiddens = [
                         2048, 1024,
                         2048, 1024,
@@ -89,7 +89,7 @@ def main():
                     loss_key = 'mse'
                     target_change = ('delta_p' in outputs_to_use)
                     alpha_rw = alpha
-                    bandwidth = 4.42e-2 
+                    bandwidth = 4.42e-2
                     repr_dim = 128
                     output_dim = len(outputs_to_use)
                     dropout = 0.5
@@ -228,7 +228,7 @@ def main():
                     # Recreate the model architecture
                     final_model_sep.compile(
                         optimizer=AdamW(
-                            learning_rate=learning_rate, 
+                            learning_rate=learning_rate,
                             beta_1=momentum_beta1,
                             weight_decay=weight_decay
                         ),
