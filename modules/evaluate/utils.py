@@ -175,6 +175,57 @@ def plot_repr_corr_density(model, X, y, title, model_type='features'):
 
     return plot_filename
 
+# def plot_repr_correlation(model, X, y, title, model_type='features'):
+#     """
+#     Plots the correlation between distances in target values and distances in the representation space.
+
+#     Parameters:
+#     - model: The trained model used to transform input features into a representation space.
+#     - X: Input features (NumPy array or compatible).
+#     - y: Target values (NumPy array or compatible).
+#     - title: Title for the plot.
+#     - model_type: The type of model to use (features, features_reg, features_dec, features_reg_dec).
+
+#     Returns:
+#     - Plots the representation distance correlation plot.
+#     """
+#     # Get representations from the model
+#     print('In plot_repr_correlation')
+#     # Extract features based on the model type
+#     if model_type in ['features_reg_dec', 'features_reg', 'features_dec']:
+#         representations = model.predict(X)[0]  # Assuming the first output is always features
+#     else:  # model_type == 'features'
+#         representations = model.predict(X)
+
+#     print('calculating the pairwise distances')
+#     # Calculate pairwise distances in the target space and representation space
+#     distances_target = pdist(y.reshape(-1, 1), 'euclidean')
+#     distances_repr = pdist(representations, 'euclidean')
+
+#     # Normalize distances to [0, 1] range for better comparison
+#     scaler = MinMaxScaler()
+#     distances_target_norm = scaler.fit_transform(distances_target.reshape(-1, 1)).flatten()
+#     distances_repr_norm = scaler.fit_transform(distances_repr.reshape(-1, 1)).flatten()
+
+#     print('calculating the spearman rank correlation')
+#     # Calculate pearson's rank correlation coefficient
+#     r, _ = pearsonr(distances_target_norm, distances_repr_norm)
+
+#     # Create scatter plot
+#     plt.figure(figsize=(8, 6))
+#     plt.scatter(distances_target_norm, distances_repr_norm, alpha=0.5, s=1)
+#     plt.plot([0, 1], [0, 1], 'k--')  # Perfect fit diagonal
+#     plt.xlabel('Normalized Distance in Target Space')
+#     plt.ylabel('Normalized Distance in Representation Space')
+#     plt.title(f'{title}\nRepresentation Space Correlation (pearson r= {r:.2f})')
+#     plt.grid(True)
+#     # plt.show()
+#     # save the plot
+#     file_path = f"representation_correlation_{title}.png"
+#     plt.savefig(file_path)
+#     plt.close()
+
+#     return file_path
 
 def plot_repr_correlation(model, X, y, title, model_type='features'):
     """
@@ -212,7 +263,7 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
 
     print('plotting with density colors')
     plt.figure(figsize=(8, 6))
-    scatter = plt.scatter(distances_target_norm, distances_repr_norm, c=z, s=15, edgecolor='', cmap='viridis',
+    scatter = plt.scatter(distances_target_norm, distances_repr_norm, c=z, s=5, edgecolor='none', cmap='viridis',
                           alpha=0.5)
     plt.colorbar(scatter, label='Density')
     plt.plot([0, 1], [0, 1], 'k--')  # Perfect fit diagonal
