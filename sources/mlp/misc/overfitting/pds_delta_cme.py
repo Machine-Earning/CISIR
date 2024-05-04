@@ -42,7 +42,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
-            for add_slope in [True]:
+            for add_slope in [False]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
@@ -73,22 +73,22 @@ def main():
                 }
                 hiddens = [
                     2048, 1024,
-                    2048, 1024,
-                    1024, 512,
-                    1024, 512,
-                    512, 256,
-                    512, 256,
-                    128, 64,
-                    128, 64,
-                    64, 64,
-                    64, 64,
-                    64, 64,
-                    64, 64
+                        2048, 1024,
+                        1024, 512,
+                        1024, 512,
+                        512, 256,
+                        512, 256,
+                        256, 128,
+                        256, 128,
+                        256, 128,
+                        128, 128,
+                        128, 128,
+                        128, 128
                 ]
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 pds = True
                 target_change = ('delta_p' in outputs_to_use)
-                repr_dim = 64
+                repr_dim = 128
                 dropout_rate = 0.5
                 activation = None
                 norm = 'batch_norm'
@@ -127,11 +127,12 @@ def main():
                     'cme_speed_threshold': cme_speed_threshold,
                     "residual": residual,
                     "skipped_layers": skipped_layers,
-                    "repr_dim": repr_dim
+                    "repr_dim": repr_dim,
+                    "ds_version": 5
                 })
 
                 # set the root directory
-                root_dir = "data/electron_cme_data_split_v3"
+                root_dir = "data/electron_cme_data_split_v5"
                 # build the dataset
                 X_train, y_train = build_dataset(
                     root_dir + '/training',
@@ -196,67 +197,67 @@ def main():
                     learning_rate=Options['learning_rate'],
                     epochs=Options['epochs'],
                     batch_size=Options['batch_size'],
-                    save_tag=current_time + title + "_features",
+                    save_tag=current_time + title + "_features_128",
                     callbacks_list=[
                         WandbCallback(save_model=False),
                         reduce_lr_on_plateau
                     ]
                 )
 
-                file_path = plot_tsne_delta(
-                    mlp_model_sep,
-                    X_train, y_train, title,
-                    'training',
-                    model_type='features',
-                    save_tag=current_time,
-                    seed=SEED)
+                # file_path = plot_tsne_delta(
+                #     mlp_model_sep,
+                #     X_train, y_train, title,
+                #     'training',
+                #     model_type='features',
+                #     save_tag=current_time,
+                #     seed=SEED)
 
-                # Log t-SNE plot for training
-                # Log the training t-SNE plot to wandb
-                wandb.log({'tsne_training_plot': wandb.Image(file_path)})
-                print('file_path: ' + file_path)
+                # # Log t-SNE plot for training
+                # # Log the training t-SNE plot to wandb
+                # wandb.log({'tsne_training_plot': wandb.Image(file_path)})
+                # print('file_path: ' + file_path)
 
-                file_path = plot_tsne_delta(
-                    mlp_model_sep,
-                    X_test, y_test, title,
-                    'testing',
-                    model_type='features',
-                    save_tag=current_time,
-                    seed=SEED)
+                # file_path = plot_tsne_delta(
+                #     mlp_model_sep,
+                #     X_test, y_test, title,
+                #     'testing',
+                #     model_type='features',
+                #     save_tag=current_time,
+                #     seed=SEED)
 
-                # Log t-SNE plot for testing
-                # Log the testing t-SNE plot to wandb
-                wandb.log({'tsne_testing_plot': wandb.Image(file_path)})
-                print('file_path: ' + file_path)
+                # # Log t-SNE plot for testing
+                # # Log the testing t-SNE plot to wandb
+                # wandb.log({'tsne_testing_plot': wandb.Image(file_path)})
+                # print('file_path: ' + file_path)
 
-                X_val, y_val = build_dataset(
-                    root_dir + '/validation',
-                    inputs_to_use=inputs_to_use,
-                    add_slope=add_slope,
-                    outputs_to_use=outputs_to_use,
-                    cme_speed_threshold=cme_speed_threshold
-                )
+                # X_val, y_val = build_dataset(
+                #     root_dir + '/validation',
+                #     inputs_to_use=inputs_to_use,
+                #     add_slope=add_slope,
+                #     outputs_to_use=outputs_to_use,
+                #     cme_speed_threshold=cme_speed_threshold
+                # )
 
-                print(f'X_val.shape: {X_val.shape}')
-                print(f'y_val.shape: {y_val.shape}')
+                # print(f'X_val.shape: {X_val.shape}')
+                # print(f'y_val.shape: {y_val.shape}')
 
-                X_val = reshape_X(
-                    X_val,
-                    [n_features],
-                    inputs_to_use,
-                    add_slope,
-                    mlp_model_sep.name
-                )
+                # X_val = reshape_X(
+                #     X_val,
+                #     [n_features],
+                #     inputs_to_use,
+                #     add_slope,
+                #     mlp_model_sep.name
+                # )
 
-                file_path = plot_repr_correlation(mlp_model_sep, X_val, y_val, title + "_training")
-                # Log the representation correlation plot to wandb
-                wandb.log({'representation_correlation_plot_train': wandb.Image(file_path)})
-                print('file_path: ' + file_path)
+                # file_path = plot_repr_correlation(mlp_model_sep, X_val, y_val, title + "_training")
+                # # Log the representation correlation plot to wandb
+                # wandb.log({'representation_correlation_plot_train': wandb.Image(file_path)})
+                # print('file_path: ' + file_path)
 
-                file_path = plot_repr_correlation(mlp_model_sep, X_test, y_test, title + "_test")
-                # Log the representation correlation plot to wandb
-                wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
-                print('file_path: ' + file_path)
+                # file_path = plot_repr_correlation(mlp_model_sep, X_test, y_test, title + "_test")
+                # # Log the representation correlation plot to wandb
+                # wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
+                # print('file_path: ' + file_path)
 
                 # Finish the wandb run
                 wandb.finish()

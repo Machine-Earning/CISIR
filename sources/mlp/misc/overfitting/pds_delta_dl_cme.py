@@ -3,7 +3,7 @@ import random
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import numpy as np
 import tensorflow as tf
@@ -49,8 +49,8 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
-            for add_slope in [True]:
-                for alpha in [0.2]:
+            for add_slope in [False]:
+                for alpha in [0.39]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
                     # add_slope = True
@@ -74,7 +74,7 @@ def main():
                     # Set the early stopping patience and learning rate as variables
                     Options = {
                         'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                        'epochs': 10000,
+                        'epochs': 40000,
                         'learning_rate': 1e-2,  # Updated to 3e-4
                         'weight_decay': 1e-8,  # Added weight decay
                         'momentum_beta1': 0.9,  # Added momentum beta1
@@ -86,17 +86,17 @@ def main():
                         1024, 512,
                         512, 256,
                         512, 256,
-                        128, 64,
-                        128, 64,
-                        64, 64,
-                        64, 64,
-                        64, 64,
-                        64, 64
+                        256, 128,
+                        256, 128,
+                        256, 128,
+                        128, 128,
+                        128, 128,
+                        128, 128
                     ]
                     hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                     pds = True
                     target_change = ('delta_p' in outputs_to_use)
-                    repr_dim = 64
+                    repr_dim = 128
                     dropout_rate = 0.5
                     activation = None
                     norm = 'batch_norm'
@@ -107,7 +107,7 @@ def main():
                         verbose=1,
                         min_delta=1e-5,
                         min_lr=1e-10)
-                    bandwidth = 0.099
+                    bandwidth = 4.42e-2
                     alpha_rw = alpha
                     residual = True
                     skipped_layers = 2
@@ -138,11 +138,12 @@ def main():
                         "bandwidth": bandwidth,
                         "residual": residual,
                         "skipped_layers": skipped_layers,
-                        "repr_dim": repr_dim
+                        "repr_dim": repr_dim,
+                        "ds_version": 5
                     })
 
                     # set the root directory
-                    root_dir = "data/electron_cme_data_split_v3"
+                    root_dir = "data/electron_cme_data_split_v5"
                     # build the dataset
                     X_train, y_train = build_dataset(
                         root_dir + '/training',
@@ -232,47 +233,47 @@ def main():
                         learning_rate=Options['learning_rate'],
                         epochs=Options['epochs'],
                         batch_size=Options['batch_size'],
-                        save_tag=current_time + title + "_features",
+                        save_tag=current_time + title + "_features_128",
                         callbacks_list=[
                             WandbCallback(save_model=False),
                             reduce_lr_on_plateau
                         ])
                     
-                    file_path = plot_repr_correlation(mlp_model_sep, X_val, y_val, title + "_training")
-                    # Log the representation correlation plot to wandb
-                    wandb.log({'representation_correlation_plot_train': wandb.Image(file_path)})
-                    print('file_path: ' + file_path)
+                    # file_path = plot_repr_correlation(mlp_model_sep, X_val, y_val, title + "_training")
+                    # # Log the representation correlation plot to wandb
+                    # wandb.log({'representation_correlation_plot_train': wandb.Image(file_path)})
+                    # print('file_path: ' + file_path)
 
-                    file_path = plot_repr_correlation(mlp_model_sep, X_test, y_test, title + "_test")
-                    # Log the representation correlation plot to wandb
-                    wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
-                    print('file_path: ' + file_path)
+                    # file_path = plot_repr_correlation(mlp_model_sep, X_test, y_test, title + "_test")
+                    # # Log the representation correlation plot to wandb
+                    # wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
+                    # print('file_path: ' + file_path)
 
-                    file_path = plot_tsne_delta(
-                        mlp_model_sep,
-                        X_train, y_train, title,
-                        'training',
-                        save_tag=current_time,
-                        model_type='features',
-                        seed=SEED)
+                    # file_path = plot_tsne_delta(
+                    #     mlp_model_sep,
+                    #     X_train, y_train, title,
+                    #     'training',
+                    #     save_tag=current_time,
+                    #     model_type='features',
+                    #     seed=SEED)
 
-                    # Log t-SNE plot for training
-                    # Log the training t-SNE plot to wandb
-                    wandb.log({'tsne_training_plot': wandb.Image(file_path)})
-                    print('file_path: ' + file_path)
+                    # # Log t-SNE plot for training
+                    # # Log the training t-SNE plot to wandb
+                    # wandb.log({'tsne_training_plot': wandb.Image(file_path)})
+                    # print('file_path: ' + file_path)
 
-                    file_path = plot_tsne_delta(
-                        mlp_model_sep,
-                        X_test, y_test, title,
-                        'testing',
-                        save_tag=current_time,
-                        model_type='features',
-                        seed=SEED)
+                    # file_path = plot_tsne_delta(
+                    #     mlp_model_sep,
+                    #     X_test, y_test, title,
+                    #     'testing',
+                    #     save_tag=current_time,
+                    #     model_type='features',
+                    #     seed=SEED)
 
-                    # Log t-SNE plot for testing
-                    # Log the testing t-SNE plot to wandb
-                    wandb.log({'tsne_testing_plot': wandb.Image(file_path)})
-                    print('file_path: ' + file_path)
+                    # # Log t-SNE plot for testing
+                    # # Log the testing t-SNE plot to wandb
+                    # wandb.log({'tsne_testing_plot': wandb.Image(file_path)})
+                    # print('file_path: ' + file_path)
 
                     
 

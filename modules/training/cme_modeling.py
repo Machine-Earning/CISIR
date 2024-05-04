@@ -521,7 +521,7 @@ class ModelBuilder:
                   verbose=verbose)
 
         # save the model weights
-        model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
+        model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
         # print where the model weights are saved
         print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
 
