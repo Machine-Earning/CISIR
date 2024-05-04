@@ -54,7 +54,7 @@ def main():
                     seed = 456789
                     tf.random.set_seed(seed)
                     np.random.seed(seed)
-                    patience = 10000  # higher patience
+                    patience = 25000  # higher patience
                     learning_rate = 1e-2  # og learning rate
                     # initial_learning_rate = 3e-3
                     # final_learning_rate = 3e-7
