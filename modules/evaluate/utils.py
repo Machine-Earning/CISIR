@@ -13,6 +13,7 @@ from tsnecuda import TSNE
 import itertools
 from modules.evaluate import evaluation as eval
 from modules.training import seploader as sepl
+from modules.training.ts_modeling import process_predictions
 
 
 def print_statistics(statistics: dict) -> None:
@@ -162,7 +163,7 @@ def plot_repr_corr_density(model, X, y, title, model_type='features'):
         for j in range(len(yedges) - 1):
             # if counts[i][j] > 0:  # Only add labels to non-zero cells
             plt.text(xedges[i] + bin_width / 2, yedges[j] + bin_width / 2, f'{int(counts[i][j])}',
-                        color='tab:blue', ha='center', va='center', fontsize=8)
+                     color='tab:blue', ha='center', va='center', fontsize=8)
     #
     plt.xlabel('Normalized Distance in Target Space')
     plt.ylabel('Normalized Distance in Representation Space')
@@ -174,6 +175,7 @@ def plot_repr_corr_density(model, X, y, title, model_type='features'):
     plt.close()
 
     return plot_filename
+
 
 # def plot_repr_correlation(model, X, y, title, model_type='features'):
 #     """
@@ -309,11 +311,11 @@ def plot_repr_corr_colored(model, X, y, title, model_type='features'):
     categories = np.where(np.abs(y) <= 0.5, 'B', 'S')
     indices = np.arange(len(y))
     index_pairs = list(itertools.combinations(indices, 2))
-    pair_categories = np.array([f'{min(categories[i], categories[j])}{max(categories[i], categories[j])}' for i, j in index_pairs])
+    pair_categories = np.array(
+        [f'{min(categories[i], categories[j])}{max(categories[i], categories[j])}' for i, j in index_pairs])
 
     r, _ = pearsonr(distances_target_norm, distances_repr_norm)
     print('Categories:', np.unique(pair_categories, return_counts=True))
-
 
     print('plotting with specified markers and colors')
     print('plotting with specified markers and colors')
@@ -322,9 +324,12 @@ def plot_repr_corr_colored(model, X, y, title, model_type='features'):
     mask_bs_sb = np.logical_or(pair_categories == 'BS', pair_categories == 'SB')
     mask_ss = pair_categories == 'SS'
 
-    plt.scatter(distances_target_norm[mask_bb], distances_repr_norm[mask_bb], c='gray', s=10, marker='o', label='BB', alpha=0.5)
-    plt.scatter(distances_target_norm[mask_bs_sb], distances_repr_norm[mask_bs_sb], c='blue', s=30, marker='d', label='BS/SB', alpha=0.5)
-    plt.scatter(distances_target_norm[mask_ss], distances_repr_norm[mask_ss], c='red', s=50, marker='x', label='SS', alpha=0.5)
+    plt.scatter(distances_target_norm[mask_bb], distances_repr_norm[mask_bb], c='gray', s=10, marker='o', label='BB',
+                alpha=0.5)
+    plt.scatter(distances_target_norm[mask_bs_sb], distances_repr_norm[mask_bs_sb], c='blue', s=30, marker='d',
+                label='BS/SB', alpha=0.5)
+    plt.scatter(distances_target_norm[mask_ss], distances_repr_norm[mask_ss], c='red', s=50, marker='x', label='SS',
+                alpha=0.5)
 
     plt.plot([0, 1], [0, 1], 'k--')
     plt.xlabel('Normalized Distance in Target Space')
@@ -465,6 +470,138 @@ def plot_tsne_delta(
         norm=norm,
         s=sizes[rare_points],
         alpha=alphas[rare_points])
+
+    # Add a color bar
+    cbar = plt.colorbar(sc, ax=axs[0], label='Change in logIntensity', extend='both')
+
+    # Title and labels
+    plt.title(f'{title}\n2D t-SNE Visualization')
+    # plt.xlabel('Dimension 1')
+    # plt.ylabel('Dimension 2')
+
+    # Plot Shepard plot on the second subplot
+    plt.sca(axs[1])
+    plot_shepard(features, tsne_result)
+
+    # Adjust the subplot layout
+    plt.tight_layout()
+
+    # Save the plot
+    file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
+    plt.savefig(file_path)
+
+    if show_plot:
+        plt.show()
+
+    plt.close()
+
+    return file_path
+
+
+def investigate_tsne_delta(
+        model,
+        X: np.ndarray,
+        y: np.ndarray,
+        title: str,
+        prefix: str,
+        model_type='features_reg',
+        show_plot=False,
+        save_tag=None,
+        seed=42,
+        pred_upper_bound=0.1,
+        actual_lower_bound=0.5
+) -> str:
+    """
+    Visualizes changes (e.g., in logIntensity) using t-SNE by coloring points based on their values.
+
+    Parameters:
+    - model: Trained feature extractor model.
+    - X: Input data (NumPy array or compatible).
+    - y: Target labels (NumPy array or compatible), representing changes.
+    - title: Title for the plot.
+    - prefix: Prefix for the file name.
+    - model_type: The type of model output to use ('features', 'features_reg', etc.).
+    - show_plot: If True, display the plot in addition to saving it.
+    - save_tag: Optional tag to append to the file name.
+    - seed: Random seed for t-SNE.
+    - pred_upper_bound: Upper threshold for prediction values to highlight.
+    - actual_lower_bound: Lower threshold for actual label values to highlight.
+
+    Returns:
+    - The file path of the saved t-SNE plot.
+    """
+
+    # Ensure model_type is 'features_reg', otherwise, no operation
+    if model_type != 'features_reg':
+        raise ValueError("Only 'features_reg' model type is supported.")
+
+    # Get features and predictions from the model
+    features, predictions = model.predict(X)
+    predictions = process_predictions(predictions)
+
+    # Apply t-SNE
+    tsne = TSNE(n_components=2, random_seed=seed)
+    tsne_result = tsne.fit_transform(features)
+
+    # Plot setup
+    fig, axs = plt.subplots(2, 1, figsize=(18, 16), gridspec_kw={'height_ratios': [2, 1]})  # Adjust size as needed
+    # Plot t-SNE on the first subplot
+    plt.sca(axs[0])
+    # Normalize y-values for color intensity to reflect the magnitude of change
+    norm = plt.Normalize(-2.5, 2.5)
+    cmap = plt.cm.coolwarm  # Choosing a colormap that spans across negative and positive changes
+
+    lower_thr, upper_thr = -0.5, 0.5
+    # Determine which points to highlight
+    highlight_mask = (np.abs(predictions) <= pred_upper_bound) & (np.abs(y) >= actual_lower_bound)
+
+
+    # Determine the size and alpha dynamically
+    sizes = np.where((y > upper_thr) | (y < lower_thr), 50, 12)  # Larger size for rarer values
+    alphas = np.where((y > upper_thr) | (y < lower_thr), 1.0, 0.3)  # More opaque for rarer values
+    markers = np.where(highlight_mask, 'x', 'o')  # Highlighted points have a different marker
+
+    # Ensure sizes and alphas are 1-dimensional arrays
+    sizes = sizes.ravel()
+    alphas = alphas.ravel()
+    markers = markers.ravel()
+
+    # # Scatter plot for all points with varying size and alpha based on change in logIntensity
+    # sc = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, s=sizes, alpha=alphas)
+    # plt.colorbar(sc, label='Change in logIntensity', extend='both')
+
+    # Sort points by size (or another metric) to ensure larger points are plotted last (on top)
+    sort_order = np.argsort(sizes)  # This gives indices that would sort the array
+
+    # Instead of directly indexing with the boolean condition, use it to create a mask and then apply.
+    common_points_mask = sizes[sort_order] == 12
+    rare_points_mask = sizes[sort_order] == 50
+
+    # Now, apply these masks to the sorted indices to get the correct indices for common and rare points.
+    common_points = sort_order[common_points_mask]
+    rare_points = sort_order[rare_points_mask]
+    markers_sorted = markers[sort_order] # TODO: test this
+
+    # Proceed with your scatter plot as planned
+    sc = plt.scatter(
+        tsne_result[common_points, 0],
+        tsne_result[common_points, 1],
+        c=y[common_points],
+        cmap=cmap,
+        norm=norm,
+        s=sizes[common_points],
+        alpha=alphas[common_points],
+        marker=markers_sorted[common_points])
+
+    plt.scatter(
+        tsne_result[rare_points, 0],
+        tsne_result[rare_points, 1],
+        c=y[rare_points],
+        cmap=cmap,
+        norm=norm,
+        s=sizes[rare_points],
+        alpha=alphas[rare_points],
+        marker=markers_sorted[rare_points])
 
     # Add a color bar
     cbar = plt.colorbar(sc, ax=axs[0], label='Change in logIntensity', extend='both')

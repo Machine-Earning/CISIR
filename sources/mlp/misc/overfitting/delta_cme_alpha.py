@@ -19,7 +19,9 @@ from modules.training.ts_modeling import (
     process_sep_events,
     get_loss,
     reshape_X,
-    plot_error_hist)
+    plot_error_hist,
+    filter_ds)
+from modules.evaluate.utils import investigate_tsne_delta
 
 
 def main():
@@ -30,7 +32,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
-            for alpha in [0.38]:
+            for alpha in [0, 0.38]:
                 for add_slope in [False]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
@@ -96,6 +98,9 @@ def main():
                     cme_speed_threshold = cme_speed_threshold
                     residual = True
                     skipped_layers = 2
+                    N = 500
+                    lower_threshold = -0.5
+                    upper_threshold = 0.5
 
                     # Initialize wandb
                     wandb.init(project="nasa-ts-delta-overfit", name=experiment_name, config={
@@ -145,6 +150,16 @@ def main():
                         outputs_to_use=outputs_to_use,
                         cme_speed_threshold=cme_speed_threshold
                     )
+                    X_train_filtered, y_train_filtered = filter_ds(
+                        X_train, y_train,
+                        low_threshold=lower_threshold,
+                        high_threshold=upper_threshold,
+                        N=N, seed=seed)
+                    X_test_filtered, y_test_filtered = filter_ds(
+                        X_test, y_test,
+                        low_threshold=lower_threshold,
+                        high_threshold=upper_threshold,
+                        N=N, seed=seed)
 
                     # print all cme_files shapes
                     print(f'X_train.shape: {X_train.shape}')
@@ -309,6 +324,27 @@ def main():
                         title=title,
                         prefix='training_weighted')
                     wandb.log({"training_weighted_error_hist": wandb.Image(filename)})
+
+                    ## Log t-SNE plot
+                    # Log the training t-SNE plot to wandb
+                    stage1_file_path = investigate_tsne_delta(
+                        final_model_sep,
+                        X_train_filtered, y_train_filtered, title,
+                        'training',
+                        model_type='features',
+                        save_tag=current_time, seed=seed)
+                    wandb.log({'stage1_tsne_training_plot': wandb.Image(stage1_file_path)})
+                    print('stage1_file_path: ' + stage1_file_path)
+
+                    # Log the testing t-SNE plot to wandb
+                    stage1_file_path = investigate_tsne_delta(
+                        final_model_sep,
+                        X_test_filtered, y_test_filtered, title,
+                        'testing',
+                        model_type='features',
+                        save_tag=current_time, seed=seed)
+                    wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
+                    print('stage1_file_path: ' + stage1_file_path)
 
                     # Finish the wandb run
                     wandb.finish()
