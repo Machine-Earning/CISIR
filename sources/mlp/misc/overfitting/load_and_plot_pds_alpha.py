@@ -100,7 +100,7 @@ def main():
                     weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
                     residual = True
                     skipped_layers = 2
-                    N = 1000
+                    N = 500
                     lower_threshold = -0.5
                     upper_threshold = 0.5
                     # Initialize wandb
