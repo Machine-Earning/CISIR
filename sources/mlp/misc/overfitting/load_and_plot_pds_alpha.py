@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import tensorflow as tf
 import wandb
@@ -26,11 +26,9 @@ mb = ModelBuilder()
 # Define the lookup dictionary
 weight_paths = {
     (True,
-     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240504-000435MLP_e0_5_e1_8_p_slopeTrue_PDS_bs4096_CME0_dsv3_features_128.h5',
-
-    (False,
-     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240504-002452MLP_e0_5_e1_8_p_slopeFalse_PDS_bs4096_CME0_dsv3_features_128.h5',
+     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240425-013320MLP_e0_5_e1_8_p_slopeTrue_PDS_bs4096_alpha0.20_CME0_dsv3_features.h5',
     # (True, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-183733MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_CME500_features.h5',
+    # (False, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-171125MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_CME0_features.h5',
     # (False, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-200720MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_CME500_features.h5',
 }
 
@@ -42,9 +40,9 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [True, False]:
+        for add_slope in [True]:
             for cme_speed_threshold in [0]:
-                for alpha in [0]:
+                for alpha in [0.2]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
                     # add_slope = True
@@ -78,12 +76,12 @@ def main():
                         1024, 512,
                         512, 256,
                         512, 256,
-                        256, 128,
-                        256, 128,
-                        256, 128,
-                        128, 128,
-                        128, 128,
-                        128, 128
+                        128, 64,
+                        128, 64,
+                        64, 64,
+                        64, 64,
+                        64, 64,
+                        64, 64
                     ]
 
                     hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
@@ -93,7 +91,7 @@ def main():
                     rebalacing = True
                     alpha_rw = alpha
                     bandwidth = 4.42e-2  # 0.0519
-                    repr_dim = 128
+                    repr_dim = 64
                     dropout = 0.5
                     activation = None
                     norm = 'batch_norm'
