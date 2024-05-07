@@ -7,7 +7,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 import numpy as np
 import tensorflow as tf
 import wandb
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, Callback
 from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
 
@@ -22,6 +22,59 @@ from modules.training.ts_modeling import (
     reshape_X, plot_error_hist)
 
 
+class PlottingCallback(Callback):
+    def __init__(self, model, root_dir, plot_every, plot_here, inputs_to_use, add_slope, outputs_to_use, title,
+                 cme_speed_threshold):
+        super().__init__()
+        self.model = model
+        self.root_dir = root_dir
+        self.plot_every = plot_every
+        self.plot_here = plot_here
+        self.inputs_to_use = inputs_to_use
+        self.add_slope = add_slope
+        self.outputs_to_use = outputs_to_use
+        self.title = title
+        self.cme_speed_threshold = cme_speed_threshold
+        self.epoch_count = 0
+
+    def on_epoch_end(self, epoch, logs=None):
+        self.epoch_count += 1
+        if (self.epoch_count % self.plot_every == 0) or (self.epoch_count in self.plot_here):
+            # Process and log for the testing set
+            test_directory = self.root_dir + '/testing'
+            filenames = process_sep_events(
+                test_directory,
+                self.model,
+                title=self.title,
+                inputs_to_use=self.inputs_to_use,
+                add_slope=self.add_slope,
+                outputs_to_use=self.outputs_to_use,
+                show_avsp=True,
+                prefix='testing_'+str(self.epoch_count),
+                using_cme=True,
+                cme_speed_threshold=self.cme_speed_threshold)
+            for filename in filenames:
+                log_title = os.path.basename(filename)
+                wandb.log({f'testing_{log_title}': wandb.Image(filename)})
+
+            # Process and log for the training set
+            train_directory = self.root_dir + '/training'
+            filenames = process_sep_events(
+                train_directory,
+                self.model,
+                title=self.title,
+                inputs_to_use=self.inputs_to_use,
+                add_slope=self.add_slope,
+                outputs_to_use=self.outputs_to_use,
+                show_avsp=True,
+                prefix='training_'+str(self.epoch_count),
+                using_cme=True,
+                cme_speed_threshold=self.cme_speed_threshold)
+            for filename in filenames:
+                log_title = os.path.basename(filename)
+                wandb.log({f'training_{log_title}': wandb.Image(filename)})
+
+
 def main():
     """
     Main function to run the E-MLP model
@@ -30,7 +83,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for add_slope in [False]:
-            for alpha in [0.38, 0.39]:
+            for alpha in [0.38]:
                 for cme_speed_threshold in [0]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
@@ -66,6 +119,9 @@ def main():
                     #     decay_steps=steps_per_epoch,
                     #     decay_rate=learning_rate_decay_factor,
                     #     staircase=True)
+
+                    plot_every = 500
+                    plot_here = [50, 150, 200, 4000, 8000]
 
                     reduce_lr_on_plateau = ReduceLROnPlateau(
                         monitor='loss',
@@ -294,7 +350,18 @@ def main():
                         callbacks=[
                             early_stopping,
                             reduce_lr_on_plateau,
-                            WandbCallback(save_model=False)
+                            WandbCallback(save_model=False),
+                            PlottingCallback(
+                                model_sep,
+                                root_dir,
+                                plot_every,
+                                plot_here,
+                                inputs_to_use,
+                                add_slope,
+                                outputs_to_use,
+                                experiment_name,
+                                cme_speed_threshold
+                            )
                         ],
                         verbose=1
                     )
