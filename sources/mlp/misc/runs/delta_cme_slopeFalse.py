@@ -83,7 +83,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for add_slope in [False]:
-            for alpha in [0.38]:
+            for alpha in [0.38, 0.6]:
                 for cme_speed_threshold in [0]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
@@ -107,7 +107,7 @@ def main():
                     seed = 456789
                     tf.random.set_seed(seed)
                     np.random.seed(seed)
-                    patience = 25000  # higher patience
+                    patience = 10000  # higher patience
                     learning_rate = 1e-2  # og learning rate
                     # initial_learning_rate = 3e-3
                     # final_learning_rate = 3e-7
@@ -121,7 +121,7 @@ def main():
                     #     staircase=True)
 
                     plot_every = 500
-                    plot_here = [50, 150, 200, 4000, 8000]
+                    plot_here = [50, 150, 200, 600, 4000, 8000]
 
                     reduce_lr_on_plateau = ReduceLROnPlateau(
                         monitor='loss',
