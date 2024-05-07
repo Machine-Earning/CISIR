@@ -1,3 +1,5 @@
+# from tsnecuda import TSNE
+import itertools
 from datetime import datetime
 from typing import List, Tuple, Optional
 
@@ -7,10 +9,9 @@ import tensorflow as tf
 from scipy.spatial.distance import pdist
 from scipy.stats import gaussian_kde
 from scipy.stats import pearsonr
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.manifold import TSNE
-# from tsnecuda import TSNE
-import itertools
+from sklearn.preprocessing import MinMaxScaler
+
 from modules.evaluate import evaluation as eval
 from modules.training import seploader as sepl
 from modules.training.ts_modeling import process_predictions
@@ -378,6 +379,113 @@ def plot_shepard(features, tsne_result):
     plt.grid(True)
 
     print('Done with plot_shepard')
+
+
+def plot_tsne(
+        X: np.ndarray,
+        y: np.ndarray,
+        title: str,
+        prefix: str,
+        show_plot=False,
+        save_tag=None,
+        seed=42) -> str:
+    """
+    Visualizes changes (e.g., in logIntensity) using t-SNE by coloring points based on their values.
+
+    Parameters:
+    - X: Input data (NumPy array or compatible).
+    - y: Target labels (NumPy array or compatible), representing changes.
+    - title: Title for the plot.
+    - prefix: Prefix for the file name.
+    - show_plot: If True, display the plot in addition to saving it.
+    - save_tag: Optional tag to append to the file name.
+    - seed: Random seed for t-SNE.
+
+    Returns:
+    - The file path of the saved t-SNE plot.
+    """
+
+    # Apply t-SNE
+    tsne = TSNE(n_components=2, random_state=seed)
+    tsne_result = tsne.fit_transform(X)
+
+    # Plot setup
+    fig, axs = plt.subplots(2, 1, figsize=(18, 16), gridspec_kw={'height_ratios': [2, 1]})  # Adjust size as needed
+    # Plot t-SNE on the first subplot
+    plt.sca(axs[0])
+    # Normalize y-values for color intensity to reflect the magnitude of change
+    norm = plt.Normalize(-2.5, 2.5)
+    cmap = plt.cm.coolwarm  # Choosing a colormap that spans across negative and positive changes
+
+    lower_thr, upper_thr = -0.5, 0.5
+
+    # Determine the size and alpha dynamically
+    sizes = np.where((y > upper_thr) | (y < lower_thr), 50, 12)  # Larger size for rarer values
+    alphas = np.where((y > upper_thr) | (y < lower_thr), 1.0, 0.3)  # More opaque for rarer values
+
+    # Ensure sizes and alphas are 1-dimensional arrays
+    sizes = sizes.ravel()
+    alphas = alphas.ravel()
+
+    # # Scatter plot for all points with varying size and alpha based on change in logIntensity
+    # sc = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, s=sizes, alpha=alphas)
+    # plt.colorbar(sc, label='Change in logIntensity', extend='both')
+
+    # Sort points by size (or another metric) to ensure larger points are plotted last (on top)
+    sort_order = np.argsort(sizes)  # This gives indices that would sort the array
+
+    # Instead of directly indexing with the boolean condition, use it to create a mask and then apply.
+    common_points_mask = sizes[sort_order] == 12
+    rare_points_mask = sizes[sort_order] == 50
+
+    # Now, apply these masks to the sorted indices to get the correct indices for common and rare points.
+    common_points = sort_order[common_points_mask]
+    rare_points = sort_order[rare_points_mask]
+
+    # Proceed with your scatter plot as planned
+    sc = plt.scatter(
+        tsne_result[common_points, 0],
+        tsne_result[common_points, 1],
+        c=y[common_points],
+        cmap=cmap,
+        norm=norm,
+        s=sizes[common_points],
+        alpha=alphas[common_points])
+
+    plt.scatter(
+        tsne_result[rare_points, 0],
+        tsne_result[rare_points, 1],
+        c=y[rare_points],
+        cmap=cmap,
+        norm=norm,
+        s=sizes[rare_points],
+        alpha=alphas[rare_points])
+
+    # Add a color bar
+    cbar = plt.colorbar(sc, ax=axs[0], label='Change in logIntensity', extend='both')
+
+    # Title and labels
+    plt.title(f'{title}\n2D t-SNE Visualization')
+    # plt.xlabel('Dimension 1')
+    # plt.ylabel('Dimension 2')
+
+    # Plot Shepard plot on the second subplot
+    plt.sca(axs[1])
+    plot_shepard(X, tsne_result)
+
+    # Adjust the subplot layout
+    plt.tight_layout()
+
+    # Save the plot
+    file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
+    plt.savefig(file_path)
+
+    if show_plot:
+        plt.show()
+
+    plt.close()
+
+    return file_path
 
 
 def plot_tsne_delta(
