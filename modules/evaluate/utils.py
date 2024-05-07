@@ -559,47 +559,25 @@ def investigate_tsne_delta(
     alphas = np.where((y > upper_thr) | (y < lower_thr), 1.0, 0.3)  # More opaque for rarer values
     markers = np.where(highlight_mask, 'x', 'o')  # Highlighted points have a different marker
 
-    # Ensure sizes and alphas are 1-dimensional arrays
-    sizes = sizes.ravel()
-    alphas = alphas.ravel()
-    markers = markers.ravel()
+    # Create masks for common and rare points
+    common_mask = (y >= lower_thr) & (y <= upper_thr)
+    rare_mask = ~common_mask
 
-    # # Scatter plot for all points with varying size and alpha based on change in logIntensity
-    # sc = plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c=y, cmap=cmap, norm=norm, s=sizes, alpha=alphas)
-    # plt.colorbar(sc, label='Change in logIntensity', extend='both')
-
-    # Sort points by size (or another metric) to ensure larger points are plotted last (on top)
-    sort_order = np.argsort(sizes)  # This gives indices that would sort the array
-
-    # Instead of directly indexing with the boolean condition, use it to create a mask and then apply.
-    common_points_mask = sizes[sort_order] == 12
-    rare_points_mask = sizes[sort_order] == 50
-
-    # Now, apply these masks to the sorted indices to get the correct indices for common and rare points.
-    common_points = sort_order[common_points_mask]
-    rare_points = sort_order[rare_points_mask]
-    markers_sorted = markers[sort_order]  # TODO: test this
-
-    # Proceed with your scatter plot as planned
-    sc = plt.scatter(
-        tsne_result[common_points, 0],
-        tsne_result[common_points, 1],
-        c=y[common_points],
-        cmap=cmap,
-        norm=norm,
-        s=sizes[common_points],
-        alpha=alphas[common_points],
-        marker=markers_sorted[common_points])
-
-    plt.scatter(
-        tsne_result[rare_points, 0],
-        tsne_result[rare_points, 1],
-        c=y[rare_points],
-        cmap=cmap,
-        norm=norm,
-        s=sizes[rare_points],
-        alpha=alphas[rare_points],
-        marker=markers_sorted[rare_points])
+    # Plotting
+    for size, mask, group_name in zip([12, 50], [common_mask, rare_mask], ['common', 'rare']):
+        group_mask = mask
+        for marker in np.unique(markers[group_mask]):
+            specific_mask = group_mask & (markers == marker)
+            sc = plt.scatter(
+                tsne_result[specific_mask, 0],
+                tsne_result[specific_mask, 1],
+                c=y[specific_mask],
+                cmap=cmap,
+                norm=norm,
+                s=size,
+                alpha=alphas[specific_mask],
+                marker=marker,
+                label=f'{group_name} {marker}')
 
     # Add a color bar
     cbar = plt.colorbar(sc, ax=axs[0], label='Change in logIntensity', extend='both')
@@ -608,6 +586,7 @@ def investigate_tsne_delta(
     plt.title(f'{title}\n2D t-SNE Visualization')
     # plt.xlabel('Dimension 1')
     # plt.ylabel('Dimension 2')
+    plt.legend()
 
     # Plot Shepard plot on the second subplot
     plt.sca(axs[1])
