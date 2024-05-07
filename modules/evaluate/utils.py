@@ -318,7 +318,6 @@ def plot_repr_corr_colored(model, X, y, title, model_type='features'):
     print('Categories:', np.unique(pair_categories, return_counts=True))
 
     print('plotting with specified markers and colors')
-    print('plotting with specified markers and colors')
     plt.figure(figsize=(8, 6))
     mask_bb = pair_categories == 'BB'
     mask_bs_sb = np.logical_or(pair_categories == 'BS', pair_categories == 'SB')
