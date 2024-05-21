@@ -11,9 +11,7 @@ import numpy as np
 from modules.evaluate.utils import (
     plot_tsne_delta,
     plot_repr_correlation,
-    plot_repr_corr_density,
-    plot_repr_corr_colored,
-    plot_tsne
+    plot_repr_corr_dist
 )
 from modules.training.cme_modeling import ModelBuilder
 from modules.training.ts_modeling import (
@@ -103,9 +101,9 @@ def main():
                     weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
                     residual = True
                     skipped_layers = 2
-                    N = 500
-                    lower_threshold = -0.5
-                    upper_threshold = 0.5
+                    N = 200  # number of samples to keep outside the threshold
+                    lower_threshold = -0.5  # lower threshold for the delta_p
+                    upper_threshold = 0.5  # upper threshold for the delta_p
                     # Initialize wandb
                     wandb.init(project="nasa-ts-delta-overfit", name=experiment_name, config={
                         "inputs_to_use": inputs_to_use,
@@ -198,26 +196,26 @@ def main():
                     )
                     model_sep_stage1.summary()
 
-                    ## Log t-SNE plot
-                    # Log the training t-SNE plot to wandb
-                    stage1_file_path = plot_tsne_delta(
-                        model_sep_stage1,
-                        X_train_filtered, y_train_filtered, title,
-                        'stage1_training_init',
-                        model_type='features',
-                        save_tag=current_time, seed=seed)
-                    wandb.log({'stage1_tsne_training_plot_init': wandb.Image(stage1_file_path)})
-                    print('stage1_file_path: ' + stage1_file_path)
-
-                    # Log the testing t-SNE plot to wandb
-                    stage1_file_path = plot_tsne_delta(
-                        model_sep_stage1,
-                        X_test_filtered, y_test_filtered, title,
-                        'stage1_testing_init',
-                        model_type='features',
-                        save_tag=current_time, seed=seed)
-                    wandb.log({'stage1_tsne_testing_plot_init': wandb.Image(stage1_file_path)})
-                    print('stage1_file_path: ' + stage1_file_path)
+                    # ## Log t-SNE plot
+                    # # Log the training t-SNE plot to wandb
+                    # stage1_file_path = plot_tsne_delta(
+                    #     model_sep_stage1,
+                    #     X_train_filtered, y_train_filtered, title,
+                    #     'stage1_training_init',
+                    #     model_type='features',
+                    #     save_tag=current_time, seed=seed)
+                    # wandb.log({'stage1_tsne_training_plot_init': wandb.Image(stage1_file_path)})
+                    # print('stage1_file_path: ' + stage1_file_path)
+                    #
+                    # # Log the testing t-SNE plot to wandb
+                    # stage1_file_path = plot_tsne_delta(
+                    #     model_sep_stage1,
+                    #     X_test_filtered, y_test_filtered, title,
+                    #     'stage1_testing_init',
+                    #     model_type='features',
+                    #     save_tag=current_time, seed=seed)
+                    # wandb.log({'stage1_tsne_testing_plot_init': wandb.Image(stage1_file_path)})
+                    # print('stage1_file_path: ' + stage1_file_path)
 
                     # load the weights from the first stage
                     print(f'weights loading from: {weight_path}')
@@ -225,22 +223,39 @@ def main():
                     # print the save
                     print(f'weights loaded successfully from: {weight_path}')
 
-                    ## Log the t-SNE plot for input
-                    # Log the training t-SNE plot to wandb
-                    stage1_file_path = plot_tsne(
-                        X_train_filtered, y_train_filtered, title,
-                        'stage1_training_raw',
-                        save_tag=current_time, seed=seed)
-                    wandb.log({'stage1_tsne_training_raw_plot': wandb.Image(stage1_file_path)})
-                    print('stage1_file_path: ' + stage1_file_path)
+                    # ## Log the t-SNE plot for input
+                    # # Log the training t-SNE plot to wandb
+                    # stage1_file_path = plot_tsne(
+                    #     X_train_filtered, y_train_filtered, title,
+                    #     'stage1_training_raw',
+                    #     save_tag=current_time, seed=seed)
+                    # wandb.log({'stage1_tsne_training_raw_plot': wandb.Image(stage1_file_path)})
+                    # print('stage1_file_path: ' + stage1_file_path)
+                    #
+                    # # Log the testing t-SNE plot to wandb
+                    # stage1_file_path = plot_tsne(
+                    #     X_test_filtered, y_test_filtered, title,
+                    #     'stage1_testing_raw',
+                    #     save_tag=current_time, seed=seed)
+                    # wandb.log({'stage1_tsne_testing_raw_plot': wandb.Image(stage1_file_path)})
+                    # print('stage1_file_path: ' + stage1_file_path)
 
-                    # Log the testing t-SNE plot to wandb
-                    stage1_file_path = plot_tsne(
-                        X_test_filtered, y_test_filtered, title,
-                        'stage1_testing_raw',
-                        save_tag=current_time, seed=seed)
-                    wandb.log({'stage1_tsne_testing_raw_plot': wandb.Image(stage1_file_path)})
-                    print('stage1_file_path: ' + stage1_file_path)
+                    ## Evalute the model correlation with colored
+                    file_path = plot_repr_corr_dist(
+                        model_sep_stage1,
+                        X_train_filtered, y_train_filtered,
+                        title + "_training"
+                    )
+                    wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
+                    print('file_path: ' + file_path)
+
+                    file_path = plot_repr_corr_dist(
+                        model_sep_stage1,
+                        X_test_filtered, y_test_filtered,
+                        title + "_test"
+                    )
+                    wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
+                    print('file_path: ' + file_path)
 
                     ## Log t-SNE plot
                     # Log the training t-SNE plot to wandb
@@ -280,39 +295,39 @@ def main():
                     wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
                     print('file_path: ' + file_path)
 
-                    ## Evalute the model correlation density
-                    file_path = plot_repr_corr_density(
-                        model_sep_stage1,
-                        X_train_filtered, y_train_filtered,
-                        title + "_training"
-                    )
-                    wandb.log({'representation_correlation_density_plot_train': wandb.Image(file_path)})
-                    print('file_path: ' + file_path)
+                    # ## Evalute the model correlation density
+                    # file_path = plot_repr_corr_density(
+                    #     model_sep_stage1,
+                    #     X_train_filtered, y_train_filtered,
+                    #     title + "_training"
+                    # )
+                    # wandb.log({'representation_correlation_density_plot_train': wandb.Image(file_path)})
+                    # print('file_path: ' + file_path)
+                    #
+                    # file_path = plot_repr_corr_density(
+                    #     model_sep_stage1,
+                    #     X_test_filtered, y_test_filtered,
+                    #     title + "_test"
+                    # )
+                    # wandb.log({'representation_correlation_density_plot_test': wandb.Image(file_path)})
+                    # print('file_path: ' + file_path)
 
-                    file_path = plot_repr_corr_density(
-                        model_sep_stage1,
-                        X_test_filtered, y_test_filtered,
-                        title + "_test"
-                    )
-                    wandb.log({'representation_correlation_density_plot_test': wandb.Image(file_path)})
-                    print('file_path: ' + file_path)
-
-                    ## Evalute the model correlation with colored
-                    file_path = plot_repr_corr_colored(
-                        model_sep_stage1,
-                        X_train_filtered, y_train_filtered,
-                        title + "_training"
-                    )
-                    wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
-                    print('file_path: ' + file_path)
-
-                    file_path = plot_repr_corr_colored(
-                        model_sep_stage1,
-                        X_test_filtered, y_test_filtered,
-                        title + "_test"
-                    )
-                    wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
-                    print('file_path: ' + file_path)
+                    # ## Evalute the model correlation with colored
+                    # file_path = plot_repr_corr_colored(
+                    #     model_sep_stage1,
+                    #     X_train_filtered, y_train_filtered,
+                    #     title + "_training"
+                    # )
+                    # wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
+                    # print('file_path: ' + file_path)
+                    #
+                    # file_path = plot_repr_corr_colored(
+                    #     model_sep_stage1,
+                    #     X_test_filtered, y_test_filtered,
+                    #     title + "_test"
+                    # )
+                    # wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
+                    # print('file_path: ' + file_path)
 
                     # Finish the wandb run
                     wandb.finish()
