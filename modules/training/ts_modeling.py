@@ -702,7 +702,7 @@ def load_file_data(
 
 def build_dataset(
         directory_path: str,
-        shuffle_data: bool = True,
+        shuffle_data: bool = False,
         apply_log: bool = True,
         inputs_to_use: Optional[List[str]] = None,
         add_slope: bool = True,
@@ -750,6 +750,56 @@ def build_dataset(
         X_combined, y_combined = shuffle(X_combined, y_combined, random_state=seed_value)
 
     return X_combined, y_combined
+
+
+def locate_high_deltas(
+        directory_path: str,
+        shuffle_data: bool = True,
+        apply_log: bool = True,
+        inputs_to_use: Optional[List[str]] = None,
+        add_slope: bool = True,
+        outputs_to_use: Optional[List[str]] = None,
+        cme_speed_threshold: float = -1
+) -> None:
+    """
+    Builds a dataset by processing files in a given directory.
+
+    Reads SEP event files from the specified directory, processes them to extract
+    input and target cme_files, normalizes the values between 0 and 1 for the columns
+    of interest, excludes rows where proton intensity is -9999, and optionally shuffles the cme_files.
+
+     Parameters:
+        - directory_path (str): Path to the directory containing the sep_event_X files.
+        - shuffle_data (bool): If True, shuffle the cme_files before returning.
+        - apply_log (bool): Whether to apply a logarithmic transformation before normalization.
+        - inputs_to_use (List[str]): List of input types to include in the dataset. Default is ['e0.5', 'e1.8', 'p'].
+        - add_slope (bool): If True, adds slope features to the dataset.
+        - outputs_to_use (List[str]): List of output types to include in the dataset. Default is both ['p'] and ['delta_p'].
+        - cme_speed_threshold (float): The threshold for CME speed. CMEs with speeds below (<) this threshold will be excluded. -1
+
+    Returns:
+    - Tuple[np.ndarray, np.ndarray]: A tuple containing the combined input data (X) and target data (y).
+    """
+
+    for file_name in os.listdir(directory_path):
+        print(f'Processing file: {file_name}')
+        if file_name.endswith('_ie_trim.csv'):
+            file_path = os.path.join(directory_path, file_name)
+            X, y = load_file_data(
+                file_path,
+                apply_log,
+                inputs_to_use,
+                add_slope,
+                outputs_to_use,
+                cme_speed_threshold)
+
+            # Counting labels
+            label_count_above_2 = np.sum(y > 2)
+            label_count_above_1_and_below_minus1 = np.sum((y > 1) | (y < -1))
+
+            print(f'Count of labels above 2: {label_count_above_2}')
+            print(f'Count of labels above 1 and below -1: {label_count_above_1_and_below_minus1}')
+
 
 
 def generate_feature_names(inputs_to_use: List[str], add_slope: bool) -> List[str]:

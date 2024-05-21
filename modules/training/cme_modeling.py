@@ -2247,14 +2247,14 @@ class ModelBuilder:
     def pds_loss_vec(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
         """
         Vectorized computation of the loss for a batch of predicted features and their labels.
-
+        TODO: Double check the calculation procedure, use
         :param y_true: A batch of true label values, shape of [batch_size, 1].
-        :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
+        :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
         :param reduction: The type of reduction to apply to the loss.
         :return: The average error for all unique combinations of the samples in the batch.
         """
         # Compute pairwise differences for z_pred and y_true using broadcasting
-        y_true_diff = y_true - tf.transpose(y_true)
+        y_true_diff = y_true - tf.transpose(y_true) # labels are not normailzed
         z_pred_diff = z_pred[:, tf.newaxis, :] - z_pred[tf.newaxis, :, :]
 
         # Calculate squared L2 norm for z_pred differences
@@ -2264,26 +2264,27 @@ class ModelBuilder:
         y_diff_squared = tf.square(y_true_diff)
 
         # Compute the loss for each pair
-        pairwise_loss = .5 * tf.square(z_diff_squared - y_diff_squared)
+        pairwise_loss = tf.square(z_diff_squared - y_diff_squared)
 
         # Mask to exclude self-comparisons (where i == j)
         batch_size = tf.shape(y_true)[0]
-        mask = 1 - tf.eye(batch_size, dtype=tf.float32)
+        # mask = 1 - tf.eye(batch_size, dtype=tf.float32)
 
         # Apply mask to exclude self-comparisons from the loss calculation
-        pairwise_loss_masked = pairwise_loss * mask
+        # pairwise_loss_masked = pairwise_loss #* mask
 
         # Sum over all unique pairs
-        total_error = tf.reduce_sum(pairwise_loss_masked)
+        # 0.5 is used for derivative simplification, not because of upper triangle;s division by 2
+        total_error = 0.5 * tf.reduce_sum(pairwise_loss) #pairwise_loss_masked)
 
         # Number of unique comparisons, excluding self-pairs
         num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=tf.float32)
 
         if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error / 2
+            return total_error / 2 # upper triangle only
         elif reduction == tf.keras.losses.Reduction.NONE:
             # Avoid division by zero
-            return total_error / (num_comparisons + 1e-9)
+            return total_error / (num_comparisons + 1e-9) # average over all elements
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
