@@ -11,8 +11,8 @@ import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from wandb.keras import WandbCallback
 
-from modules.evaluate.utils import plot_tsne_delta, plot_repr_correlation
 from modules.training import cme_modeling
+from modules.training.cme_modeling import pds_space_norm
 from modules.training.ts_modeling import build_dataset, create_mlp, reshape_X
 
 # SEEDING
@@ -42,7 +42,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
-            for add_slope in [False]:
+            for add_slope in [False, True]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
@@ -55,7 +55,7 @@ def main():
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDS_bs{bs}_CME{cme_speed_threshold}_dsv3'
+                title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSnorm_bs{bs}_CME{cme_speed_threshold}'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -66,8 +66,8 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                    'epochs': 25000,
-                    'learning_rate': 1e-2,  # Updated to 3e-4
+                    'epochs': int(2.5e4),  # 35k epochs
+                    'learning_rate': 1e-2,  # initial learning rate
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.9,  # Added momentum beta1
                 }
@@ -140,18 +140,22 @@ def main():
                     add_slope=add_slope,
                     outputs_to_use=outputs_to_use,
                     cme_speed_threshold=cme_speed_threshold)
-                X_test, y_test = build_dataset(
-                    root_dir + '/testing',
-                    inputs_to_use=inputs_to_use,
-                    add_slope=add_slope,
-                    outputs_to_use=outputs_to_use,
-                    cme_speed_threshold=cme_speed_threshold)
+                # X_test, y_test = build_dataset(
+                #     root_dir + '/testing',
+                #     inputs_to_use=inputs_to_use,
+                #     add_slope=add_slope,
+                #     outputs_to_use=outputs_to_use,
+                #     cme_speed_threshold=cme_speed_threshold)
+
+                # pds normalize the data
+                y_train_norm = pds_space_norm(y_train)
+                # y_test_norm = pds_space_norm(y_test)
 
                 # print all cme_files shapes
                 print(f'X_train.shape: {X_train.shape}')
                 print(f'y_train.shape: {y_train.shape}')
-                print(f'X_test.shape: {X_test.shape}')
-                print(f'y_test.shape: {y_test.shape}')
+                # print(f'X_test.shape: {X_test.shape}')
+                # print(f'y_test.shape: {y_test.shape}')
 
                 # print a sample of the training cme_files
                 # print(f'X_train[0]: {X_train[0]}')
@@ -162,7 +166,7 @@ def main():
                 print(f'n_features: {n_features}')
 
                 # create the model
-                mlp_model_sep = create_mlp(
+                model_sep = create_mlp(
                     input_dim=n_features,
                     hiddens=hiddens,
                     output_dim=0,
@@ -174,7 +178,7 @@ def main():
                     residual=residual,
                     skipped_layers=skipped_layers
                 )
-                mlp_model_sep.summary()
+                model_sep.summary()
 
                 print('Reshaping input for model')
                 X_train = reshape_X(
@@ -182,18 +186,18 @@ def main():
                     [n_features],
                     inputs_to_use,
                     add_slope,
-                    mlp_model_sep.name)
+                    model_sep.name)
 
-                X_test = reshape_X(
-                    X_test,
-                    [n_features],
-                    inputs_to_use,
-                    add_slope,
-                    mlp_model_sep.name)
+                # X_test = reshape_X(
+                #     X_test,
+                #     [n_features],
+                #     inputs_to_use,
+                #     add_slope,
+                #     model_sep.name)
 
                 mb.overtrain_pds(
-                    mlp_model_sep,
-                    X_train, y_train,
+                    model_sep,
+                    X_train, y_train_norm,
                     learning_rate=Options['learning_rate'],
                     epochs=Options['epochs'],
                     batch_size=Options['batch_size'],
@@ -205,7 +209,7 @@ def main():
                 )
 
                 # file_path = plot_tsne_delta(
-                #     mlp_model_sep,
+                #     model_sep,
                 #     X_train, y_train, title,
                 #     'training',
                 #     model_type='features',
@@ -218,7 +222,7 @@ def main():
                 # print('file_path: ' + file_path)
 
                 # file_path = plot_tsne_delta(
-                #     mlp_model_sep,
+                #     model_sep,
                 #     X_test, y_test, title,
                 #     'testing',
                 #     model_type='features',
@@ -246,15 +250,15 @@ def main():
                 #     [n_features],
                 #     inputs_to_use,
                 #     add_slope,
-                #     mlp_model_sep.name
+                #     model_sep.name
                 # )
 
-                # file_path = plot_repr_correlation(mlp_model_sep, X_val, y_val, title + "_training")
+                # file_path = plot_repr_correlation(model_sep, X_val, y_val, title + "_training")
                 # # Log the representation correlation plot to wandb
                 # wandb.log({'representation_correlation_plot_train': wandb.Image(file_path)})
                 # print('file_path: ' + file_path)
 
-                # file_path = plot_repr_correlation(mlp_model_sep, X_test, y_test, title + "_test")
+                # file_path = plot_repr_correlation(model_sep, X_test, y_test, title + "_test")
                 # # Log the representation correlation plot to wandb
                 # wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
                 # print('file_path: ' + file_path)

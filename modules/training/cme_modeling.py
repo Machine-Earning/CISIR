@@ -64,6 +64,39 @@ def error(z1: Tensor, z2: Tensor, label1: float, label2: float) -> Tensor:
     return tf.reduce_sum(squared_difference)
 
 
+def pds_space_norm(y_train: np.ndarray, rho: float = 1.5, debug: bool = False) -> np.ndarray:
+    """
+    Normalize the input labels according to the equation:
+    y' = (Dz_max / (rho * Dy_max)) * y
+
+    Parameters:
+    - y_train (np.ndarray): The original labels to normalize.
+    - rho (float): A factor allowing additional room outside the dataset for the representation space. Default is 1.5.
+    - debug (bool): If True, show a sample of 5 instances before and after normalization. Default is False.
+
+    Returns:
+    - np.ndarray: The normalized labels.
+    """
+    # Define the maximum distance in the Z space
+    Dz_max = 2
+
+    # Calculate the maximum difference in the y labels
+    Dy_max = np.max(y_train) - np.min(y_train)
+
+    # Print the calculated Dy_max
+    print(f"Dy_max: {Dy_max}")
+
+    # Normalize the y labels
+    y_normalized = (Dz_max / (rho * Dy_max)) * y_train
+
+    # Debugging: Show a sample of 5 instances before and after normalization
+    if debug:
+        print("Sample of 5 instances before normalization:", y_train[:5])
+        print("Sample of 5 instances after normalization:", y_normalized[:5])
+
+    return y_normalized
+
+
 class ModelBuilder:
     """
     Class for building a neural network model.
