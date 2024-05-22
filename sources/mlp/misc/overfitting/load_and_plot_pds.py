@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import tensorflow as tf
 import wandb
@@ -101,7 +101,7 @@ def main():
                     weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
                     residual = True
                     skipped_layers = 2
-                    N = 200  # number of samples to keep outside the threshold
+                    N = 150  # number of samples to keep outside the threshold
                     lower_threshold = -0.5  # lower threshold for the delta_p
                     upper_threshold = 0.5  # upper threshold for the delta_p
                     # Initialize wandb

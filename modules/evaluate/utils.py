@@ -235,7 +235,7 @@ def plot_repr_corr_dist(model, X, y, title, model_type='features'):
     fig, ax = plt.subplots(figsize=(8, 6))
     for i, (x, y) in enumerate(zip(distances_target_norm, distances_repr_norm)):
         color1, color2 = colors[i]
-        draw_half_colored_dot(ax, x, y, color1, color2, size=0.01)  # Adjust size as needed
+        draw_half_colored_dot(ax, x, y, color1, color2, size=0.005)  # Adjust size as needed
 
     ax.plot([0, 1], [0, 1], 'k--')  # Perfect fit diagonal
     ax.set_xlabel('Normalized Distance in Target Space')
