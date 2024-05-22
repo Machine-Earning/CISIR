@@ -17,10 +17,7 @@ from numpy import ndarray
 from tensorflow import Tensor
 from tensorflow.keras import layers, callbacks, Model
 from tensorflow.keras.layers import (
-    Input,
-    Flatten,
     Dense,
-    Concatenate,
     Dropout,
     LeakyReLU,
     BatchNormalization,
@@ -2254,7 +2251,7 @@ class ModelBuilder:
         :return: The average error for all unique combinations of the samples in the batch.
         """
         # Compute pairwise differences for z_pred and y_true using broadcasting
-        y_true_diff = y_true - tf.transpose(y_true) # labels are not normailzed
+        y_true_diff = y_true - tf.transpose(y_true)  # labels are not normailzed
         z_pred_diff = z_pred[:, tf.newaxis, :] - z_pred[tf.newaxis, :, :]
 
         # Calculate squared L2 norm for z_pred differences
@@ -2275,16 +2272,16 @@ class ModelBuilder:
 
         # Sum over all unique pairs
         # 0.5 is used for derivative simplification, not because of upper triangle;s division by 2
-        total_error = 0.5 * tf.reduce_sum(pairwise_loss) #pairwise_loss_masked)
+        total_error = 0.5 * tf.reduce_sum(pairwise_loss)  # pairwise_loss_masked)
 
         # Number of unique comparisons, excluding self-pairs
         num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=tf.float32)
 
         if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error / 2 # upper triangle only
+            return total_error / 2  # upper triangle only
         elif reduction == tf.keras.losses.Reduction.NONE:
             # Avoid division by zero
-            return total_error / (num_comparisons + 1e-9) # average over all elements
+            return total_error / (num_comparisons + 1e-9)  # average over all elements
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
@@ -2890,23 +2887,41 @@ if __name__ == '__main__':
     print("WITHOUT SAMPLE WEIGHTS")
     loss_tester = ModelBuilder()
     # Generate dummy data for testing
-    np.random.seed(42)  # For reproducibility
-    batch_size = 100
-    z_dim = 9
-    y_true_dummy = np.random.rand(batch_size, 1).astype(np.float32) - 0.5
-    z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32) - 0.5
+    # np.random.seed(42)  # For reproducibility
+    # batch_size = 100
+    # z_dim = 9
+    # y_true_dummy = np.random.rand(batch_size, 1).astype(np.float32) - 0.5
+    # z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32) - 0.5
+
+    # Fabricated data from the table
+    fabricated_z = np.array([[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 0], [0, 1], [1, -1], [1, 0], [1, 1]],
+                            dtype=np.float32)
+    fabricated_y = np.array([[-1], [-1], [-1], [0], [0], [0], [1], [1], [1]], dtype=np.float32)
 
     # print a sample of y and z
-    print(f"y_true_dummy: {y_true_dummy[:5]}")
-    print(f"z_pred_dummy: {z_pred_dummy[:5]}")
+    # print(f"y_true_dummy: {y_true_dummy[:5]}")
+    # print(f"z_pred_dummy: {z_pred_dummy[:5]}")
+    #
+    # print("y_true_dummy shape:", y_true_dummy.shape)
+    # print("z_pred_dummy shape:", z_pred_dummy.shape)
+    #
+    # # Convert NumPy arrays to TensorFlow tensors
+    # y_true_tensor = tf.convert_to_tensor(y_true_dummy, dtype=tf.float32)
+    # z_pred_tensor = tf.convert_to_tensor(z_pred_dummy, dtype=tf.float32)
+    # Generate dummy data for testing
+    batch_size = len(fabricated_y)
+    z_dim = fabricated_z.shape[1]
 
+    # Print a sample of y and z
+    print(f"fabricated_y: {fabricated_y[:5]}")
+    print(f"fabricated_z: {fabricated_z[:5]}")
 
-    print("y_true_dummy shape:", y_true_dummy.shape)
-    print("z_pred_dummy shape:", z_pred_dummy.shape)
+    print("fabricated_y shape:", fabricated_y.shape)
+    print("fabricated_z shape:", fabricated_z.shape)
 
     # Convert NumPy arrays to TensorFlow tensors
-    y_true_tensor = tf.convert_to_tensor(y_true_dummy, dtype=tf.float32)
-    z_pred_tensor = tf.convert_to_tensor(z_pred_dummy, dtype=tf.float32)
+    y_true_tensor = tf.convert_to_tensor(fabricated_y, dtype=tf.float32)
+    z_pred_tensor = tf.convert_to_tensor(fabricated_z, dtype=tf.float32)
 
     # Time and compute loss using the original function
     print("Computing loss using the original function...")
