@@ -2890,81 +2890,35 @@ if __name__ == '__main__':
     print("WITHOUT SAMPLE WEIGHTS")
     loss_tester = ModelBuilder()
     # Generate dummy data for testing
-    # np.random.seed(42)  # For reproducibility
-    # batch_size = 200
-    # z_dim = 9
-    # y_true_dummy = np.random.rand(batch_size, 1).astype(np.float32)
-    # z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32)
-    #
-    # print("y_true_dummy shape:", y_true_dummy.shape)
-    # print("z_pred_dummy shape:", z_pred_dummy.shape)
-    #
-    # # Convert NumPy arrays to TensorFlow tensors
-    # y_true_tensor = tf.convert_to_tensor(y_true_dummy, dtype=tf.float32)
-    # z_pred_tensor = tf.convert_to_tensor(z_pred_dummy, dtype=tf.float32)
-    #
-    # # Time and compute loss using the original function
-    # print("Computing loss using the original function...")
-    # start_time_original = time.time()
-    # loss_original = loss_tester.pds_loss(y_true_tensor, z_pred_tensor)
-    # end_time_original = time.time()
-    # original_duration = end_time_original - start_time_original
-    #
-    # # Time and compute loss using the vectorized function
-    # print("Computing loss using the vectorized function...")
-    # start_time_vectorized = time.time()
-    # loss_vectorized = loss_tester.pds_loss_vec(y_true_tensor, z_pred_tensor)
-    # end_time_vectorized = time.time()
-    # vectorized_duration = end_time_vectorized - start_time_vectorized
-    #
-    # # Evaluate the TensorFlow tensors to get their numpy values
-    # loss_original_value = loss_original.numpy()
-    # loss_vectorized_value = loss_vectorized.numpy()
-    #
-    # # Print the losses and timing for comparison
-    # print(f"Original Loss: {loss_original_value}, Time Taken: {original_duration} seconds")
-    # print(f"Vectorized Loss: {loss_vectorized_value}, Time Taken: {vectorized_duration} seconds")
-    #
-    # # # Check if the losses are approximately equal
-    # # np.testing.assert_almost_equal(loss_original_value, loss_vectorized_value, decimal=5)
-    # # print("Test passed: The original and vectorized loss functions return approximately the same value.")
-    #
-    # # Compare the execution time
-    # if vectorized_duration < original_duration:
-    #     print(f"The vectorized function is faster by {original_duration - vectorized_duration} seconds.")
-    # else:
-    #     print(f"The original function is faster by {vectorized_duration - original_duration} seconds.")
-
-    print("WITH SAMPLE WEIGHTS")
-    # Generate dummy data for testing
     np.random.seed(42)  # For reproducibility
-    batch_size = 200
+    batch_size = 100
     z_dim = 9
-    num_unique_pairs = batch_size * (batch_size - 1) // 2
-    y_true_dummy = np.random.rand(batch_size, 1).astype(np.float32)
-    z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32)
-    sample_weights_dummy = np.random.rand(num_unique_pairs, 1).astype(np.float32)
+    y_true_dummy = np.random.rand(batch_size, 1).astype(np.float32) - 0.5
+    z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32) - 0.5
+
+    # print a sample of y and z
+    print(f"y_true_dummy: {y_true_dummy[:5]}")
+    print(f"z_pred_dummy: {z_pred_dummy[:5]}")
+
 
     print("y_true_dummy shape:", y_true_dummy.shape)
     print("z_pred_dummy shape:", z_pred_dummy.shape)
-    print("sample_weights_dummy shape:", sample_weights_dummy.shape)
 
     # Convert NumPy arrays to TensorFlow tensors
     y_true_tensor = tf.convert_to_tensor(y_true_dummy, dtype=tf.float32)
     z_pred_tensor = tf.convert_to_tensor(z_pred_dummy, dtype=tf.float32)
-    sample_weights_tensor = tf.convert_to_tensor(sample_weights_dummy, dtype=tf.float32)  # Convert sample weights
 
-    # Time and compute loss using the original function with sample weights
-    print("Computing loss using the original function with sample weights...")
+    # Time and compute loss using the original function
+    print("Computing loss using the original function...")
     start_time_original = time.time()
-    loss_original = loss_tester.pds_loss_dl(y_true_tensor, z_pred_tensor, sample_weights=sample_weights_tensor)
+    loss_original = loss_tester.pds_loss(y_true_tensor, z_pred_tensor)
     end_time_original = time.time()
     original_duration = end_time_original - start_time_original
 
-    # Time and compute loss using the vectorized function with sample weights
-    print("Computing loss using the vectorized function with sample weights...")
+    # Time and compute loss using the vectorized function
+    print("Computing loss using the vectorized function...")
     start_time_vectorized = time.time()
-    loss_vectorized = loss_tester.pds_loss_dl_vec(y_true_tensor, z_pred_tensor, sample_weights=sample_weights_tensor)
+    loss_vectorized = loss_tester.pds_loss_vec(y_true_tensor, z_pred_tensor)
     end_time_vectorized = time.time()
     vectorized_duration = end_time_vectorized - start_time_vectorized
 
@@ -2973,13 +2927,64 @@ if __name__ == '__main__':
     loss_vectorized_value = loss_vectorized.numpy()
 
     # Print the losses and timing for comparison
-    print(f"Original Loss with Sample Weights: {loss_original_value}, Time Taken: {original_duration} seconds")
-    print(f"Vectorized Loss with Sample Weights: {loss_vectorized_value}, Time Taken: {vectorized_duration} seconds")
+    print(f"Original Loss: {loss_original_value}, Time Taken: {original_duration} seconds")
+    print(f"Vectorized Loss: {loss_vectorized_value}, Time Taken: {vectorized_duration} seconds")
+
+    # # Check if the losses are approximately equal
+    # np.testing.assert_almost_equal(loss_original_value, loss_vectorized_value, decimal=5)
+    # print("Test passed: The original and vectorized loss functions return approximately the same value.")
 
     # Compare the execution time
     if vectorized_duration < original_duration:
-        print(
-            f"The vectorized function with sample weights is faster by {original_duration - vectorized_duration} seconds.")
+        print(f"The vectorized function is faster by {original_duration - vectorized_duration} seconds.")
     else:
-        print(
-            f"The original function with sample weights is faster by {vectorized_duration - original_duration} seconds.")
+        print(f"The original function is faster by {vectorized_duration - original_duration} seconds.")
+
+    # print("WITH SAMPLE WEIGHTS")
+    # # Generate dummy data for testing
+    # np.random.seed(42)  # For reproducibility
+    # batch_size = 200
+    # z_dim = 9
+    # num_unique_pairs = batch_size * (batch_size - 1) // 2
+    # y_true_dummy = np.random.rand(batch_size, 1).astype(np.float32)
+    # z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32)
+    # sample_weights_dummy = np.random.rand(num_unique_pairs, 1).astype(np.float32)
+    #
+    # print("y_true_dummy shape:", y_true_dummy.shape)
+    # print("z_pred_dummy shape:", z_pred_dummy.shape)
+    # print("sample_weights_dummy shape:", sample_weights_dummy.shape)
+    #
+    # # Convert NumPy arrays to TensorFlow tensors
+    # y_true_tensor = tf.convert_to_tensor(y_true_dummy, dtype=tf.float32)
+    # z_pred_tensor = tf.convert_to_tensor(z_pred_dummy, dtype=tf.float32)
+    # sample_weights_tensor = tf.convert_to_tensor(sample_weights_dummy, dtype=tf.float32)  # Convert sample weights
+    #
+    # # Time and compute loss using the original function with sample weights
+    # print("Computing loss using the original function with sample weights...")
+    # start_time_original = time.time()
+    # loss_original = loss_tester.pds_loss_dl(y_true_tensor, z_pred_tensor, sample_weights=sample_weights_tensor)
+    # end_time_original = time.time()
+    # original_duration = end_time_original - start_time_original
+    #
+    # # Time and compute loss using the vectorized function with sample weights
+    # print("Computing loss using the vectorized function with sample weights...")
+    # start_time_vectorized = time.time()
+    # loss_vectorized = loss_tester.pds_loss_dl_vec(y_true_tensor, z_pred_tensor, sample_weights=sample_weights_tensor)
+    # end_time_vectorized = time.time()
+    # vectorized_duration = end_time_vectorized - start_time_vectorized
+    #
+    # # Evaluate the TensorFlow tensors to get their numpy values
+    # loss_original_value = loss_original.numpy()
+    # loss_vectorized_value = loss_vectorized.numpy()
+    #
+    # # Print the losses and timing for comparison
+    # print(f"Original Loss with Sample Weights: {loss_original_value}, Time Taken: {original_duration} seconds")
+    # print(f"Vectorized Loss with Sample Weights: {loss_vectorized_value}, Time Taken: {vectorized_duration} seconds")
+    #
+    # # Compare the execution time
+    # if vectorized_duration < original_duration:
+    #     print(
+    #         f"The vectorized function with sample weights is faster by {original_duration - vectorized_duration} seconds.")
+    # else:
+    #     print(
+    #         f"The original function with sample weights is faster by {vectorized_duration - original_duration} seconds.")
