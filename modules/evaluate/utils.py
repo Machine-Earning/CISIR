@@ -352,6 +352,7 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
 
 def plot_repr_corr_colored(model, X, y, title, model_type='features'):
     """
+    TODO: doesn't work. Needs to be fixed
     Plots the correlation between distances in target values and distances in the representation space,
     with color and marker variations based on the category of the label. Labels are categorized into 'BB', 'BS/SB', and 'SS' with specific colors and markers for each.
 

@@ -11,7 +11,8 @@ import numpy as np
 from modules.evaluate.utils import (
     plot_tsne_delta,
     plot_repr_correlation,
-    plot_repr_corr_dist
+    plot_repr_corr_dist,
+    plot_repr_corr_density
 )
 from modules.training.cme_modeling import ModelBuilder
 from modules.training.ts_modeling import (
@@ -28,7 +29,7 @@ weight_paths = {
      0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240504-000435MLP_e0_5_e1_8_p_slopeTrue_PDS_bs4096_CME0_dsv3_features_128.h5',
 
     (False,
-     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240504-002452MLP_e0_5_e1_8_p_slopeFalse_PDS_bs4096_CME0_dsv3_features_128.h5',
+     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240522-192141MLP_e0_5_e1_8_p_slopeFalse_PDSnorm_bs4096_CME0_features_128.h5',
     # (True, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-183733MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_CME500_features.h5',
     # (False, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-200720MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_CME500_features.h5',
 }
@@ -41,7 +42,7 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [True, False]:
+        for add_slope in [False]:
             for cme_speed_threshold in [0]:
                 for alpha in [0]:
                     # PARAMS
@@ -52,7 +53,7 @@ def main():
                     inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                     # Construct the title
-                    title = f'MLP_PDS_Stage1_{inputs_str}_slope{str(add_slope)}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                    title = f'MLP_{inputs_str}_PDS_Stage1_slope{str(add_slope)}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
 
                     # Replace any other characters that are not suitable for filenames (if any)
                     title = title.replace(' ', '_').replace(':', '_')
@@ -101,7 +102,7 @@ def main():
                     weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
                     residual = True
                     skipped_layers = 2
-                    N = 150  # number of samples to keep outside the threshold
+                    N = 100  # number of samples to keep outside the threshold
                     lower_threshold = -0.5  # lower threshold for the delta_p
                     upper_threshold = 0.5  # upper threshold for the delta_p
                     # Initialize wandb
@@ -295,39 +296,23 @@ def main():
                     wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
                     print('file_path: ' + file_path)
 
-                    # ## Evalute the model correlation density
-                    # file_path = plot_repr_corr_density(
-                    #     model_sep_stage1,
-                    #     X_train_filtered, y_train_filtered,
-                    #     title + "_training"
-                    # )
-                    # wandb.log({'representation_correlation_density_plot_train': wandb.Image(file_path)})
-                    # print('file_path: ' + file_path)
-                    #
-                    # file_path = plot_repr_corr_density(
-                    #     model_sep_stage1,
-                    #     X_test_filtered, y_test_filtered,
-                    #     title + "_test"
-                    # )
-                    # wandb.log({'representation_correlation_density_plot_test': wandb.Image(file_path)})
-                    # print('file_path: ' + file_path)
+                    ## Evalute the model correlation density
+                    file_path = plot_repr_corr_density(
+                        model_sep_stage1,
+                        X_train_filtered, y_train_filtered,
+                        title + "_training"
+                    )
+                    wandb.log({'representation_correlation_density_plot_train': wandb.Image(file_path)})
+                    print('file_path: ' + file_path)
+                    
+                    file_path = plot_repr_corr_density(
+                        model_sep_stage1,
+                        X_test_filtered, y_test_filtered,
+                        title + "_test"
+                    )
+                    wandb.log({'representation_correlation_density_plot_test': wandb.Image(file_path)})
+                    print('file_path: ' + file_path)
 
-                    # ## Evalute the model correlation with colored
-                    # file_path = plot_repr_corr_colored(
-                    #     model_sep_stage1,
-                    #     X_train_filtered, y_train_filtered,
-                    #     title + "_training"
-                    # )
-                    # wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
-                    # print('file_path: ' + file_path)
-                    #
-                    # file_path = plot_repr_corr_colored(
-                    #     model_sep_stage1,
-                    #     X_test_filtered, y_test_filtered,
-                    #     title + "_test"
-                    # )
-                    # wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
-                    # print('file_path: ' + file_path)
 
                     # Finish the wandb run
                     wandb.finish()

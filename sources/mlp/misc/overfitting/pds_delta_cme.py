@@ -3,7 +3,7 @@ import random
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import numpy as np
 import tensorflow as tf
@@ -66,7 +66,7 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                    'epochs': int(2.5e4),  # 35k epochs
+                    'epochs': int(5e4),  # 35k epochs
                     'learning_rate': 1e-2,  # initial learning rate
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.9,  # Added momentum beta1
@@ -95,7 +95,7 @@ def main():
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor='loss',
                     factor=0.5,
-                    patience=1000,
+                    patience=1800,
                     verbose=1,
                     min_delta=1e-5,
                     min_lr=1e-10)
