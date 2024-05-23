@@ -3,7 +3,7 @@ import random
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import numpy as np
 import tensorflow as tf
@@ -50,7 +50,7 @@ def main():
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
             for add_slope in [False, True]:
-                for alpha in [0.3, 0.6, 0.8]:
+                for alpha in [0.3, 0.5, 0.8]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
                     # add_slope = True
@@ -74,7 +74,7 @@ def main():
                     # Set the early stopping patience and learning rate as variables
                     Options = {
                         'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                        'epochs': int(1e4),
+                        'epochs': int(3.5e4),
                         'learning_rate': 1e-2,  # Updated to 3e-4
                         'weight_decay': 1e-8,  # Added weight decay
                         'momentum_beta1': 0.9,  # Added momentum beta1
@@ -250,7 +250,7 @@ def main():
                         learning_rate=Options['learning_rate'],
                         epochs=Options['epochs'],
                         batch_size=Options['batch_size'],
-                        save_tag=current_time + title + "_features_128",
+                        save_tag=current_time + title + "_features_128_sl",
                         callbacks_list=[
                             WandbCallback(save_model=False),
                             reduce_lr_on_plateau

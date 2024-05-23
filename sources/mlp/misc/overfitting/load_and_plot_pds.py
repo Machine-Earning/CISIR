@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import tensorflow as tf
 import wandb
@@ -25,11 +25,11 @@ mb = ModelBuilder()
 
 # Define the lookup dictionary
 weight_paths = {
-    (True,
-     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240504-000435MLP_e0_5_e1_8_p_slopeTrue_PDS_bs4096_CME0_dsv3_features_128.h5',
-
     (False,
-     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240522-192141MLP_e0_5_e1_8_p_slopeFalse_PDSnorm_bs4096_CME0_features_128.h5',
+     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240523-082603MLP_e0_5_e1_8_p_slopeFalse_PDSnorm_bs0_CME0_features_128_sl.h5',
+
+    (True,
+     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240523-083940MLP_e0_5_e1_8_p_slopeTrue_PDSnorm_bs0_CME0_features_128_sl.h5',
     # (True, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-183733MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_CME500_features.h5',
     # (False, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-200720MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_CME500_features.h5',
 }
@@ -42,7 +42,7 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [False]:
+        for add_slope in [False, True]:
             for cme_speed_threshold in [0]:
                 for alpha in [0]:
                     # PARAMS
@@ -70,7 +70,7 @@ def main():
                     weight_decay = 1e-8  # higher weight decay
                     momentum_beta1 = 0.9  # higher momentum beta1
                     batch_size = 4096
-                    epochs = 25000  # higher epochs
+                    epochs = int(3.5e4)  # higher epochs
                     hiddens = [
                         2048, 1024,
                         2048, 1024,
@@ -102,7 +102,7 @@ def main():
                     weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
                     residual = True
                     skipped_layers = 2
-                    N = 100  # number of samples to keep outside the threshold
+                    N = 500  # number of samples to keep outside the threshold
                     lower_threshold = -0.5  # lower threshold for the delta_p
                     upper_threshold = 0.5  # upper threshold for the delta_p
                     # Initialize wandb

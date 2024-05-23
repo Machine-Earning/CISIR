@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import tensorflow as tf
 import wandb
@@ -12,7 +12,7 @@ from modules.evaluate.utils import (
     plot_tsne_delta,
     plot_repr_correlation,
     plot_repr_corr_density,
-    plot_repr_corr_colored,
+    plot_repr_corr_dist,
 )
 from modules.training.cme_modeling import ModelBuilder
 from modules.training.ts_modeling import (
@@ -24,13 +24,34 @@ from modules.training.utils import get_weight_path
 mb = ModelBuilder()
 
 # Define the lookup dictionary
+
+# weight_paths = {
+#     (True,
+#      0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240523-005507MLP_e0_5_e1_8_p_slopeTrue_PDSnorm_bs0_alpha0.30_CME0_features_128.h5',
+#     # (True, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-183733MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_CME500_features.h5',
+#     (False, 
+#      0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240523-000509MLP_e0_5_e1_8_p_slopeFalse_PDSnorm_bs0_alpha0.30_CME0_features_128.h5',
+#     # (False, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-200720MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_CME500_features.h5',
+# }
+
+# weight_paths = {
+#     (True,
+#      0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240523-011152MLP_e0_5_e1_8_p_slopeTrue_PDSnorm_bs0_alpha0.60_CME0_features_128.h5',
+#     # (True, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-183733MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_CME500_features.h5',
+#     (False, 
+#      0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240523-002147MLP_e0_5_e1_8_p_slopeFalse_PDSnorm_bs0_alpha0.60_CME0_features_128.h5',
+#     # (False, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-200720MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_CME500_features.h5',
+# }
+
 weight_paths = {
     (True,
-     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240425-013320MLP_e0_5_e1_8_p_slopeTrue_PDS_bs4096_alpha0.20_CME0_dsv3_features.h5',
+     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240523-012834MLP_e0_5_e1_8_p_slopeTrue_PDSnorm_bs0_alpha0.80_CME0_features_128.h5',
     # (True, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-183733MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_CME500_features.h5',
-    # (False, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-171125MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_CME0_features.h5',
+    (False, 
+     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240523-003827MLP_e0_5_e1_8_p_slopeFalse_PDSnorm_bs0_alpha0.80_CME0_features_128.h5',
     # (False, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-200720MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_CME500_features.h5',
 }
+
 
 
 def main():
@@ -42,7 +63,7 @@ def main():
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for add_slope in [True]:
             for cme_speed_threshold in [0]:
-                for alpha in [0.2]:
+                for alpha in [0.8]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
                     # add_slope = True
@@ -68,7 +89,7 @@ def main():
                     weight_decay = 1e-8  # higher weight decay
                     momentum_beta1 = 0.9  # higher momentum beta1
                     batch_size = 4096
-                    epochs = 25000  # higher epochs
+                    epochs = int(3.5e4)  # higher epochs
                     hiddens = [
                         2048, 1024,
                         2048, 1024,
@@ -76,12 +97,12 @@ def main():
                         1024, 512,
                         512, 256,
                         512, 256,
-                        128, 64,
-                        128, 64,
-                        64, 64,
-                        64, 64,
-                        64, 64,
-                        64, 64
+                        256, 128,
+                        256, 128,
+                        256, 128,
+                        128, 128,
+                        128, 128,
+                        128, 128
                     ]
 
                     hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
@@ -91,7 +112,7 @@ def main():
                     rebalacing = True
                     alpha_rw = alpha
                     bandwidth = 4.42e-2  # 0.0519
-                    repr_dim = 64
+                    repr_dim = 128
                     dropout = 0.5
                     activation = None
                     norm = 'batch_norm'
@@ -236,7 +257,7 @@ def main():
                     print('file_path: ' + file_path)
 
                     ## Evalute the model correlation with colored
-                    file_path = plot_repr_corr_colored(
+                    file_path = plot_repr_corr_dist(
                         model_sep_stage1,
                         X_train_filtered, y_train_filtered,
                         title + "_training"
@@ -244,7 +265,7 @@ def main():
                     wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
                     print('file_path: ' + file_path)
 
-                    file_path = plot_repr_corr_colored(
+                    file_path = plot_repr_corr_dist(
                         model_sep_stage1,
                         X_test_filtered, y_test_filtered,
                         title + "_test"

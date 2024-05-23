@@ -66,7 +66,7 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                    'epochs': int(1e4),  # 35k epochs
+                    'epochs': int(3.5e4),  # 35k epochs
                     'learning_rate': 1e-2,  # initial learning rate
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.9,  # Added momentum beta1
@@ -213,7 +213,7 @@ def main():
                     learning_rate=Options['learning_rate'],
                     epochs=Options['epochs'],
                     batch_size=Options['batch_size'],
-                    save_tag=current_time + title + "_features_128",
+                    save_tag=current_time + title + "_features_128_sl",
                     callbacks_list=[
                         WandbCallback(save_model=False),
                         reduce_lr_on_plateau
