@@ -13,7 +13,7 @@ from wandb.keras import WandbCallback
 
 from modules.training import cme_modeling
 from modules.training.cme_modeling import pds_space_norm
-from modules.training.ts_modeling import build_dataset, create_mlp, reshape_X
+from modules.training.ts_modeling import build_dataset, create_mlp, reshape_X, filter_ds
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # from tensorflow.keras.mixed_precision import experimental as mixed_precision
@@ -56,7 +56,7 @@ def main():
                     # add_slope = True
                     outputs_to_use = ['delta_p']
 
-                    bs = 4096  # full dataset used
+                    bs = 0  # full dataset used
                     print(f'batch size : {bs}')
 
                     # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -74,7 +74,7 @@ def main():
                     # Set the early stopping patience and learning rate as variables
                     Options = {
                         'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                        'epochs': int(2.5e4),
+                        'epochs': int(1e4),
                         'learning_rate': 1e-2,  # Updated to 3e-4
                         'weight_decay': 1e-8,  # Added weight decay
                         'momentum_beta1': 0.9,  # Added momentum beta1
@@ -111,6 +111,9 @@ def main():
                     alpha_rw = alpha
                     residual = True
                     skipped_layers = 2
+                    N = 750  # number of samples to keep outside the threshold
+                    lower_threshold = -0.5  # lower threshold for the delta_p
+                    upper_threshold = 0.5  # upper threshold for the delta_p
 
                     # Initialize wandb
                     wandb.init(project="nasa-ts-delta-overfit", name=experiment_name, config={
@@ -139,7 +142,10 @@ def main():
                         "residual": residual,
                         "skipped_layers": skipped_layers,
                         "repr_dim": repr_dim,
-                        "ds_version": 5
+                        "ds_version": 5,
+                        "N_freq": N,
+                        "lower_t": lower_threshold,
+                        "upper_t": upper_threshold
                     })
 
                     # set the root directory
@@ -151,6 +157,13 @@ def main():
                         add_slope=add_slope,
                         outputs_to_use=outputs_to_use,
                         cme_speed_threshold=cme_speed_threshold)
+                    
+                    X_train, y_train = filter_ds(
+                        X_train, y_train,
+                        low_threshold=lower_threshold,
+                        high_threshold=upper_threshold,
+                        N=N, seed=SEED)
+
 
                     # pds normalize the data
                     y_train_norm = pds_space_norm(y_train)

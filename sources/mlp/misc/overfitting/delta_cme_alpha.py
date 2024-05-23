@@ -69,7 +69,7 @@ def main():
 
                     weight_decay = 1e-8  # higher weight decay
                     momentum_beta1 = 0.9  # higher momentum beta1
-                    batch_size = 4096
+                    batch_size = 10000
                     epochs = 30000  # higher epochs
                     hiddens = [
                         2048, 1024,
