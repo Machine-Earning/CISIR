@@ -166,7 +166,7 @@ def main():
 
 
                     # pds normalize the data
-                    y_train_norm = pds_space_norm(y_train)
+                    y_train_norm, _, _ = pds_space_norm(y_train)
 
                     # X_test, y_test = build_dataset(
                     #     root_dir + '/testing',

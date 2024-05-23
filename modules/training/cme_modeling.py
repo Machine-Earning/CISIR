@@ -64,7 +64,11 @@ def error(z1: Tensor, z2: Tensor, label1: float, label2: float) -> Tensor:
     return tf.reduce_sum(squared_difference)
 
 
-def pds_space_norm(y_train: np.ndarray, rho: float = 1.5, debug: bool = False) -> np.ndarray:
+def pds_space_norm(y_train: np.ndarray,
+                   rho: float = 1.5,
+                   lower_threshold: float = -0.5,
+                   upper_threshold: float = 0.5,
+                   debug: bool = False) -> (np.ndarray, float, float):
     """
     Normalize the input labels according to the equation:
     y' = (Dz_max / (rho * Dy_max)) * y
@@ -72,10 +76,14 @@ def pds_space_norm(y_train: np.ndarray, rho: float = 1.5, debug: bool = False) -
     Parameters:
     - y_train (np.ndarray): The original labels to normalize.
     - rho (float): A factor allowing additional room outside the dataset for the representation space. Default is 1.5.
+    - lower_threshold (float): The lower threshold value for normalization. Default is -0.5.
+    - upper_threshold (float): The upper threshold value for normalization. Default is 0.5.
     - debug (bool): If True, show a sample of 5 instances before and after normalization. Default is False.
 
     Returns:
     - np.ndarray: The normalized labels.
+    - float: The normalized lower threshold.
+    - float: The normalized upper threshold.
     """
     # Define the maximum distance in the Z space
     Dz_max = 2
@@ -89,12 +97,18 @@ def pds_space_norm(y_train: np.ndarray, rho: float = 1.5, debug: bool = False) -
     # Normalize the y labels
     y_normalized = (Dz_max / (rho * Dy_max)) * y_train
 
+    # Normalize the threshold values
+    norm_lower = (Dz_max / (rho * Dy_max)) * lower_threshold
+    norm_upper = (Dz_max / (rho * Dy_max)) * upper_threshold
+
     # Debugging: Show a sample of 5 instances before and after normalization
     if debug:
         print("Sample of 5 instances before normalization:", y_train[:5])
         print("Sample of 5 instances after normalization:", y_normalized[:5])
+        print(f"Normalized lower threshold: {norm_lower}")
+        print(f"Normalized upper threshold: {norm_upper}")
 
-    return y_normalized
+    return y_normalized, norm_lower, norm_upper
 
 
 class ModelBuilder:
@@ -554,6 +568,78 @@ class ModelBuilder:
         model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
         # print where the model weights are saved
         print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
+
+    def overtrain_pds_inj(self,
+                          model: tf.keras.Model,
+                          X_train: np.ndarray,
+                          y_train: np.ndarray,
+                          learning_rate: float = 1e-3,
+                          epochs: int = 100,
+                          batch_size: int = 32,
+                          lower_bound: float = -0.5,
+                          upper_bound: float = 0.5,
+                          save_tag=None,
+                          callbacks_list=None,
+                          verbose: int = 1):
+        """
+        Trains the model and returns the training history with specific batch constraints.
+
+        :param X_train: training and validation sets together
+        :param y_train: labels of training and validation sets together
+        :param save_tag: tag to use for saving experiments
+        :param model: The TensorFlow model to stage2.
+        :param learning_rate: The learning rate for the Adam optimizer.
+        :param epochs: The maximum number of epochs for training.
+        :param batch_size: The batch size for training.
+        :param lower_bound: The lower bound for selecting rare samples.
+        :param upper_bound: The upper bound for selecting rare samples.
+        :param callbacks_list: List of callback instances to apply during training.
+        :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
+
+        :return: The training history as a History object.
+        """
+
+        # Identify injected rare samples
+        rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
+        freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
+
+        # Check if the batch size is sufficient
+        if batch_size < len(rare_indices):
+            raise ValueError(f"Batch size must be at least the size of the injected rare samples. "
+                             f"Current batch size: {batch_size}, size of injected rare samples: {len(rare_indices)}")
+
+        # Custom data generator to yield batches
+        def data_generator(X, y, batch_size):
+            while True:
+                np.random.shuffle(freq_indices)
+                for start in range(0, len(freq_indices), batch_size - len(rare_indices)):
+                    end = min(start + batch_size - len(rare_indices), len(freq_indices))
+                    freq_batch_indices = freq_indices[start:end]
+                    batch_indices = np.concatenate([rare_indices, freq_batch_indices])
+                    np.random.shuffle(batch_indices)
+                    yield X[batch_indices], y[batch_indices]
+
+        # Compile the model
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            loss=self.pds_loss_vec
+        )
+
+        # Fit the model using the custom generator
+        steps_per_epoch = len(freq_indices) // (batch_size - len(rare_indices))
+        history = model.fit(
+            data_generator(X_train, y_train, batch_size),
+            steps_per_epoch=steps_per_epoch,
+            epochs=epochs,
+            callbacks=callbacks_list,
+            verbose=verbose
+        )
+
+        # Save the model weights
+        model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
+        print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
+
+        return history
 
     def train_pds_distributed(self,
                               model: Model,

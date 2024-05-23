@@ -2,8 +2,10 @@ import os
 import random
 from datetime import datetime
 
+from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density
+
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import numpy as np
 import tensorflow as tf
@@ -48,14 +50,14 @@ def main():
                 # add_slope = True
                 outputs_to_use = ['delta_p']
 
-                bs = 0 # full dataset used
+                bs = 4096  # full dataset used
                 print(f'batch size : {bs}')
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSnorm_bs{bs}_CME{cme_speed_threshold}'
+                title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSinj_bs{bs}_CME{cme_speed_threshold}'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -66,7 +68,7 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                    'epochs': int(3.5e4),  # 35k epochs
+                    'epochs': int(2e4),  # 35k epochs
                     'learning_rate': 1e-2,  # initial learning rate
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.9,  # Added momentum beta1
@@ -101,7 +103,7 @@ def main():
                     min_lr=1e-10)
                 residual = True
                 skipped_layers = 2
-                N = 750  # number of samples to keep outside the threshold
+                N = 200  # number of samples to keep outside the threshold
                 lower_threshold = -0.5  # lower threshold for the delta_p
                 upper_threshold = 0.5  # upper threshold for the delta_p
 
@@ -146,28 +148,34 @@ def main():
                     add_slope=add_slope,
                     outputs_to_use=outputs_to_use,
                     cme_speed_threshold=cme_speed_threshold)
-                # X_test, y_test = build_dataset(
-                #     root_dir + '/testing',
-                #     inputs_to_use=inputs_to_use,
-                #     add_slope=add_slope,
-                #     outputs_to_use=outputs_to_use,
-                #     cme_speed_threshold=cme_speed_threshold)
+                X_test, y_test = build_dataset(
+                    root_dir + '/testing',
+                    inputs_to_use=inputs_to_use,
+                    add_slope=add_slope,
+                    outputs_to_use=outputs_to_use,
+                    cme_speed_threshold=cme_speed_threshold)
 
-                X_train, y_train = filter_ds(
+                X_train_filtered, y_train_filtered = filter_ds(
                     X_train, y_train,
                     low_threshold=lower_threshold,
                     high_threshold=upper_threshold,
                     N=N, seed=SEED)
 
+                X_test_filtered, y_test_filtered = filter_ds(
+                    X_test, y_test,
+                    low_threshold=lower_threshold,
+                    high_threshold=upper_threshold,
+                    N=N, seed=SEED)
+
                 # pds normalize the data
-                y_train_norm, _, _ = pds_space_norm(y_train)
+                y_train_norm, norm_lower_t, norm_upper_t = pds_space_norm(y_train)
                 # y_test_norm = pds_space_norm(y_test)
 
                 # print all cme_files shapes
                 print(f'X_train.shape: {X_train.shape}')
                 print(f'y_train.shape: {y_train.shape}')
-                # print(f'X_test.shape: {X_test.shape}')
-                # print(f'y_test.shape: {y_test.shape}')
+                print(f'X_test.shape: {X_test.shape}')
+                print(f'y_test.shape: {y_test.shape}')
 
                 # print a sample of the training cme_files
                 # print(f'X_train[0]: {X_train[0]}')
@@ -207,73 +215,92 @@ def main():
                 #     add_slope,
                 #     model_sep.name)
 
-                mb.overtrain_pds(
+                mb.overtrain_pds_inj(
                     model_sep,
                     X_train, y_train_norm,
                     learning_rate=Options['learning_rate'],
                     epochs=Options['epochs'],
                     batch_size=Options['batch_size'],
                     save_tag=current_time + title + "_features_128_sl",
+                    lower_bound=norm_lower_t,
+                    upper_bound=norm_upper_t,
                     callbacks_list=[
                         WandbCallback(save_model=False),
                         reduce_lr_on_plateau
                     ]
                 )
 
-                # file_path = plot_tsne_delta(
-                #     model_sep,
-                #     X_train, y_train, title,
-                #     'training',
-                #     model_type='features',
-                #     save_tag=current_time,
-                #     seed=SEED)
+                ##Evalute the model correlation with colored
+                file_path = plot_repr_corr_dist(
+                    model_sep,
+                    X_train_filtered, y_train_filtered,
+                    title + "_training"
+                )
+                wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
+                print('file_path: ' + file_path)
 
-                # # Log t-SNE plot for training
-                # # Log the training t-SNE plot to wandb
-                # wandb.log({'tsne_training_plot': wandb.Image(file_path)})
-                # print('file_path: ' + file_path)
+                file_path = plot_repr_corr_dist(
+                    model_sep,
+                    X_test_filtered, y_test_filtered,
+                    title + "_test"
+                )
+                wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
+                print('file_path: ' + file_path)
 
-                # file_path = plot_tsne_delta(
-                #     model_sep,
-                #     X_test, y_test, title,
-                #     'testing',
-                #     model_type='features',
-                #     save_tag=current_time,
-                #     seed=SEED)
+                ## Log t-SNE plot
+                # Log the training t-SNE plot to wandb
+                stage1_file_path = plot_tsne_delta(
+                    model_sep,
+                    X_train_filtered, y_train_filtered, title,
+                    'stage1_training',
+                    model_type='features',
+                    save_tag=current_time, seed=SEED)
+                wandb.log({'stage1_tsne_training_plot': wandb.Image(stage1_file_path)})
+                print('stage1_file_path: ' + stage1_file_path)
 
-                # # Log t-SNE plot for testing
-                # # Log the testing t-SNE plot to wandb
-                # wandb.log({'tsne_testing_plot': wandb.Image(file_path)})
-                # print('file_path: ' + file_path)
+                # Log the testing t-SNE plot to wandb
+                stage1_file_path = plot_tsne_delta(
+                    model_sep,
+                    X_test_filtered, y_test_filtered, title,
+                    'stage1_testing',
+                    model_type='features',
+                    save_tag=current_time, seed=SEED)
+                wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
+                print('stage1_file_path: ' + stage1_file_path)
 
-                # X_val, y_val = build_dataset(
-                #     root_dir + '/validation',
-                #     inputs_to_use=inputs_to_use,
-                #     add_slope=add_slope,
-                #     outputs_to_use=outputs_to_use,
-                #     cme_speed_threshold=cme_speed_threshold
-                # )
+                ## Evalute the model correlation
+                file_path = plot_repr_correlation(
+                    model_sep,
+                    X_train_filtered, y_train_filtered,
+                    title + "_training"
+                )
+                wandb.log({'representation_correlation_plot_train': wandb.Image(file_path)})
+                print('file_path: ' + file_path)
 
-                # print(f'X_val.shape: {X_val.shape}')
-                # print(f'y_val.shape: {y_val.shape}')
+                file_path = plot_repr_correlation(
+                    model_sep,
+                    X_test_filtered, y_test_filtered,
+                    title + "_test"
+                )
+                wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
+                print('file_path: ' + file_path)
 
-                # X_val = reshape_X(
-                #     X_val,
-                #     [n_features],
-                #     inputs_to_use,
-                #     add_slope,
-                #     model_sep.name
-                # )
+                ## Evalute the model correlation density
+                file_path = plot_repr_corr_density(
+                    model_sep,
+                    X_train_filtered, y_train_filtered,
+                    title + "_training"
+                )
+                wandb.log({'representation_correlation_density_plot_train': wandb.Image(file_path)})
+                print('file_path: ' + file_path)
 
-                # file_path = plot_repr_correlation(model_sep, X_val, y_val, title + "_training")
-                # # Log the representation correlation plot to wandb
-                # wandb.log({'representation_correlation_plot_train': wandb.Image(file_path)})
-                # print('file_path: ' + file_path)
-
-                # file_path = plot_repr_correlation(model_sep, X_test, y_test, title + "_test")
-                # # Log the representation correlation plot to wandb
-                # wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
-                # print('file_path: ' + file_path)
+                file_path = plot_repr_corr_density(
+                    model_sep,
+                    X_test_filtered, y_test_filtered,
+                    title + "_test"
+                )
+                wandb.log({'representation_correlation_density_plot_test': wandb.Image(file_path)})
+                print('file_path: ' + file_path)
 
                 # Finish the wandb run
                 wandb.finish()
