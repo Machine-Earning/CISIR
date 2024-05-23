@@ -6,7 +6,7 @@
 #SBATCH --mem=128GB                    # Memory per node
 #SBATCH --time=infinite              # Time limit
 #SBATCH --partition=gpu1              # Partition, dynamically set
-#SBATCH --gres=gpu:4             # Number of GPUs per node
+#SBATCH --gres=gpu:3             # Number of GPUs per node
 #SBATCH --output=./logs/%x.%J.out       # Output file
 #SBATCH --error=./logs/%x.%J.err        # Error file
 
@@ -24,4 +24,4 @@ echo "Current working directory is $(pwd)"
 srun python -m $1
 
 # how to use this script:
-# sbatch your_slurm_script.sh sources.mlp_pds
+# sbatch --job-name=inj aip_scripts/slurm_gpu1.sh sources.mlp.misc.overfitting.pds_delta_cme_inj
