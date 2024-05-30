@@ -1303,119 +1303,119 @@ class ModelBuilder:
 
         return retrain_history
 
-    def overtrain_pds_dl_inj(self,
-                             model: tf.keras.Model,
-                             X_train: np.ndarray,
-                             y_train: np.ndarray,
-                             train_label_weights_dict: Optional[Dict[float, float]] = None,
-                             learning_rate: float = 1e-3,
-                             epochs: int = 100,
-                             batch_size: int = 32,
-                             lower_bound: float = -0.5,
-                             upper_bound: float = 0.5,
-                             save_tag: Optional[str] = None,
-                             callbacks_list=None,
-                             verbose: int = 1) -> Dict[str, List[Any]]:
-        """
-        Custom training loop to stage2 the model and returns the training history.
-
-        :param X_train: training and validation sets together
-        :param y_train: labels of training and validation sets together
-        :param model: The TensorFlow model to stage2.
-        :param train_label_weights_dict: Dictionary containing label weights for the stage2 set.
-        :param learning_rate: The learning rate for the Adam optimizer.
-        :param epochs: The maximum number of epochs for training.
-        :param batch_size: The batch size for training.
-         :param lower_bound: The lower bound for selecting rare samples.
-        :param upper_bound: The upper bound for selecting rare samples.
-        :param save_tag: Tag to use for saving experiments.
-        :param callbacks_list: List of callback instances to apply during training.
-        :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
-
-        :return: The training history as a dictionary.
-        """
-
-        # Identify injected rare samples
-        rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
-        freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
-
-        if callbacks_list is None:
-            callbacks_list = []
-
-        # Setting up callback environment
-        params = {
-            'epochs': epochs,
-            'steps': None,
-            'verbose': verbose,
-            'do_validation': False,
-            'metrics': ['loss'],
-        }
-        for cb in callbacks_list:
-            cb.set_model(model)
-            cb.set_params(params)
-
-        logs = {}
-        # Signal the beginning of training
-        for cb in callbacks_list:
-            cb.on_train_begin(logs=logs)
-
-        # Optimizer and history initialization
-        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-        model.compile(optimizer=optimizer)  # Set the optimizer for the model
-
-        # Custom data generator to yield batches with required constraints
-        def data_generator(X, y, batch_size):
-            while True:
-                np.random.shuffle(freq_indices)
-                for start in range(0, len(freq_indices), batch_size - 2):
-                    end = min(start + batch_size - 2, len(freq_indices))
-                    freq_batch_indices = freq_indices[start:end]
-                    if len(freq_batch_indices) < batch_size - 2:
-                        # If not enough frequent samples, shuffle and start again
-                        np.random.shuffle(freq_indices)
-                        freq_batch_indices = freq_indices[:batch_size - 2]
-
-                    # Select 2 random rare samples
-                    rare_batch_indices = np.random.choice(rare_indices, 2, replace=False)
-                    batch_indices = np.concatenate([rare_batch_indices, freq_batch_indices])
-                    np.random.shuffle(batch_indices)
-                    yield X[batch_indices], y[batch_indices]
-
-        # Fit the model using the custom generator
-        steps_per_epoch = len(freq_indices) // (batch_size - 2)
-        history = {'loss': []}
-
-        for epoch in range(epochs):
-            for cb in callbacks_list:
-                cb.on_epoch_begin(epoch, logs=logs)
-
-            # Train for one epoch using the generator
-            epoch_loss = 0
-            for step in range(steps_per_epoch):
-                X_batch, y_batch = next(data_generator(X_train, y_train, batch_size))
-                with tf.GradientTape() as tape:
-                    logits = model(X_batch, training=True)
-                    loss_value = self.pds_loss_dl_vec(y_batch, logits)
-                gradients = tape.gradient(loss_value, model.trainable_variables)
-                optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-                epoch_loss += loss_value.numpy()
-
-            epoch_loss /= steps_per_epoch
-            history['loss'].append(epoch_loss)
-            print(f"Epoch {epoch + 1}/{epochs}, Loss: {epoch_loss}")
-
-            logs = {'loss': epoch_loss}
-            for cb in callbacks_list:
-                cb.on_epoch_end(epoch, logs=logs)
-
-        for cb in callbacks_list:
-            cb.on_train_end(logs=logs)
-
-        # Save the final model
-        model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
-        print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
-
-        return history
+    # def overtrain_pds_dl_inj(self,
+    #                          model: tf.keras.Model,
+    #                          X_train: np.ndarray,
+    #                          y_train: np.ndarray,
+    #                          train_label_weights_dict: Optional[Dict[float, float]] = None,
+    #                          learning_rate: float = 1e-3,
+    #                          epochs: int = 100,
+    #                          batch_size: int = 32,
+    #                          lower_bound: float = -0.5,
+    #                          upper_bound: float = 0.5,
+    #                          save_tag: Optional[str] = None,
+    #                          callbacks_list=None,
+    #                          verbose: int = 1) -> Dict[str, List[Any]]:
+    #     """
+    #     Custom training loop to stage2 the model and returns the training history.
+    #
+    #     :param X_train: training and validation sets together
+    #     :param y_train: labels of training and validation sets together
+    #     :param model: The TensorFlow model to stage2.
+    #     :param train_label_weights_dict: Dictionary containing label weights for the stage2 set.
+    #     :param learning_rate: The learning rate for the Adam optimizer.
+    #     :param epochs: The maximum number of epochs for training.
+    #     :param batch_size: The batch size for training.
+    #      :param lower_bound: The lower bound for selecting rare samples.
+    #     :param upper_bound: The upper bound for selecting rare samples.
+    #     :param save_tag: Tag to use for saving experiments.
+    #     :param callbacks_list: List of callback instances to apply during training.
+    #     :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
+    #
+    #     :return: The training history as a dictionary.
+    #     """
+    #
+    #     # Identify injected rare samples
+    #     rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
+    #     freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
+    #
+    #     if callbacks_list is None:
+    #         callbacks_list = []
+    #
+    #     # Setting up callback environment
+    #     params = {
+    #         'epochs': epochs,
+    #         'steps': None,
+    #         'verbose': verbose,
+    #         'do_validation': False,
+    #         'metrics': ['loss'],
+    #     }
+    #     for cb in callbacks_list:
+    #         cb.set_model(model)
+    #         cb.set_params(params)
+    #
+    #     logs = {}
+    #     # Signal the beginning of training
+    #     for cb in callbacks_list:
+    #         cb.on_train_begin(logs=logs)
+    #
+    #     # Optimizer and history initialization
+    #     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    #     model.compile(optimizer=optimizer)  # Set the optimizer for the model
+    #
+    #     # Custom data generator to yield batches with required constraints
+    #     def data_generator(X, y, batch_size):
+    #         while True:
+    #             np.random.shuffle(freq_indices)
+    #             for start in range(0, len(freq_indices), batch_size - 2):
+    #                 end = min(start + batch_size - 2, len(freq_indices))
+    #                 freq_batch_indices = freq_indices[start:end]
+    #                 if len(freq_batch_indices) < batch_size - 2:
+    #                     # If not enough frequent samples, shuffle and start again
+    #                     np.random.shuffle(freq_indices)
+    #                     freq_batch_indices = freq_indices[:batch_size - 2]
+    #
+    #                 # Select 2 random rare samples
+    #                 rare_batch_indices = np.random.choice(rare_indices, 2, replace=False)
+    #                 batch_indices = np.concatenate([rare_batch_indices, freq_batch_indices])
+    #                 np.random.shuffle(batch_indices)
+    #                 yield X[batch_indices], y[batch_indices]
+    #
+    #     # Fit the model using the custom generator
+    #     steps_per_epoch = len(freq_indices) // (batch_size - 2)
+    #     history = {'loss': []}
+    #
+    #     for epoch in range(epochs):
+    #         for cb in callbacks_list:
+    #             cb.on_epoch_begin(epoch, logs=logs)
+    #
+    #         # Train for one epoch using the generator
+    #         epoch_loss = 0
+    #         for step in range(steps_per_epoch):
+    #             X_batch, y_batch = next(data_generator(X_train, y_train, batch_size))
+    #             with tf.GradientTape() as tape:
+    #                 logits = model(X_batch, training=True)
+    #                 loss_value = self.pds_loss_dl_vec(y_batch, logits)
+    #             gradients = tape.gradient(loss_value, model.trainable_variables)
+    #             optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    #             epoch_loss += loss_value.numpy()
+    #
+    #         epoch_loss /= steps_per_epoch
+    #         history['loss'].append(epoch_loss)
+    #         print(f"Epoch {epoch + 1}/{epochs}, Loss: {epoch_loss}")
+    #
+    #         logs = {'loss': epoch_loss}
+    #         for cb in callbacks_list:
+    #             cb.on_epoch_end(epoch, logs=logs)
+    #
+    #     for cb in callbacks_list:
+    #         cb.on_train_end(logs=logs)
+    #
+    #     # Save the final model
+    #     model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
+    #     print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
+    #
+    #     return history
 
     def overtrain_pds_dl_inj(self,
                              model: tf.keras.Model,
@@ -1462,7 +1462,8 @@ class ModelBuilder:
             rare_injection_count = len(rare_indices)
         if rare_injection_count > len(rare_indices):
             raise ValueError(
-                f"rare_injection_count ({rare_injection_count}) is greater than the number of rare samples ({len(rare_indices)}).")
+                f"rare_injection_count ({rare_injection_count}) is greater than the number of rare samples "
+                f"({len(rare_indices)}).")
 
         # Check if the batch size is sufficient
         if batch_size < rare_injection_count:
@@ -1490,13 +1491,7 @@ class ModelBuilder:
 
         retrain_history = {'loss': []}
 
-        # Creating sample weights array if train_label_weights_dict is provided
-        if train_label_weights_dict:
-            sample_weights = np.array([train_label_weights_dict[label] for label in y_train])
-        else:
-            sample_weights = np.ones_like(y_train)
-
-        def data_generator(X, y, sample_weights, batch_size):
+        def data_generator(X, y, batch_size):
             while True:
                 np.random.shuffle(freq_indices)
                 for start in range(0, len(freq_indices), batch_size - rare_injection_count):
@@ -1505,17 +1500,39 @@ class ModelBuilder:
                     rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
                     batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
                     np.random.shuffle(batch_indices)
-                    yield X[batch_indices], y[batch_indices], sample_weights[batch_indices]
+                    batch_X = X[batch_indices]
+                    batch_y = y[batch_indices]
+
+                    yield batch_X, batch_y
 
         steps_per_epoch = len(freq_indices) // (batch_size - rare_injection_count)
 
-        history = model.fit(
-            data_generator(X_train, y_train, sample_weights, batch_size),
-            steps_per_epoch=steps_per_epoch,
-            epochs=epochs,
-            callbacks=callbacks_list,
-            verbose=verbose
-        )
+        for epoch in range(epochs):
+            for cb in callbacks_list:
+                cb.on_epoch_begin(epoch, logs=logs)
+
+            epoch_loss = 0
+            for step in range(steps_per_epoch):
+                batch_X, batch_y = next(
+                    data_generator(X_train, y_train, batch_size)
+                )
+
+                with tf.GradientTape() as tape:
+                    y_pred = model(batch_X, training=True)
+                    loss = self.pds_loss_dl_vec(batch_y, y_pred, sample_weights=train_label_weights_dict)
+
+                gradients = tape.gradient(loss, model.trainable_variables)
+                optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+                epoch_loss += loss.numpy()
+
+            avg_epoch_loss = epoch_loss / steps_per_epoch
+            retrain_history['loss'].append(avg_epoch_loss)
+            print(f"Retrain Epoch {epoch + 1}/{epochs}, Loss: {avg_epoch_loss}")
+
+            logs = {'loss': avg_epoch_loss}  # Update logs with retrain loss
+
+            for cb in callbacks_list:
+                cb.on_epoch_end(epoch, logs=logs)
 
         for cb in callbacks_list:
             cb.on_train_end(logs=logs)
@@ -1523,7 +1540,7 @@ class ModelBuilder:
         model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
         print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
 
-        return history
+        return retrain_history
 
     # def train_pds_dl_bs(self,
     #                     model: tf.keras.Model,
@@ -2457,7 +2474,7 @@ class ModelBuilder:
         # Cast y_diff_squared to match the data type of z_diff_squared
         y_diff_squared = tf.cast(y_diff_squared, dtype=z_diff_squared.dtype)
         # Compute the loss for each pair
-        pairwise_loss = 0.5 * tf.square(z_diff_squared - y_diff_squared)
+        pairwise_loss = tf.square(z_diff_squared - y_diff_squared)
 
         # Apply sample weights if provided
         if sample_weights is not None:
@@ -2478,7 +2495,7 @@ class ModelBuilder:
         # Apply mask to exclude self-comparisons from the loss calculation
         pairwise_loss_masked = pairwise_loss * mask
         # Sum over all unique pairs
-        total_error = tf.reduce_sum(pairwise_loss_masked)
+        total_error = 0.5 * tf.reduce_sum(pairwise_loss_masked)
         # Number of unique comparisons, excluding self-pairs
         num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=z_diff_squared.dtype)
 
