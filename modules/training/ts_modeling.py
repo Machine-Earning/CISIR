@@ -11,6 +11,7 @@ import tensorflow as tf
 from matplotlib.lines import Line2D
 from numpy import ndarray
 from scipy.signal import correlate, correlation_lags
+from scipy import stats
 from sklearn.metrics import mean_absolute_error
 from sklearn.utils import shuffle
 from tensorflow.keras.callbacks import Callback
@@ -700,6 +701,119 @@ def load_file_data(
     return X, y
 
 
+def stratified_split(X: np.ndarray, y: np.ndarray, shuffle: bool = True, seed: int = None, split: float = 0.25,
+                     debug: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Splits the dataset into subtraining and validation sets using stratified sampling.
+
+    Parameters:
+    X (np.ndarray): Feature matrix of shape (n_samples, n_features).
+    y (np.ndarray): Label vector of shape (n_samples, 1).
+    shuffle (bool): Whether to shuffle the data before splitting. Default is True.
+    seed (int): Random seed for reproducibility. Default is None.
+    split (float): Proportion of the dataset to include in the validation set. Default is 0.25.
+    debug (bool): Whether to plot the distributions of the original, subtrain, and validation sets. Default is False.
+
+    Returns:
+    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Split feature and label matrices:
+        - X_subtrain: Features for the subtraining set.
+        - y_subtrain: Labels for the subtraining set.
+        - X_val: Features for the validation set.
+        - y_val: Labels for the validation set.
+    """
+    if shuffle:
+        np.random.seed(seed)
+
+    # Sort the data by the labels
+    sorted_indices = np.argsort(y, axis=0).flatten()
+    X_sorted = X[sorted_indices]
+    y_sorted = y[sorted_indices]
+
+    # Calculate the number of validation samples
+    num_samples = X.shape[0]
+    val_size = int(num_samples * split)
+
+    # Initialize lists to hold subtraining and validation data
+    X_subtrain = []
+    y_subtrain = []
+    X_val = []
+    y_val = []
+
+    # Divide into groups of 4 and split into subtrain and validation
+    for i in range(0, num_samples, 4):
+        group_indices = list(range(i, min(i + 4, num_samples)))
+        if shuffle:
+            np.random.shuffle(group_indices)  # Shuffle within the group
+        val_indices = group_indices[:1]
+        subtrain_indices = group_indices[1:]
+
+        X_val.extend(X_sorted[val_indices])
+        y_val.extend(y_sorted[val_indices])
+        X_subtrain.extend(X_sorted[subtrain_indices])
+        y_subtrain.extend(y_sorted[subtrain_indices])
+
+    # Convert lists back to arrays
+    X_subtrain = np.array(X_subtrain)
+    y_subtrain = np.array(y_subtrain)
+    X_val = np.array(X_val)
+    y_val = np.array(y_val)
+
+    # Ensure the largest y is in the validation set
+    max_y_index = np.argmax(y_sorted)
+    max_y_val = y_sorted[max_y_index]
+    if max_y_val not in y_val:
+        # Add the sample with the largest y value to the validation set
+        X_val = np.vstack([X_val, X_sorted[max_y_index].reshape(1, -1)])
+        y_val = np.vstack([y_val, max_y_val.reshape(1, -1)])
+        # Remove the largest y from the subtraining set
+        mask = y_subtrain != max_y_val
+        X_subtrain = X_subtrain[mask.flatten()]
+        y_subtrain = y_subtrain[mask.flatten()]
+
+    if debug:
+        plot_distributions(y, y_subtrain, y_val)
+
+    return X_subtrain, y_subtrain, X_val, y_val
+
+
+def plot_distributions(y_train: np.ndarray, y_subtrain: np.ndarray, y_val: np.ndarray) -> None:
+    """
+    Plots the distributions of the original training set, subtraining set, and validation set.
+    Also prints the min, max, and mode values of the labels for each set.
+
+    Parameters:
+    y_train (np.ndarray): Labels of the original training set.
+    y_subtrain (np.ndarray): Labels of the subtraining set.
+    y_val (np.ndarray): Labels of the validation set.
+    """
+
+    def print_stats(y, name):
+        min_y = np.min(y)
+        max_y = np.max(y)
+        mode_y = stats.mode(y).mode[0]
+        print(f"{name} - Min: {min_y}, Max: {max_y}, Mode: {mode_y}")
+
+    print_stats(y_train, "Train")
+    print_stats(y_subtrain, "Subtrain")
+    print_stats(y_val, "Validation")
+
+    plt.figure(figsize=(15, 5))
+
+    plt.subplot(1, 3, 1)
+    plt.hist(y_train, bins=50, color='blue', alpha=0.7, label='Train')
+    plt.title('Original Training Set Distribution')
+
+    plt.subplot(1, 3, 2)
+    plt.hist(y_subtrain, bins=50, color='green', alpha=0.7, label='Subtrain')
+    plt.title('Subtraining Set Distribution')
+
+    plt.subplot(1, 3, 3)
+    plt.hist(y_val, bins=50, color='red', alpha=0.7, label='Validation')
+    plt.title('Validation Set Distribution')
+
+    plt.show()
+
+
 def build_dataset(
         directory_path: str,
         shuffle_data: bool = False,
@@ -799,7 +913,6 @@ def locate_high_deltas(
 
             print(f'Count of labels above 2: {label_count_above_2}')
             print(f'Count of labels above 1 and below -1: {label_count_above_1_and_below_minus1}')
-
 
 
 def generate_feature_names(inputs_to_use: List[str], add_slope: bool) -> List[str]:
@@ -2073,21 +2186,21 @@ def filter_ds(
 
     # Create a mask to identify high delta samples (below low_threshold or above high_threshold)
     high_deltas_mask = (y_flat <= low_threshold) | (y_flat >= high_threshold)
-    
+
     # Apply the high deltas mask to get the corresponding samples
     X_high_deltas = X[high_deltas_mask, :]
     y_high_deltas = y[high_deltas_mask, :]
 
     # Create a mask to identify low delta samples (between low_threshold and high_threshold)
     low_deltas_mask = (y_flat > low_threshold) & (y_flat < high_threshold)
-    
+
     # Apply the low deltas mask to get the corresponding samples
     X_low_deltas = X[low_deltas_mask, :]
     y_low_deltas = y[low_deltas_mask, :]
 
     # Create bin edges for the low delta samples
     bins_edges = np.linspace(low_threshold, high_threshold, bins + 1)
-    
+
     # Digitize y_low_deltas to assign each sample to a bin
     binned_indices = np.digitize(y_low_deltas.flatten(), bins_edges) - 1
 
@@ -2103,15 +2216,15 @@ def filter_ds(
     for bin_idx in range(bins):
         # Create a mask for the current bin
         bin_mask = binned_indices == bin_idx
-        
+
         # Select samples in the current bin
         X_bin = X_low_deltas[bin_mask, :]
         y_bin = y_low_deltas[bin_mask, :]
-        
+
         # Determine the number of samples to draw from this bin
         bin_budget = budget + (1 if remainder > 0 else 0)
         remainder = max(0, remainder - 1)
-        
+
         # Sample from the bin if it has more samples than the budget
         if len(y_bin) > bin_budget:
             sampled_indices = np.random.choice(len(X_bin), size=bin_budget, replace=False)
@@ -2131,12 +2244,12 @@ def filter_ds(
         bin_mask = binned_indices == bin_idx
         X_bin = X_low_deltas[bin_mask, :]
         y_bin = y_low_deltas[bin_mask, :]
-        
+
         if len(y_bin) > len(X_low_deltas_sampled[bin_idx]):
             additional_needed = min(remainder, len(y_bin) - len(X_low_deltas_sampled[bin_idx]))
             sampled_indices = np.random.choice(
-                np.arange(len(y_bin)), 
-                size=additional_needed, 
+                np.arange(len(y_bin)),
+                size=additional_needed,
                 replace=False
             )
             X_low_deltas_sampled[bin_idx] = np.concatenate((X_low_deltas_sampled[bin_idx], X_bin[sampled_indices]))

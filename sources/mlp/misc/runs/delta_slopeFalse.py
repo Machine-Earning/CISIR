@@ -143,7 +143,8 @@ def main():
                 X_train, y_train = build_dataset(root_dir + '/training',
                                                  inputs_to_use=inputs_to_use,
                                                  add_slope=add_slope,
-                                                 outputs_to_use=outputs_to_use)
+                                                 outputs_to_use=outputs_to_use,
+                                                 shuffle_data=True)
                 X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining',
                                                        inputs_to_use=inputs_to_use,
                                                        add_slope=add_slope,

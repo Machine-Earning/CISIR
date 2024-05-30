@@ -241,7 +241,7 @@ def main():
                     # wandb.log({'stage1_tsne_testing_raw_plot': wandb.Image(stage1_file_path)})
                     # print('stage1_file_path: ' + stage1_file_path)
 
-                    ## Evalute the model correlation with colored
+                    # Evalute the model correlation with colored
                     file_path = plot_repr_corr_dist(
                         model_sep_stage1,
                         X_train_filtered, y_train_filtered,
@@ -258,7 +258,7 @@ def main():
                     wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
                     print('file_path: ' + file_path)
 
-                    ## Log t-SNE plot
+                    # Log t-SNE plot
                     # Log the training t-SNE plot to wandb
                     stage1_file_path = plot_tsne_delta(
                         model_sep_stage1,

@@ -20,7 +20,8 @@ from modules.training.ts_modeling import (
     get_loss,
     reshape_X,
     plot_error_hist,
-    filter_ds)
+    filter_ds,
+    stratified_split)
 from modules.evaluate.utils import investigate_tsne_delta
 
 
@@ -33,7 +34,7 @@ def main():
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
             for alpha in [0, 0.38, 0.6]:
-                for add_slope in [False]:
+                for add_slope in [False, True]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
                     # add_slope = True

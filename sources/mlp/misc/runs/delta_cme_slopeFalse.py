@@ -1,6 +1,8 @@
 import os
 from datetime import datetime
 
+from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
+
 # Set the environment variable for CUDA (in case it is necessary)
 os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
@@ -19,7 +21,9 @@ from modules.training.ts_modeling import (
     evaluate_model_cond,
     process_sep_events,
     get_loss,
-    reshape_X, plot_error_hist)
+    reshape_X,
+    plot_error_hist,
+    stratified_split, filter_ds)
 
 
 class PlottingCallback(Callback):
@@ -50,7 +54,7 @@ class PlottingCallback(Callback):
                 add_slope=self.add_slope,
                 outputs_to_use=self.outputs_to_use,
                 show_avsp=True,
-                prefix='testing_'+str(self.epoch_count),
+                prefix='testing_' + str(self.epoch_count),
                 using_cme=True,
                 cme_speed_threshold=self.cme_speed_threshold)
             for filename in filenames:
@@ -67,7 +71,7 @@ class PlottingCallback(Callback):
                 add_slope=self.add_slope,
                 outputs_to_use=self.outputs_to_use,
                 show_avsp=True,
-                prefix='training_'+str(self.epoch_count),
+                prefix='training_' + str(self.epoch_count),
                 using_cme=True,
                 cme_speed_threshold=self.cme_speed_threshold)
             for filename in filenames:
@@ -82,8 +86,8 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [True]:
-            for alpha in [0.28, 0.3]:
+        for add_slope in [True, False]:
+            for alpha in [0.28, 0.3, 0]:
                 for cme_speed_threshold in [0]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
@@ -107,7 +111,7 @@ def main():
                     seed = 456789
                     tf.random.set_seed(seed)
                     np.random.seed(seed)
-                    patience = 10000  # higher patience
+                    patience = int(3.5e4)  # higher patience
                     learning_rate = 1e-2  # og learning rate
                     # initial_learning_rate = 3e-3
                     # final_learning_rate = 3e-7
@@ -120,7 +124,7 @@ def main():
                     #     decay_rate=learning_rate_decay_factor,
                     #     staircase=True)
 
-                    plot_every = 1000
+                    plot_every = 10000
                     plot_here = [50, 150, 200]
 
                     reduce_lr_on_plateau = ReduceLROnPlateau(
@@ -134,7 +138,7 @@ def main():
                     weight_decay = 1e-8  # higher weight decay
                     momentum_beta1 = 0.9  # higher momentum beta1
                     batch_size = 4096
-                    epochs = 40000  # higher epochs
+                    epochs = 100000  # higher epochs
                     hiddens = [
                         2048, 1024,
                         2048, 1024,
@@ -164,9 +168,12 @@ def main():
                     cme_speed_threshold = cme_speed_threshold
                     residual = True
                     skipped_layers = 2
+                    N = 500  # number of samples to keep outside the threshold
+                    lower_threshold = -0.5  # lower threshold for the delta_p
+                    upper_threshold = 0.5  # upper threshold for the delta_p
 
                     # Initialize wandb
-                    wandb.init(project="nasa-ts-delta-v5.1", name=experiment_name, config={
+                    wandb.init(project="nasa-ts-delta-v6", name=experiment_name, config={
                         "inputs_to_use": inputs_to_use,
                         "add_slope": add_slope,
                         "patience": patience,
@@ -195,11 +202,11 @@ def main():
                         'cme_speed_threshold': cme_speed_threshold,
                         'residual': residual,
                         'skipped_layers': skipped_layers,
-                        'ds_version': 5.1
+                        'ds_version': 6,
                     })
 
                     # set the root directory
-                    root_dir = 'data/electron_cme_data_split_v5.1'
+                    root_dir = 'data/electron_cme_data_split_v5'
                     # build the dataset
                     X_train, y_train = build_dataset(
                         root_dir + '/training',
@@ -207,24 +214,33 @@ def main():
                         add_slope=add_slope,
                         outputs_to_use=outputs_to_use,
                         cme_speed_threshold=cme_speed_threshold)
-                    X_subtrain, y_subtrain = build_dataset(
-                        root_dir + '/subtraining',
-                        inputs_to_use=inputs_to_use,
-                        add_slope=add_slope,
-                        outputs_to_use=outputs_to_use,
-                        cme_speed_threshold=cme_speed_threshold)
+
+                    X_train_filtered, y_train_filtered = filter_ds(
+                        X_train, y_train,
+                        low_threshold=lower_threshold,
+                        high_threshold=upper_threshold,
+                        N=N, seed=seed)
+
                     X_test, y_test = build_dataset(
                         root_dir + '/testing',
                         inputs_to_use=inputs_to_use,
                         add_slope=add_slope,
                         outputs_to_use=outputs_to_use,
                         cme_speed_threshold=cme_speed_threshold)
-                    X_val, y_val = build_dataset(
-                        root_dir + '/validation',
-                        inputs_to_use=inputs_to_use,
-                        add_slope=add_slope,
-                        outputs_to_use=outputs_to_use,
-                        cme_speed_threshold=cme_speed_threshold)
+
+                    X_test_filtered, y_test_filtered = filter_ds(
+                        X_test, y_test,
+                        low_threshold=lower_threshold,
+                        high_threshold=upper_threshold,
+                        N=N, seed=seed)
+
+                    X_subtrain, y_subtrain, X_val, y_val = stratified_split(
+                        X_train,
+                        y_train,
+                        shuffle=True,
+                        seed=seed,
+                        split=0.25,
+                        debug=False)
 
                     # print all cme_files shapes
                     print(f'X_train.shape: {X_train.shape}')
@@ -351,17 +367,17 @@ def main():
                             early_stopping,
                             reduce_lr_on_plateau,
                             WandbCallback(save_model=False),
-                            PlottingCallback(
-                                model_sep,
-                                root_dir,
-                                plot_every,
-                                plot_here,
-                                inputs_to_use,
-                                add_slope,
-                                outputs_to_use,
-                                experiment_name,
-                                cme_speed_threshold
-                            )
+                            # PlottingCallback(
+                            #     model_sep,
+                            #     root_dir,
+                            #     plot_every,
+                            #     plot_here,
+                            #     inputs_to_use,
+                            #     add_slope,
+                            #     outputs_to_use,
+                            #     experiment_name,
+                            #     cme_speed_threshold
+                            # )
                         ],
                         verbose=1
                     )
@@ -476,6 +492,46 @@ def main():
 
                     print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
                     # Log the MAE error to wandb
+
+                    # Evaluate the model correlation with colored
+                    file_path = plot_repr_corr_dist(
+                        final_model_sep,
+                        X_train_filtered, y_train_filtered,
+                        title + "_training",
+                        model_type='features_reg'
+                    )
+                    wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
+                    print('file_path: ' + file_path)
+
+                    file_path = plot_repr_corr_dist(
+                        final_model_sep,
+                        X_test_filtered, y_test_filtered,
+                        title + "_test",
+                        model_type='features_reg'
+                    )
+                    wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
+                    print('file_path: ' + file_path)
+
+                    # Log t-SNE plot
+                    # Log the training t-SNE plot to wandb
+                    stage1_file_path = plot_tsne_delta(
+                        final_model_sep,
+                        X_train_filtered, y_train_filtered, title,
+                        'stage1_training',
+                        model_type='features_reg',
+                        save_tag=current_time, seed=seed)
+                    wandb.log({'stage1_tsne_training_plot': wandb.Image(stage1_file_path)})
+                    print('stage1_file_path: ' + stage1_file_path)
+
+                    # Log the testing t-SNE plot to wandb
+                    stage1_file_path = plot_tsne_delta(
+                        final_model_sep,
+                        X_test_filtered, y_test_filtered, title,
+                        'stage1_testing',
+                        model_type='features_reg',
+                        save_tag=current_time, seed=seed)
+                    wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
+                    print('stage1_file_path: ' + stage1_file_path)
 
                     filename = plot_error_hist(
                         final_model_sep,
