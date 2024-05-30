@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import numpy as np
 import tensorflow as tf
@@ -82,8 +82,8 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [False]:
-            for alpha in [0.38, 0.6]:
+        for add_slope in [True]:
+            for alpha in [0.28, 0.3]:
                 for cme_speed_threshold in [0]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
@@ -120,8 +120,8 @@ def main():
                     #     decay_rate=learning_rate_decay_factor,
                     #     staircase=True)
 
-                    plot_every = 500
-                    plot_here = [50, 150, 200, 600, 4000, 8000]
+                    plot_every = 1000
+                    plot_here = [50, 150, 200]
 
                     reduce_lr_on_plateau = ReduceLROnPlateau(
                         monitor='loss',
@@ -134,7 +134,7 @@ def main():
                     weight_decay = 1e-8  # higher weight decay
                     momentum_beta1 = 0.9  # higher momentum beta1
                     batch_size = 4096
-                    epochs = 60000  # higher epochs
+                    epochs = 40000  # higher epochs
                     hiddens = [
                         2048, 1024,
                         2048, 1024,
@@ -166,7 +166,7 @@ def main():
                     skipped_layers = 2
 
                     # Initialize wandb
-                    wandb.init(project="nasa-ts-delta-r2", name=experiment_name, config={
+                    wandb.init(project="nasa-ts-delta-v5.1", name=experiment_name, config={
                         "inputs_to_use": inputs_to_use,
                         "add_slope": add_slope,
                         "patience": patience,
@@ -195,11 +195,11 @@ def main():
                         'cme_speed_threshold': cme_speed_threshold,
                         'residual': residual,
                         'skipped_layers': skipped_layers,
-                        'ds_version': 5
+                        'ds_version': 5.1
                     })
 
                     # set the root directory
-                    root_dir = 'data/electron_cme_data_split_v5'
+                    root_dir = 'data/electron_cme_data_split_v5.1'
                     # build the dataset
                     X_train, y_train = build_dataset(
                         root_dir + '/training',

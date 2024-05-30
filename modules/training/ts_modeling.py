@@ -2066,76 +2066,88 @@ def filter_ds(
         Tuple[np.ndarray, np.ndarray]: The filtered and sampled input features and output labels.
     """
     # Set the random seed for reproducibility
-    global sampled_indices
     np.random.seed(seed)
 
     # Flatten the output array to ensure mask works properly with input dimensions
     y_flat = y.flatten()
 
-    # Mask for selecting samples where y is either too low or too high
+    # Create a mask to identify high delta samples (below low_threshold or above high_threshold)
     high_deltas_mask = (y_flat <= low_threshold) | (y_flat >= high_threshold)
-    X_high_deltas = X[high_deltas_mask]
-    y_high_deltas = y[high_deltas_mask]
+    
+    # Apply the high deltas mask to get the corresponding samples
+    X_high_deltas = X[high_deltas_mask, :]
+    y_high_deltas = y[high_deltas_mask, :]
 
-    # Mask for selecting samples where y is in the middle range
+    # Create a mask to identify low delta samples (between low_threshold and high_threshold)
     low_deltas_mask = (y_flat > low_threshold) & (y_flat < high_threshold)
-    X_low_deltas = X[low_deltas_mask]
-    y_low_deltas = y[low_deltas_mask]
+    
+    # Apply the low deltas mask to get the corresponding samples
+    X_low_deltas = X[low_deltas_mask, :]
+    y_low_deltas = y[low_deltas_mask, :]
 
-    # Bin the low delta samples
+    # Create bin edges for the low delta samples
     bins_edges = np.linspace(low_threshold, high_threshold, bins + 1)
-    binned_indices = np.digitize(y_low_deltas, bins_edges) - 1
+    
+    # Digitize y_low_deltas to assign each sample to a bin
+    binned_indices = np.digitize(y_low_deltas.flatten(), bins_edges) - 1
 
-    # Budget per bin
+    # Determine the budget per bin and remainder
     budget = N // bins
     remainder = N % bins
 
-    # Sampled arrays for low deltas
+    # Initialize lists to store sampled low delta values
     X_low_deltas_sampled = []
     y_low_deltas_sampled = []
 
+    # Sample low delta values from each bin
     for bin_idx in range(bins):
+        # Create a mask for the current bin
         bin_mask = binned_indices == bin_idx
-        X_bin = X_low_deltas[bin_mask]
-        y_bin = y_low_deltas[bin_mask]
-
+        
+        # Select samples in the current bin
+        X_bin = X_low_deltas[bin_mask, :]
+        y_bin = y_low_deltas[bin_mask, :]
+        
         # Determine the number of samples to draw from this bin
         bin_budget = budget + (1 if remainder > 0 else 0)
         remainder = max(0, remainder - 1)
-
+        
+        # Sample from the bin if it has more samples than the budget
         if len(y_bin) > bin_budget:
             sampled_indices = np.random.choice(len(X_bin), size=bin_budget, replace=False)
             X_low_deltas_sampled.append(X_bin[sampled_indices])
             y_low_deltas_sampled.append(y_bin[sampled_indices])
         else:
+            # If the bin has fewer samples than the budget, include all samples
             X_low_deltas_sampled.append(X_bin)
             y_low_deltas_sampled.append(y_bin)
             remainder += bin_budget - len(y_bin)
 
-    # Adjust center bins if there is any remaining budget
+    # Distribute the remaining budget to the center bins
     center_bins = np.arange(bins // 4, 3 * bins // 4)
     for bin_idx in center_bins:
         if remainder <= 0:
             break
         bin_mask = binned_indices == bin_idx
-        X_bin = X_low_deltas[bin_mask]
-        y_bin = y_low_deltas[bin_mask]
-
+        X_bin = X_low_deltas[bin_mask, :]
+        y_bin = y_low_deltas[bin_mask, :]
+        
         if len(y_bin) > len(X_low_deltas_sampled[bin_idx]):
             additional_needed = min(remainder, len(y_bin) - len(X_low_deltas_sampled[bin_idx]))
             sampled_indices = np.random.choice(
-                np.setdiff1d(np.arange(len(y_bin)), np.arange(len(y_bin))[sampled_indices]),
-                size=additional_needed,
+                np.arange(len(y_bin)), 
+                size=additional_needed, 
                 replace=False
             )
             X_low_deltas_sampled[bin_idx] = np.concatenate((X_low_deltas_sampled[bin_idx], X_bin[sampled_indices]))
             y_low_deltas_sampled[bin_idx] = np.concatenate((y_low_deltas_sampled[bin_idx], y_bin[sampled_indices]))
             remainder -= additional_needed
 
+    # Concatenate all sampled low delta values
     X_low_deltas_sampled = np.concatenate(X_low_deltas_sampled, axis=0)
     y_low_deltas_sampled = np.concatenate(y_low_deltas_sampled, axis=0)
 
-    # Combine the high delta samples and the sampled low delta samples
+    # Combine high delta samples with sampled low delta samples
     X_combined = np.concatenate([X_high_deltas, X_low_deltas_sampled], axis=0)
     y_combined = np.concatenate([y_high_deltas, y_low_deltas_sampled], axis=0)
 

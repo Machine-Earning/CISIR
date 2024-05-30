@@ -26,10 +26,10 @@ mb = ModelBuilder()
 # Define the lookup dictionary
 weight_paths = {
     (False,
-     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240523-082603MLP_e0_5_e1_8_p_slopeFalse_PDSnorm_bs0_CME0_features_128_sl.h5',
+     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240524-090941MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_CME0_features_128_sl.h5',
 
     (True,
-     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240523-083940MLP_e0_5_e1_8_p_slopeTrue_PDSnorm_bs0_CME0_features_128_sl.h5',
+     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240524-134308MLP_e0_5_e1_8_p_slopeTrue_PDSinj_bs4096_CME0_features_128_sl.h5',
     # (True, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-183733MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_CME500_features.h5',
     # (False, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-200720MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_CME500_features.h5',
 }
