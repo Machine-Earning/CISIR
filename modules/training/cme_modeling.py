@@ -1303,10 +1303,6 @@ class ModelBuilder:
 
         return retrain_history
 
-    import numpy as np
-    import tensorflow as tf
-    from typing import Optional, Dict, List, Any
-
     def overtrain_pds_dl_inj(self,
                              model: tf.keras.Model,
                              X_train: np.ndarray,
@@ -1418,6 +1414,114 @@ class ModelBuilder:
         # Save the final model
         model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
         print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
+
+        return history
+
+    def overtrain_pds_dl_inj(self,
+                             model: tf.keras.Model,
+                             X_train: np.ndarray,
+                             y_train: np.ndarray,
+                             train_label_weights_dict: Optional[Dict[float, float]] = None,
+                             learning_rate: float = 1e-3,
+                             epochs: int = 100,
+                             batch_size: int = 32,
+                             rare_injection_count: int = 2,
+                             lower_bound: float = -0.5,
+                             upper_bound: float = 0.5,
+                             save_tag: Optional[str] = None,
+                             callbacks_list=None,
+                             verbose: int = 1) -> Dict[str, List[Any]]:
+        """
+        Custom training loop to stage2 the model with sample weights and injected rare samples.
+
+        :param X_train: training and validation sets together
+        :param y_train: labels of training and validation sets together
+        :param model: The TensorFlow model to stage2.
+        :param train_label_weights_dict: Dictionary containing label weights for the stage2 set.
+        :param learning_rate: The learning rate for the Adam optimizer.
+        :param epochs: The maximum number of epochs for training.
+        :param batch_size: The batch size for training.
+        :param rare_injection_count: Number of rare samples to inject in each batch (-1 for all, 0 for none, default 2).
+        :param lower_bound: The lower bound for selecting rare samples.
+        :param upper_bound: The upper bound for selecting rare samples.
+        :param save_tag: Tag to use for saving experiments.
+        :param callbacks_list: List of callback instances to apply during training.
+        :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
+
+        :return: The training history as a dictionary.
+        """
+
+        if callbacks_list is None:
+            callbacks_list = []
+
+        # Identify rare and frequent samples
+        rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
+        freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
+
+        if rare_injection_count == -1:
+            rare_injection_count = len(rare_indices)
+        if rare_injection_count > len(rare_indices):
+            raise ValueError(
+                f"rare_injection_count ({rare_injection_count}) is greater than the number of rare samples ({len(rare_indices)}).")
+
+        # Check if the batch size is sufficient
+        if batch_size < rare_injection_count:
+            raise ValueError(f"Batch size must be at least the number of injected rare samples. "
+                             f"Current batch size: {batch_size}, rare_injection_count: {rare_injection_count}")
+
+        # Setting up callback environment
+        params = {
+            'epochs': epochs,
+            'steps': None,
+            'verbose': verbose,
+            'do_validation': False,
+            'metrics': ['loss'],
+        }
+        for cb in callbacks_list:
+            cb.set_model(model)
+            cb.set_params(params)
+
+        logs = {}
+        for cb in callbacks_list:
+            cb.on_train_begin(logs=logs)
+
+        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        model.compile(optimizer=optimizer)
+
+        retrain_history = {'loss': []}
+
+        # Creating sample weights array if train_label_weights_dict is provided
+        if train_label_weights_dict:
+            sample_weights = np.array([train_label_weights_dict[label] for label in y_train])
+        else:
+            sample_weights = np.ones_like(y_train)
+
+        def data_generator(X, y, sample_weights, batch_size):
+            while True:
+                np.random.shuffle(freq_indices)
+                for start in range(0, len(freq_indices), batch_size - rare_injection_count):
+                    end = min(start + batch_size - rare_injection_count, len(freq_indices))
+                    freq_batch_indices = freq_indices[start:end]
+                    rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
+                    batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
+                    np.random.shuffle(batch_indices)
+                    yield X[batch_indices], y[batch_indices], sample_weights[batch_indices]
+
+        steps_per_epoch = len(freq_indices) // (batch_size - rare_injection_count)
+
+        history = model.fit(
+            data_generator(X_train, y_train, sample_weights, batch_size),
+            steps_per_epoch=steps_per_epoch,
+            epochs=epochs,
+            callbacks=callbacks_list,
+            verbose=verbose
+        )
+
+        for cb in callbacks_list:
+            cb.on_train_end(logs=logs)
+
+        model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
+        print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
 
         return history
 
