@@ -1303,120 +1303,6 @@ class ModelBuilder:
 
         return retrain_history
 
-    # def overtrain_pds_dl_inj(self,
-    #                          model: tf.keras.Model,
-    #                          X_train: np.ndarray,
-    #                          y_train: np.ndarray,
-    #                          train_label_weights_dict: Optional[Dict[float, float]] = None,
-    #                          learning_rate: float = 1e-3,
-    #                          epochs: int = 100,
-    #                          batch_size: int = 32,
-    #                          lower_bound: float = -0.5,
-    #                          upper_bound: float = 0.5,
-    #                          save_tag: Optional[str] = None,
-    #                          callbacks_list=None,
-    #                          verbose: int = 1) -> Dict[str, List[Any]]:
-    #     """
-    #     Custom training loop to stage2 the model and returns the training history.
-    #
-    #     :param X_train: training and validation sets together
-    #     :param y_train: labels of training and validation sets together
-    #     :param model: The TensorFlow model to stage2.
-    #     :param train_label_weights_dict: Dictionary containing label weights for the stage2 set.
-    #     :param learning_rate: The learning rate for the Adam optimizer.
-    #     :param epochs: The maximum number of epochs for training.
-    #     :param batch_size: The batch size for training.
-    #      :param lower_bound: The lower bound for selecting rare samples.
-    #     :param upper_bound: The upper bound for selecting rare samples.
-    #     :param save_tag: Tag to use for saving experiments.
-    #     :param callbacks_list: List of callback instances to apply during training.
-    #     :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
-    #
-    #     :return: The training history as a dictionary.
-    #     """
-    #
-    #     # Identify injected rare samples
-    #     rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
-    #     freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
-    #
-    #     if callbacks_list is None:
-    #         callbacks_list = []
-    #
-    #     # Setting up callback environment
-    #     params = {
-    #         'epochs': epochs,
-    #         'steps': None,
-    #         'verbose': verbose,
-    #         'do_validation': False,
-    #         'metrics': ['loss'],
-    #     }
-    #     for cb in callbacks_list:
-    #         cb.set_model(model)
-    #         cb.set_params(params)
-    #
-    #     logs = {}
-    #     # Signal the beginning of training
-    #     for cb in callbacks_list:
-    #         cb.on_train_begin(logs=logs)
-    #
-    #     # Optimizer and history initialization
-    #     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-    #     model.compile(optimizer=optimizer)  # Set the optimizer for the model
-    #
-    #     # Custom data generator to yield batches with required constraints
-    #     def data_generator(X, y, batch_size):
-    #         while True:
-    #             np.random.shuffle(freq_indices)
-    #             for start in range(0, len(freq_indices), batch_size - 2):
-    #                 end = min(start + batch_size - 2, len(freq_indices))
-    #                 freq_batch_indices = freq_indices[start:end]
-    #                 if len(freq_batch_indices) < batch_size - 2:
-    #                     # If not enough frequent samples, shuffle and start again
-    #                     np.random.shuffle(freq_indices)
-    #                     freq_batch_indices = freq_indices[:batch_size - 2]
-    #
-    #                 # Select 2 random rare samples
-    #                 rare_batch_indices = np.random.choice(rare_indices, 2, replace=False)
-    #                 batch_indices = np.concatenate([rare_batch_indices, freq_batch_indices])
-    #                 np.random.shuffle(batch_indices)
-    #                 yield X[batch_indices], y[batch_indices]
-    #
-    #     # Fit the model using the custom generator
-    #     steps_per_epoch = len(freq_indices) // (batch_size - 2)
-    #     history = {'loss': []}
-    #
-    #     for epoch in range(epochs):
-    #         for cb in callbacks_list:
-    #             cb.on_epoch_begin(epoch, logs=logs)
-    #
-    #         # Train for one epoch using the generator
-    #         epoch_loss = 0
-    #         for step in range(steps_per_epoch):
-    #             X_batch, y_batch = next(data_generator(X_train, y_train, batch_size))
-    #             with tf.GradientTape() as tape:
-    #                 logits = model(X_batch, training=True)
-    #                 loss_value = self.pds_loss_dl_vec(y_batch, logits)
-    #             gradients = tape.gradient(loss_value, model.trainable_variables)
-    #             optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-    #             epoch_loss += loss_value.numpy()
-    #
-    #         epoch_loss /= steps_per_epoch
-    #         history['loss'].append(epoch_loss)
-    #         print(f"Epoch {epoch + 1}/{epochs}, Loss: {epoch_loss}")
-    #
-    #         logs = {'loss': epoch_loss}
-    #         for cb in callbacks_list:
-    #             cb.on_epoch_end(epoch, logs=logs)
-    #
-    #     for cb in callbacks_list:
-    #         cb.on_train_end(logs=logs)
-    #
-    #     # Save the final model
-    #     model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
-    #     print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
-    #
-    #     return history
-
     def overtrain_pds_dl_inj(self,
                              model: tf.keras.Model,
                              X_train: np.ndarray,
@@ -1464,6 +1350,15 @@ class ModelBuilder:
             raise ValueError(
                 f"rare_injection_count ({rare_injection_count}) is greater than the number of rare samples "
                 f"({len(rare_indices)}).")
+
+        # Calculate the steps per epoch
+        steps_per_epoch = len(freq_indices) // (batch_size - rare_injection_count)
+        # Adjust rare_injection_count based on the ratio of rare samples to the number of batches
+        ratio_based_injection_count = max(1, len(rare_indices) // steps_per_epoch)
+        if ratio_based_injection_count > rare_injection_count:
+            print(
+                f"Adjusting rare_injection_count to {ratio_based_injection_count} based on the ratio of rare samples to batches.")
+            rare_injection_count = ratio_based_injection_count
 
         # Check if the batch size is sufficient
         if batch_size < rare_injection_count:
