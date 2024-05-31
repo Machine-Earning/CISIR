@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import numpy as np
 import tensorflow as tf
@@ -86,7 +86,7 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [True, False]:
+        for add_slope in [False, True]:
             for alpha in [0.28, 0.3, 0]:
                 for cme_speed_threshold in [0]:
                     # PARAMS
@@ -111,7 +111,7 @@ def main():
                     seed = 456789
                     tf.random.set_seed(seed)
                     np.random.seed(seed)
-                    patience = int(3.5e4)  # higher patience
+                    patience = int(3.5e3)  # higher patience
                     learning_rate = 1e-2  # og learning rate
                     # initial_learning_rate = 3e-3
                     # final_learning_rate = 3e-7
