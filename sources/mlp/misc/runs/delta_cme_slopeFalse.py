@@ -86,8 +86,8 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [False, True]:
-            for alpha in [0.28, 0.3, 0]:
+        for add_slope in [False]:
+            for alpha in np.arange(0.1, 0.52, 0.01):
                 for cme_speed_threshold in [0]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
@@ -111,7 +111,7 @@ def main():
                     seed = 456789
                     tf.random.set_seed(seed)
                     np.random.seed(seed)
-                    patience = int(3.5e3)  # higher patience
+                    patience = int(1e4)  # higher patience
                     learning_rate = 1e-2  # og learning rate
                     # initial_learning_rate = 3e-3
                     # final_learning_rate = 3e-7
@@ -130,7 +130,7 @@ def main():
                     reduce_lr_on_plateau = ReduceLROnPlateau(
                         monitor='loss',
                         factor=0.5,
-                        patience=1000,
+                        patience=int(2e3),
                         verbose=1,
                         min_delta=1e-5,
                         min_lr=1e-10)
