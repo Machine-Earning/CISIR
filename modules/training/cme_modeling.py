@@ -24,6 +24,8 @@ from tensorflow.keras.layers import (
     LayerNormalization,
     Add
 )
+
+
 # from tensorflow.python.profiler import profiler_v2 as profiler
 
 
@@ -639,6 +641,143 @@ class ModelBuilder:
         # Save the model weights
         model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
         print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
+
+        return history
+
+    def train_pds_inj(self,
+                      model: tf.keras.Model,
+                      X_subtrain: np.ndarray,
+                      y_subtrain: np.ndarray,
+                      X_val: np.ndarray,
+                      y_val: np.ndarray,
+                      X_train: np.ndarray,
+                      y_train: np.ndarray,
+                      learning_rate: float = 1e-3,
+                      epochs: int = 100,
+                      batch_size: int = 32,
+                      lower_bound: float = -0.5,
+                      upper_bound: float = 0.5,
+                      patience: int = 9,
+                      save_tag=None,
+                      callbacks_list=None,
+                      verbose: int = 1):
+        """
+        Trains the model and returns the training history with specific batch constraints.
+
+        :param X_train: training and validation sets together
+        :param y_train: labels of training and validation sets together
+        :param X_subtrain: The training feature set.
+        :param y_subtrain: The training labels.
+        :param X_val: Validation features.
+        :param y_val: Validation labels.
+        :param save_tag: tag to use for saving experiments
+        :param model: The TensorFlow model to stage2.
+        :param learning_rate: The learning rate for the Adam optimizer.
+        :param epochs: The maximum number of epochs for training.
+        :param batch_size: The batch size for training.
+        :param lower_bound: The lower bound for selecting rare samples.
+        :param upper_bound: The upper bound for selecting rare samples.
+        :param patience: The number of epochs with no improvement to wait before early stopping.
+        :param callbacks_list: List of callback instances to apply during training.
+        :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
+
+        :return: The training history as a History object.
+        """
+
+        if callbacks_list is None:
+            callbacks_list = []
+
+        # Initialize early stopping and model checkpointing for subtraining
+        early_stopping_cb = callbacks.EarlyStopping(
+            monitor='val_loss',
+            patience=patience,
+            restore_best_weights=True
+        )
+        checkpoint_cb = callbacks.ModelCheckpoint(
+            filepath=f"model_weights_{str(save_tag)}.h5",
+            monitor='val_loss',
+            save_best_only=True,
+            save_weights_only=True
+        )
+
+        # Append the early stopping and checkpoint callbacks to the custom callbacks list
+        subtrain_callbacks_list = callbacks_list + [early_stopping_cb, checkpoint_cb]
+
+        # Save initial weights for retraining on full training set after best epoch found
+        initial_weights = model.get_weights()
+
+        # Identify injected rare samples in the subtraining set
+        subtrain_rare_indices = np.where((y_subtrain < lower_bound) | (y_subtrain > upper_bound))[0]
+        subtrain_freq_indices = np.where((y_subtrain >= lower_bound) & (y_subtrain <= upper_bound))[0]
+
+        # Check if the batch size is sufficient for subtraining
+        if batch_size < len(subtrain_rare_indices):
+            raise ValueError(f"Batch size must be at least the size of the injected rare samples in subtraining. "
+                             f"Current batch size: {batch_size}, size of subtraining rare samples: {len(subtrain_rare_indices)}")
+
+        # Identify injected rare samples in the full training set
+        train_rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
+        train_freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
+
+        # Check if the batch size is sufficient for final training
+        if batch_size < len(train_rare_indices):
+            raise ValueError(f"Batch size must be at least the size of the injected rare samples in final training. "
+                             f"Current batch size: {batch_size}, size of final training rare samples: {len(train_rare_indices)}")
+
+        # Generalized data generator to yield batches
+        def data_generator(X, y, rare_indices, freq_indices, batch_size):
+            while True:
+                np.random.shuffle(freq_indices)
+                for start in range(0, len(freq_indices), batch_size - len(rare_indices)):
+                    end = min(start + batch_size - len(rare_indices), len(freq_indices))
+                    freq_batch_indices = freq_indices[start:end]
+                    batch_indices = np.concatenate([rare_indices, freq_batch_indices])
+                    np.random.shuffle(batch_indices)
+                    yield X[batch_indices], y[batch_indices]
+
+        # Compile the model
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            loss=self.pds_loss_vec
+        )
+
+        # Calculate steps per epoch for subtraining
+        steps_per_epoch_subtrain = len(subtrain_freq_indices) // (batch_size - len(subtrain_rare_indices))
+
+        # First, train the model with a validation set to determine the best epoch
+        history = model.fit(
+            data_generator(X_subtrain, y_subtrain, subtrain_rare_indices, subtrain_freq_indices, batch_size),
+            steps_per_epoch=steps_per_epoch_subtrain,
+            epochs=epochs,
+            validation_data=(X_val, y_val),
+            callbacks=subtrain_callbacks_list,
+            verbose=verbose
+        )
+
+        # Get the best epoch from early stopping
+        best_epoch = early_stopping_cb.stopped_epoch - patience + 1  # Adjust for the offset
+
+        # Reset model weights to initial state before retraining
+        model.set_weights(initial_weights)
+
+        # Calculate steps per epoch for final training
+        steps_per_epoch_final = len(train_freq_indices) // (batch_size - len(train_rare_indices))
+
+        # Add checkpoint callback to the list of final training callbacks
+        final_callbacks_list = callbacks_list + [checkpoint_cb]
+
+        # Fit the model using the custom generator on the entire training set
+        model.fit(
+            data_generator(X_train, y_train, train_rare_indices, train_freq_indices, batch_size),
+            steps_per_epoch=steps_per_epoch_final,
+            epochs=best_epoch,
+            callbacks=final_callbacks_list,
+            verbose=verbose
+        )
+
+        # Save the final model weights
+        model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
+        print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
 
         return history
 
