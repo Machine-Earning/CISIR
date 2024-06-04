@@ -2,9 +2,8 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
-import matplotlib.pyplot as plt
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
@@ -12,7 +11,7 @@ from tensorflow_addons.optimizers import AdamW
 from wandb.keras import WandbCallback
 import numpy as np
 
-from modules.evaluate.utils import plot_tsne_delta, plot_tsne_delta
+from modules.evaluate.utils import plot_tsne_delta, plot_repr_corr_dist
 from modules.training.DenseReweights import exDenseReweights
 from modules.training.cme_modeling import ModelBuilder
 from modules.training.ts_modeling import (
@@ -22,17 +21,19 @@ from modules.training.ts_modeling import (
     evaluate_model_cond,
     process_sep_events,
     get_loss,
-    reshape_X)
+    reshape_X, filter_ds, stratified_split, plot_error_hist)
 from modules.training.utils import get_weight_path
 
 mb = ModelBuilder()
 
 # Define the lookup dictionary
 weight_paths = {
-    (True, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-154808MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_CME0_features.h5',
-    (True, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-183733MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_CME500_features.h5',
-    (False, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-171125MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_CME0_features.h5',
-    (False, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406-200720MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_CME500_features.h5',
+    (True, 0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240524-134308MLP_e0_5_e1_8_p_slopeTrue_PDSinj_bs4096_CME0_features_128_sl.h5',
+    # (True, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406
+    # -183733MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_CME500_features.h5',
+    (False, 0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240524-090941MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_CME0_features_128_sl.h5',
+    # (False, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406
+    # -200720MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_CME500_features.h5',
 }
 
 
@@ -43,10 +44,10 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [False, True]:
+        for add_slope in [True]:
             for freeze in [False, True]:
-                for cme_speed_threshold in [0, 500]:
-                    for alpha in np.arange(0.1, 1, 0.1):
+                for cme_speed_threshold in [0]:
+                    for alpha in np.arange(0.1, 0.31, 0.01):
                         # PARAMS
                         # inputs_to_use = ['e0.5']
                         # add_slope = True
@@ -67,43 +68,43 @@ def main():
                         seed = 456789
                         tf.random.set_seed(seed)
                         np.random.seed(seed)
-                        patience = 5000  # higher patience
-                        learning_rate = 5e-3  # og learning rate
+                        patience = int(1e4)  # higher patience
+                        learning_rate = 1e-2  # og learning rate
                         reduce_lr_on_plateau = ReduceLROnPlateau(
                             monitor='loss',
                             factor=0.5,
-                            patience=300,
+                            patience=int(2e3),
                             verbose=1,
                             min_delta=1e-5,
                             min_lr=1e-10)
 
-                        weight_decay = 1e-6  # higher weight decay
+                        weight_decay = 1e-8  # higher weight decay
                         momentum_beta1 = 0.9  # higher momentum beta1
                         batch_size = 4096
-                        epochs = 50000  # higher epochs
+                        epochs = 100000  # higher epochs
                         hiddens = [
                             2048, 1024,
-                    2048, 1024,
-                    1024, 512,
-                    1024, 512,
-                    512, 256,
-                    512, 256,
-                    128, 64,
-                    128, 64,
-                    64, 32,
-                    64, 32,
-                    32, 16,
-                    32, 16
+                            2048, 1024,
+                            1024, 512,
+                            1024, 512,
+                            512, 256,
+                            512, 256,
+                            256, 128,
+                            256, 128,
+                            256, 128,
+                            128, 128,
+                            128, 128,
+                            128, 128
                         ]
-                        proj_hiddens = [6]
+                        proj_hiddens = [64]
                         hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                         loss_key = 'mse'
                         target_change = ('delta_p' in outputs_to_use)
                         # print_batch_mse_cb = PrintBatchMSE()
                         rebalacing = True
                         alpha_rw = alpha
-                        bandwidth = 0.099  # 0.0519
-                        repr_dim = 9
+                        bandwidth = 4.42e-2
+                        repr_dim = 128
                         output_dim = len(outputs_to_use)
                         dropout = 0.5
                         activation = None
@@ -113,8 +114,12 @@ def main():
                         weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
                         residual = True
                         skipped_layers = 2
+                        N = 500  # number of samples to keep outside the threshold
+                        lower_threshold = -0.5  # lower threshold for the delta_p
+                        upper_threshold = 0.5  # upper threshold for the delta_p
+
                         # Initialize wandb
-                        wandb.init(project="nasa-ts-pds-delta-2", name=experiment_name, config={
+                        wandb.init(project="nasa-ts-delta-v6", name=experiment_name, config={
                             "inputs_to_use": inputs_to_use,
                             "add_slope": add_slope,
                             "patience": patience,
@@ -146,32 +151,47 @@ def main():
                             "stage1_weights": weight_path,
                             "cme_speed_threshold": cme_speed_threshold,
                             "residual": residual,
-                            "skipped_layers": skipped_layers
+                            "skipped_layers": skipped_layers,
+                            'ds_version': 6,
                         })
 
                         # set the root directory
-                        root_dir = 'data/electron_cme_data_split'
+                        root_dir = 'data/electron_cme_data_split_v5'
                         # build the dataset
-                        X_train, y_train = build_dataset(root_dir + '/training',
-                                                         inputs_to_use=inputs_to_use,
-                                                         add_slope=add_slope,
-                                                         outputs_to_use=outputs_to_use,
-                                                         cme_speed_threshold=cme_speed_threshold)
-                        X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining',
-                                                               inputs_to_use=inputs_to_use,
-                                                               add_slope=add_slope,
-                                                               outputs_to_use=outputs_to_use,
-                                                               cme_speed_threshold=cme_speed_threshold)
-                        X_test, y_test = build_dataset(root_dir + '/testing',
-                                                       inputs_to_use=inputs_to_use,
-                                                       add_slope=add_slope,
-                                                       outputs_to_use=outputs_to_use,
-                                                       cme_speed_threshold=cme_speed_threshold)
-                        X_val, y_val = build_dataset(root_dir + '/validation',
-                                                     inputs_to_use=inputs_to_use,
-                                                     add_slope=add_slope,
-                                                     outputs_to_use=outputs_to_use,
-                                                     cme_speed_threshold=cme_speed_threshold)
+                        # build the dataset
+                        X_train, y_train = build_dataset(
+                            root_dir + '/training',
+                            inputs_to_use=inputs_to_use,
+                            add_slope=add_slope,
+                            outputs_to_use=outputs_to_use,
+                            cme_speed_threshold=cme_speed_threshold)
+
+                        X_train_filtered, y_train_filtered = filter_ds(
+                            X_train, y_train,
+                            low_threshold=lower_threshold,
+                            high_threshold=upper_threshold,
+                            N=N, seed=seed)
+
+                        X_test, y_test = build_dataset(
+                            root_dir + '/testing',
+                            inputs_to_use=inputs_to_use,
+                            add_slope=add_slope,
+                            outputs_to_use=outputs_to_use,
+                            cme_speed_threshold=cme_speed_threshold)
+
+                        X_test_filtered, y_test_filtered = filter_ds(
+                            X_test, y_test,
+                            low_threshold=lower_threshold,
+                            high_threshold=upper_threshold,
+                            N=N, seed=seed)
+
+                        X_subtrain, y_subtrain, X_val, y_val = stratified_split(
+                            X_train,
+                            y_train,
+                            shuffle=True,
+                            seed=seed,
+                            split=0.25,
+                            debug=False)
 
                         # print all cme_files shapes
                         print(f'X_train.shape: {X_train.shape}')
@@ -186,8 +206,10 @@ def main():
                         # Compute the sample weights
                         delta_train = y_train[:, 0]
                         delta_subtrain = y_subtrain[:, 0]
+                        delta_val = y_val[:, 0]
                         print(f'delta_train.shape: {delta_train.shape}')
                         print(f'delta_subtrain.shape: {delta_subtrain.shape}')
+                        print(f'delta_val.shape: {delta_val.shape}')
 
                         print(f'rebalancing the training set...')
                         min_norm_weight = 0.01 / len(delta_train)
@@ -207,12 +229,21 @@ def main():
                             debug=False).reweights
                         print(f'subtraining set rebalanced.')
 
+                        print(f'rebalancing the validation set...')
+                        min_norm_weight = 0.01 / len(delta_val)
+                        y_val_weights = exDenseReweights(
+                            X_val, delta_val,
+                            alpha=alpha_rw, bw=bandwidth,
+                            min_norm_weight=min_norm_weight,
+                            debug=False).reweights
+                        print(f'validation set rebalanced.')
+
                         # get the number of features
                         n_features = X_train.shape[1]
                         print(f'n_features: {n_features}')
 
                         # create the model
-                        mlp_model_sep_stage1 = create_mlp(
+                        model_sep_stage1 = create_mlp(
                             input_dim=n_features,
                             hiddens=hiddens,
                             output_dim=0,
@@ -224,20 +255,20 @@ def main():
                             residual=residual,
                             skipped_layers=skipped_layers
                         )
-                        mlp_model_sep_stage1.summary()
+                        model_sep_stage1.summary()
 
                         # load the weights from the first stage
                         print(f'weights loading from: {weight_path}')
-                        mlp_model_sep_stage1.load_weights(weight_path)
+                        model_sep_stage1.load_weights(weight_path)
                         # print the save
                         print(f'weights loaded successfully from: {weight_path}')
 
                         # Log t-SNE plot for training
                         # Log the training t-SNE plot to wandb
                         stage1_file_path = plot_tsne_delta(
-                            mlp_model_sep_stage1, 
-                            X_train, y_train, title,
-                            'stage1_training', 
+                            model_sep_stage1,
+                            X_train_filtered, y_train_filtered, title,
+                            'stage1_training',
                             model_type='features',
                             save_tag=current_time, seed=seed)
                         wandb.log({'stage1_tsne_training_plot': wandb.Image(stage1_file_path)})
@@ -246,17 +277,16 @@ def main():
                         # Log t-SNE plot for testing
                         # Log the testing t-SNE plot to wandb
                         stage1_file_path = plot_tsne_delta(
-                            mlp_model_sep_stage1, 
-                            X_test, y_test, title,
+                            model_sep_stage1,
+                            X_test_filtered, y_test_filtered, title,
                             'stage1_testing',
                             model_type='features',
                             save_tag=current_time, seed=seed)
-                        
                         wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
                         print('stage1_file_path: ' + stage1_file_path)
 
-                        mlp_model_sep = mb.add_proj_head(
-                            mlp_model_sep_stage1,
+                        model_sep = mb.add_proj_head(
+                            model_sep_stage1,
                             output_dim=output_dim,
                             freeze_features=freeze,
                             pds=pds,
@@ -268,7 +298,7 @@ def main():
                             skipped_layers=skipped_layers,
                             name='mlp'
                         )
-                        mlp_model_sep.summary()
+                        model_sep.summary()
 
                         print('Reshaping input for model')
                         X_subtrain = reshape_X(
@@ -276,28 +306,28 @@ def main():
                             [n_features],
                             inputs_to_use,
                             add_slope,
-                            mlp_model_sep.name)
+                            model_sep.name)
 
                         X_val = reshape_X(
                             X_val,
                             [n_features],
                             inputs_to_use,
                             add_slope,
-                            mlp_model_sep.name)
+                            model_sep.name)
 
                         X_train = reshape_X(
                             X_train,
                             [n_features],
                             inputs_to_use,
                             add_slope,
-                            mlp_model_sep.name)
+                            model_sep.name)
 
                         X_test = reshape_X(
                             X_test,
                             [n_features],
                             inputs_to_use,
                             add_slope,
-                            mlp_model_sep.name)
+                            model_sep.name)
 
                         # Define the EarlyStopping callback
                         early_stopping = EarlyStopping(
@@ -307,22 +337,29 @@ def main():
                             restore_best_weights=True)
 
                         # Compile the model with the specified learning rate
-                        mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
-                                                              weight_decay=weight_decay,
-                                                              beta_1=momentum_beta1),
-                                              loss={'forecast_head': get_loss(loss_key)})
+                        model_sep.compile(
+                            optimizer=AdamW(
+                                learning_rate=learning_rate,
+                                weight_decay=weight_decay,
+                                beta_1=momentum_beta1
+                            ),
+                            loss={'forecast_head': get_loss(loss_key)}
+                        )
 
                         # Train the model with the callback
-                        history = mlp_model_sep.fit(X_subtrain,
-                                                    {'forecast_head': y_subtrain},
-                                                    sample_weight=y_subtrain_weights,
-                                                    epochs=epochs, batch_size=batch_size,
-                                                    validation_data=(X_val, {'forecast_head': y_val}),
-                                                    callbacks=[
-                                                        early_stopping,
-                                                        WandbCallback(save_model=False),
-                                                        reduce_lr_on_plateau
-                                                    ])
+                        history = model_sep.fit(
+                            X_subtrain,
+                            {'forecast_head': y_subtrain},
+                            sample_weight=y_subtrain_weights,
+                            epochs=epochs, batch_size=batch_size,
+                            validation_data=(X_val, {'forecast_head': y_val}, y_val_weights),
+                            callbacks=[
+                                early_stopping,
+                                reduce_lr_on_plateau,  # Reduce learning rate on plateau
+                                WandbCallback(save_model=False),
+                            ],
+                            verbose=1
+                        )
 
                         # Plot the training and validation loss
                         # plt.figure(figsize=(12, 6))
@@ -337,7 +374,7 @@ def main():
 
                         # Determine the optimal number of epochs from early stopping
                         optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
-                        final_mlp_model_sep_stage1 = create_mlp(
+                        final_model_sep_stage1 = create_mlp(
                             input_dim=n_features,
                             hiddens=hiddens,
                             output_dim=0,
@@ -349,11 +386,11 @@ def main():
                             residual=residual,
                             skipped_layers=skipped_layers
                         )
-                        final_mlp_model_sep_stage1.load_weights(weight_path)
+                        final_model_sep_stage1.load_weights(weight_path)
 
-                        # Recreate the model architecture for final_mlp_model_sep
-                        final_mlp_model_sep = mb.add_proj_head(
-                            final_mlp_model_sep_stage1,
+                        # Recreate the model architecture for final_model_sep
+                        final_model_sep = mb.add_proj_head(
+                            final_model_sep_stage1,
                             output_dim=output_dim,
                             freeze_features=freeze,
                             pds=pds,
@@ -366,60 +403,43 @@ def main():
                             name='mlp'
                         )
 
-                        final_mlp_model_sep.compile(
-                            optimizer=AdamW(learning_rate=learning_rate,
-                                            weight_decay=weight_decay,
-                                            beta_1=momentum_beta1),
-                            loss={'forecast_head': get_loss(loss_key)})  # Compile the model just like before
+                        final_model_sep.compile(
+                            optimizer=AdamW(
+                                learning_rate=learning_rate,
+                                weight_decay=weight_decay,
+                                beta_1=momentum_beta1
+                            ),
+                            loss={'forecast_head': get_loss(loss_key)}
+                        )  # Compile the model just like before
+
                         # Train on the full dataset
-                        final_mlp_model_sep.fit(
+                        final_model_sep.fit(
                             X_train,
                             {'forecast_head': y_train},
                             sample_weight=y_train_weights,
                             epochs=optimal_epochs,
                             batch_size=batch_size,
                             callbacks=[reduce_lr_on_plateau, WandbCallback(save_model=False)],
-                            verbose=1)
+                            verbose=1
+                        )
 
                         # evaluate the model on test cme_files
-                        error_mae = evaluate_model(final_mlp_model_sep, X_test, y_test)
+                        error_mae = evaluate_model(final_model_sep, X_test, y_test)
                         print(f'mae error: {error_mae}')
                         # Log the MAE error to wandb
                         wandb.log({"mae_error": error_mae})
 
                         # evaluate the model on stage2 cme_files
-                        error_mae_train = evaluate_model(final_mlp_model_sep, X_train, y_train)
+                        error_mae_train = evaluate_model(final_model_sep, X_train, y_train)
                         print(f'mae error train: {error_mae_train}')
                         # Log the MAE error to wandb
                         wandb.log({"train_mae_error": error_mae_train})
-
-                        # Log t-SNE plot for training
-                        # Log the training t-SNE plot to wandb
-                        stage2_file_path = plot_tsne_delta(
-                            final_mlp_model_sep, 
-                            X_train, y_train, title,
-                            'stage2_training', 
-                            model_type='features_reg',
-                            save_tag=current_time, seed=seed)
-                        wandb.log({'stage2_tsne_training_plot': wandb.Image(stage2_file_path)})
-                        print('stage2_file_path: ' + stage2_file_path)
-
-                        # Log t-SNE plot for testing
-                        # Log the testing t-SNE plot to wandb
-                        stage2_file_path = plot_tsne_delta(
-                            final_mlp_model_sep, 
-                            X_test, y_test, title, 
-                            'stage2_testing',
-                            model_type='features_reg',
-                            save_tag=current_time, seed=seed)
-                        wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage2_file_path)})
-                        print('stage2_file_path: ' + stage2_file_path)
 
                         # Process SEP event files in the specified directory
                         test_directory = root_dir + '/testing'
                         filenames = process_sep_events(
                             test_directory,
-                            final_mlp_model_sep,
+                            final_model_sep,
                             title=title,
                             inputs_to_use=inputs_to_use,
                             add_slope=add_slope,
@@ -430,21 +450,22 @@ def main():
 
                         # Log the plot to wandb
                         for filename in filenames:
-                            wandb.log({f'testing_{filename}': wandb.Image(filename)})
+                            log_title = os.path.basename(filename)
+                            wandb.log({f'testing_{log_title}': wandb.Image(filename)})
 
                         # Process SEP event files in the specified directory
                         test_directory = root_dir + '/training'
                         filenames = process_sep_events(
                             test_directory,
-                            final_mlp_model_sep,
+                            final_model_sep,
                             title=title,
                             inputs_to_use=inputs_to_use,
                             add_slope=add_slope,
                             outputs_to_use=outputs_to_use,
                             show_avsp=True,
+                            prefix='training',
                             using_cme=True,
-                            cme_speed_threshold=cme_speed_threshold,
-                            prefix='training')
+                            cme_speed_threshold=cme_speed_threshold)
 
                         # Log the plot to wandb
                         for filename in filenames:
@@ -454,7 +475,7 @@ def main():
                         # evaluate the model on test cme_files
                         above_threshold = 0.1
                         error_mae_cond = evaluate_model_cond(
-                            final_mlp_model_sep, X_test, y_test, above_threshold=above_threshold)
+                            final_model_sep, X_test, y_test, above_threshold=above_threshold)
 
                         print(f'mae error delta >= 0.1 test: {error_mae_cond}')
                         # Log the MAE error to wandb
@@ -462,10 +483,73 @@ def main():
 
                         # evaluate the model on training cme_files
                         error_mae_cond_train = evaluate_model_cond(
-                            final_mlp_model_sep, X_train, y_train, above_threshold=above_threshold)
+                            final_model_sep, X_train, y_train, above_threshold=above_threshold)
 
                         print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
-                        #
+
+                        # Evaluate the model correlation with colored
+                        file_path = plot_repr_corr_dist(
+                            final_model_sep,
+                            X_train_filtered, y_train_filtered,
+                            title + "_training",
+                            model_type='features_reg'
+                        )
+                        wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
+                        print('file_path: ' + file_path)
+
+                        file_path = plot_repr_corr_dist(
+                            final_model_sep,
+                            X_test_filtered, y_test_filtered,
+                            title + "_test",
+                            model_type='features_reg'
+                        )
+                        wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
+                        print('file_path: ' + file_path)
+
+                        # Log t-SNE plot
+                        # Log the training t-SNE plot to wandb
+                        stage1_file_path = plot_tsne_delta(
+                            final_model_sep,
+                            X_train_filtered, y_train_filtered, title,
+                            'stage1_training',
+                            model_type='features_reg',
+                            save_tag=current_time, seed=seed)
+                        wandb.log({'stage1_tsne_training_plot': wandb.Image(stage1_file_path)})
+                        print('stage1_file_path: ' + stage1_file_path)
+
+                        # Log the testing t-SNE plot to wandb
+                        stage1_file_path = plot_tsne_delta(
+                            final_model_sep,
+                            X_test_filtered, y_test_filtered, title,
+                            'stage1_testing',
+                            model_type='features_reg',
+                            save_tag=current_time, seed=seed)
+                        wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
+                        print('stage1_file_path: ' + stage1_file_path)
+
+                        filename = plot_error_hist(
+                            final_model_sep,
+                            X_train, y_train,
+                            sample_weights=None,
+                            title=title,
+                            prefix='training')
+                        wandb.log({"training_error_hist": wandb.Image(filename)})
+
+                        filename = plot_error_hist(
+                            final_model_sep,
+                            X_train, y_train,
+                            sample_weights=y_train_weights,
+                            title=title,
+                            prefix='training_weighted')
+                        wandb.log({"training_weighted_error_hist": wandb.Image(filename)})
+
+                        filename = plot_error_hist(
+                            final_model_sep,
+                            X_test, y_test,
+                            sample_weights=None,
+                            title=title,
+                            prefix='testing')
+                        wandb.log({"testing_error_hist": wandb.Image(filename)})
 
                         # Finish the wandb run
                         wandb.finish()

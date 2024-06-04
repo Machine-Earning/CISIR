@@ -749,7 +749,7 @@ class ModelBuilder:
             data_generator(X_subtrain, y_subtrain, subtrain_rare_indices, subtrain_freq_indices, batch_size),
             steps_per_epoch=steps_per_epoch_subtrain,
             epochs=epochs,
-            validation_data=(X_val, y_val),
+            validation_data=(X_val, y_val), # weight the validation loss here
             callbacks=subtrain_callbacks_list,
             verbose=verbose
         )
