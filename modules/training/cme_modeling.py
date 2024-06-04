@@ -24,7 +24,7 @@ from tensorflow.keras.layers import (
     LayerNormalization,
     Add
 )
-from tensorflow.python.profiler import profiler_v2 as profiler
+# from tensorflow.python.profiler import profiler_v2 as profiler
 
 
 def ydist(val1: float, val2: float) -> float:
@@ -1405,7 +1405,7 @@ class ModelBuilder:
         steps_per_epoch = len(freq_indices) // (batch_size - rare_injection_count)
 
         # Start the profiler
-        tf.profiler.experimental.start(logdir)
+        # tf.profiler.experimental.start(logdir)
 
         for epoch in range(epochs):
             for cb in callbacks_list:
@@ -1438,7 +1438,7 @@ class ModelBuilder:
             cb.on_train_end(logs=logs)
 
         # Stop the profiler
-        tf.profiler.experimental.stop()
+        # tf.profiler.experimental.stop()
 
         model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
         print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
