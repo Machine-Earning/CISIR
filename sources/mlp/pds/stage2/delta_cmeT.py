@@ -47,7 +47,7 @@ def main():
         for add_slope in [True]:
             for freeze in [False, True]:
                 for cme_speed_threshold in [0]:
-                    for alpha in np.arange(0.1, 0.31, 0.01):
+                    for alpha in np.arange(0.2, 0.31, 0.01):
                         # PARAMS
                         # inputs_to_use = ['e0.5']
                         # add_slope = True
@@ -56,7 +56,7 @@ def main():
                         inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                         # Construct the title
-                        title = f'MLP_PDS_Stage2_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                        title = f'MLP_S2_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
 
                         # Replace any other characters that are not suitable for filenames (if any)
                         title = title.replace(' ', '_').replace(':', '_')
@@ -69,7 +69,7 @@ def main():
                         tf.random.set_seed(seed)
                         np.random.seed(seed)
                         patience = int(1e4)  # higher patience
-                        learning_rate = 1e-2  # og learning rate
+                        learning_rate = 3e-4  # og learning rate
                         reduce_lr_on_plateau = ReduceLROnPlateau(
                             monitor='loss',
                             factor=0.5,
