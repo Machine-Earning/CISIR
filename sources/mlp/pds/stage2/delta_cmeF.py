@@ -511,20 +511,20 @@ def main():
                         stage1_file_path = plot_tsne_delta(
                             final_model_sep,
                             X_train_filtered, y_train_filtered, title,
-                            'stage1_training',
+                            'stage2_training',
                             model_type='features_reg',
                             save_tag=current_time, seed=seed)
-                        wandb.log({'stage1_tsne_training_plot': wandb.Image(stage1_file_path)})
+                        wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
                         print('stage1_file_path: ' + stage1_file_path)
 
                         # Log the testing t-SNE plot to wandb
                         stage1_file_path = plot_tsne_delta(
                             final_model_sep,
                             X_test_filtered, y_test_filtered, title,
-                            'stage1_testing',
+                            'stage2_testing',
                             model_type='features_reg',
                             save_tag=current_time, seed=seed)
-                        wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
+                        wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
                         print('stage1_file_path: ' + stage1_file_path)
 
                         filename = plot_error_hist(

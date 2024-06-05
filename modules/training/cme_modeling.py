@@ -1527,6 +1527,10 @@ class ModelBuilder:
 
         retrain_history = {'loss': []}
 
+        # TODO: figure out how Tensorflow not copy batch
+        # approach 1: copy
+        # approach 2: allocate and deallocate
+        # approach 3: special data structure that doesn't need copy - find out Tensorflow way
         def data_generator(X, y, batch_size):
             while True:
                 np.random.shuffle(freq_indices)
