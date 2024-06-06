@@ -2633,7 +2633,7 @@ class ModelBuilder:
         if reduction == tf.keras.losses.Reduction.SUM:
             return total_error / 2  # total loss
         elif reduction == tf.keras.losses.Reduction.NONE:
-            denom = tf.cast(int_batch_size * (int_batch_size - 1) + 1e-9, dtype=tf.float32)
+            denom = tf.cast(int_batch_size * (int_batch_size - 1), dtype=tf.float32)
             # tf.print(denom)
             return total_error / denom  # average loss
         else:
@@ -2682,7 +2682,6 @@ class ModelBuilder:
     def pds_loss_vec(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
         """
         Vectorized computation of the loss for a batch of predicted features and their labels.
-        TODO: Double check the calculation procedure, use
         :param y_true: A batch of true label values, shape of [batch_size, 1].
         :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
         :param reduction: The type of reduction to apply to the loss.
@@ -2719,7 +2718,7 @@ class ModelBuilder:
             return total_error / 2  # upper triangle only
         elif reduction == tf.keras.losses.Reduction.NONE:
             # Avoid division by zero
-            return total_error / (num_comparisons + 1e-9)  # average over all elements
+            return total_error / num_comparisons  # average over all elements
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
