@@ -2627,10 +2627,6 @@ class ModelBuilder:
 
                 # tf.print("Pair (i, j):", i, j, "z1, z2:", z1, z2, "label1, label2:", label1, label2, "err:", err)
 
-        # tf.print(total_error)
-        # tf.print("Total error before normalization:", total_error)
-        total_error = total_error / 2  # divide by 2 to avoid double counting
-
         if reduction == tf.keras.losses.Reduction.SUM:
             return total_error  # total loss
         elif reduction == tf.keras.losses.Reduction.NONE:
@@ -2668,8 +2664,6 @@ class ModelBuilder:
             # Pair with the point before the previous point
             err = error(z_pred[i], z_pred[i - 2], y_true[i], y_true[i - 2])
             total_error += tf.cast(err, dtype=tf.float32)
-
-        total_error = total_error / 2  # Divide by 2 to cancel derivative
 
         # Apply reduction
         if reduction == tf.keras.losses.Reduction.SUM:
@@ -2712,14 +2706,14 @@ class ModelBuilder:
 
         # Sum over all unique pairs
         # take the upper triangle of the matrix so multiply by 0.5
-        total_error = 0.5 * tf.reduce_sum(pairwise_loss_masked)  # pairwise_loss_masked)
-        total_error = total_error / 2  # cancel derivative square
+        total_error = tf.reduce_sum(pairwise_loss_masked)  # pairwise_loss_masked)
+        # total_error = total_error / 2  # cancel derivative square
 
         # Number of unique comparisons, excluding self-pairs
-        num_comparisons = tf.cast(batch_size * (batch_size - 1) / 2, dtype=tf.float32)
+        num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=tf.float32)
 
         if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error  # upper triangle only
+            return total_error / 2  # upper triangle only
         elif reduction == tf.keras.losses.Reduction.NONE:
             # Avoid division by zero
             return total_error / num_comparisons  # average over all elements
@@ -3353,7 +3347,6 @@ if __name__ == '__main__':
     # y_true_tensor = tf.convert_to_tensor(y_true_dummy, dtype=tf.float32)
     # z_pred_tensor = tf.convert_to_tensor(z_pred_dummy, dtype=tf.float32)
     # Generate dummy data for testing
-    batch_size = len(fabricated_y)
     z_dim = fabricated_z.shape[1]
 
     # Print a sample of y and z
