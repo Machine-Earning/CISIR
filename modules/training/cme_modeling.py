@@ -2627,7 +2627,7 @@ class ModelBuilder:
 
                 # tf.print("Pair (i, j):", i, j, "z1, z2:", z1, z2, "label1, label2:", label1, label2, "err:", err)
 
-        total_error = total_error / 2
+        # total_error = total_error / 2 #
         num_pairs = tf.cast((int_batch_size * (int_batch_size - 1)) / 2, dtype=tf.float32)
 
         if reduction == tf.keras.losses.Reduction.SUM:
@@ -2667,7 +2667,7 @@ class ModelBuilder:
             err = error(z_pred[i], z_pred[i - 2], y_true[i], y_true[i - 2])
             total_error += tf.cast(err, dtype=tf.float32)
 
-        total_error = total_error / 2
+        # total_error = total_error / 2
         # Calculate the number of pairs
         num_pairs = tf.cast(2 * int_batch_size - 3, dtype=tf.float32)
 
@@ -2710,7 +2710,7 @@ class ModelBuilder:
         # Sum over all unique pairs
         # take the upper triangle of the matrix so multiply by 0.5
         total_error = 0.5 * tf.reduce_sum(pairwise_loss_masked)  # pairwise_loss_masked)
-        total_error = total_error / 2  # cancel derivative square
+        # total_error = total_error / 2  # cancel derivative square
 
         # Number of unique comparisons, excluding self-pairs
         num_comparisons = tf.cast(batch_size * (batch_size - 1) / 2, dtype=tf.float32)
