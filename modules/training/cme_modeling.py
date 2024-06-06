@@ -2702,14 +2702,14 @@ class ModelBuilder:
 
         # Mask to exclude self-comparisons (where i == j)
         batch_size = tf.shape(y_true)[0]
-        # mask = 1 - tf.eye(batch_size, dtype=tf.float32)
+        mask = 1 - tf.eye(batch_size, dtype=tf.float32)
 
         # Apply mask to exclude self-comparisons from the loss calculation
-        # pairwise_loss_masked = pairwise_loss #* mask
+        pairwise_loss_masked = pairwise_loss * mask
 
         # Sum over all unique pairs
         # take the upper triangle of the matrix so multiply by 0.5
-        total_error = 0.5 * tf.reduce_sum(pairwise_loss)  # pairwise_loss_masked)
+        total_error = 0.5 * tf.reduce_sum(pairwise_loss_masked)  # pairwise_loss_masked)
 
         # Number of unique comparisons, excluding self-pairs
         num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=tf.float32)
