@@ -62,7 +62,7 @@ def error(z1: Tensor, z2: Tensor, label1: float, label2: float) -> Tensor:
     :param label2: The label of the second input sample.
     :return: The squared difference between the zdist and ydist.
     """
-    squared_difference = .5 * (zdist(z1, z2) - ydist(label1, label2)) ** 2
+    squared_difference = (zdist(z1, z2) - ydist(label1, label2)) ** 2
     # added multiplication by .5 to reduce the error range to 0-8
     return tf.reduce_sum(squared_difference)
 
