@@ -1555,7 +1555,8 @@ class ModelBuilder:
         ratio_based_injection_count = max(1, len(rare_indices) // steps_per_epoch)
         if ratio_based_injection_count > rare_injection_count:
             print(
-                f"Adjusting rare_injection_count to {ratio_based_injection_count} based on the ratio of rare samples to batches.")
+                f"Adjusting rare_injection_count to {ratio_based_injection_count} based on the ratio of rare samples "
+                f"to batches.")
             rare_injection_count = ratio_based_injection_count
 
         # Check if the batch size is sufficient
@@ -3439,11 +3440,11 @@ if __name__ == '__main__':
     print("WITHOUT SAMPLE WEIGHTS")
     loss_tester = ModelBuilder()
     # Generate dummy data for testing
-    # np.random.seed(42)  # For reproducibility
-    # batch_size = 100
-    # z_dim = 9
-    # y_true_dummy = np.random.rand(batch_size, 1).astype(np.float32) - 0.5
-    # z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32) - 0.5
+    np.random.seed(42)  # For reproducibility
+    batch_size = 100
+    z_dim = 9
+    y_true_dummy = np.random.rand(batch_size, 1).astype(np.float32) - 0.5
+    z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32) - 0.5
 
     # Fabricated data from the table
     fabricated_z = np.array(
@@ -3457,25 +3458,25 @@ if __name__ == '__main__':
     # print(f"y_true_dummy: {y_true_dummy[:5]}")
     # print(f"z_pred_dummy: {z_pred_dummy[:5]}")
     #
-    # print("y_true_dummy shape:", y_true_dummy.shape)
-    # print("z_pred_dummy shape:", z_pred_dummy.shape)
+    print("y_true_dummy shape:", y_true_dummy.shape)
+    print("z_pred_dummy shape:", z_pred_dummy.shape)
     #
     # # Convert NumPy arrays to TensorFlow tensors
-    # y_true_tensor = tf.convert_to_tensor(y_true_dummy, dtype=tf.float32)
-    # z_pred_tensor = tf.convert_to_tensor(z_pred_dummy, dtype=tf.float32)
+    y_true_tensor = tf.convert_to_tensor(y_true_dummy, dtype=tf.float32)
+    z_pred_tensor = tf.convert_to_tensor(z_pred_dummy, dtype=tf.float32)
     # Generate dummy data for testing
-    z_dim = fabricated_z.shape[1]
-
-    # Print a sample of y and z
-    print(f"fabricated_y: {fabricated_y[:5]}")
-    print(f"fabricated_z: {fabricated_z[:5]}")
-
-    print("fabricated_y shape:", fabricated_y.shape)
-    print("fabricated_z shape:", fabricated_z.shape)
-
-    # Convert NumPy arrays to TensorFlow tensors
-    y_true_tensor = tf.convert_to_tensor(fabricated_y, dtype=tf.float32)
-    z_pred_tensor = tf.convert_to_tensor(fabricated_z, dtype=tf.float32)
+    # z_dim = fabricated_z.shape[1]
+    #
+    # # Print a sample of y and z
+    # print(f"fabricated_y: {fabricated_y[:5]}")
+    # print(f"fabricated_z: {fabricated_z[:5]}")
+    #
+    # print("fabricated_y shape:", fabricated_y.shape)
+    # print("fabricated_z shape:", fabricated_z.shape)
+    #
+    # # Convert NumPy arrays to TensorFlow tensors
+    # y_true_tensor = tf.convert_to_tensor(fabricated_y, dtype=tf.float32)
+    # z_pred_tensor = tf.convert_to_tensor(fabricated_z, dtype=tf.float32)
 
     # Time and compute loss using the original function
     print("Computing loss using the original function...")
