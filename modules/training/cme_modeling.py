@@ -2705,7 +2705,7 @@ class ModelBuilder:
         :return: The average error for the specified combinations of the samples in the batch.
         """
         int_batch_size = tf.shape(y_true)[0]
-        # total_error = tf.constant(0.0, dtype=tf.float32)
+        total_error = tf.constant(0.0, dtype=tf.float32)  # Initialize
 
         # Shape invariant for total_error to ensure it remains a scalar
         total_error = tf.autograph.experimental.set_loop_options(shape_invariants=tf.constant(0.0, dtype=tf.float32))
