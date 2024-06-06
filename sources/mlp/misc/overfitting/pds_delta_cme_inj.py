@@ -215,7 +215,7 @@ def main():
                 #     add_slope,
                 #     model_sep.name)
 
-                mb.overtrain_pds_inj(
+                mb.overtrain_pds_inj_olin(
                     model_sep,
                     X_train, y_train_norm,
                     learning_rate=Options['learning_rate'],
