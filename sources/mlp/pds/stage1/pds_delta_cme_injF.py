@@ -55,7 +55,7 @@ def main():
                 # add_slope = True
                 outputs_to_use = ['delta_p']
 
-                bs = 1024  # full dataset used
+                bs = 4096  # full dataset used
                 print(f'batch size : {bs}')
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -73,7 +73,7 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                    'epochs': int(5e4),  # 35k epochs
+                    'epochs': int(10e4),  # 35k epochs
                     'patience': int(2.5e4),
                     'learning_rate': 1e-2,  # initial learning rate
                     'weight_decay': 1e-8,  # Added weight decay
@@ -103,7 +103,7 @@ def main():
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor='loss',
                     factor=0.5,
-                    patience=2000,
+                    patience=1000,
                     verbose=1,
                     min_delta=1e-5,
                     min_lr=1e-10)
