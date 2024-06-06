@@ -3424,23 +3424,23 @@ if __name__ == '__main__':
     olin_duration = end_time_olin - start_time_olin
 
     # Time and compute loss using the vectorized olin function
-    print("Computing loss using the vectorized olin function...")
-    start_time_olin_vec = time.time()
-    loss_olin_vec = loss_tester.pds_olin_loss_vec(y_true_tensor, z_pred_tensor)
-    end_time_olin_vec = time.time()
-    olin_vec_duration = end_time_olin_vec - start_time_olin_vec
+    # print("Computing loss using the vectorized olin function...")
+    # start_time_olin_vec = time.time()
+    # loss_olin_vec = loss_tester.pds_olin_loss_vec(y_true_tensor, z_pred_tensor)
+    # end_time_olin_vec = time.time()
+    # olin_vec_duration = end_time_olin_vec - start_time_olin_vec
 
     # Evaluate the TensorFlow tensors to get their numpy values
     loss_original_value = loss_original.numpy()
     loss_vectorized_value = loss_vectorized.numpy()
     loss_olin_value = loss_olin.numpy()
-    loss_olin_vec_value = loss_olin_vec.numpy()
+    # loss_olin_vec_value = loss_olin_vec.numpy()
 
     # Print the losses and timing for comparison
     print(f"Original Loss: {loss_original_value}, Time Taken: {original_duration} seconds")
     print(f"Vectorized Loss: {loss_vectorized_value}, Time Taken: {vectorized_duration} seconds")
     print(f"Olin Loss: {loss_olin_value}, Time Taken: {olin_duration} seconds")
-    print(f"Vectorized Olin Loss: {loss_olin_vec_value}, Time Taken: {olin_vec_duration} seconds")
+    # print(f"Vectorized Olin Loss: {loss_olin_vec_value}, Time Taken: {olin_vec_duration} seconds")
 
     # # Check if the losses are approximately equal
     # np.testing.assert_almost_equal(loss_original_value, loss_vectorized_value, decimal=5)
