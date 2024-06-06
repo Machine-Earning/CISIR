@@ -749,7 +749,7 @@ class ModelBuilder:
             data_generator(X_subtrain, y_subtrain, subtrain_rare_indices, subtrain_freq_indices, batch_size),
             steps_per_epoch=steps_per_epoch_subtrain,
             epochs=epochs,
-            validation_data=(X_val, y_val), # weight the validation loss here
+            validation_data=(X_val, y_val),  # weight the validation loss here
             callbacks=subtrain_callbacks_list,
             verbose=verbose
         )
@@ -764,7 +764,7 @@ class ModelBuilder:
         steps_per_epoch_final = len(train_freq_indices) // (batch_size - len(train_rare_indices))
 
         # Add checkpoint callback to the list of final training callbacks
-        final_callbacks_list = callbacks_list + [checkpoint_cb]
+        final_callbacks_list = callbacks_list
 
         # Fit the model using the custom generator on the entire training set
         model.fit(
@@ -2607,12 +2607,11 @@ class ModelBuilder:
         verified!
 
         :param y_true: A batch of true label values, shape of [batch_size, 1].
-        :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
+        :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
         :param reduction: The type of reduction to apply to the loss.
         :return: The average error for all unique combinations of the samples in the batch.
         """
         int_batch_size = tf.shape(z_pred)[0]
-        batch_size = tf.cast(int_batch_size, dtype=tf.float32)
         total_error = tf.constant(0.0, dtype=tf.float32)
 
         # tf.print(" received batch size:", int_batch_size)
@@ -2621,13 +2620,8 @@ class ModelBuilder:
         # Loop through all unique pairs of samples in the batch
         for i in tf.range(int_batch_size):
             for j in tf.range(i + 1, int_batch_size):
-                z1, z2 = z_pred[i], z_pred[j]
-                # tf.print(z1, z2, sep=', ', end='\n')
-                label1, label2 = y_true[i], y_true[j]
-                # Update pair counts and check if it's a SEP-SEP pair
-                # self.update_pair_counts(label1, label2)
-                # tf.print(label1, label2, sep=', ', end='\n')
-                err = error(z1, z2, label1, label2)
+                # calculate the error for each pair
+                err = error(z_pred[i], z_pred[j], y_true[i], y_true[j])
                 # tf.print(err, end='\n\n')
                 total_error += tf.cast(err, dtype=tf.float32)
 
@@ -2637,10 +2631,50 @@ class ModelBuilder:
         # tf.print("Total error before normalization:", total_error)
 
         if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error  # total loss
+            return total_error / 2  # total loss
         elif reduction == tf.keras.losses.Reduction.NONE:
-            denom = tf.cast(batch_size * (batch_size - 1) / 2 + 1e-9, dtype=tf.float32)
+            denom = tf.cast(int_batch_size * (int_batch_size - 1) + 1e-9, dtype=tf.float32)
             # tf.print(denom)
+            return total_error / denom  # average loss
+        else:
+            raise ValueError(f"Unsupported reduction type: {reduction}.")
+
+    def pds_olin_loss(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
+        """
+        Computes the loss for a batch of predicted features and their labels using a specific pairing strategy.
+
+        :param y_true: A batch of true label values, shape of [batch_size, 1].
+        :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
+        :param reduction: The type of reduction to apply to the loss.
+        :return: The average error for the specified combinations of the samples in the batch.
+        """
+        int_batch_size = tf.shape(z_pred)[0]
+        total_error = tf.constant(0.0, dtype=tf.float32)
+
+        # Loop through the first three points to create initial pairs
+        for i in tf.range(3):
+            for j in tf.range(i + 1, 3):
+                # Calculate the error for each pair
+                err = error(z_pred[i], z_pred[j], y_true[i], y_true[j])
+                total_error += tf.cast(err, dtype=tf.float32)
+
+        # Loop through the rest of the points
+        for i in tf.range(3, int_batch_size):
+            # Pair with the previous point
+            err = error(z_pred[i], z_pred[i - 1], y_true[i], y_true[i - 1])
+            total_error += tf.cast(err, dtype=tf.float32)
+
+            # Pair with the point before the previous point
+            err = error(z_pred[i], z_pred[i - 2], y_true[i], y_true[i - 2])
+            total_error += tf.cast(err, dtype=tf.float32)
+
+        # Apply reduction
+        if reduction == tf.keras.losses.Reduction.SUM:
+            return total_error / 2  # total loss
+        elif reduction == tf.keras.losses.Reduction.NONE:
+            # Calculate the number of pairs
+            num_pairs = 2 * int_batch_size - 3
+            denom = tf.cast(num_pairs, dtype=tf.float32) / 2
             return total_error / denom  # average loss
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
@@ -3298,9 +3332,12 @@ if __name__ == '__main__':
     # z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32) - 0.5
 
     # Fabricated data from the table
-    fabricated_z = np.array([[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 0], [0, 1], [1, -1], [1, 0], [1, 1]],
-                            dtype=np.float32)
-    fabricated_y = np.array([[-1], [-1], [-1], [0], [0], [0], [1], [1], [1]], dtype=np.float32)
+    fabricated_z = np.array(
+        [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 0], [0, 1], [1, -1], [1, 0], [1, 1]],
+        dtype=np.float32)
+    fabricated_y = np.array(
+        [[-1], [-1], [-1], [0], [0], [0], [1], [1], [1]],
+        dtype=np.float32)
 
     # print a sample of y and z
     # print(f"y_true_dummy: {y_true_dummy[:5]}")
@@ -3341,13 +3378,22 @@ if __name__ == '__main__':
     end_time_vectorized = time.time()
     vectorized_duration = end_time_vectorized - start_time_vectorized
 
+    # Time and compute loss using the olin function
+    print("Computing loss using the olin function...")
+    start_time_olin = time.time()
+    loss_olin = loss_tester.pds_olin_loss(y_true_tensor, z_pred_tensor)
+    end_time_olin = time.time()
+    olin_duration = end_time_olin - start_time_olin
+
     # Evaluate the TensorFlow tensors to get their numpy values
     loss_original_value = loss_original.numpy()
     loss_vectorized_value = loss_vectorized.numpy()
+    loss_olin_value = loss_olin.numpy()
 
     # Print the losses and timing for comparison
     print(f"Original Loss: {loss_original_value}, Time Taken: {original_duration} seconds")
     print(f"Vectorized Loss: {loss_vectorized_value}, Time Taken: {vectorized_duration} seconds")
+    print(f"Olin Loss: {loss_olin_value}, Time Taken: {olin_duration} seconds")
 
     # # Check if the losses are approximately equal
     # np.testing.assert_almost_equal(loss_original_value, loss_vectorized_value, decimal=5)
