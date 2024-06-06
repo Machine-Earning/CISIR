@@ -2631,9 +2631,9 @@ class ModelBuilder:
         # tf.print("Total error before normalization:", total_error)
 
         if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error  # total loss
+            return total_error / 2  # total loss
         elif reduction == tf.keras.losses.Reduction.NONE:
-            denom = tf.cast(int_batch_size * (int_batch_size - 1) / 2, dtype=tf.float32)
+            denom = tf.cast(int_batch_size * (int_batch_size - 1), dtype=tf.float32)
             # tf.print(denom)
             return total_error / denom  # average loss
         else:
@@ -2670,10 +2670,10 @@ class ModelBuilder:
 
         # Apply reduction
         if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error  # total loss
+            return total_error / 2  # total loss
         elif reduction == tf.keras.losses.Reduction.NONE:
             # Calculate the number of pairs
-            num_pairs = 2 * int_batch_size - 3
+            num_pairs = 2 * (2 * int_batch_size - 3)
             denom = tf.cast(num_pairs, dtype=tf.float32)
             return total_error / denom  # average loss
         else:
@@ -2708,14 +2708,14 @@ class ModelBuilder:
         # pairwise_loss_masked = pairwise_loss #* mask
 
         # Sum over all unique pairs
-        # 0.5 is used for derivative simplification, not because of upper triangle;s division by 2
+        # take the upper triangle of the matrix so multiply by 0.5
         total_error = 0.5 * tf.reduce_sum(pairwise_loss)  # pairwise_loss_masked)
 
         # Number of unique comparisons, excluding self-pairs
-        num_comparisons = tf.cast(batch_size * (batch_size - 1) / 2, dtype=tf.float32)
+        num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=tf.float32)
 
         if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error  # upper triangle only
+            return total_error / 2  # upper triangle only
         elif reduction == tf.keras.losses.Reduction.NONE:
             # Avoid division by zero
             return total_error / num_comparisons  # average over all elements
