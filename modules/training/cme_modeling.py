@@ -2709,7 +2709,7 @@ class ModelBuilder:
         total_error = tf.constant(0.0, dtype=tf.float32)  # Initialize
 
         # Shape invariant for total_error to ensure it remains a scalar
-        total_error = tf.autograph.experimental.set_loop_options(shape_invariants=tf.constant(0.0, dtype=tf.float32))
+        # total_error = tf.autograph.experimental.set_loop_options(shape_invariants=tf.constant(0.0, dtype=tf.float32))
 
         # Loop through the first three points to create initial pairs
         for i in tf.range(3):
