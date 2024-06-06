@@ -189,8 +189,16 @@ def main():
                     seed=SEED,
                     split=0.25,
                     debug=False)
-                
-                # filter validation loss
+
+                # filter validation set
+                X_val, y_val_norm = filter_ds(
+                    X_val, y_val_norm,
+                    low_threshold=norm_lower_t,
+                    high_threshold=norm_upper_t,
+                    N=750, seed=SEED)
+
+                print(f'X_val.shape: {X_val.shape}')
+                print(f'y_val.shape: {y_val_norm.shape}')
 
                 # print a sample of the training cme_files
                 # print(f'X_train[0]: {X_train[0]}')

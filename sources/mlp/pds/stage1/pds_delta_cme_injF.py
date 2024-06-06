@@ -50,8 +50,6 @@ def main():
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
             for add_slope in [False]:
-                # PARAMS
-                # inputs_to_use = ['e0.5']
                 # add_slope = True
                 outputs_to_use = ['delta_p']
 
@@ -191,6 +189,16 @@ def main():
                     seed=SEED,
                     split=0.25,
                     debug=False)
+
+                # filter validation set
+                X_val, y_val_norm = filter_ds(
+                    X_val, y_val_norm,
+                    low_threshold=norm_lower_t,
+                    high_threshold=norm_upper_t,
+                    N=750, seed=SEED)
+
+                print(f'X_val.shape: {X_val.shape}')
+                print(f'y_val.shape: {y_val_norm.shape}')
 
                 # print a sample of the training cme_files
                 # print(f'X_train[0]: {X_train[0]}')
