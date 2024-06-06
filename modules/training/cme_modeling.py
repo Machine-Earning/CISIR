@@ -2611,7 +2611,7 @@ class ModelBuilder:
         :param reduction: The type of reduction to apply to the loss.
         :return: The average error for all unique combinations of the samples in the batch.
         """
-        int_batch_size = tf.shape(z_pred)[0]
+        int_batch_size = tf.shape(y_true)[0]
         total_error = tf.constant(0.0, dtype=tf.float32)
 
         # tf.print(" received batch size:", int_batch_size)
@@ -2627,12 +2627,14 @@ class ModelBuilder:
 
                 # tf.print("Pair (i, j):", i, j, "z1, z2:", z1, z2, "label1, label2:", label1, label2, "err:", err)
 
+        total_error = total_error / 2
+        num_pairs = tf.cast((int_batch_size * (int_batch_size - 1)) / 2, dtype=tf.float32)
+
         if reduction == tf.keras.losses.Reduction.SUM:
             return total_error  # total loss
         elif reduction == tf.keras.losses.Reduction.NONE:
-            denom = tf.cast(int_batch_size * (int_batch_size - 1) / 2, dtype=tf.float32)
             # tf.print(denom)
-            return total_error / denom  # average loss
+            return total_error / num_pairs  # average loss
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
@@ -2645,7 +2647,7 @@ class ModelBuilder:
         :param reduction: The type of reduction to apply to the loss.
         :return: The average error for the specified combinations of the samples in the batch.
         """
-        int_batch_size = tf.shape(z_pred)[0]
+        int_batch_size = tf.shape(y_true)[0]
         total_error = tf.constant(0.0, dtype=tf.float32)
 
         # Loop through the first three points to create initial pairs
@@ -2665,14 +2667,15 @@ class ModelBuilder:
             err = error(z_pred[i], z_pred[i - 2], y_true[i], y_true[i - 2])
             total_error += tf.cast(err, dtype=tf.float32)
 
+        total_error = total_error / 2
+        # Calculate the number of pairs
+        num_pairs = tf.cast(2 * int_batch_size - 3, dtype=tf.float32)
+
         # Apply reduction
         if reduction == tf.keras.losses.Reduction.SUM:
             return total_error  # total loss
         elif reduction == tf.keras.losses.Reduction.NONE:
-            # Calculate the number of pairs
-            num_pairs = 2 * int_batch_size - 3
-            denom = tf.cast(num_pairs, dtype=tf.float32)
-            return total_error / denom  # average loss
+            return total_error / num_pairs # average loss
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
@@ -2706,14 +2709,14 @@ class ModelBuilder:
 
         # Sum over all unique pairs
         # take the upper triangle of the matrix so multiply by 0.5
-        total_error = tf.reduce_sum(pairwise_loss_masked)  # pairwise_loss_masked)
-        # total_error = total_error / 2  # cancel derivative square
+        total_error = 0.5 * tf.reduce_sum(pairwise_loss_masked)  # pairwise_loss_masked)
+        total_error = total_error / 2  # cancel derivative square
 
         # Number of unique comparisons, excluding self-pairs
-        num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=tf.float32)
+        num_comparisons = tf.cast(batch_size * (batch_size - 1) / 2, dtype=tf.float32)
 
         if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error / 2  # upper triangle only
+            return total_error  # upper triangle only
         elif reduction == tf.keras.losses.Reduction.NONE:
             # Avoid division by zero
             return total_error / num_comparisons  # average over all elements
