@@ -5,7 +5,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import numpy as np
 import tensorflow as tf
@@ -195,7 +195,7 @@ def main():
                     X_val, y_val_norm,
                     low_threshold=norm_lower_t,
                     high_threshold=norm_upper_t,
-                    N=750, seed=SEED)
+                    N=200, seed=SEED)
 
                 print(f'X_val.shape: {X_val.shape}')
                 print(f'y_val.shape: {y_val_norm.shape}')
