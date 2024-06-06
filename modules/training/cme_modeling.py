@@ -29,42 +29,27 @@ from tensorflow.keras.layers import (
 # from tensorflow.python.profiler import profiler_v2 as profiler
 
 
-def ydist(val1: float, val2: float) -> float:
+def error(z1, z2, label1, label2):
     """
-    Computes the squared distance between two label values.
+    Computes the error between the squared L2 norm distance of two input predicted z values and the squared distance
+    between their labels.
 
-    :param val1: The first label value.
-    :param val2: The second label value.
-    :return: The squared distance.
+    :param z1: The predicted z value tensor for the first input sample.
+    :param z2: The predicted z value tensor for the second input sample.
+    :param label1: The label tensor of the first input sample.
+    :param label2: The label tensor of the second input sample.
+    :return: The squared difference tensor between the zdist and ydist.
     """
-    return (val1 - val2) ** 2
+    # Compute the squared L2 norm distance between z1 and z2
+    z_dist = tf.reduce_sum(tf.square(z1 - z2), axis=-1)
 
+    # Compute the squared distance between label1 and label2
+    y_dist = tf.square(label1 - label2)
 
-def zdist(vec1: Tensor, vec2: Tensor) -> Tensor:
-    """
-    Computes the squared L2 norm distance between two input feature vectors.
+    # Compute the squared difference between z_dist and y_dist
+    squared_difference = tf.square(z_dist - y_dist)
 
-    :param vec1: The first input feature vector.
-    :param vec2: The second input feature vector.
-    :return: The squared L2 norm distance.
-    """
-    return tf.reduce_sum(tf.square(vec1 - vec2))
-
-
-def error(z1: Tensor, z2: Tensor, label1: float, label2: float) -> Tensor:
-    """
-    Computes the error between the zdist of two input predicted z values and their ydist.
-    Range of the error is [0, 8].
-
-    :param z1: The predicted z value for the first input sample.
-    :param z2: The predicted z value for the second input sample.
-    :param label1: The label of the first input sample.
-    :param label2: The label of the second input sample.
-    :return: The squared difference between the zdist and ydist.
-    """
-    squared_difference = (zdist(z1, z2) - ydist(label1, label2)) ** 2
-    # added multiplication by .5 to reduce the error range to 0-8
-    return tf.reduce_sum(squared_difference)
+    return squared_difference
 
 
 def pds_space_norm(y_train: np.ndarray,
@@ -2723,6 +2708,60 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
+    def pds_olin_loss_vec(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
+        """
+        Computes the loss for a batch of predicted features and their labels using a specific pairing strategy.
+
+        :param y_true: A batch of true label values, shape of [batch_size, 1].
+        :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
+        :param reduction: The type of reduction to apply to the loss.
+        :return: The average error for the specified combinations of the samples in the batch.
+        """
+        int_batch_size = tf.shape(y_true)[0]
+
+        # Create indices for pairs (0, 1), (0, 2), (1, 2)
+        pairs_first_three = tf.constant([[0, 1], [0, 2], [1, 2]], dtype=tf.int32)
+
+        # Compute error for the first three pairs
+        z1_first_three = tf.gather(z_pred, pairs_first_three[:, 0])
+        z2_first_three = tf.gather(z_pred, pairs_first_three[:, 1])
+        y1_first_three = tf.gather(y_true, pairs_first_three[:, 0])
+        y2_first_three = tf.gather(y_true, pairs_first_three[:, 1])
+
+        first_three_errors = error(z1_first_three, z2_first_three, y1_first_three, y2_first_three)
+
+        # Indices for the rest of the points
+        rest_indices = tf.range(3, int_batch_size)
+
+        # Gather z_pred and y_true for the rest of the points
+        z_rest = tf.gather(z_pred, rest_indices)
+        y_rest = tf.gather(y_true, rest_indices)
+
+        # Gather z_pred and y_true for the previous points (i-1 and i-2)
+        z_rest_minus_1 = tf.gather(z_pred, rest_indices - 1)
+        y_rest_minus_1 = tf.gather(y_true, rest_indices - 1)
+
+        z_rest_minus_2 = tf.gather(z_pred, rest_indices - 2)
+        y_rest_minus_2 = tf.gather(y_true, rest_indices - 2)
+
+        # Compute errors for the rest of the points
+        rest_errors_1 = error(z_rest, z_rest_minus_1, y_rest, y_rest_minus_1)
+        rest_errors_2 = error(z_rest, z_rest_minus_2, y_rest, y_rest_minus_2)
+
+        # Combine all errors
+        total_error = tf.reduce_sum(first_three_errors) + tf.reduce_sum(rest_errors_1) + tf.reduce_sum(rest_errors_2)
+
+        # Calculate the number of pairs
+        num_pairs = tf.cast(2 * int_batch_size - 3, dtype=tf.float32)
+
+        # Apply reduction
+        if reduction == tf.keras.losses.Reduction.SUM:
+            return total_error  # total loss
+        elif reduction == tf.keras.losses.Reduction.NONE:
+            return total_error / num_pairs  # average loss
+        else:
+            raise ValueError(f"Unsupported reduction type: {reduction}.")
+
 
 class NormalizeLayer(layers.Layer):
     def __init__(self, epsilon: float = 1e-9, **kwargs):
@@ -3384,15 +3423,24 @@ if __name__ == '__main__':
     end_time_olin = time.time()
     olin_duration = end_time_olin - start_time_olin
 
+    # Time and compute loss using the vectorized olin function
+    print("Computing loss using the vectorized olin function...")
+    start_time_olin_vec = time.time()
+    loss_olin_vec = loss_tester.pds_olin_loss_vec(y_true_tensor, z_pred_tensor)
+    end_time_olin_vec = time.time()
+    olin_vec_duration = end_time_olin_vec - start_time_olin_vec
+
     # Evaluate the TensorFlow tensors to get their numpy values
     loss_original_value = loss_original.numpy()
     loss_vectorized_value = loss_vectorized.numpy()
     loss_olin_value = loss_olin.numpy()
+    loss_olin_vec_value = loss_olin_vec.numpy()
 
     # Print the losses and timing for comparison
     print(f"Original Loss: {loss_original_value}, Time Taken: {original_duration} seconds")
     print(f"Vectorized Loss: {loss_vectorized_value}, Time Taken: {vectorized_duration} seconds")
     print(f"Olin Loss: {loss_olin_value}, Time Taken: {olin_duration} seconds")
+    print(f"Vectorized Olin Loss: {loss_olin_vec_value}, Time Taken: {olin_vec_duration} seconds")
 
     # # Check if the losses are approximately equal
     # np.testing.assert_almost_equal(loss_original_value, loss_vectorized_value, decimal=5)
