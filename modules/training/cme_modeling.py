@@ -3540,8 +3540,8 @@ if __name__ == '__main__':
     loss_tester = ModelBuilder()
     # Generate dummy data for testing
     np.random.seed(42)  # For reproducibility
-    batch_size = 100
-    z_dim = 9
+    batch_size = 4096
+    z_dim = 128
     y_true_dummy = np.random.rand(batch_size, 1).astype(np.float32) - 0.5
     z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32) - 0.5
 
@@ -3578,11 +3578,11 @@ if __name__ == '__main__':
     # z_pred_tensor = tf.convert_to_tensor(fabricated_z, dtype=tf.float32)
 
     # Time and compute loss using the original function
-    print("Computing loss using the original function...")
-    start_time_original = time.time()
-    loss_original = loss_tester.pds_loss(y_true_tensor, z_pred_tensor)
-    end_time_original = time.time()
-    original_duration = end_time_original - start_time_original
+    # print("Computing loss using the original function...")
+    # start_time_original = time.time()
+    # loss_original = loss_tester.pds_loss(y_true_tensor, z_pred_tensor)
+    # end_time_original = time.time()
+    # original_duration = end_time_original - start_time_original
 
     # Time and compute loss using the vectorized function
     print("Computing loss using the vectorized function...")
@@ -3606,13 +3606,13 @@ if __name__ == '__main__':
     # olin_vec_duration = end_time_olin_vec - start_time_olin_vec
 
     # Evaluate the TensorFlow tensors to get their numpy values
-    loss_original_value = loss_original.numpy()
+    # loss_original_value = loss_original.numpy()
     loss_vectorized_value = loss_vectorized.numpy()
     loss_olin_value = loss_olin.numpy()
     # loss_olin_vec_value = loss_olin_vec.numpy()
 
     # Print the losses and timing for comparison
-    print(f"Original Loss: {loss_original_value}, Time Taken: {original_duration} seconds")
+    # print(f"Original Loss: {loss_original_value}, Time Taken: {original_duration} seconds")
     print(f"Vectorized Loss: {loss_vectorized_value}, Time Taken: {vectorized_duration} seconds")
     print(f"Olin Loss: {loss_olin_value}, Time Taken: {olin_duration} seconds")
     # print(f"Vectorized Olin Loss: {loss_olin_vec_value}, Time Taken: {olin_vec_duration} seconds")

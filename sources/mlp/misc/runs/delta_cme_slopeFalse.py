@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import numpy as np
 import tensorflow as tf
@@ -86,8 +86,9 @@ def main():
     """
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [False]:
-            for alpha in np.arange(0.1, 0.52, 0.01):
+        
+        for alpha in [0.2, 0.3]:
+            for add_slope in [False, True]:
                 for cme_speed_threshold in [0]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
@@ -137,7 +138,7 @@ def main():
 
                     weight_decay = 1e-8  # higher weight decay
                     momentum_beta1 = 0.9  # higher momentum beta1
-                    batch_size = 4096
+                    batch_size = 128
                     epochs = 100000  # higher epochs
                     hiddens = [
                         2048, 1024,
