@@ -478,7 +478,7 @@ class ModelBuilder:
                             verbose=verbose)
 
         # Get the best epoch from early stopping
-        best_epoch = early_stopping_cb.stopped_epoch - patience + 1  # Adjust for the offset
+        best_epoch = early_stopping_cb.stopped_epoch  + 1  # Adjust for the offset
         # best_epoch = np.argmin(history.history['val_loss']) + 1
 
         # Plot training loss and validation loss
@@ -871,7 +871,7 @@ class ModelBuilder:
         )
 
         # Get the best epoch from early stopping
-        best_epoch = early_stopping_cb.stopped_epoch - patience + 1  # Adjust for the offset
+        best_epoch = early_stopping_cb.stopped_epoch  + 1  # Adjust for the offset
 
         # Reset model weights to initial state before retraining
         model.set_weights(initial_weights)
@@ -1423,7 +1423,7 @@ class ModelBuilder:
         for cb in callbacks_list:
             cb.on_train_end(logs=logs)
 
-        best_epoch = early_stopping_cb.stopped_epoch - patience + 1  # Adjust for the offset
+        best_epoch = early_stopping_cb.stopped_epoch  + 1  # Adjust for the offset
 
         # Plotting the losses
         # plt.plot(history['loss'], label='Training Loss')

@@ -278,7 +278,7 @@ def main():
                                                 ])
 
                     # Determine the optimal number of epochs from early stopping
-                    optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
+                    optimal_epochs = early_stopping.stopped_epoch  + 1  # Adjust for the offset
                     final_mlp_model_sep = create_mlp(
                         input_dim=n_features,
                         hiddens=hiddens,

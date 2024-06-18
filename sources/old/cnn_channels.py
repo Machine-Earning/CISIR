@@ -117,7 +117,7 @@ def main():
             plt.savefig(f'cnn_loss_{title}.png')
 
             # Determine the optimal number of epochs from early stopping
-            optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
+            optimal_epochs = early_stopping.stopped_epoch  + 1  # Adjust for the offset
             final_cnn_model_sep = create_cnns_ch(input_dims=n_features)  # Recreate the model architecture
             final_cnn_model_sep.compile(optimizer=Adam(learning_rate=learning_rate),
                                         loss={'forecast_head': 'mse'})  # Compile the model just like before

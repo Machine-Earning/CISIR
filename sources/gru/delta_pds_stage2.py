@@ -306,7 +306,7 @@ def main():
                     # plt.savefig(f'mlp_loss_{title}.png')
 
                     # Determine the optimal number of epochs from early stopping
-                    optimal_epochs = early_stopping.stopped_epoch - patience + 1  # Adjust for the offset
+                    optimal_epochs = early_stopping.stopped_epoch  + 1  # Adjust for the offset
                     final_mlp_model_sep_stage1 = create_gru(
                         input_dims=n_features,
                         gru_units=gru_units,
