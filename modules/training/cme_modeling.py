@@ -6,7 +6,7 @@
 import time
 from itertools import cycle
 # types for type hinting
-from typing import Tuple, List, Optional, Dict, Any
+from typing import Tuple, List, Optional, Dict, Any, Generator
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -715,9 +715,9 @@ class ModelBuilder:
                       lower_bound: float = -0.5,
                       upper_bound: float = 0.5,
                       patience: int = 9,
-                      save_tag=None,
-                      callbacks_list=None,
-                      verbose: int = 1):
+                      save_tag: Optional[str] = None,
+                      callbacks_list: Optional[List[tf.keras.callbacks.Callback]] = None,
+                      verbose: int = 1) -> tf.keras.callbacks.History:
         """
         Trains the model and returns the training history with specific batch constraints.
 
@@ -745,12 +745,12 @@ class ModelBuilder:
             callbacks_list = []
 
         # Initialize early stopping and model checkpointing for subtraining
-        early_stopping_cb = callbacks.EarlyStopping(
+        early_stopping_cb = tf.keras.callbacks.EarlyStopping(
             monitor='val_loss',
             patience=patience,
             restore_best_weights=True
         )
-        checkpoint_cb = callbacks.ModelCheckpoint(
+        checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
             filepath=f"model_weights_{str(save_tag)}.h5",
             monitor='val_loss',
             save_best_only=True,
@@ -781,16 +781,67 @@ class ModelBuilder:
             raise ValueError(f"Batch size must be at least the size of the injected rare samples in final training. "
                              f"Current batch size: {batch_size}, size of final training rare samples: {len(train_rare_indices)}")
 
-        # Generalized data generator to yield batches
-        def data_generator(X, y, rare_indices, freq_indices, batch_size):
+        def data_generator(X: np.ndarray, y: np.ndarray, rare_indices: np.ndarray, freq_indices: np.ndarray,
+                           batch_size: int) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
+            """
+            Generalized data generator to yield batches with a mixture of rare and frequent samples.
+
+            :param X: Feature set.
+            :param y: Labels.
+            :param rare_indices: Indices of the rare samples.
+            :param freq_indices: Indices of the frequent samples.
+            :param batch_size: Size of each batch.
+
+            :yield: Batches of (features, labels) with mixed rare and frequent samples.
+            """
             while True:
+                # Shuffle the indices of frequent samples to ensure randomization in each epoch
                 np.random.shuffle(freq_indices)
+                # Iterate through the frequent samples in chunks (batches)
                 for start in range(0, len(freq_indices), batch_size - len(rare_indices)):
+                    # Determine the end of the current batch
                     end = min(start + batch_size - len(rare_indices), len(freq_indices))
+                    # Select the current batch of frequent sample indices
                     freq_batch_indices = freq_indices[start:end]
+                    # Combine the rare and frequent sample indices to form the final batch indices
                     batch_indices = np.concatenate([rare_indices, freq_batch_indices])
+                    # Shuffle the combined batch indices to mix rare and frequent samples
                     np.random.shuffle(batch_indices)
-                    yield X[batch_indices], y[batch_indices]
+                    # Extract the actual data (features and labels) for the current batch
+                    batch_X = X[batch_indices]
+                    batch_y = y[batch_indices]
+                    # Ensure that batch_y has the correct shape
+                    batch_y = batch_y.reshape(-1)
+                    # Yield the current batch (features and labels) to be used by the training loop
+                    yield batch_X, batch_y
+
+        # Create a TensorFlow Dataset from the data generator
+        def create_tf_dataset(
+                X: np.ndarray,
+                y: np.ndarray,
+                rare_indices: np.ndarray,
+                freq_indices: np.ndarray,
+                batch_size: int
+        ) -> tf.data.Dataset:
+            """
+            Creates a TensorFlow dataset from the data generator.
+
+            :param X: Feature set.
+            :param y: Labels.
+            :param rare_indices: Indices of the rare samples.
+            :param freq_indices: Indices of the frequent samples.
+            :param batch_size: Size of each batch.
+
+            :return: A tf.data.Dataset object.
+            """
+            dataset = tf.data.Dataset.from_generator(
+                lambda: data_generator(X, y, rare_indices, freq_indices, batch_size),
+                output_signature=(
+                    tf.TensorSpec(shape=(None, X.shape[1]), dtype=tf.float32),
+                    tf.TensorSpec(shape=(None,), dtype=tf.float32)
+                )
+            )
+            return dataset.prefetch(tf.data.AUTOTUNE)
 
         # Compile the model
         model.compile(
@@ -801,12 +852,20 @@ class ModelBuilder:
         # Calculate steps per epoch for subtraining
         steps_per_epoch_subtrain = len(subtrain_freq_indices) // (batch_size - len(subtrain_rare_indices))
 
+        # Create the TensorFlow dataset for subtraining
+        subtrain_dataset = create_tf_dataset(
+            X_subtrain,
+            y_subtrain,
+            subtrain_rare_indices,
+            subtrain_freq_indices,
+            batch_size)
+
         # First, train the model with a validation set to determine the best epoch
         history = model.fit(
-            data_generator(X_subtrain, y_subtrain, subtrain_rare_indices, subtrain_freq_indices, batch_size),
+            subtrain_dataset,
             steps_per_epoch=steps_per_epoch_subtrain,
             epochs=epochs,
-            validation_data=(X_val, y_val),  # weight the validation loss here
+            validation_data=(X_val, y_val),
             callbacks=subtrain_callbacks_list,
             verbose=verbose
         )
@@ -820,15 +879,20 @@ class ModelBuilder:
         # Calculate steps per epoch for final training
         steps_per_epoch_final = len(train_freq_indices) // (batch_size - len(train_rare_indices))
 
-        # Add checkpoint callback to the list of final training callbacks
-        final_callbacks_list = callbacks_list
+        # Create the TensorFlow dataset for final training
+        final_train_dataset = create_tf_dataset(
+            X_train,
+            y_train,
+            train_rare_indices,
+            train_freq_indices,
+            batch_size)
 
         # Fit the model using the custom generator on the entire training set
         model.fit(
-            data_generator(X_train, y_train, train_rare_indices, train_freq_indices, batch_size),
+            final_train_dataset,
             steps_per_epoch=steps_per_epoch_final,
             epochs=best_epoch,
-            callbacks=final_callbacks_list,
+            callbacks=callbacks_list,
             verbose=verbose
         )
 
