@@ -1610,7 +1610,7 @@ class ModelBuilder:
                 tf.TensorSpec(shape=(None, X_train.shape[1]), dtype=tf.float32),
                 tf.TensorSpec(shape=(None,), dtype=tf.float32)
             )
-        ).batch(batch_size).prefetch(tf.data.AUTOTUNE)
+        ).prefetch(tf.data.AUTOTUNE)
 
         for epoch in range(epochs):
             for cb in callbacks_list:
