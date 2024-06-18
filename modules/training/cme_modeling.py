@@ -1598,6 +1598,8 @@ class ModelBuilder:
                     # Extract the actual data (features and labels) for the current batch
                     batch_X = X_train[batch_indices]
                     batch_y = y_train[batch_indices]
+                    # Ensure that batch_y has the correct shape
+                    batch_y = batch_y.reshape(-1)
 
                     # Yield the current batch (features and labels) to be used by the training loop
                     yield batch_X, batch_y
