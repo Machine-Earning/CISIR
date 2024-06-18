@@ -1617,7 +1617,7 @@ class ModelBuilder:
                 cb.on_epoch_begin(epoch, logs=logs)
 
             epoch_loss = 0
-            for step, (batch_X, batch_y) in enumerate(dataset):
+            for step, (batch_X, batch_y) in enumerate(dataset.take(steps_per_epoch)):
                 with tf.GradientTape() as tape:
                     y_pred = model(batch_X, training=True)
                     loss = self.pds_loss_dl_vec(batch_y, y_pred, sample_weights=train_label_weights_dict)
