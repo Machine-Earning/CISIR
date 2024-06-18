@@ -1515,12 +1515,12 @@ class ModelBuilder:
                              callbacks_list=None,
                              verbose: int = 1) -> Dict[str, List[Any]]:
         """
-        Custom training loop to stage2 the model with sample weights and injected rare samples.
+        Custom training loop to train the model with sample weights and injected rare samples.
 
         :param X_train: training and validation sets together
         :param y_train: labels of training and validation sets together
-        :param model: The TensorFlow model to stage2.
-        :param train_label_weights_dict: Dictionary containing label weights for the stage2 set.
+        :param model: The TensorFlow model to train.
+        :param train_label_weights_dict: Dictionary containing label weights for the training set.
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
         :param batch_size: The batch size for training.
@@ -1533,120 +1533,6 @@ class ModelBuilder:
 
         :return: The training history as a dictionary.
         """
-        # logdir = "./logs/profile"
-        #
-        # if callbacks_list is None:
-        #     callbacks_list = []
-        #
-        # # Identify rare and frequent samples
-        # rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
-        # freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
-        #
-        # if rare_injection_count == -1:
-        #     rare_injection_count = len(rare_indices)
-        # if rare_injection_count > len(rare_indices):
-        #     raise ValueError(
-        #         f"rare_injection_count ({rare_injection_count}) is greater than the number of rare samples "
-        #         f"({len(rare_indices)}).")
-        #
-        # # Calculate the steps per epoch
-        # steps_per_epoch = len(freq_indices) // (batch_size - rare_injection_count)
-        # # Adjust rare_injection_count based on the ratio of rare samples to the number of batches
-        # ratio_based_injection_count = max(1, len(rare_indices) // steps_per_epoch)
-        # if ratio_based_injection_count > rare_injection_count:
-        #     print(
-        #         f"Adjusting rare_injection_count to {ratio_based_injection_count} based on the ratio of rare samples "
-        #         f"to batches.")
-        #     rare_injection_count = ratio_based_injection_count
-        #
-        # # Check if the batch size is sufficient
-        # if batch_size < rare_injection_count:
-        #     raise ValueError(f"Batch size must be at least the number of injected rare samples. "
-        #                      f"Current batch size: {batch_size}, rare_injection_count: {rare_injection_count}")
-        #
-        # # Setting up callback environment
-        # params = {
-        #     'epochs': epochs,
-        #     'steps': None,
-        #     'verbose': verbose,
-        #     'do_validation': False,
-        #     'metrics': ['loss'],
-        # }
-        # for cb in callbacks_list:
-        #     cb.set_model(model)
-        #     cb.set_params(params)
-        #
-        # logs = {}
-        # for cb in callbacks_list:
-        #     cb.on_train_begin(logs=logs)
-        #
-        # optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-        # model.compile(optimizer=optimizer)
-        #
-        # retrain_history = {'loss': []}
-        #
-        # # TODO: figure out how Tensorflow not copy batch
-        # # approach 1: copy
-        # # approach 2: allocate and deallocate
-        # # approach 3: special data structure that doesn't need copy - find out Tensorflow way
-        # def data_generator(X, y, batch_size):
-        #     while True:
-        #         np.random.shuffle(freq_indices)
-        #         for start in range(0, len(freq_indices), batch_size - rare_injection_count):
-        #             end = min(start + batch_size - rare_injection_count, len(freq_indices))
-        #             freq_batch_indices = freq_indices[start:end]
-        #             rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
-        #             batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
-        #             np.random.shuffle(batch_indices)
-        #             batch_X = X[batch_indices]
-        #             batch_y = y[batch_indices]
-        #
-        #             yield batch_X, batch_y
-        #
-        # steps_per_epoch = len(freq_indices) // (batch_size - rare_injection_count)
-        #
-        # # Start the profiler
-        # # tf.profiler.experimental.start(logdir)
-        #
-        # for epoch in range(epochs):
-        #     for cb in callbacks_list:
-        #         cb.on_epoch_begin(epoch, logs=logs)
-        #
-        #     epoch_loss = 0
-        #     for step in range(steps_per_epoch):
-        #         batch_X, batch_y = next(
-        #             data_generator(X_train, y_train, batch_size)
-        #         )
-        #
-        #         with tf.GradientTape() as tape:
-        #             y_pred = model(batch_X, training=True)
-        #             loss = self.pds_loss_dl_vec(batch_y, y_pred, sample_weights=train_label_weights_dict)
-        #
-        #         gradients = tape.gradient(loss, model.trainable_variables)
-        #         optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-        #         epoch_loss += loss.numpy()
-        #
-        #     avg_epoch_loss = epoch_loss / steps_per_epoch
-        #     retrain_history['loss'].append(avg_epoch_loss)
-        #     print(f"Retrain Epoch {epoch + 1}/{epochs}, Loss: {avg_epoch_loss}")
-        #
-        #     logs = {'loss': avg_epoch_loss}  # Update logs with retrain loss
-        #
-        #     for cb in callbacks_list:
-        #         cb.on_epoch_end(epoch, logs=logs)
-        #
-        # for cb in callbacks_list:
-        #     cb.on_train_end(logs=logs)
-        #
-        # # Stop the profiler
-        # # tf.profiler.experimental.stop()
-        #
-        # model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
-        # print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
-        #
-        # return retrain_history
-
-        logdir = "./logs/profile"
 
         if callbacks_list is None:
             callbacks_list = []
@@ -1693,31 +1579,43 @@ class ModelBuilder:
 
         retrain_history = {'loss': []}
 
-        def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
+        def data_generator():
             while True:
+                # Shuffle the indices of the frequent samples to ensure randomization in each epoch
                 np.random.shuffle(freq_indices)
+                # Iterate through the frequent samples in chunks (batches)
                 for start in range(0, len(freq_indices), batch_size - rare_injection_count):
+                    # Determine the end of the current batch
                     end = min(start + batch_size - rare_injection_count, len(freq_indices))
+                    # Select the current batch of frequent sample indices
                     freq_batch_indices = freq_indices[start:end]
+                    # Randomly select rare samples to inject into the batch
                     rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
+                    # Combine the rare and frequent sample indices to form the final batch indices
                     batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
+                    # Shuffle the combined batch indices to mix rare and frequent samples
                     np.random.shuffle(batch_indices)
-                    batch_X = X[batch_indices]
-                    batch_y = y[batch_indices]
+                    # Extract the actual data (features and labels) for the current batch
+                    batch_X = X_train[batch_indices]
+                    batch_y = y_train[batch_indices]
 
+                    # Yield the current batch (features and labels) to be used by the training loop
                     yield batch_X, batch_y
 
-        gen = data_generator(X_train, y_train, batch_size, rare_indices, freq_indices, rare_injection_count)
-        steps_per_epoch = len(freq_indices) // (batch_size - rare_injection_count)
+        dataset = tf.data.Dataset.from_generator(
+            data_generator,
+            output_signature=(
+                tf.TensorSpec(shape=(None, X_train.shape[1]), dtype=tf.float32),
+                tf.TensorSpec(shape=(None,), dtype=tf.float32)
+            )
+        ).batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
         for epoch in range(epochs):
             for cb in callbacks_list:
                 cb.on_epoch_begin(epoch, logs=logs)
 
             epoch_loss = 0
-            for step in range(steps_per_epoch):
-                batch_X, batch_y = next(gen)
-
+            for step, (batch_X, batch_y) in enumerate(dataset):
                 with tf.GradientTape() as tape:
                     y_pred = model(batch_X, training=True)
                     loss = self.pds_loss_dl_vec(batch_y, y_pred, sample_weights=train_label_weights_dict)
@@ -1725,8 +1623,6 @@ class ModelBuilder:
                 gradients = tape.gradient(loss, model.trainable_variables)
                 optimizer.apply_gradients(zip(gradients, model.trainable_variables))
                 epoch_loss += loss.numpy()
-
-                del tape  # Ensure the tape is released
 
             avg_epoch_loss = epoch_loss / steps_per_epoch
             retrain_history['loss'].append(avg_epoch_loss)
