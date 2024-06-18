@@ -871,7 +871,7 @@ class ModelBuilder:
         )
 
         # Get the best epoch from early stopping
-        best_epoch = early_stopping_cb.stopped_epoch - patience + 1  # Adjust for the offset
+        best_epoch = early_stopping_cb.stopped_epoch + 1  # Adjust for the offset
 
         # Reset model weights to initial state before retraining
         model.set_weights(initial_weights)

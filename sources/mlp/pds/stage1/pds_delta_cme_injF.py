@@ -71,8 +71,8 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                    'epochs': int(10e4),  # 35k epochs
-                    'patience': int(2.5e4),
+                    'epochs': int(4e3),  # 35k epochs
+                    'patience': int(2.5e3),
                     'learning_rate': 1e-2,  # initial learning rate
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.9,  # Added momentum beta1
