@@ -157,7 +157,8 @@ def main():
                         inputs_to_use=inputs_to_use,
                         add_slope=add_slope,
                         outputs_to_use=outputs_to_use,
-                        cme_speed_threshold=cme_speed_threshold)
+                        cme_speed_threshold=cme_speed_threshold,
+                        shuffle_data=True)
                     X_test, y_test = build_dataset(
                         root_dir + '/testing',
                         inputs_to_use=inputs_to_use,
@@ -241,7 +242,7 @@ def main():
                     mb.overtrain_pds_dl_inj(
                         model_sep,
                         X_train, y_train_norm,
-                        train_label_weights_dict=train_weights_dict,
+                        train_label_weights_dict=None,
                         learning_rate=Options['learning_rate'],
                         epochs=Options['epochs'],
                         batch_size=Options['batch_size'],
