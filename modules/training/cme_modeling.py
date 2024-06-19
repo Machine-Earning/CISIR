@@ -478,7 +478,7 @@ class ModelBuilder:
                             verbose=verbose)
 
         # Get the best epoch from early stopping
-        best_epoch = early_stopping_cb.stopped_epoch  + 1  # Adjust for the offset
+        best_epoch = early_stopping_cb.stopped_epoch + 1  # Adjust for the offset
         # best_epoch = np.argmin(history.history['val_loss']) + 1
 
         # Plot training loss and validation loss
@@ -860,22 +860,9 @@ class ModelBuilder:
             subtrain_freq_indices,
             batch_size)
 
-        # Calculate steps per epoch for final training
-        steps_per_epoch_final = len(train_freq_indices) // (batch_size - len(train_rare_indices))
-
-        # Create the TensorFlow dataset for final training
-        final_train_dataset = create_tf_dataset(
-            X_train,
-            y_train,
-            train_rare_indices,
-            train_freq_indices,
-            batch_size)
-
-
         # First, train the model with a validation set to determine the best epoch
         history = model.fit(
-            # subtrain_dataset,
-            final_train_dataset,
+            subtrain_dataset,
             steps_per_epoch=steps_per_epoch_subtrain,
             epochs=epochs,
             validation_data=(X_val, y_val),
@@ -889,6 +876,16 @@ class ModelBuilder:
         # Reset model weights to initial state before retraining
         model.set_weights(initial_weights)
 
+        # Calculate steps per epoch for final training
+        steps_per_epoch_final = len(train_freq_indices) // (batch_size - len(train_rare_indices))
+
+        # Create the TensorFlow dataset for final training
+        final_train_dataset = create_tf_dataset(
+            X_train,
+            y_train,
+            train_rare_indices,
+            train_freq_indices,
+            batch_size)
 
         # Fit the model using the custom generator on the entire training set
         model.fit(
@@ -1426,7 +1423,7 @@ class ModelBuilder:
         for cb in callbacks_list:
             cb.on_train_end(logs=logs)
 
-        best_epoch = early_stopping_cb.stopped_epoch  + 1  # Adjust for the offset
+        best_epoch = early_stopping_cb.stopped_epoch + 1  # Adjust for the offset
 
         # Plotting the losses
         # plt.plot(history['loss'], label='Training Loss')
