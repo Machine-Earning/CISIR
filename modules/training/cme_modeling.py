@@ -2894,7 +2894,6 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
-    @tf.function(jit_compile=True)  # Enable XLA optimization
     def pds_loss_unit_vec(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
         """
         Vectorized computation of the loss for a batch of predicted features and their labels,
@@ -2911,7 +2910,8 @@ class ModelBuilder:
         pairwise_dotprod = tf.linalg.matmul(z_pred, z_pred, transpose_b=True)
 
         # Compute pairwise squared distances using the optimized formula
-        z_diff_squared = 2 - 2 * pairwise_dotprod
+        # z_diff_squared = 2 - 2 * pairwise_dotprod
+        z_diff_squared = 2 * (1 - pairwise_dotprod)
 
         # Calculate squared differences for y_true
         y_diff_squared = tf.square(y_true_diff)
