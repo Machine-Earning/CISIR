@@ -3,6 +3,8 @@
 # using validation loss to determine epoch number for training).
 # this module should be interchangeable with other modules (
 ##############################################################################################################
+import os
+import subprocess
 import time
 from itertools import cycle
 # types for type hinting
@@ -97,6 +99,16 @@ def pds_space_norm(y_train: np.ndarray,
         print(f"Normalized upper threshold: {norm_upper}")
 
     return y_normalized, norm_lower, norm_upper
+
+
+def query_gpu_memory_usage():
+    print("GPU MEMORY USAGE")
+    result = subprocess.run(
+        ['nvidia-smi', '--query-compute-apps=pid,used_memory', '--format=csv'],
+        stdout=subprocess.PIPE
+    )
+    output = result.stdout.decode('utf-8')
+    print(output)
 
 
 class ModelBuilder:
@@ -1676,16 +1688,13 @@ class ModelBuilder:
             )
         ).prefetch(tf.data.AUTOTUNE)
 
-        # Enable memory growth for the GPU
-        # gpus = tf.config.experimental.list_physical_devices('GPU')
-        # if gpus:
-        #     for gpu in gpus:
-        #         # physical devices cannot be modified after initiaalization
-        #         tf.config.experimental.set_memory_growth(gpu, True)
-        #         print(f"Memory Info Before Training: {tf.config.experimental.get_memory_info('GPU:0')}")
+        # Ensure log directory exists
+        logdir = "logdir"
+        if not os.path.exists(logdir):
+            os.makedirs(logdir)
 
         # Start TensorFlow Profiler
-        tf.profiler.experimental.start(logdir="logdir")
+        tf.profiler.experimental.start(logdir=logdir)
 
         latest_epoch = 0
 
@@ -1694,6 +1703,10 @@ class ModelBuilder:
                 latest_epoch = epoch  # Save the latest epoch in case of an error
                 for cb in callbacks_list:
                     cb.on_epoch_begin(epoch, logs=logs)
+
+                # Query GPU memory usage at the start of each epoch
+                query_gpu_memory_usage()
+
                 epoch_loss = 0
                 for step, (batch_X, batch_y) in enumerate(dataset.take(steps_per_epoch)):
                     with tf.GradientTape() as tape:
@@ -1713,6 +1726,9 @@ class ModelBuilder:
                 for cb in callbacks_list:
                     cb.on_epoch_end(epoch, logs=logs)
 
+                # Query GPU memory usage at the end of each epoch
+                query_gpu_memory_usage()
+
             for cb in callbacks_list:
                 cb.on_train_end(logs=logs)
 
@@ -1729,8 +1745,8 @@ class ModelBuilder:
             # Stop TensorFlow Profiler
             tf.profiler.experimental.stop()
 
-            # if gpus:
-            #     print(f"Memory Info After Training: {tf.config.experimental.get_memory_info('GPU:0')}")
+            # Query GPU memory usage after training
+            query_gpu_memory_usage()
 
         return retrain_history
 
