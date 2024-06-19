@@ -1677,11 +1677,12 @@ class ModelBuilder:
         ).prefetch(tf.data.AUTOTUNE)
 
         # Enable memory growth for the GPU
-        gpus = tf.config.experimental.list_physical_devices('GPU')
-        if gpus:
-            for gpu in gpus:
-                tf.config.experimental.set_memory_growth(gpu, True)
-                # print(f"Memory Info Before Training: {tf.config.experimental.get_memory_info('GPU:0')}")
+        # gpus = tf.config.experimental.list_physical_devices('GPU')
+        # if gpus:
+        #     for gpu in gpus:
+        #         # physical devices cannot be modified after initiaalization
+        #         tf.config.experimental.set_memory_growth(gpu, True)
+        #         print(f"Memory Info Before Training: {tf.config.experimental.get_memory_info('GPU:0')}")
 
         # Start TensorFlow Profiler
         tf.profiler.experimental.start(logdir="logdir")
@@ -1728,8 +1729,8 @@ class ModelBuilder:
             # Stop TensorFlow Profiler
             tf.profiler.experimental.stop()
 
-            if gpus:
-                print(f"Memory Info After Training: {tf.config.experimental.get_memory_info('GPU:0')}")
+            # if gpus:
+            #     print(f"Memory Info After Training: {tf.config.experimental.get_memory_info('GPU:0')}")
 
         return retrain_history
 
