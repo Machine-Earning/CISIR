@@ -888,6 +888,12 @@ class ModelBuilder:
         # Reset model weights to initial state before retraining
         model.set_weights(initial_weights)
 
+        # Re-Compile the model to reset the learning rate scheduler
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            loss=self.pds_loss_vec
+        )
+
         # Calculate steps per epoch for final training
         steps_per_epoch_final = len(train_freq_indices) // (batch_size - len(train_rare_indices))
 
