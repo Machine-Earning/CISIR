@@ -1681,7 +1681,7 @@ class ModelBuilder:
         if gpus:
             for gpu in gpus:
                 tf.config.experimental.set_memory_growth(gpu, True)
-                print(f"Memory Info Before Training: {tf.config.experimental.get_memory_info('GPU:0')}")
+                # print(f"Memory Info Before Training: {tf.config.experimental.get_memory_info('GPU:0')}")
 
         # Start TensorFlow Profiler
         tf.profiler.experimental.start(logdir="logdir")
