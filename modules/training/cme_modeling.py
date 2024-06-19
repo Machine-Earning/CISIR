@@ -2894,6 +2894,7 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
+    @tf.function(jit_compile=True)  # Enable XLA optimization
     def pds_loss_unit_vec(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
         """
         Vectorized computation of the loss for a batch of predicted features and their labels,
