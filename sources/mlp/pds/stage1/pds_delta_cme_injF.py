@@ -151,7 +151,8 @@ def main():
                     inputs_to_use=inputs_to_use,
                     add_slope=add_slope,
                     outputs_to_use=outputs_to_use,
-                    cme_speed_threshold=cme_speed_threshold)
+                    cme_speed_threshold=cme_speed_threshold,
+                    shuffle_data=True)
                 X_test, y_test = build_dataset(
                     root_dir + '/testing',
                     inputs_to_use=inputs_to_use,
