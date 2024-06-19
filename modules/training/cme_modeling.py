@@ -1676,34 +1676,60 @@ class ModelBuilder:
             )
         ).prefetch(tf.data.AUTOTUNE)
 
-        for epoch in range(epochs):
+        # Enable memory growth for the GPU
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        if gpus:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+                print(f"Memory Info Before Training: {tf.config.experimental.get_memory_info('GPU:0')}")
+
+        # Start TensorFlow Profiler
+        tf.profiler.experimental.start(logdir="logdir")
+
+        latest_epoch = 0
+
+        try:
+            for epoch in range(epochs):
+                latest_epoch = epoch  # Save the latest epoch in case of an error
+                for cb in callbacks_list:
+                    cb.on_epoch_begin(epoch, logs=logs)
+                epoch_loss = 0
+                for step, (batch_X, batch_y) in enumerate(dataset.take(steps_per_epoch)):
+                    with tf.GradientTape() as tape:
+                        y_pred = model(batch_X, training=True)
+                        loss = self.pds_loss_dl_vec(batch_y, y_pred, sample_weights=train_label_weights_dict)
+
+                    gradients = tape.gradient(loss, model.trainable_variables)
+                    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+                    epoch_loss += loss.numpy()
+
+                avg_epoch_loss = epoch_loss / steps_per_epoch
+                retrain_history['loss'].append(avg_epoch_loss)
+                print(f"Retrain Epoch {epoch + 1}/{epochs}, Loss: {avg_epoch_loss}")
+
+                logs = {'loss': avg_epoch_loss}  # Update logs with retrain loss
+
+                for cb in callbacks_list:
+                    cb.on_epoch_end(epoch, logs=logs)
+
             for cb in callbacks_list:
-                cb.on_epoch_begin(epoch, logs=logs)
+                cb.on_train_end(logs=logs)
 
-            epoch_loss = 0
-            for step, (batch_X, batch_y) in enumerate(dataset.take(steps_per_epoch)):
-                with tf.GradientTape() as tape:
-                    y_pred = model(batch_X, training=True)
-                    loss = self.pds_loss_dl_vec(batch_y, y_pred, sample_weights=train_label_weights_dict)
+            model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
+            print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
 
-                gradients = tape.gradient(loss, model.trainable_variables)
-                optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-                epoch_loss += loss.numpy()
+        except tf.errors.ResourceExhaustedError as e:
+            print("Out of memory error:", e)
+            # Optionally, save intermediate model weights or other states here
+            model.save_weights(f"underfit_final_model_weights_{str(save_tag)}_epoch{latest_epoch}.h5")
+            print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
 
-            avg_epoch_loss = epoch_loss / steps_per_epoch
-            retrain_history['loss'].append(avg_epoch_loss)
-            print(f"Retrain Epoch {epoch + 1}/{epochs}, Loss: {avg_epoch_loss}")
+        finally:
+            # Stop TensorFlow Profiler
+            tf.profiler.experimental.stop()
 
-            logs = {'loss': avg_epoch_loss}  # Update logs with retrain loss
-
-            for cb in callbacks_list:
-                cb.on_epoch_end(epoch, logs=logs)
-
-        for cb in callbacks_list:
-            cb.on_train_end(logs=logs)
-
-        model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
-        print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
+            if gpus:
+                print(f"Memory Info After Training: {tf.config.experimental.get_memory_info('GPU:0')}")
 
         return retrain_history
 
