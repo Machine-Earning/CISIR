@@ -2870,6 +2870,7 @@ class ModelBuilder:
         # tf.square(z_pred_diff) squares each element, keeping the shape [batch_size, batch_size, d]
         # tf.reduce_sum(..., axis=-1) sums over the last dimension (d),
         # resulting in shape [batch_size, batch_size]
+        # faster because square is done element-wise.
         z_diff_squared = tf.reduce_sum(tf.square(z_pred_diff), axis=-1)
         # Calculate squared differences for y_true
         y_diff_squared = tf.square(y_true_diff)
