@@ -2860,11 +2860,17 @@ class ModelBuilder:
         """
         # Compute pairwise differences for z_pred and y_true using broadcasting
         y_true_diff = y_true - tf.transpose(y_true)  # labels are not normalized
+        # Compute pairwise differences for z_pred using broadcasting
+        # z_pred[:, tf.newaxis, :] has shape [batch_size, 1, d]
+        # z_pred[tf.newaxis, :, :] has shape [1, batch_size, d]
+        # Broadcasting these gives a shape of [batch_size, batch_size, d]
         z_pred_diff = z_pred[:, tf.newaxis, :] - z_pred[tf.newaxis, :, :]
 
         # Calculate squared L2 norm for z_pred differences
+        # tf.square(z_pred_diff) squares each element, keeping the shape [batch_size, batch_size, d]
+        # tf.reduce_sum(..., axis=-1) sums over the last dimension (d),
+        # resulting in shape [batch_size, batch_size]
         z_diff_squared = tf.reduce_sum(tf.square(z_pred_diff), axis=-1)
-
         # Calculate squared differences for y_true
         y_diff_squared = tf.square(y_true_diff)
 
@@ -2907,11 +2913,23 @@ class ModelBuilder:
         y_true_diff = y_true - tf.transpose(y_true)  # labels are not normalized
 
         # Compute pairwise dot products
+        # z_pred has shape [batch_size, d]
+        # tf.linalg.matmul(z_pred, z_pred, transpose_b=True) performs matrix multiplication of z_pred with its transpose
+        # This results in a shape of [batch_size, batch_size],
+        # where each element (i, j) is the dot product of z_pred[i] and z_pred[j]
+        # slower because of matmul
         pairwise_dotprod = tf.linalg.matmul(z_pred, z_pred, transpose_b=True)
 
         # Compute pairwise squared distances using the optimized formula
+        # The squared L2 distance between vectors u and v can be computed as:
+        # ||u - v||^2 = ||u||^2 + ||v||^2 - 2 * (u . v)
+        # Since ||u||^2 and ||v||^2 are both 1 for normalized vectors, this simplifies to:
+        # ||u - v||^2 = 2 - 2 * (u . v)
+        # Therefore, the pairwise squared distances can be calculated as:
         # z_diff_squared = 2 - 2 * pairwise_dotprod
-        z_diff_squared = 2 * (1 - pairwise_dotprod)
+        # This gives a shape of [batch_size, batch_size],
+        # where each element (i, j) is the squared L2 distance between z_pred[i] and z_pred[j]
+        z_diff_squared = 2 - 2 * pairwise_dotprod
 
         # Calculate squared differences for y_true
         y_diff_squared = tf.square(y_true_diff)
@@ -3591,7 +3609,6 @@ def evaluate(model, X, y, batch_size=-1, pairs=False):
 
 # main run
 if __name__ == '__main__':
-
     print("Testing the vectorized loss function...")
     print("WITHOUT SAMPLE WEIGHTS")
     loss_tester = ModelBuilder()
