@@ -3615,10 +3615,25 @@ if __name__ == '__main__':
     #
     print("y_true_dummy shape:", y_true_dummy.shape)
     print("z_pred_dummy shape:", z_pred_dummy.shape)
-    #
-    # # Convert NumPy arrays to TensorFlow tensors
+
+    # Normalize z_pred_dummy to make it unit vectors
+    z_pred_dummy_normalized = tf.linalg.l2_normalize(z_pred_dummy, axis=1)
+
+    # Convert NumPy arrays to TensorFlow tensors
     y_true_tensor = tf.convert_to_tensor(y_true_dummy, dtype=tf.float32)
-    z_pred_tensor = tf.convert_to_tensor(z_pred_dummy, dtype=tf.float32)
+    z_pred_tensor = tf.convert_to_tensor(z_pred_dummy_normalized, dtype=tf.float32)
+
+    # Verify normalization: The L2 norm of each vector in z_pred_dummy_normalized should be 1
+    l2_norms = tf.norm(z_pred_tensor, axis=1)
+    print("L2 norms of z_pred_dummy_normalized (should all be 1):", l2_norms.numpy())
+
+    # Check if all norms are 1
+    all_norms_one = np.allclose(l2_norms.numpy(), 1.0)
+    print("All vectors are unit vectors:", all_norms_one)
+    #
+    # # # Convert NumPy arrays to TensorFlow tensors
+    # y_true_tensor = tf.convert_to_tensor(y_true_dummy, dtype=tf.float32)
+    # z_pred_tensor = tf.convert_to_tensor(z_pred_dummy, dtype=tf.float32)
     # Generate dummy data for testing
     # z_dim = fabricated_z.shape[1]
     #
