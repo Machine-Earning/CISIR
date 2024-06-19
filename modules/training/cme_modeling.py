@@ -2917,6 +2917,7 @@ class ModelBuilder:
         # tf.linalg.matmul(z_pred, z_pred, transpose_b=True) performs matrix multiplication of z_pred with its transpose
         # This results in a shape of [batch_size, batch_size],
         # where each element (i, j) is the dot product of z_pred[i] and z_pred[j]
+        # slower because of matmul
         pairwise_dotprod = tf.linalg.matmul(z_pred, z_pred, transpose_b=True)
 
         # Compute pairwise squared distances using the optimized formula
