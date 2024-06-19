@@ -888,7 +888,7 @@ class ModelBuilder:
         # Reset model weights to initial state before retraining
         model.set_weights(initial_weights)
 
-        # Re-Compile the model to reset the learning rate scheduler
+        # IMPORTANT: Re-Compile the model to reset the learning rate scheduler
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
             loss=self.pds_loss_vec
@@ -2894,6 +2894,51 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
+    def pds_loss_unit_vec(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
+        """
+        Vectorized computation of the loss for a batch of predicted features and their labels,
+        optimized for unit vectors.
+        :param y_true: A batch of true label values, shape of [batch_size, 1].
+        :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
+        :param reduction: The type of reduction to apply to the loss.
+        :return: The average error for all unique combinations of the samples in the batch.
+        """
+        # Compute pairwise differences for y_true using broadcasting
+        y_true_diff = y_true - tf.transpose(y_true)  # labels are not normalized
+
+        # Compute pairwise dot products
+        pairwise_dotprod = tf.linalg.matmul(z_pred, z_pred, transpose_b=True)
+
+        # Compute pairwise squared distances using the optimized formula
+        z_diff_squared = 2 - 2 * pairwise_dotprod
+
+        # Calculate squared differences for y_true
+        y_diff_squared = tf.square(y_true_diff)
+
+        # Compute the loss for each pair
+        pairwise_loss = tf.square(z_diff_squared - y_diff_squared)
+
+        # Mask to exclude self-comparisons (where i == j)
+        batch_size = tf.shape(y_true)[0]
+        mask = 1 - tf.eye(batch_size, dtype=tf.float32)
+
+        # Apply mask to exclude self-comparisons from the loss calculation
+        pairwise_loss_masked = pairwise_loss * mask
+
+        # Sum over all unique pairs
+        total_error = 0.5 * tf.reduce_sum(pairwise_loss_masked)
+
+        # Number of unique comparisons, excluding self-pairs
+        num_comparisons = tf.cast(batch_size * (batch_size - 1) / 2, dtype=tf.float32)
+
+        if reduction == tf.keras.losses.Reduction.SUM:
+            return total_error  # upper triangle only
+        elif reduction == tf.keras.losses.Reduction.NONE:
+            # Avoid division by zero
+            return total_error / num_comparisons  # average over all elements
+        else:
+            raise ValueError(f"Unsupported reduction type: {reduction}.")
+
     def pds_olin_loss_vec(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
         """
         Computes the loss for a batch of predicted features and their labels using a specific pairing strategy.
@@ -3602,12 +3647,19 @@ if __name__ == '__main__':
     end_time_vectorized = time.time()
     vectorized_duration = end_time_vectorized - start_time_vectorized
 
+    # Time and compute loss using the vectorized function
+    print("Computing loss using the unit vectorized function...")
+    start_time_unit_vectorized = time.time()
+    loss_unit_vectorized = loss_tester.pds_loss_unit_vec(y_true_tensor, z_pred_tensor)
+    end_time_unit_vectorized = time.time()
+    unit_vectorized_duration = end_time_unit_vectorized - start_time_unit_vectorized
+
     # Time and compute loss using the olin function
-    print("Computing loss using the olin function...")
-    start_time_olin = time.time()
-    loss_olin = loss_tester.pds_olin_loss(y_true_tensor, z_pred_tensor)
-    end_time_olin = time.time()
-    olin_duration = end_time_olin - start_time_olin
+    # print("Computing loss using the olin function...")
+    # start_time_olin = time.time()
+    # loss_olin = loss_tester.pds_olin_loss(y_true_tensor, z_pred_tensor)
+    # end_time_olin = time.time()
+    # olin_duration = end_time_olin - start_time_olin
 
     # Time and compute loss using the vectorized olin function
     # print("Computing loss using the vectorized olin function...")
@@ -3619,13 +3671,15 @@ if __name__ == '__main__':
     # Evaluate the TensorFlow tensors to get their numpy values
     # loss_original_value = loss_original.numpy()
     loss_vectorized_value = loss_vectorized.numpy()
-    loss_olin_value = loss_olin.numpy()
+    loss_unit_vectorized_value = loss_unit_vectorized.numpy()
+    # loss_olin_value = loss_olin.numpy()
     # loss_olin_vec_value = loss_olin_vec.numpy()
 
     # Print the losses and timing for comparison
     # print(f"Original Loss: {loss_original_value}, Time Taken: {original_duration} seconds")
     print(f"Vectorized Loss: {loss_vectorized_value}, Time Taken: {vectorized_duration} seconds")
-    print(f"Olin Loss: {loss_olin_value}, Time Taken: {olin_duration} seconds")
+    print(f"Unit Vectorized Loss: {loss_unit_vectorized_value}, Time Taken: {unit_vectorized_duration} seconds")
+    # print(f"Olin Loss: {loss_olin_value}, Time Taken: {olin_duration} seconds")
     # print(f"Vectorized Olin Loss: {loss_olin_vec_value}, Time Taken: {olin_vec_duration} seconds")
 
     # # Check if the losses are approximately equal
@@ -3633,10 +3687,10 @@ if __name__ == '__main__':
     # print("Test passed: The original and vectorized loss functions return approximately the same value.")
 
     # Compare the execution time
-    if vectorized_duration < original_duration:
-        print(f"The vectorized function is faster by {original_duration - vectorized_duration} seconds.")
-    else:
-        print(f"The original function is faster by {vectorized_duration - original_duration} seconds.")
+    # if vectorized_duration < original_duration:
+    #     print(f"The vectorized function is faster by {original_duration - vectorized_duration} seconds.")
+    # else:
+    #     print(f"The original function is faster by {vectorized_duration - original_duration} seconds.")
 
     # print("WITH SAMPLE WEIGHTS")
     # # Generate dummy data for testing
