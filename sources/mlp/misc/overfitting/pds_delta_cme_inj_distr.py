@@ -5,7 +5,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import numpy as np
 import tensorflow as tf
@@ -31,6 +31,8 @@ random.seed(SEED)
 
 mb = cme_modeling.ModelBuilder()
 
+# Initialize distributed strategy globally
+strategy = tf.distribute.MultiWorkerMirroredStrategy()
 
 def main():
     """
@@ -44,20 +46,20 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
-            for add_slope in [False]:
+            for add_slope in [False, True]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
                 outputs_to_use = ['delta_p']
 
-                bs = 256  # full dataset used
+                bs = 4096  # full dataset used
                 print(f'batch size : {bs}')
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSinj_bs{bs}_CME{cme_speed_threshold}'
+                title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSinj_bs{bs}_CME{cme_speed_threshold}_distr'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -69,7 +71,7 @@ def main():
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
                     'epochs': int(3.5e4),  # 35k epochs
-                    'learning_rate': 1e-2,  # initial learning rate
+                    'learning_rate': 5e-3,  # initial learning rate
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.9,  # Added momentum beta1
                 }
@@ -133,7 +135,7 @@ def main():
                     "residual": residual,
                     "skipped_layers": skipped_layers,
                     "repr_dim": repr_dim,
-                    "ds_version": 5,
+                    "ds_version": 6,
                     "N_freq": N,
                     "lower_t": lower_threshold,
                     "upper_t": upper_threshold
@@ -187,19 +189,20 @@ def main():
                 print(f'n_features: {n_features}')
 
                 # create the model
-                model_sep = create_mlp(
-                    input_dim=n_features,
-                    hiddens=hiddens,
-                    output_dim=0,
-                    pds=pds,
-                    repr_dim=repr_dim,
-                    dropout_rate=dropout_rate,
-                    activation=activation,
-                    norm=norm,
-                    residual=residual,
-                    skipped_layers=skipped_layers
-                )
-                model_sep.summary()
+                with strategy.scope():
+                    model_sep = create_mlp(
+                        input_dim=n_features,
+                        hiddens=hiddens,
+                        output_dim=0,
+                        pds=pds,
+                        repr_dim=repr_dim,
+                        dropout_rate=dropout_rate,
+                        activation=activation,
+                        norm=norm,
+                        residual=residual,
+                        skipped_layers=skipped_layers
+                    )
+                    model_sep.summary()
 
                 print('Reshaping input for model')
                 X_train = reshape_X(
@@ -216,22 +219,23 @@ def main():
                 #     add_slope,
                 #     model_sep.name)
 
-                mb.overtrain_pds_inj(
+                mb.overtrain_pds_inj_distr(
                     model_sep,
                     X_train, y_train_norm,
                     learning_rate=Options['learning_rate'],
                     epochs=Options['epochs'],
                     batch_size=Options['batch_size'],
-                    save_tag=current_time + title + "_features_128_test",
+                    save_tag=current_time + title + "_features_128_distr",
                     lower_bound=norm_lower_t,
                     upper_bound=norm_upper_t,
                     callbacks_list=[
                         WandbCallback(save_model=False),
                         reduce_lr_on_plateau
-                    ]
+                    ],
+                    strategy=strategy
                 )
 
-                ##Evalute the model correlation with colored
+                # Evaluate the model correlation with colored
                 file_path = plot_repr_corr_dist(
                     model_sep,
                     X_train_filtered, y_train_filtered,
@@ -269,7 +273,7 @@ def main():
                 wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
                 print('stage1_file_path: ' + stage1_file_path)
 
-                ## Evalute the model correlation
+                ## Evaluate the model correlation
                 file_path = plot_repr_correlation(
                     model_sep,
                     X_train_filtered, y_train_filtered,
@@ -286,7 +290,7 @@ def main():
                 wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
                 print('file_path: ' + file_path)
 
-                ## Evalute the model correlation density
+                ## Evaluate the model correlation density
                 file_path = plot_repr_corr_density(
                     model_sep,
                     X_train_filtered, y_train_filtered,
