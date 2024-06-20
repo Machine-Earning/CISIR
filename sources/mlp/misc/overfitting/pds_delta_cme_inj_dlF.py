@@ -242,7 +242,7 @@ def main():
                     mb.overtrain_pds_dl_inj(
                         model_sep,
                         X_train, y_train_norm,
-                        train_label_weights_dict=None,
+                        train_label_weights_dict=train_weights_dict,
                         learning_rate=Options['learning_rate'],
                         epochs=Options['epochs'],
                         batch_size=Options['batch_size'],
