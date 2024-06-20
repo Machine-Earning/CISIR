@@ -1808,7 +1808,7 @@ class ModelBuilder:
         ratio = len(rare_indices) / num_batches
         if ratio > rare_injection_count:
             # insert ratio  / rare_injection_count rare samples in each batch
-            rare_injection_count = ratio / rare_injection_count
+            rare_injection_count = int(ratio / rare_injection_count)
             print(f"Adjusting rare_injection_count to {ratio} based on the ratio of rare samples to batches.")
         else:
             # insert rare_injection_count rare samples in each batch
