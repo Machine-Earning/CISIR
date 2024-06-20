@@ -5,7 +5,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import numpy as np
 import tensorflow as tf
@@ -49,7 +49,7 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
-            for add_slope in [False]:
+            for add_slope in [True]:
                 # add_slope = True
                 outputs_to_use = ['delta_p']
 
@@ -71,7 +71,7 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                    'epochs': int(4e4),  # 35k epochs
+                    'epochs': int(5e4),  # 35k epochs
                     'patience': int(2.5e4),
                     'learning_rate': 1e-2,  # initial learning rate
                     'weight_decay': 1e-8,  # Added weight decay
@@ -100,11 +100,11 @@ def main():
                 norm = 'batch_norm'
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor='loss',
-                    factor=0.5,
-                    patience=1000,
+                    factor=0.55,
+                    patience=2000,
                     verbose=1,
                     min_delta=1e-5,
-                    min_lr=1e-10)
+                    min_lr=1e-6)
                 residual = True
                 skipped_layers = 2
                 N = 500  # number of samples to keep outside the threshold
@@ -196,7 +196,7 @@ def main():
                     X_val, y_val_norm,
                     low_threshold=norm_lower_t,
                     high_threshold=norm_upper_t,
-                    N=200, seed=SEED)
+                    N=450, seed=SEED)
 
                 print(f'X_val.shape: {X_val.shape}')
                 print(f'y_val.shape: {y_val_norm.shape}')
@@ -262,7 +262,7 @@ def main():
                     epochs=Options['epochs'],
                     batch_size=Options['batch_size'],
                     patience=Options['patience'],
-                    save_tag=current_time + title + "_features_128_sl",
+                    save_tag=current_time + title + "_features_128_g",
                     lower_bound=norm_lower_t,
                     upper_bound=norm_upper_t,
                     callbacks_list=[

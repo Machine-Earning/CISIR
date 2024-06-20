@@ -1757,9 +1757,6 @@ class ModelBuilder:
     #
     #     return retrain_history
 
-    import tensorflow as tf
-    import numpy as np
-
     def overtrain_pds_dl_inj(self,
                              model: tf.keras.Model,
                              X_train: np.ndarray,
