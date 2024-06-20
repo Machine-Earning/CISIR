@@ -1799,18 +1799,31 @@ class ModelBuilder:
         if rare_injection_count == -1:
             rare_injection_count = len(rare_indices)
         if rare_injection_count > len(rare_indices):
-            raise ValueError(
-                f"rare_injection_count ({rare_injection_count}) is greater than the number of rare samples "
-                f"({len(rare_indices)}).")
+            rare_injection_count = len(rare_indices)
+            print(f"rare_injection_count ({rare_injection_count}) is greater than the number of rare samples "
+                  f"({len(rare_indices)}).")
+
+        # initial number of batches = number of samples / batch size
+        num_batches = len(y_train) // batch_size
+        ratio = len(rare_indices) / num_batches
+        if ratio > rare_injection_count:
+            # insert ratio  / rare_injection_count rare samples in each batch
+            rare_injection_count = ratio / rare_injection_count
+            print(f"Adjusting rare_injection_count to {ratio} based on the ratio of rare samples to batches.")
+        else:
+            # insert rare_injection_count rare samples in each batch
+            # rare_injection_count = rare_injection_count
+            print(f"Injecting {rare_injection_count} rare samples in each batch.")
 
         steps_per_epoch = len(freq_indices) // (batch_size - rare_injection_count)
-        ratio_based_injection_count = max(1, len(rare_indices) // steps_per_epoch)
-        if ratio_based_injection_count > rare_injection_count:
-            print(
-                f"Adjusting rare_injection_count to {ratio_based_injection_count} based on the ratio of rare samples "
-                f"to batches.")
-            rare_injection_count = ratio_based_injection_count
+        # ratio_based_injection_count = max(1, len(rare_indices) // steps_per_epoch)
+        # if ratio_based_injection_count > rare_injection_count:
+        #     print(
+        #         f"Adjusting rare_injection_count to {ratio_based_injection_count} based on the ratio of rare samples "
+        #         f"to batches.")
+        #     rare_injection_count = ratio_based_injection_count
 
+        # Check if the batch size is sufficient
         if batch_size < rare_injection_count:
             raise ValueError(f"Batch size must be at least the number of injected rare samples. "
                              f"Current batch size: {batch_size}, rare_injection_count: {rare_injection_count}")
@@ -1824,18 +1837,18 @@ class ModelBuilder:
                     rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
                     batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
                     np.random.shuffle(batch_indices)
-                    batch_X = X[batch_indices]
-                    batch_y = y[batch_indices]
-                    batch_y = batch_y.reshape(-1)
-                    yield batch_X, batch_y
+                    # batch_X = X[batch_indices]
+                    # batch_y = y[batch_indices]
+                    # batch_y = batch_y.reshape(-1)
+                    yield X[batch_indices], y[batch_indices]
 
-        dataset = tf.data.Dataset.from_generator(
-            lambda: data_generator(X_train, y_train, batch_size, rare_indices, freq_indices, rare_injection_count),
-            output_signature=(
-                tf.TensorSpec(shape=(None, X_train.shape[1]), dtype=tf.float32),
-                tf.TensorSpec(shape=(None,), dtype=tf.float32)
-            )
-        ).prefetch(tf.data.AUTOTUNE)
+        # dataset = tf.data.Dataset.from_generator(
+        #     lambda: data_generator(X_train, y_train, batch_size, rare_indices, freq_indices, rare_injection_count),
+        #     output_signature=(
+        #         tf.TensorSpec(shape=(None, X_train.shape[1]), dtype=tf.float32),
+        #         tf.TensorSpec(shape=(None,), dtype=tf.float32)
+        #     )
+        # ).prefetch(tf.data.AUTOTUNE)
 
         # Ensure log directory exists
         logdir = "logdir"
@@ -1846,19 +1859,15 @@ class ModelBuilder:
         tf.profiler.experimental.start(logdir=logdir)
 
         try:
-            # model.compile(
-            #     optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            #     loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
-            #         y_true, y_pred, sample_weights=train_label_weights_dict
-            #     )
-            # )
             model.compile(
                 optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-                loss=self.pds_loss_vec
+                loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
+                    y_true, y_pred, sample_weights=train_label_weights_dict
+                )
             )
 
             history = model.fit(
-                dataset,
+                data_generator(X_train, y_train, batch_size, rare_indices, freq_indices, rare_injection_count),
                 steps_per_epoch=steps_per_epoch,
                 epochs=epochs,
                 callbacks=callbacks_list,
