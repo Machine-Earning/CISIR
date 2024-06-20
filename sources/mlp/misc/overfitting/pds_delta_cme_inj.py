@@ -31,6 +31,8 @@ random.seed(SEED)
 
 mb = cme_modeling.ModelBuilder()
 
+# Initialize distributed strategy globally
+strategy = tf.distribute.MultiWorkerMirroredStrategy()
 
 def main():
     """
@@ -57,7 +59,7 @@ def main():
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSinj_bs{bs}_CME{cme_speed_threshold}'
+                title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSinj_bs{bs}_CME{cme_speed_threshold}_distr'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -187,19 +189,20 @@ def main():
                 print(f'n_features: {n_features}')
 
                 # create the model
-                model_sep = create_mlp(
-                    input_dim=n_features,
-                    hiddens=hiddens,
-                    output_dim=0,
-                    pds=pds,
-                    repr_dim=repr_dim,
-                    dropout_rate=dropout_rate,
-                    activation=activation,
-                    norm=norm,
-                    residual=residual,
-                    skipped_layers=skipped_layers
-                )
-                model_sep.summary()
+                with strategy.scope():
+                    model_sep = create_mlp(
+                        input_dim=n_features,
+                        hiddens=hiddens,
+                        output_dim=0,
+                        pds=pds,
+                        repr_dim=repr_dim,
+                        dropout_rate=dropout_rate,
+                        activation=activation,
+                        norm=norm,
+                        residual=residual,
+                        skipped_layers=skipped_layers
+                    )
+                    model_sep.summary()
 
                 print('Reshaping input for model')
                 X_train = reshape_X(
@@ -228,7 +231,8 @@ def main():
                     callbacks_list=[
                         WandbCallback(save_model=False),
                         reduce_lr_on_plateau
-                    ]
+                    ],
+                    strategy=strategy
                 )
 
                 # Evaluate the model correlation with colored

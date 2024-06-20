@@ -652,6 +652,7 @@ class ModelBuilder:
                                 upper_bound: float = 0.5,
                                 save_tag=None,
                                 callbacks_list=None,
+                                strategy=None,
                                 verbose: int = 1):
         """
         Trains the model and returns the training history with specific batch constraints in a distributed manner.
@@ -670,8 +671,6 @@ class ModelBuilder:
 
         :return: The training history as a History object.
         """
-
-        strategy = tf.distribute.MultiWorkerMirroredStrategy()
         num_replicas = strategy.num_replicas_in_sync
         global_batch_size = batch_size * num_replicas
 
@@ -692,7 +691,14 @@ class ModelBuilder:
                     freq_batch_indices = freq_indices[start:end]
                     batch_indices = np.concatenate([rare_indices, freq_batch_indices])
                     np.random.shuffle(batch_indices)
-                    yield X[batch_indices], y[batch_indices]
+                    # Extract the actual data (features and labels) for the current batch
+                    batch_X = X[batch_indices]
+                    batch_y = y[batch_indices]
+                    # Ensure that batch_y has the correct shape
+                    batch_y = batch_y.reshape(-1)
+                    # Yield the current batch (features and labels) to be used by the training loop
+                    yield batch_X, batch_y
+
 
         with strategy.scope():
             dataset = tf.data.Dataset.from_generator(

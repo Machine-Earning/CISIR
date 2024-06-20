@@ -5,7 +5,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import numpy as np
 import tensorflow as tf
@@ -53,7 +53,7 @@ def main():
                     # add_slope = True
                     outputs_to_use = ['delta_p']
 
-                    bs = 1024  # full dataset used
+                    bs = 256  # full dataset used
                     print(f'batch size : {bs}')
 
                     # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
