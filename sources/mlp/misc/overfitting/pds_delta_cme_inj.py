@@ -5,7 +5,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import numpy as np
 import tensorflow as tf
@@ -69,7 +69,7 @@ def main():
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
                     'epochs': int(3.5e4),  # 35k epochs
-                    'learning_rate': 1e-2,  # initial learning rate
+                    'learning_rate': 5e-3,  # initial learning rate
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.9,  # Added momentum beta1
                 }
@@ -147,7 +147,8 @@ def main():
                     inputs_to_use=inputs_to_use,
                     add_slope=add_slope,
                     outputs_to_use=outputs_to_use,
-                    cme_speed_threshold=cme_speed_threshold)
+                    cme_speed_threshold=cme_speed_threshold,
+                    shuffle_data=True)
                 X_test, y_test = build_dataset(
                     root_dir + '/testing',
                     inputs_to_use=inputs_to_use,
@@ -215,13 +216,13 @@ def main():
                 #     add_slope,
                 #     model_sep.name)
 
-                mb.overtrain_pds_inj_olin(
+                mb.overtrain_pds_inj_distr(
                     model_sep,
                     X_train, y_train_norm,
                     learning_rate=Options['learning_rate'],
                     epochs=Options['epochs'],
                     batch_size=Options['batch_size'],
-                    save_tag=current_time + title + "_features_128_sl",
+                    save_tag=current_time + title + "_features_128_distr",
                     lower_bound=norm_lower_t,
                     upper_bound=norm_upper_t,
                     callbacks_list=[
@@ -230,7 +231,7 @@ def main():
                     ]
                 )
 
-                ##Evalute the model correlation with colored
+                # Evaluate the model correlation with colored
                 file_path = plot_repr_corr_dist(
                     model_sep,
                     X_train_filtered, y_train_filtered,
@@ -268,7 +269,7 @@ def main():
                 wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
                 print('stage1_file_path: ' + stage1_file_path)
 
-                ## Evalute the model correlation
+                ## Evaluate the model correlation
                 file_path = plot_repr_correlation(
                     model_sep,
                     X_train_filtered, y_train_filtered,
@@ -285,7 +286,7 @@ def main():
                 wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
                 print('file_path: ' + file_path)
 
-                ## Evalute the model correlation density
+                ## Evaluate the model correlation density
                 file_path = plot_repr_corr_density(
                     model_sep,
                     X_train_filtered, y_train_filtered,
