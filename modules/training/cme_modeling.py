@@ -1792,8 +1792,6 @@ class ModelBuilder:
         """
 
         global history
-        if callbacks_list is None:
-            callbacks_list = []
 
         rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
         freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
@@ -1817,33 +1815,22 @@ class ModelBuilder:
             raise ValueError(f"Batch size must be at least the number of injected rare samples. "
                              f"Current batch size: {batch_size}, rare_injection_count: {rare_injection_count}")
 
-        def data_generator():
+        def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
             while True:
-                # Shuffle the indices of the frequent samples to ensure randomization in each epoch
                 np.random.shuffle(freq_indices)
-                # Iterate through the frequent samples in chunks (batches)
                 for start in range(0, len(freq_indices), batch_size - rare_injection_count):
-                    # Determine the end of the current batch
                     end = min(start + batch_size - rare_injection_count, len(freq_indices))
-                    # Select the current batch of frequent sample indices
                     freq_batch_indices = freq_indices[start:end]
-                    # Randomly select rare samples to inject into the batch
                     rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
-                    # Combine the rare and frequent sample indices to form the final batch indices
                     batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
-                    # Shuffle the combined batch indices to mix rare and frequent samples
                     np.random.shuffle(batch_indices)
-                    # Extract the actual data (features and labels) for the current batch
-                    batch_X = X_train[batch_indices]
-                    batch_y = y_train[batch_indices]
-                    # Ensure that batch_y has the correct shape
+                    batch_X = X[batch_indices]
+                    batch_y = y[batch_indices]
                     batch_y = batch_y.reshape(-1)
-
-                    # Yield the current batch (features and labels) to be used by the training loop
                     yield batch_X, batch_y
 
         dataset = tf.data.Dataset.from_generator(
-            data_generator,
+            lambda: data_generator(X_train, y_train, batch_size, rare_indices, freq_indices, rare_injection_count),
             output_signature=(
                 tf.TensorSpec(shape=(None, X_train.shape[1]), dtype=tf.float32),
                 tf.TensorSpec(shape=(None,), dtype=tf.float32)
@@ -1868,10 +1855,10 @@ class ModelBuilder:
 
             history = model.fit(
                 dataset,
+                steps_per_epoch=steps_per_epoch,
                 epochs=epochs,
                 callbacks=callbacks_list,
-                verbose=verbose,
-                steps_per_epoch=steps_per_epoch
+                verbose=verbose
             )
 
             model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
@@ -1889,7 +1876,7 @@ class ModelBuilder:
             # Query GPU memory usage after training
             query_gpu_memory_usage()
 
-        return history.history
+        return history
 
     # def train_pds_dl_bs(self,
     #                     model: tf.keras.Model,
