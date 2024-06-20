@@ -1846,11 +1846,15 @@ class ModelBuilder:
         tf.profiler.experimental.start(logdir=logdir)
 
         try:
+            # model.compile(
+            #     optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            #     loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
+            #         y_true, y_pred, sample_weights=train_label_weights_dict
+            #     )
+            # )
             model.compile(
                 optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-                loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
-                    y_true, y_pred, sample_weights=train_label_weights_dict
-                )
+                loss=self.pds_loss_vec
             )
 
             history = model.fit(
