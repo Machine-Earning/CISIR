@@ -1582,6 +1582,184 @@ class ModelBuilder:
 
         return retrain_history
 
+    # def overtrain_pds_dl_inj(self,
+    #                          model: tf.keras.Model,
+    #                          X_train: np.ndarray,
+    #                          y_train: np.ndarray,
+    #                          train_label_weights_dict: Optional[Dict[float, float]] = None,
+    #                          learning_rate: float = 1e-3,
+    #                          epochs: int = 100,
+    #                          batch_size: int = 32,
+    #                          rare_injection_count: int = 2,
+    #                          lower_bound: float = -0.5,
+    #                          upper_bound: float = 0.5,
+    #                          save_tag: Optional[str] = None,
+    #                          callbacks_list=None,
+    #                          verbose: int = 1) -> Dict[str, List[Any]]:
+    #     """
+    #     Custom training loop to train the model with sample weights and injected rare samples.
+    #
+    #     :param X_train: training and validation sets together
+    #     :param y_train: labels of training and validation sets together
+    #     :param model: The TensorFlow model to train.
+    #     :param train_label_weights_dict: Dictionary containing label weights for the training set.
+    #     :param learning_rate: The learning rate for the Adam optimizer.
+    #     :param epochs: The maximum number of epochs for training.
+    #     :param batch_size: The batch size for training.
+    #     :param rare_injection_count: Number of rare samples to inject in each batch (-1 for all, 0 for none, default 2).
+    #     :param lower_bound: The lower bound for selecting rare samples.
+    #     :param upper_bound: The upper bound for selecting rare samples.
+    #     :param save_tag: Tag to use for saving experiments.
+    #     :param callbacks_list: List of callback instances to apply during training.
+    #     :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
+    #
+    #     :return: The training history as a dictionary.
+    #     TODO: doesn't work. random crash of memory
+    #     """
+    #
+    #     if callbacks_list is None:
+    #         callbacks_list = []
+    #
+    #     rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
+    #     freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
+    #
+    #     if rare_injection_count == -1:
+    #         rare_injection_count = len(rare_indices)
+    #     if rare_injection_count > len(rare_indices):
+    #         raise ValueError(
+    #             f"rare_injection_count ({rare_injection_count}) is greater than the number of rare samples "
+    #             f"({len(rare_indices)}).")
+    #
+    #     steps_per_epoch = len(freq_indices) // (batch_size - rare_injection_count)
+    #     ratio_based_injection_count = max(1, len(rare_indices) // steps_per_epoch)
+    #     if ratio_based_injection_count > rare_injection_count:
+    #         print(
+    #             f"Adjusting rare_injection_count to {ratio_based_injection_count} based on the ratio of rare samples "
+    #             f"to batches.")
+    #         rare_injection_count = ratio_based_injection_count
+    #
+    #     if batch_size < rare_injection_count:
+    #         raise ValueError(f"Batch size must be at least the number of injected rare samples. "
+    #                          f"Current batch size: {batch_size}, rare_injection_count: {rare_injection_count}")
+    #
+    #     params = {
+    #         'epochs': epochs,
+    #         'steps': None,
+    #         'verbose': verbose,
+    #         'do_validation': False,
+    #         'metrics': ['loss'],
+    #     }
+    #     for cb in callbacks_list:
+    #         cb.set_model(model)
+    #         cb.set_params(params)
+    #
+    #     logs = {}
+    #     for cb in callbacks_list:
+    #         cb.on_train_begin(logs=logs)
+    #
+    #     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    #     model.compile(optimizer=optimizer)
+    #
+    #     retrain_history = {'loss': []}
+    #
+    #     def data_generator():
+    #         while True:
+    #             # Shuffle the indices of the frequent samples to ensure randomization in each epoch
+    #             np.random.shuffle(freq_indices)
+    #             # Iterate through the frequent samples in chunks (batches)
+    #             for start in range(0, len(freq_indices), batch_size - rare_injection_count):
+    #                 # Determine the end of the current batch
+    #                 end = min(start + batch_size - rare_injection_count, len(freq_indices))
+    #                 # Select the current batch of frequent sample indices
+    #                 freq_batch_indices = freq_indices[start:end]
+    #                 # Randomly select rare samples to inject into the batch
+    #                 rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
+    #                 # Combine the rare and frequent sample indices to form the final batch indices
+    #                 batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
+    #                 # Shuffle the combined batch indices to mix rare and frequent samples
+    #                 np.random.shuffle(batch_indices)
+    #                 # Extract the actual data (features and labels) for the current batch
+    #                 batch_X = X_train[batch_indices]
+    #                 batch_y = y_train[batch_indices]
+    #                 # Ensure that batch_y has the correct shape
+    #                 batch_y = batch_y.reshape(-1)
+    #
+    #                 # Yield the current batch (features and labels) to be used by the training loop
+    #                 yield batch_X, batch_y
+    #
+    #     dataset = tf.data.Dataset.from_generator(
+    #         data_generator,
+    #         output_signature=(
+    #             tf.TensorSpec(shape=(None, X_train.shape[1]), dtype=tf.float32),
+    #             tf.TensorSpec(shape=(None,), dtype=tf.float32)
+    #         )
+    #     ).prefetch(tf.data.AUTOTUNE)
+    #
+    #     # Ensure log directory exists
+    #     logdir = "logdir"
+    #     if not os.path.exists(logdir):
+    #         os.makedirs(logdir)
+    #
+    #     # Start TensorFlow Profiler
+    #     tf.profiler.experimental.start(logdir=logdir)
+    #
+    #     latest_epoch = 0
+    #
+    #     try:
+    #         for epoch in range(epochs):
+    #             latest_epoch = epoch  # Save the latest epoch in case of an error
+    #             for cb in callbacks_list:
+    #                 cb.on_epoch_begin(epoch, logs=logs)
+    #
+    #             # Query GPU memory usage at the start of each epoch
+    #             query_gpu_memory_usage()
+    #
+    #             epoch_loss = 0
+    #             for step, (batch_X, batch_y) in enumerate(dataset.take(steps_per_epoch)):
+    #                 with tf.GradientTape() as tape:
+    #                     y_pred = model(batch_X, training=True)
+    #                     loss = self.pds_loss_dl_vec(batch_y, y_pred, sample_weights=train_label_weights_dict)
+    #
+    #                 gradients = tape.gradient(loss, model.trainable_variables)
+    #                 optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    #                 epoch_loss += loss.numpy()
+    #
+    #             avg_epoch_loss = epoch_loss / steps_per_epoch
+    #             retrain_history['loss'].append(avg_epoch_loss)
+    #             print(f"Retrain Epoch {epoch + 1}/{epochs}, Loss: {avg_epoch_loss}")
+    #
+    #             logs = {'loss': avg_epoch_loss}  # Update logs with retrain loss
+    #
+    #             for cb in callbacks_list:
+    #                 cb.on_epoch_end(epoch, logs=logs)
+    #
+    #             # Query GPU memory usage at the end of each epoch
+    #             query_gpu_memory_usage()
+    #
+    #         for cb in callbacks_list:
+    #             cb.on_train_end(logs=logs)
+    #
+    #         model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
+    #         print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
+    #
+    #     except tf.errors.ResourceExhaustedError as e:
+    #         print("Out of memory error:", e)
+    #         # Optionally, save intermediate model weights or other states here
+    #         model.save_weights(f"underfit_final_model_weights_{str(save_tag)}_epoch{latest_epoch}.h5")
+    #         print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
+    #
+    #     finally:
+    #         # Stop TensorFlow Profiler
+    #         tf.profiler.experimental.stop()
+    #
+    #         # Query GPU memory usage after training
+    #         query_gpu_memory_usage()
+    #
+    #     return retrain_history
+
+    import tensorflow as tf
+    import numpy as np
+
     def overtrain_pds_dl_inj(self,
                              model: tf.keras.Model,
                              X_train: np.ndarray,
@@ -1616,6 +1794,7 @@ class ModelBuilder:
         :return: The training history as a dictionary.
         """
 
+        global history
         if callbacks_list is None:
             callbacks_list = []
 
@@ -1640,26 +1819,6 @@ class ModelBuilder:
         if batch_size < rare_injection_count:
             raise ValueError(f"Batch size must be at least the number of injected rare samples. "
                              f"Current batch size: {batch_size}, rare_injection_count: {rare_injection_count}")
-
-        params = {
-            'epochs': epochs,
-            'steps': None,
-            'verbose': verbose,
-            'do_validation': False,
-            'metrics': ['loss'],
-        }
-        for cb in callbacks_list:
-            cb.set_model(model)
-            cb.set_params(params)
-
-        logs = {}
-        for cb in callbacks_list:
-            cb.on_train_begin(logs=logs)
-
-        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-        model.compile(optimizer=optimizer)
-
-        retrain_history = {'loss': []}
 
         def data_generator():
             while True:
@@ -1702,49 +1861,28 @@ class ModelBuilder:
         # Start TensorFlow Profiler
         tf.profiler.experimental.start(logdir=logdir)
 
-        latest_epoch = 0
-
         try:
-            for epoch in range(epochs):
-                latest_epoch = epoch  # Save the latest epoch in case of an error
-                for cb in callbacks_list:
-                    cb.on_epoch_begin(epoch, logs=logs)
+            model.compile(
+                optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+                loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
+                    y_true, y_pred, sample_weights=train_label_weights_dict
+                )
+            )
 
-                # Query GPU memory usage at the start of each epoch
-                query_gpu_memory_usage()
-
-                epoch_loss = 0
-                for step, (batch_X, batch_y) in enumerate(dataset.take(steps_per_epoch)):
-                    with tf.GradientTape() as tape:
-                        y_pred = model(batch_X, training=True)
-                        loss = self.pds_loss_dl_vec(batch_y, y_pred, sample_weights=train_label_weights_dict)
-
-                    gradients = tape.gradient(loss, model.trainable_variables)
-                    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-                    epoch_loss += loss.numpy()
-
-                avg_epoch_loss = epoch_loss / steps_per_epoch
-                retrain_history['loss'].append(avg_epoch_loss)
-                print(f"Retrain Epoch {epoch + 1}/{epochs}, Loss: {avg_epoch_loss}")
-
-                logs = {'loss': avg_epoch_loss}  # Update logs with retrain loss
-
-                for cb in callbacks_list:
-                    cb.on_epoch_end(epoch, logs=logs)
-
-                # Query GPU memory usage at the end of each epoch
-                query_gpu_memory_usage()
-
-            for cb in callbacks_list:
-                cb.on_train_end(logs=logs)
+            history = model.fit(
+                dataset,
+                epochs=epochs,
+                callbacks=callbacks_list,
+                verbose=verbose,
+                steps_per_epoch=steps_per_epoch
+            )
 
             model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
             print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
 
         except tf.errors.ResourceExhaustedError as e:
             print("Out of memory error:", e)
-            # Optionally, save intermediate model weights or other states here
-            model.save_weights(f"underfit_final_model_weights_{str(save_tag)}_epoch{latest_epoch}.h5")
+            model.save_weights(f"underfit_final_model_weights_{str(save_tag)}_epoch{epochs}.h5")
             print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
 
         finally:
@@ -1754,7 +1892,7 @@ class ModelBuilder:
             # Query GPU memory usage after training
             query_gpu_memory_usage()
 
-        return retrain_history
+        return history.history
 
     # def train_pds_dl_bs(self,
     #                     model: tf.keras.Model,
