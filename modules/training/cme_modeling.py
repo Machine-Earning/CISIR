@@ -3,7 +3,6 @@
 # using validation loss to determine epoch number for training).
 # this module should be interchangeable with other modules (
 ##############################################################################################################
-import os
 import subprocess
 import time
 from itertools import cycle
@@ -699,7 +698,6 @@ class ModelBuilder:
                     # Yield the current batch (features and labels) to be used by the training loop
                     yield batch_X, batch_y
 
-
         with strategy.scope():
             dataset = tf.data.Dataset.from_generator(
                 lambda: data_generator(X_train, y_train, global_batch_size, rare_indices, freq_indices),
@@ -1012,8 +1010,6 @@ class ModelBuilder:
         print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
 
         return history
-
-
 
     def investigate_pds(self,
                         model: Model,
@@ -1798,8 +1794,6 @@ class ModelBuilder:
         :return: The training history as a dictionary.
         """
 
-        global history
-
         # rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
         # freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
         #
@@ -1859,51 +1853,30 @@ class ModelBuilder:
                     np.random.shuffle(batch_indices)
                     yield X[batch_indices], y[batch_indices]
 
-        # Ensure log directory exists
-        logdir = "logdir"
-        if not os.path.exists(logdir):
-            os.makedirs(logdir)
+        # model.compile(
+        #     optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+        #     loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
+        #         y_true, y_pred, sample_weights=train_label_weights_dict
+        #     )
+        # )
+        # Compile the model
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            loss=self.pds_loss_vec
+        )
 
-        # Start TensorFlow Profiler
-        tf.profiler.experimental.start(logdir=logdir)
+        # Fit the model using the custom generator
+        steps_per_epoch = len(freq_indices) // (batch_size - len(rare_indices))
+        history = model.fit(
+            data_generator(X_train, y_train, batch_size),
+            steps_per_epoch=steps_per_epoch,
+            epochs=epochs,
+            callbacks=callbacks_list,
+            verbose=verbose
+        )
 
-        try:
-            # model.compile(
-            #     optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            #     loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
-            #         y_true, y_pred, sample_weights=train_label_weights_dict
-            #     )
-            # )
-            # Compile the model
-            model.compile(
-                optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-                loss=self.pds_loss_vec
-            )
-
-            # Fit the model using the custom generator
-            steps_per_epoch = len(freq_indices) // (batch_size - len(rare_indices))
-            history = model.fit(
-                data_generator(X_train, y_train, batch_size),
-                steps_per_epoch=steps_per_epoch,
-                epochs=epochs,
-                callbacks=callbacks_list,
-                verbose=verbose
-            )
-
-            model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
-            print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
-
-        except tf.errors.ResourceExhaustedError as e:
-            print("Out of memory error:", e)
-            model.save_weights(f"underfit_final_model_weights_{str(save_tag)}_epoch{epochs}.h5")
-            print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
-
-        finally:
-            # Stop TensorFlow Profiler
-            tf.profiler.experimental.stop()
-
-            # Query GPU memory usage after training
-            query_gpu_memory_usage()
+        model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
+        print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
 
         return history
 
