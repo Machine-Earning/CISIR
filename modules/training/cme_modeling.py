@@ -1840,7 +1840,7 @@ class ModelBuilder:
         #             np.random.shuffle(batch_indices)
         #             yield X[batch_indices], y[batch_indices]
 
-        def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
+        def data_generator(X, y, batch_size):
             while True:
                 np.random.shuffle(freq_indices)
                 for start in range(0, len(freq_indices), batch_size - len(rare_indices)):
@@ -1872,7 +1872,7 @@ class ModelBuilder:
             )
 
             history = model.fit(
-                data_generator(X_train, y_train, batch_size, rare_indices, freq_indices, rare_injection_count),
+                data_generator(X_train, y_train, batch_size),
                 steps_per_epoch=steps_per_epoch,
                 epochs=epochs,
                 callbacks=callbacks_list,
