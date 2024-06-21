@@ -1,12 +1,14 @@
 # from tsnecuda import TSNE
 import itertools
 from datetime import datetime
-from typing import List, Tuple, Optional
+from typing import List
+from typing import Tuple, Optional
 
 import matplotlib.pyplot as plt
-from matplotlib.patches import Wedge
 import numpy as np
 import tensorflow as tf
+import wandb
+from matplotlib.patches import Wedge
 from scipy.spatial.distance import pdist
 from scipy.stats import gaussian_kde
 from scipy.stats import pearsonr
@@ -16,6 +18,81 @@ from sklearn.preprocessing import MinMaxScaler
 from modules.evaluate import evaluation as eval
 from modules.training import seploader as sepl
 from modules.training.ts_modeling import process_predictions
+
+
+def log_model_evaluations(
+        model,
+        train_data, train_labels,
+        test_data, test_labels,
+        plot_title: str,
+        timestamp: str,
+        random_seed: int,
+        plots: List[str]
+) -> None:
+    """
+    Logs various model evaluation plots to Weights and Biases (wandb).
+
+    Parameters:
+    - model: The model to evaluate.
+    - train_data, train_labels: Training data and corresponding labels.
+    - test_data, test_labels: Testing data and corresponding labels.
+    - plot_title: Title for the plots.
+    - timestamp: Current timestamp for saving plots.
+    - random_seed: Random seed for reproducibility.
+    - plots: List of plots to include, options are:
+        'colored_correlation', 'tsne', 'correlation', 'correlation_density'
+
+    Returns:
+    - None
+    """
+
+    if 'colored_correlation' in plots:
+        # Evaluate the model correlation with colored
+        file_path = plot_repr_corr_dist(model, train_data, train_labels, plot_title + "_training")
+        wandb.log({'colored_correlation_train': wandb.Image(file_path)})
+        print('Training colored correlation plot saved at:', file_path)
+
+        file_path = plot_repr_corr_dist(model, test_data, test_labels, plot_title + "_test")
+        wandb.log({'colored_correlation_test': wandb.Image(file_path)})
+        print('Testing colored correlation plot saved at:', file_path)
+
+    if 'tsne' in plots:
+        # Log t-SNE plot
+        tsne_train_file_path = plot_tsne_delta(model, train_data, train_labels, plot_title, 'training',
+                                               model_type='features', save_tag=timestamp, seed=random_seed)
+        wandb.log({'tsne_train': wandb.Image(tsne_train_file_path)})
+        print('Training t-SNE plot saved at:', tsne_train_file_path)
+
+        tsne_test_file_path = plot_tsne_delta(model, test_data, test_labels, plot_title, 'testing',
+                                              model_type='features', save_tag=timestamp, seed=random_seed)
+        wandb.log({'tsne_test': wandb.Image(tsne_test_file_path)})
+        print('Testing t-SNE plot saved at:', tsne_test_file_path)
+
+    if 'correlation' in plots:
+        # Evaluate the model correlation
+        corr_train_file_path = plot_repr_correlation(model, train_data, train_labels, plot_title + "_training")
+        wandb.log({'correlation_train': wandb.Image(corr_train_file_path)})
+        print('Training correlation plot saved at:', corr_train_file_path)
+
+        corr_test_file_path = plot_repr_correlation(model, test_data, test_labels, plot_title + "_test")
+        wandb.log({'correlation_test': wandb.Image(corr_test_file_path)})
+        print('Testing correlation plot saved at:', corr_test_file_path)
+
+    if 'correlation_density' in plots:
+        # Evaluate the model correlation density
+        corr_density_train_file_path = plot_repr_corr_density(model, train_data, train_labels, plot_title + "_training")
+        wandb.log({'correlation_density_train': wandb.Image(corr_density_train_file_path)})
+        print('Training correlation density plot saved at:', corr_density_train_file_path)
+
+        corr_density_test_file_path = plot_repr_corr_density(model, test_data, test_labels, plot_title + "_test")
+        wandb.log({'correlation_density_test': wandb.Image(corr_density_test_file_path)})
+        print('Testing correlation density plot saved at:', corr_density_test_file_path)
+
+
+# Example usage:
+# plots_to_include = ['colored_correlation', 'tsne', 'correlation', 'correlation_density']
+# log_model_evaluations(model_sep, X_train_filtered, y_train_filtered, X_test_filtered, y_test_filtered,
+#                       "Model Evaluation", "20230620", 42, plots_to_include)
 
 
 def print_statistics(statistics: dict) -> None:

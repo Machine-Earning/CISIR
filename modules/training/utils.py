@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 
+
 def trim_background(directory_path: str, threshold: float = 0.1) -> List[str]:
     """
     Processes all CSV files in a given directory, trimming the beginning of each file based on a 'Proton Intensity' condition.
