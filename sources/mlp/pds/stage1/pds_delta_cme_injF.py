@@ -60,7 +60,7 @@ def main():
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSinj_bs{bs}_CME{cme_speed_threshold}'
+                title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSinj_bs{bs}_CME{cme_speed_threshold}_lr'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -73,7 +73,7 @@ def main():
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
                     'epochs': int(10e4),  # 35k epochs
                     'patience': int(2.5e4),
-                    'learning_rate': 3e-1,  # initial learning rate
+                    'learning_rate': 1e-2,  # initial learning rate
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.9,  # Added momentum beta1
                 }
@@ -101,7 +101,7 @@ def main():
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor='loss',
                     factor=0.9,
-                    patience=2000,
+                    patience=1000,
                     verbose=1,
                     min_delta=1e-5,
                     min_lr=3e-3)
