@@ -3,6 +3,7 @@
 # using validation loss to determine epoch number for training).
 # this module should be interchangeable with other modules (
 ##############################################################################################################
+import itertools
 import os
 import random
 import subprocess
@@ -1849,6 +1850,50 @@ class ModelBuilder:
         #             # batch_y = y[batch_indices]
         #             # batch_y = batch_y.reshape(-1)
         #             yield X[batch_indices], y[batch_indices]
+        # def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
+        #     """
+        #     Data generator that yields batches of data with a specified number of rare samples injected.
+        #
+        #     Args:
+        #         X (numpy.ndarray): The feature matrix.
+        #         y (numpy.ndarray): The target array.
+        #         batch_size (int): The size of each batch.
+        #         rare_indices (numpy.ndarray): Indices of rare samples.
+        #         freq_indices (numpy.ndarray): Indices of frequent samples.
+        #         rare_injection_count (int): Number of rare samples to inject in each batch.
+        #
+        #     Yields:
+        #         tuple: A batch of features and targets.
+        #     """
+        #
+        #     while True:
+        #         # Shuffle the frequent indices to ensure random sampling
+        #         np.random.shuffle(freq_indices)
+        #
+        #         # Iterate over the frequent indices in chunks defined by the batch size minus rare injection count
+        #         for start in range(0, len(freq_indices), batch_size - rare_injection_count):
+        #             end = min(start + batch_size - rare_injection_count, len(freq_indices))
+        #             freq_batch_indices = freq_indices[start:end]
+        #
+        #             # Initialize reservoir sampling for rare indices
+        #             rare_sample_indices = []
+        #             for i, index in enumerate(rare_indices):
+        #                 if i < rare_injection_count:
+        #                     # Fill the reservoir array initially
+        #                     rare_sample_indices.append(index)
+        #                 else:
+        #                     # Replace elements in the reservoir with decreasing probability
+        #                     j = random.randint(0, i)
+        #                     if j < rare_injection_count:
+        #                         rare_sample_indices[j] = index
+        #
+        #             # Combine rare and frequent sample indices to form the batch
+        #             batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
+        #             # Shuffle the combined batch indices to ensure random order
+        #             np.random.shuffle(batch_indices)
+        #
+        #             # Yield the batch of data
+        #             yield X[batch_indices], y[batch_indices]
         def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
             """
             Data generator that yields batches of data with a specified number of rare samples injected.
@@ -1865,6 +1910,9 @@ class ModelBuilder:
                 tuple: A batch of features and targets.
             """
 
+            # Create an infinite cycle iterator over the rare indices
+            rare_cycle = itertools.cycle(rare_indices)
+
             while True:
                 # Shuffle the frequent indices to ensure random sampling
                 np.random.shuffle(freq_indices)
@@ -1874,17 +1922,8 @@ class ModelBuilder:
                     end = min(start + batch_size - rare_injection_count, len(freq_indices))
                     freq_batch_indices = freq_indices[start:end]
 
-                    # Initialize reservoir sampling for rare indices
-                    rare_sample_indices = []
-                    for i, index in enumerate(rare_indices):
-                        if i < rare_injection_count:
-                            # Fill the reservoir array initially
-                            rare_sample_indices.append(index)
-                        else:
-                            # Replace elements in the reservoir with decreasing probability
-                            j = random.randint(0, i)
-                            if j < rare_injection_count:
-                                rare_sample_indices[j] = index
+                    # Select rare indices by taking the next 'rare_injection_count' items from the cycle
+                    rare_sample_indices = [next(rare_cycle) for _ in range(rare_injection_count)]
 
                     # Combine rare and frequent sample indices to form the batch
                     batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
