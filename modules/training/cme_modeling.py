@@ -1840,7 +1840,7 @@ class ModelBuilder:
         #             np.random.shuffle(batch_indices)
         #             yield X[batch_indices], y[batch_indices]
 
-        def data_generator(X, y, batch_size):
+        def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
             while True:
                 np.random.shuffle(freq_indices)
                 for start in range(0, len(freq_indices), batch_size - len(rare_indices)):
