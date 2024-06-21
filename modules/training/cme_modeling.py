@@ -1910,27 +1910,20 @@ class ModelBuilder:
                 tuple: A batch of features and targets.
             """
 
-            # Create an infinite cycle iterator over the rare indices
-            rare_cycle = itertools.cycle(rare_indices)
+            rare_indices_tensor = tf.constant(rare_indices, dtype=tf.int32)
 
             while True:
-                # Shuffle the frequent indices to ensure random sampling
                 np.random.shuffle(freq_indices)
-
-                # Iterate over the frequent indices in chunks defined by the batch size minus rare injection count
                 for start in range(0, len(freq_indices), batch_size - rare_injection_count):
                     end = min(start + batch_size - rare_injection_count, len(freq_indices))
                     freq_batch_indices = freq_indices[start:end]
 
-                    # Select rare indices by taking the next 'rare_injection_count' items from the cycle
-                    rare_sample_indices = [next(rare_cycle) for _ in range(rare_injection_count)]
+                    # Select rare indices using TensorFlow
+                    shuffled_rare_indices = tf.random.shuffle(rare_indices_tensor)[:rare_injection_count]
+                    rare_sample_indices = shuffled_rare_indices.numpy()  # Minimal memory use here
 
-                    # Combine rare and frequent sample indices to form the batch
                     batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
-                    # Shuffle the combined batch indices to ensure random order
                     np.random.shuffle(batch_indices)
-
-                    # Yield the batch of data
                     yield X[batch_indices], y[batch_indices]
 
         # dataset = tf.data.Dataset.from_generator(
