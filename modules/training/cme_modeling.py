@@ -1800,34 +1800,43 @@ class ModelBuilder:
 
         global history
 
+        # rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
+        # freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
+        #
+        # if rare_injection_count == -1:
+        #     rare_injection_count = len(rare_indices)
+        # if rare_injection_count > len(rare_indices):
+        #     rare_injection_count = len(rare_indices)
+        #     print(f"rare_injection_count ({rare_injection_count}) is greater than the number of rare samples "
+        #           f"({len(rare_indices)}).")
+        #
+        # # initial number of batches = number of samples / batch size
+        # num_batches = len(y_train) // batch_size
+        # ratio = len(rare_indices) / num_batches
+        # if ratio > rare_injection_count:
+        #     # insert ratio  / rare_injection_count rare samples in each batch
+        #     rare_injection_count = int(ratio / rare_injection_count)
+        #     print(f"Adjusting rare_injection_count to {ratio} based on the ratio of rare samples to batches.")
+        # else:
+        #     # insert rare_injection_count rare samples in each batch
+        #     # rare_injection_count = rare_injection_count
+        #     print(f"Injecting {rare_injection_count} rare samples in each batch.")
+        #
+        # steps_per_epoch = len(freq_indices) // (batch_size - rare_injection_count)
+        #
+        # # Check if the batch size is sufficient
+        # if batch_size < rare_injection_count:
+        #     raise ValueError(f"Batch size must be at least the number of injected rare samples. "
+        #                      f"Current batch size: {batch_size}, rare_injection_count: {rare_injection_count}")
+
+        # Identify injected rare samples
         rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
         freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
 
-        if rare_injection_count == -1:
-            rare_injection_count = len(rare_indices)
-        if rare_injection_count > len(rare_indices):
-            rare_injection_count = len(rare_indices)
-            print(f"rare_injection_count ({rare_injection_count}) is greater than the number of rare samples "
-                  f"({len(rare_indices)}).")
-
-        # initial number of batches = number of samples / batch size
-        num_batches = len(y_train) // batch_size
-        ratio = len(rare_indices) / num_batches
-        if ratio > rare_injection_count:
-            # insert ratio  / rare_injection_count rare samples in each batch
-            rare_injection_count = int(ratio / rare_injection_count)
-            print(f"Adjusting rare_injection_count to {ratio} based on the ratio of rare samples to batches.")
-        else:
-            # insert rare_injection_count rare samples in each batch
-            # rare_injection_count = rare_injection_count
-            print(f"Injecting {rare_injection_count} rare samples in each batch.")
-
-        steps_per_epoch = len(freq_indices) // (batch_size - rare_injection_count)
-
         # Check if the batch size is sufficient
-        if batch_size < rare_injection_count:
-            raise ValueError(f"Batch size must be at least the number of injected rare samples. "
-                             f"Current batch size: {batch_size}, rare_injection_count: {rare_injection_count}")
+        if batch_size < len(rare_indices):
+            raise ValueError(f"Batch size must be at least the size of the injected rare samples. "
+                             f"Current batch size: {batch_size}, size of injected rare samples: {len(rare_indices)}")
 
         # def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
         #     while True:
@@ -1863,7 +1872,7 @@ class ModelBuilder:
             #     optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
             #     loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
             #         y_true, y_pred, sample_weights=train_label_weights_dict
-            #     ) # TODO: double check the correctness of loss
+            #     )
             # )
             # Compile the model
             model.compile(
@@ -1871,6 +1880,8 @@ class ModelBuilder:
                 loss=self.pds_loss_vec
             )
 
+            # Fit the model using the custom generator
+            steps_per_epoch = len(freq_indices) // (batch_size - len(rare_indices))
             history = model.fit(
                 data_generator(X_train, y_train, batch_size),
                 steps_per_epoch=steps_per_epoch,
