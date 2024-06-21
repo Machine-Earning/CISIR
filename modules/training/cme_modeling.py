@@ -4,6 +4,7 @@
 # this module should be interchangeable with other modules (
 ##############################################################################################################
 import os
+import random
 import subprocess
 import time
 from itertools import cycle
@@ -1835,18 +1836,62 @@ class ModelBuilder:
             raise ValueError(f"Batch size must be at least the number of injected rare samples. "
                              f"Current batch size: {batch_size}, rare_injection_count: {rare_injection_count}")
 
+        # def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
+        #     while True:
+        #         np.random.shuffle(freq_indices)
+        #         for start in range(0, len(freq_indices), batch_size - rare_injection_count):
+        #             end = min(start + batch_size - rare_injection_count, len(freq_indices))
+        #             freq_batch_indices = freq_indices[start:end]
+        #             rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
+        #             batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
+        #             np.random.shuffle(batch_indices)
+        #             # batch_X = X[batch_indices]
+        #             # batch_y = y[batch_indices]
+        #             # batch_y = batch_y.reshape(-1)
+        #             yield X[batch_indices], y[batch_indices]
         def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
+            """
+            Data generator that yields batches of data with a specified number of rare samples injected.
+
+            Args:
+                X (numpy.ndarray): The feature matrix.
+                y (numpy.ndarray): The target array.
+                batch_size (int): The size of each batch.
+                rare_indices (numpy.ndarray): Indices of rare samples.
+                freq_indices (numpy.ndarray): Indices of frequent samples.
+                rare_injection_count (int): Number of rare samples to inject in each batch.
+
+            Yields:
+                tuple: A batch of features and targets.
+            """
+
             while True:
+                # Shuffle the frequent indices to ensure random sampling
                 np.random.shuffle(freq_indices)
+
+                # Iterate over the frequent indices in chunks defined by the batch size minus rare injection count
                 for start in range(0, len(freq_indices), batch_size - rare_injection_count):
                     end = min(start + batch_size - rare_injection_count, len(freq_indices))
                     freq_batch_indices = freq_indices[start:end]
-                    rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
+
+                    # Initialize reservoir sampling for rare indices
+                    rare_sample_indices = []
+                    for i, index in enumerate(rare_indices):
+                        if i < rare_injection_count:
+                            # Fill the reservoir array initially
+                            rare_sample_indices.append(index)
+                        else:
+                            # Replace elements in the reservoir with decreasing probability
+                            j = random.randint(0, i)
+                            if j < rare_injection_count:
+                                rare_sample_indices[j] = index
+
+                    # Combine rare and frequent sample indices to form the batch
                     batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
+                    # Shuffle the combined batch indices to ensure random order
                     np.random.shuffle(batch_indices)
-                    # batch_X = X[batch_indices]
-                    # batch_y = y[batch_indices]
-                    # batch_y = batch_y.reshape(-1)
+
+                    # Yield the batch of data
                     yield X[batch_indices], y[batch_indices]
 
         # dataset = tf.data.Dataset.from_generator(
@@ -1870,7 +1915,7 @@ class ModelBuilder:
             #     optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
             #     loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
             #         y_true, y_pred, sample_weights=train_label_weights_dict
-            #     )
+            #     ) # TODO: double check the correctness of loss
             # )
             # Compile the model
             model.compile(

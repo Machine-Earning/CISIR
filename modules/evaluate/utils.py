@@ -21,7 +21,7 @@ from modules.training.ts_modeling import process_predictions
 
 
 def log_model_evaluations(
-        model,
+        model, model_type: str,
         train_data, train_labels,
         test_data, test_labels,
         plot_title: str,
@@ -34,6 +34,7 @@ def log_model_evaluations(
 
     Parameters:
     - model: The model to evaluate.
+    - model_type: The type of model to use (features, features_reg, features_dec, features_reg_dec).
     - train_data, train_labels: Training data and corresponding labels.
     - test_data, test_labels: Testing data and corresponding labels.
     - plot_title: Title for the plots.
@@ -59,12 +60,12 @@ def log_model_evaluations(
     if 'tsne' in plots:
         # Log t-SNE plot
         tsne_train_file_path = plot_tsne_delta(model, train_data, train_labels, plot_title, 'training',
-                                               model_type='features', save_tag=timestamp, seed=random_seed)
+                                               model_type=model_type, save_tag=timestamp, seed=random_seed)
         wandb.log({'tsne_train': wandb.Image(tsne_train_file_path)})
         print('Training t-SNE plot saved at:', tsne_train_file_path)
 
         tsne_test_file_path = plot_tsne_delta(model, test_data, test_labels, plot_title, 'testing',
-                                              model_type='features', save_tag=timestamp, seed=random_seed)
+                                              model_type=model_type, save_tag=timestamp, seed=random_seed)
         wandb.log({'tsne_test': wandb.Image(tsne_test_file_path)})
         print('Testing t-SNE plot saved at:', tsne_test_file_path)
 
