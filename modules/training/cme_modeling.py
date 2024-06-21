@@ -1823,39 +1823,32 @@ class ModelBuilder:
             print(f"Injecting {rare_injection_count} rare samples in each batch.")
 
         steps_per_epoch = len(freq_indices) // (batch_size - rare_injection_count)
-        # ratio_based_injection_count = max(1, len(rare_indices) // steps_per_epoch)
-        # if ratio_based_injection_count > rare_injection_count:
-        #     print(
-        #         f"Adjusting rare_injection_count to {ratio_based_injection_count} based on the ratio of rare samples "
-        #         f"to batches.")
-        #     rare_injection_count = ratio_based_injection_count
 
         # Check if the batch size is sufficient
         if batch_size < rare_injection_count:
             raise ValueError(f"Batch size must be at least the number of injected rare samples. "
                              f"Current batch size: {batch_size}, rare_injection_count: {rare_injection_count}")
 
-        def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
+        # def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
+        #     while True:
+        #         np.random.shuffle(freq_indices)
+        #         for start in range(0, len(freq_indices), batch_size - rare_injection_count):
+        #             end = min(start + batch_size - rare_injection_count, len(freq_indices))
+        #             freq_batch_indices = freq_indices[start:end]
+        #             rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
+        #             batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
+        #             np.random.shuffle(batch_indices)
+        #             yield X[batch_indices], y[batch_indices]
+
+        def data_generator(X, y, batch_size):
             while True:
                 np.random.shuffle(freq_indices)
-                for start in range(0, len(freq_indices), batch_size - rare_injection_count):
-                    end = min(start + batch_size - rare_injection_count, len(freq_indices))
+                for start in range(0, len(freq_indices), batch_size - len(rare_indices)):
+                    end = min(start + batch_size - len(rare_indices), len(freq_indices))
                     freq_batch_indices = freq_indices[start:end]
-                    rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
-                    batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
+                    batch_indices = np.concatenate([rare_indices, freq_batch_indices])
                     np.random.shuffle(batch_indices)
-                    # batch_X = X[batch_indices]
-                    # batch_y = y[batch_indices]
-                    # batch_y = batch_y.reshape(-1)
                     yield X[batch_indices], y[batch_indices]
-
-        # dataset = tf.data.Dataset.from_generator(
-        #     lambda: data_generator(X_train, y_train, batch_size, rare_indices, freq_indices, rare_injection_count),
-        #     output_signature=(
-        #         tf.TensorSpec(shape=(None, X_train.shape[1]), dtype=tf.float32),
-        #         tf.TensorSpec(shape=(None,), dtype=tf.float32)
-        #     )
-        # ).prefetch(tf.data.AUTOTUNE)
 
         # Ensure log directory exists
         logdir = "logdir"
