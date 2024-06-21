@@ -53,7 +53,7 @@ def main():
                     # add_slope = True
                     outputs_to_use = ['delta_p']
 
-                    bs = 256  # full dataset used
+                    bs = 512  # full dataset used
                     print(f'batch size : {bs}')
 
                     # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
