@@ -1894,6 +1894,38 @@ class ModelBuilder:
         #
         #             # Yield the batch of data
         #             yield X[batch_indices], y[batch_indices]
+        # def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
+        #     """
+        #     Data generator that yields batches of data with a specified number of rare samples injected.
+        #
+        #     Args:
+        #         X (numpy.ndarray): The feature matrix.
+        #         y (numpy.ndarray): The target array.
+        #         batch_size (int): The size of each batch.
+        #         rare_indices (numpy.ndarray): Indices of rare samples.
+        #         freq_indices (numpy.ndarray): Indices of frequent samples.
+        #         rare_injection_count (int): Number of rare samples to inject in each batch.
+        #
+        #     Yields:
+        #         tuple: A batch of features and targets.
+        #     """
+        #
+        #     rare_indices_tensor = tf.constant(rare_indices, dtype=tf.int32)
+        #
+        #     while True:
+        #         np.random.shuffle(freq_indices)
+        #         for start in range(0, len(freq_indices), batch_size - rare_injection_count):
+        #             end = min(start + batch_size - rare_injection_count, len(freq_indices))
+        #             freq_batch_indices = freq_indices[start:end]
+        #
+        #             # Select rare indices using TensorFlow
+        #             shuffled_rare_indices = tf.random.shuffle(rare_indices_tensor)[:rare_injection_count]
+        #             rare_sample_indices = shuffled_rare_indices.numpy()  # Minimal memory use here
+        #
+        #             batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
+        #             np.random.shuffle(batch_indices)
+        #             yield X[batch_indices], y[batch_indices]
+
         def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
             """
             Data generator that yields batches of data with a specified number of rare samples injected.
@@ -1910,7 +1942,7 @@ class ModelBuilder:
                 tuple: A batch of features and targets.
             """
 
-            rare_indices_tensor = tf.constant(rare_indices, dtype=tf.int32)
+            rare_indices_list = rare_indices.tolist()  # Convert to list for random sampling
 
             while True:
                 np.random.shuffle(freq_indices)
@@ -1918,9 +1950,8 @@ class ModelBuilder:
                     end = min(start + batch_size - rare_injection_count, len(freq_indices))
                     freq_batch_indices = freq_indices[start:end]
 
-                    # Select rare indices using TensorFlow
-                    shuffled_rare_indices = tf.random.shuffle(rare_indices_tensor)[:rare_injection_count]
-                    rare_sample_indices = shuffled_rare_indices.numpy()  # Minimal memory use here
+                    # Select rare indices using random sampling without replacement
+                    rare_sample_indices = random.sample(rare_indices_list, rare_injection_count)
 
                     batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
                     np.random.shuffle(batch_indices)
