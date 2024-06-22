@@ -2507,28 +2507,56 @@ class ModelBuilder:
         batch_size = tf.shape(y_true)[0]
         half_batch = batch_size // 2
 
-        if quadrant == 0:
-            y_true_i = y_true[:half_batch]
-            y_true_j = y_true[:half_batch]
-            z_pred_i = z_pred[:half_batch]
-            z_pred_j = z_pred[:half_batch]
-        elif quadrant == 1:
-            y_true_i = y_true[:half_batch]
-            y_true_j = y_true[half_batch:]
-            z_pred_i = z_pred[:half_batch]
-            z_pred_j = z_pred[half_batch:]
-        elif quadrant == 2:
-            y_true_i = y_true[half_batch:]
-            y_true_j = y_true[:half_batch]
-            z_pred_i = z_pred[half_batch:]
-            z_pred_j = z_pred[:half_batch]
-        elif quadrant == 3:
-            y_true_i = y_true[half_batch:]
-            y_true_j = y_true[half_batch:]
-            z_pred_i = z_pred[half_batch:]
-            z_pred_j = z_pred[half_batch:]
-        else:
-            raise ValueError(f"Unsupported quadrant: {quadrant}.")
+        # if quadrant == 0:
+        #     y_true_i = y_true[:half_batch]
+        #     y_true_j = y_true[:half_batch]
+        #     z_pred_i = z_pred[:half_batch]
+        #     z_pred_j = z_pred[:half_batch]
+        # elif quadrant == 1:
+        #     y_true_i = y_true[:half_batch]
+        #     y_true_j = y_true[half_batch:]
+        #     z_pred_i = z_pred[:half_batch]
+        #     z_pred_j = z_pred[half_batch:]
+        # elif quadrant == 2:
+        #     y_true_i = y_true[half_batch:]
+        #     y_true_j = y_true[:half_batch]
+        #     z_pred_i = z_pred[half_batch:]
+        #     z_pred_j = z_pred[:half_batch]
+        # elif quadrant == 3:
+        #     y_true_i = y_true[half_batch:]
+        #     y_true_j = y_true[half_batch:]
+        #     z_pred_i = z_pred[half_batch:]
+        #     z_pred_j = z_pred[half_batch:]
+        # else:
+        #     raise ValueError(f"Unsupported quadrant: {quadrant}.")
+
+        # Define slicing functions for each quadrant
+        def get_quadrant_0():
+            return y_true[:half_batch], y_true[:half_batch], z_pred[:half_batch], z_pred[:half_batch]
+
+        def get_quadrant_1():
+            return y_true[:half_batch], y_true[half_batch:], z_pred[:half_batch], z_pred[half_batch:]
+
+        def get_quadrant_2():
+            return y_true[half_batch:], y_true[:half_batch], z_pred[half_batch:], z_pred[:half_batch]
+
+        def get_quadrant_3():
+            return y_true[half_batch:], y_true[half_batch:], z_pred[half_batch:], z_pred[half_batch:]
+
+        # Use tf.case to select the appropriate quadrant
+        y_true_i, y_true_j, z_pred_i, z_pred_j = tf.case([
+            (tf.equal(quadrant, 0), get_quadrant_0),
+            (tf.equal(quadrant, 1), get_quadrant_1),
+            (tf.equal(quadrant, 2), get_quadrant_2),
+            (tf.equal(quadrant, 3), get_quadrant_3)
+        ], exclusive=True)
+
+        # Debugging statements
+        tf.print("Quadrant:", quadrant)
+        tf.print("y_true_i shape:", tf.shape(y_true_i))
+        tf.print("y_true_j shape:", tf.shape(y_true_j))
+        tf.print("z_pred_i shape:", tf.shape(z_pred_i))
+        tf.print("z_pred_j shape:", tf.shape(z_pred_j))
 
         # Compute pairwise differences for z_pred and y_true using broadcasting within the specified quadrant
         y_true_diff = y_true_i[:, tf.newaxis, :] - y_true_j[tf.newaxis, :, :]  # shape: [half_batch, half_batch, 1]
