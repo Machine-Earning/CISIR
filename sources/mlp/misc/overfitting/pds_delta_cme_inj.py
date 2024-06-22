@@ -2,7 +2,11 @@ import os
 import random
 from datetime import datetime
 
-from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density
+from modules.evaluate.utils import (
+    plot_repr_corr_dist,
+    plot_tsne_delta,
+    plot_repr_correlation,
+    plot_repr_corr_density)
 
 # Set the environment variable for CUDA (in case it is necessary)
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
@@ -44,13 +48,13 @@ def main():
 
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
-            for add_slope in [True]:
+            for add_slope in [False]:
                 # PARAMS
                 # inputs_to_use = ['e0.5']
                 # add_slope = True
                 outputs_to_use = ['delta_p']
 
-                bs = 512  # full dataset used
+                bs = 4096  # full dataset used
                 print(f'batch size : {bs}')
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -68,7 +72,7 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                    'epochs': int(3.5e4),  # 35k epochs
+                    'epochs': int(4e4),  # 35k epochs
                     'learning_rate': 1e-2,  # initial learning rate
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.9,  # Added momentum beta1
@@ -96,11 +100,11 @@ def main():
                 norm = 'batch_norm'
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor='loss',
-                    factor=0.5,
+                    factor=0.9,
                     patience=1000,
                     verbose=1,
                     min_delta=1e-5,
-                    min_lr=1e-10)
+                    min_lr=3e-4)
                 residual = True
                 skipped_layers = 2
                 N = 200  # number of samples to keep outside the threshold
@@ -133,7 +137,7 @@ def main():
                     "residual": residual,
                     "skipped_layers": skipped_layers,
                     "repr_dim": repr_dim,
-                    "ds_version": 5,
+                    "ds_version": 6,
                     "N_freq": N,
                     "lower_t": lower_threshold,
                     "upper_t": upper_threshold
@@ -222,7 +226,7 @@ def main():
                     learning_rate=Options['learning_rate'],
                     epochs=Options['epochs'],
                     batch_size=Options['batch_size'],
-                    save_tag=current_time + title + "_features_128_test",
+                    save_tag=current_time + title + "_features_128_ref",
                     lower_bound=norm_lower_t,
                     upper_bound=norm_upper_t,
                     callbacks_list=[
@@ -231,7 +235,7 @@ def main():
                     ]
                 )
 
-                ##Evalute the model correlation with colored
+                # Evaluate the model correlation with colored
                 file_path = plot_repr_corr_dist(
                     model_sep,
                     X_train_filtered, y_train_filtered,
@@ -248,7 +252,7 @@ def main():
                 wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
                 print('file_path: ' + file_path)
 
-                ## Log t-SNE plot
+                # Log t-SNE plot
                 # Log the training t-SNE plot to wandb
                 stage1_file_path = plot_tsne_delta(
                     model_sep,
@@ -269,7 +273,7 @@ def main():
                 wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
                 print('stage1_file_path: ' + stage1_file_path)
 
-                ## Evalute the model correlation
+                # Evaluate the model correlation
                 file_path = plot_repr_correlation(
                     model_sep,
                     X_train_filtered, y_train_filtered,
@@ -286,7 +290,7 @@ def main():
                 wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
                 print('file_path: ' + file_path)
 
-                ## Evalute the model correlation density
+                # Evaluate the model correlation density
                 file_path = plot_repr_corr_density(
                     model_sep,
                     X_train_filtered, y_train_filtered,

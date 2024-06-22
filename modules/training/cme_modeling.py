@@ -521,7 +521,7 @@ class ModelBuilder:
                              f"Current batch size: {batch_size}, size of injected rare samples: {len(rare_indices)}")
 
         # Custom data generator to yield batches
-        def data_generator(X, y, batch_size):
+        def data_generator(X, y, batch_size, rare_indices, freq_indices):
             while True:
                 np.random.shuffle(freq_indices)
                 for start in range(0, len(freq_indices), batch_size - len(rare_indices)):
@@ -539,8 +539,9 @@ class ModelBuilder:
 
         # Fit the model using the custom generator
         steps_per_epoch = len(freq_indices) // (batch_size - len(rare_indices))
+
         history = model.fit(
-            data_generator(X_train, y_train, batch_size),
+            data_generator(X_train, y_train, batch_size, rare_indices, freq_indices),
             steps_per_epoch=steps_per_epoch,
             epochs=epochs,
             callbacks=callbacks_list,
@@ -553,97 +554,6 @@ class ModelBuilder:
 
         return history
 
-    # def overtrain_pds_inj_distr(self,
-    #                             model: tf.keras.Model,
-    #                             X_train: np.ndarray,
-    #                             y_train: np.ndarray,
-    #                             learning_rate: float = 1e-3,
-    #                             epochs: int = 100,
-    #                             batch_size: int = 32,
-    #                             lower_bound: float = -0.5,
-    #                             upper_bound: float = 0.5,
-    #                             save_tag=None,
-    #                             callbacks_list=None,
-    #                             strategy=None,
-    #                             verbose: int = 1):
-    #     """
-    #     Trains the model and returns the training history with specific batch constraints in a distributed manner.
-    #
-    #     :param X_train: training and validation sets together
-    #     :param y_train: labels of training and validation sets together
-    #     :param save_tag: tag to use for saving experiments
-    #     :param model: The TensorFlow model to train.
-    #     :param learning_rate: The learning rate for the Adam optimizer.
-    #     :param epochs: The maximum number of epochs for training.
-    #     :param batch_size: The batch size for training.
-    #     :param lower_bound: The lower bound for selecting rare samples.
-    #     :param upper_bound: The upper bound for selecting rare samples.
-    #     :param callbacks_list: List of callback instances to apply during training.
-    #     :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
-    #
-    #     :return: The training history as a History object.
-    #     """
-    #     num_replicas = strategy.num_replicas_in_sync
-    #     global_batch_size = batch_size * num_replicas
-    #
-    #     # Identify injected rare samples
-    #     rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
-    #     freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
-    #
-    #     if global_batch_size < len(rare_indices):
-    #         raise ValueError(f"Global batch size must be at least the size of the injected rare samples. "
-    #                          f"Current global batch size: {global_batch_size}, size of injected rare samples: {len(rare_indices)}")
-    #
-    #     # Custom data generator to yield batches
-    #     def data_generator(X, y, batch_size, rare_indices, freq_indices):
-    #         while True:
-    #             np.random.shuffle(freq_indices)
-    #             for start in range(0, len(freq_indices), batch_size - len(rare_indices)):
-    #                 end = min(start + batch_size - len(rare_indices), len(freq_indices))
-    #                 freq_batch_indices = freq_indices[start:end]
-    #                 batch_indices = np.concatenate([rare_indices, freq_batch_indices])
-    #                 np.random.shuffle(batch_indices)
-    #                 # Extract the actual data (features and labels) for the current batch
-    #                 batch_X = X[batch_indices]
-    #                 batch_y = y[batch_indices]
-    #                 # Ensure that batch_y has the correct shape
-    #                 batch_y = batch_y.reshape(-1)
-    #                 # Yield the current batch (features and labels) to be used by the training loop
-    #                 yield batch_X, batch_y
-    #
-    #     with strategy.scope():
-    #         dataset = tf.data.Dataset.from_generator(
-    #             lambda: data_generator(X_train, y_train, global_batch_size, rare_indices, freq_indices),
-    #             output_signature=(
-    #                 tf.TensorSpec(shape=(None, X_train.shape[1]), dtype=tf.float32),
-    #                 tf.TensorSpec(shape=(None,), dtype=tf.float32)
-    #             )
-    #         ).prefetch(tf.data.AUTOTUNE)
-    #
-    #         dataset = strategy.experimental_distribute_dataset(dataset)
-    #
-    #         # Compile the model within the strategy's scope
-    #         model.compile(
-    #             optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-    #             loss=self.pds_loss_vec
-    #         )
-    #
-    #         steps_per_epoch = len(freq_indices) // (global_batch_size - len(rare_indices))
-    #
-    #         # Fit the model using the custom dataset
-    #         history = model.fit(
-    #             dataset,
-    #             steps_per_epoch=steps_per_epoch,
-    #             epochs=epochs,
-    #             callbacks=callbacks_list,
-    #             verbose=verbose
-    #         )
-    #
-    #         # Save the model weights
-    #         model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
-    #         print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
-    #
-    #     return history
 
     def overtrain_pds_inj_distr(self,
                                 model: tf.keras.Model,
@@ -661,13 +571,14 @@ class ModelBuilder:
         """
         Trains the model and returns the training history with specific batch constraints in a distributed manner.
 
+        :param strategy:  The distribution strategy to use for training.
         :param X_train: training and validation sets together
         :param y_train: labels of training and validation sets together
         :param save_tag: tag to use for saving experiments
         :param model: The TensorFlow model to train.
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
-        :param batch_size: The batch size for training.
+        :param batch_size: The batch size for training, per replica.
         :param lower_bound: The lower bound for selecting rare samples.
         :param upper_bound: The upper bound for selecting rare samples.
         :param callbacks_list: List of callback instances to apply during training.
@@ -717,7 +628,7 @@ class ModelBuilder:
                 quadrant = ['A', 'B', 'C', 'D'][replica_id]
 
                 # Compute the loss for the assigned quadrant
-                local_loss = self.pds_loss_vec(y_true, z_pred, quadrant)
+                local_loss = self.pds_loss_vec_distr(y_true, z_pred, quadrant)
 
                 # Aggregate losses from all replicas (workers)
                 total_loss = replica_context.all_reduce(tf.distribute.ReduceOp.SUM, local_loss)
