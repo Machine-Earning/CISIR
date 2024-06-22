@@ -627,14 +627,8 @@ class ModelBuilder:
                 replica_context = tf.distribute.get_replica_context()
                 replica_id = replica_context.replica_id_in_sync_group
 
-                # Convert replica_id to an integer
-                replica_id = tf.cast(replica_id, tf.int32)
-                quadrant = tf.case([
-                    (tf.equal(replica_id, 0), lambda: tf.constant('A')),
-                    (tf.equal(replica_id, 1), lambda: tf.constant('B')),
-                    (tf.equal(replica_id, 2), lambda: tf.constant('C')),
-                    (tf.equal(replica_id, 3), lambda: tf.constant('D'))
-                ], exclusive=True)
+                # Use replica_id directly as the quadrant index
+                quadrant = tf.cast(replica_id, tf.int32)
 
                 # Compute the loss for the assigned quadrant
                 local_loss = self.pds_loss_vec_distr(y_true, z_pred, quadrant)
@@ -2505,7 +2499,7 @@ class ModelBuilder:
         Vectorized computation of the loss for a batch of predicted features and their labels.
         :param y_true: A batch of true label values, shape of [batch_size, 1].
         :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
-        :param quadrant: The quadrant to compute (one of 'A', 'B', 'C', 'D').
+        :param quadrant: The quadrant index to compute (0, 1, 2, 3).
         :param reduction: The type of reduction to apply to the loss.
         :return: The average error for all unique combinations of the samples in the batch.
         """
@@ -2513,22 +2507,22 @@ class ModelBuilder:
         batch_size = tf.shape(y_true)[0]
         half_batch = batch_size // 2
 
-        if quadrant == 'A':
+        if quadrant == 0:
             y_true_i = y_true[:half_batch]
             y_true_j = y_true[:half_batch]
             z_pred_i = z_pred[:half_batch]
             z_pred_j = z_pred[:half_batch]
-        elif quadrant == 'B':
+        elif quadrant == 1:
             y_true_i = y_true[:half_batch]
             y_true_j = y_true[half_batch:]
             z_pred_i = z_pred[:half_batch]
             z_pred_j = z_pred[half_batch:]
-        elif quadrant == 'C':
+        elif quadrant == 2:
             y_true_i = y_true[half_batch:]
             y_true_j = y_true[:half_batch]
             z_pred_i = z_pred[half_batch:]
             z_pred_j = z_pred[:half_batch]
-        elif quadrant == 'D':
+        elif quadrant == 3:
             y_true_i = y_true[half_batch:]
             y_true_j = y_true[half_batch:]
             z_pred_i = z_pred[half_batch:]
