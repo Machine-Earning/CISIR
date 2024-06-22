@@ -1823,26 +1823,26 @@ class ModelBuilder:
             raise ValueError(f"Batch size must be at least the number of injected rare samples. "
                              f"Current batch size: {batch_size}, rare_injection_count: {rare_injection_count}")
 
-        # def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
-        #     while True:
-        #         np.random.shuffle(freq_indices)
-        #         for start in range(0, len(freq_indices), batch_size - rare_injection_count):
-        #             end = min(start + batch_size - rare_injection_count, len(freq_indices))
-        #             freq_batch_indices = freq_indices[start:end]
-        #             rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
-        #             batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
-        #             np.random.shuffle(batch_indices)
-        #             yield X[batch_indices], y[batch_indices]
-
-        def data_generator(X, y, batch_size):
+        def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
             while True:
                 np.random.shuffle(freq_indices)
-                for start in range(0, len(freq_indices), batch_size - len(rare_indices)):
-                    end = min(start + batch_size - len(rare_indices), len(freq_indices))
+                for start in range(0, len(freq_indices), batch_size - rare_injection_count):
+                    end = min(start + batch_size - rare_injection_count, len(freq_indices))
                     freq_batch_indices = freq_indices[start:end]
-                    batch_indices = np.concatenate([rare_indices, freq_batch_indices])
+                    rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
+                    batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
                     np.random.shuffle(batch_indices)
                     yield X[batch_indices], y[batch_indices]
+
+        # def data_generator(X, y, batch_size):
+        #     while True:
+        #         np.random.shuffle(freq_indices)
+        #         for start in range(0, len(freq_indices), batch_size - len(rare_indices)):
+        #             end = min(start + batch_size - len(rare_indices), len(freq_indices))
+        #             freq_batch_indices = freq_indices[start:end]
+        #             batch_indices = np.concatenate([rare_indices, freq_batch_indices])
+        #             np.random.shuffle(batch_indices)
+        #             yield X[batch_indices], y[batch_indices]
 
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
@@ -1852,7 +1852,7 @@ class ModelBuilder:
         )
 
         history = model.fit(
-            data_generator(X_train, y_train, batch_size),
+            data_generator(X_train, y_train, batch_size, rare_indices, freq_indices, rare_injection_count),
             steps_per_epoch=steps_per_epoch,
             epochs=epochs,
             callbacks=callbacks_list,
