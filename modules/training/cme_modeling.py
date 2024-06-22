@@ -553,6 +553,98 @@ class ModelBuilder:
 
         return history
 
+    # def overtrain_pds_inj_distr(self,
+    #                             model: tf.keras.Model,
+    #                             X_train: np.ndarray,
+    #                             y_train: np.ndarray,
+    #                             learning_rate: float = 1e-3,
+    #                             epochs: int = 100,
+    #                             batch_size: int = 32,
+    #                             lower_bound: float = -0.5,
+    #                             upper_bound: float = 0.5,
+    #                             save_tag=None,
+    #                             callbacks_list=None,
+    #                             strategy=None,
+    #                             verbose: int = 1):
+    #     """
+    #     Trains the model and returns the training history with specific batch constraints in a distributed manner.
+    #
+    #     :param X_train: training and validation sets together
+    #     :param y_train: labels of training and validation sets together
+    #     :param save_tag: tag to use for saving experiments
+    #     :param model: The TensorFlow model to train.
+    #     :param learning_rate: The learning rate for the Adam optimizer.
+    #     :param epochs: The maximum number of epochs for training.
+    #     :param batch_size: The batch size for training.
+    #     :param lower_bound: The lower bound for selecting rare samples.
+    #     :param upper_bound: The upper bound for selecting rare samples.
+    #     :param callbacks_list: List of callback instances to apply during training.
+    #     :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
+    #
+    #     :return: The training history as a History object.
+    #     """
+    #     num_replicas = strategy.num_replicas_in_sync
+    #     global_batch_size = batch_size * num_replicas
+    #
+    #     # Identify injected rare samples
+    #     rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
+    #     freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
+    #
+    #     if global_batch_size < len(rare_indices):
+    #         raise ValueError(f"Global batch size must be at least the size of the injected rare samples. "
+    #                          f"Current global batch size: {global_batch_size}, size of injected rare samples: {len(rare_indices)}")
+    #
+    #     # Custom data generator to yield batches
+    #     def data_generator(X, y, batch_size, rare_indices, freq_indices):
+    #         while True:
+    #             np.random.shuffle(freq_indices)
+    #             for start in range(0, len(freq_indices), batch_size - len(rare_indices)):
+    #                 end = min(start + batch_size - len(rare_indices), len(freq_indices))
+    #                 freq_batch_indices = freq_indices[start:end]
+    #                 batch_indices = np.concatenate([rare_indices, freq_batch_indices])
+    #                 np.random.shuffle(batch_indices)
+    #                 # Extract the actual data (features and labels) for the current batch
+    #                 batch_X = X[batch_indices]
+    #                 batch_y = y[batch_indices]
+    #                 # Ensure that batch_y has the correct shape
+    #                 batch_y = batch_y.reshape(-1)
+    #                 # Yield the current batch (features and labels) to be used by the training loop
+    #                 yield batch_X, batch_y
+    #
+    #     with strategy.scope():
+    #         dataset = tf.data.Dataset.from_generator(
+    #             lambda: data_generator(X_train, y_train, global_batch_size, rare_indices, freq_indices),
+    #             output_signature=(
+    #                 tf.TensorSpec(shape=(None, X_train.shape[1]), dtype=tf.float32),
+    #                 tf.TensorSpec(shape=(None,), dtype=tf.float32)
+    #             )
+    #         ).prefetch(tf.data.AUTOTUNE)
+    #
+    #         dataset = strategy.experimental_distribute_dataset(dataset)
+    #
+    #         # Compile the model within the strategy's scope
+    #         model.compile(
+    #             optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+    #             loss=self.pds_loss_vec
+    #         )
+    #
+    #         steps_per_epoch = len(freq_indices) // (global_batch_size - len(rare_indices))
+    #
+    #         # Fit the model using the custom dataset
+    #         history = model.fit(
+    #             dataset,
+    #             steps_per_epoch=steps_per_epoch,
+    #             epochs=epochs,
+    #             callbacks=callbacks_list,
+    #             verbose=verbose
+    #         )
+    #
+    #         # Save the model weights
+    #         model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
+    #         print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
+    #
+    #     return history
+
     def overtrain_pds_inj_distr(self,
                                 model: tf.keras.Model,
                                 X_train: np.ndarray,
@@ -594,7 +686,6 @@ class ModelBuilder:
             raise ValueError(f"Global batch size must be at least the size of the injected rare samples. "
                              f"Current global batch size: {global_batch_size}, size of injected rare samples: {len(rare_indices)}")
 
-        # Custom data generator to yield batches
         def data_generator(X, y, batch_size, rare_indices, freq_indices):
             while True:
                 np.random.shuffle(freq_indices)
@@ -603,12 +694,9 @@ class ModelBuilder:
                     freq_batch_indices = freq_indices[start:end]
                     batch_indices = np.concatenate([rare_indices, freq_batch_indices])
                     np.random.shuffle(batch_indices)
-                    # Extract the actual data (features and labels) for the current batch
                     batch_X = X[batch_indices]
                     batch_y = y[batch_indices]
-                    # Ensure that batch_y has the correct shape
                     batch_y = batch_y.reshape(-1)
-                    # Yield the current batch (features and labels) to be used by the training loop
                     yield batch_X, batch_y
 
         with strategy.scope():
@@ -622,15 +710,27 @@ class ModelBuilder:
 
             dataset = strategy.experimental_distribute_dataset(dataset)
 
-            # Compile the model within the strategy's scope
+            def wrapped_loss(y_true, z_pred):
+                # Determine the replica context and ID
+                replica_context = tf.distribute.get_replica_context()
+                replica_id = replica_context.replica_id_in_sync_group
+                quadrant = ['A', 'B', 'C', 'D'][replica_id]
+
+                # Compute the loss for the assigned quadrant
+                local_loss = self.pds_loss_vec(y_true, z_pred, quadrant)
+
+                # Aggregate losses from all replicas (workers)
+                total_loss = replica_context.all_reduce(tf.distribute.ReduceOp.SUM, local_loss)
+
+                return total_loss / 4  # Average over the quadrants
+
             model.compile(
                 optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-                loss=self.pds_loss_vec
+                loss=wrapped_loss
             )
 
             steps_per_epoch = len(freq_indices) // (global_batch_size - len(rare_indices))
 
-            # Fit the model using the custom dataset
             history = model.fit(
                 dataset,
                 steps_per_epoch=steps_per_epoch,
@@ -639,7 +739,6 @@ class ModelBuilder:
                 verbose=verbose
             )
 
-            # Save the model weights
             model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
             print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
 
@@ -2323,18 +2422,13 @@ class ModelBuilder:
             # Apply the weights to the pairwise loss
             pairwise_loss *= weights_matrix
 
-        # Mask to exclude self-comparisons (where i == j)
-        mask = 1 - tf.eye(batch_size, dtype=z_diff_squared.dtype)
-        # Apply mask to exclude self-comparisons from the loss calculation
-        pairwise_loss_masked = pairwise_loss * mask
-        # Sum over all unique pairs
-        # take the upper triangle of the matrix so multiply by 0.5
-        total_error = 0.5 * tf.reduce_sum(pairwise_loss_masked)
+        # Get the total error
+        total_error = tf.reduce_sum(pairwise_loss)
         # Number of unique comparisons, excluding self-pairs
-        num_comparisons = tf.cast(batch_size * (batch_size - 1) / 2, dtype=z_diff_squared.dtype)
+        num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=z_diff_squared.dtype)
 
         if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error
+            return total_error * 0.5  # upper triangle
         elif reduction == tf.keras.losses.Reduction.NONE:
             # Avoid division by zero
             return total_error / num_comparisons
@@ -2468,27 +2562,153 @@ class ModelBuilder:
         z_diff_squared = tf.reduce_sum(tf.square(z_pred_diff), axis=-1)
         # Calculate squared differences for y_true
         y_diff_squared = tf.square(y_true_diff)
-
         # Compute the loss for each pair
         pairwise_loss = tf.square(z_diff_squared - y_diff_squared)
-
-        # Mask to exclude self-comparisons (where i == j)
-        mask = 1 - tf.eye(batch_size, dtype=tf.float32)
-        # Apply mask to exclude self-comparisons from the loss calculation
-        pairwise_loss_masked = pairwise_loss * mask
-        # Sum over all unique pairs
-        # take the upper triangle of the matrix so multiply by 0.5
-        total_error = 0.5 * tf.reduce_sum(pairwise_loss_masked)  # pairwise_loss_masked)
-        # total_error = total_error / 2  # cancel derivative square
-
-        # Number of unique comparisons, excluding self-pairs
-        num_comparisons = tf.cast(batch_size * (batch_size - 1) / 2, dtype=tf.float32)
+        # Get the total loss
+        total_error = tf.reduce_sum(pairwise_loss)
+        # Number of unique comparisons, excluding self-pairs (full matrix without diagonal)
+        num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=tf.float32)
 
         if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error  # upper triangle only
+            return total_error * 0.5  # upper triangle only
         elif reduction == tf.keras.losses.Reduction.NONE:
             # Avoid division by zero
             return total_error / num_comparisons  # average over all elements
+        else:
+            raise ValueError(f"Unsupported reduction type: {reduction}.")
+
+    import tensorflow as tf
+
+    def pds_loss_vec_distr(self, y_true, z_pred, quadrant, reduction=tf.keras.losses.Reduction.NONE):
+        """
+        NOTE: only support 4 GPUs like in AI Panthers
+        Vectorized computation of the loss for a batch of predicted features and their labels.
+        :param y_true: A batch of true label values, shape of [batch_size, 1].
+        :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
+        :param quadrant: The quadrant to compute (one of 'A', 'B', 'C', 'D').
+        :param reduction: The type of reduction to apply to the loss.
+        :return: The average error for all unique combinations of the samples in the batch.
+        """
+
+        batch_size = tf.shape(y_true)[0]
+        half_batch = batch_size // 2
+
+        if quadrant == 'A':
+            y_true_i = y_true[:half_batch]
+            y_true_j = y_true[:half_batch]
+            z_pred_i = z_pred[:half_batch]
+            z_pred_j = z_pred[:half_batch]
+        elif quadrant == 'B':
+            y_true_i = y_true[:half_batch]
+            y_true_j = y_true[half_batch:]
+            z_pred_i = z_pred[:half_batch]
+            z_pred_j = z_pred[half_batch:]
+        elif quadrant == 'C':
+            y_true_i = y_true[half_batch:]
+            y_true_j = y_true[:half_batch]
+            z_pred_i = z_pred[half_batch:]
+            z_pred_j = z_pred[:half_batch]
+        elif quadrant == 'D':
+            y_true_i = y_true[half_batch:]
+            y_true_j = y_true[half_batch:]
+            z_pred_i = z_pred[half_batch:]
+            z_pred_j = z_pred[half_batch:]
+        else:
+            raise ValueError(f"Unsupported quadrant: {quadrant}.")
+
+        # Compute pairwise differences for z_pred and y_true using broadcasting within the specified quadrant
+        y_true_diff = y_true_i[:, tf.newaxis, :] - y_true_j[tf.newaxis, :, :]  # shape: [half_batch, half_batch, 1]
+        z_pred_diff = z_pred_i[:, tf.newaxis, :] - z_pred_j[tf.newaxis, :, :]  # shape: [half_batch, half_batch, d]
+
+        # Calculate squared L2 norm for z_pred differences
+        z_diff_squared = tf.reduce_sum(tf.square(z_pred_diff), axis=-1)  # shape: [half_batch, half_batch]
+        y_diff_squared = tf.squeeze(tf.square(y_true_diff), axis=-1)  # shape: [half_batch, half_batch]
+        # Compute the loss for each pair
+        pairwise_loss = tf.square(z_diff_squared - y_diff_squared)  # shape: [half_batch, half_batch]
+        # Sum over all unique pairs in the quadrant
+        total_error = tf.reduce_sum(pairwise_loss)
+        # Number of unique comparisons, excluding self-pairs
+        num_comparisons = tf.cast(half_batch * (half_batch - 1), dtype=tf.float32)
+
+        if reduction == tf.keras.losses.Reduction.SUM:
+            return total_error * 0.5  # upper triangle only
+        elif reduction == tf.keras.losses.Reduction.NONE:
+            return total_error / num_comparisons
+        else:
+            raise ValueError(f"Unsupported reduction type: {reduction}.")
+
+    def pds_loss_vec_dl_distr(self, y_true, z_pred, quadrant, sample_weights=None,
+                              reduction=tf.keras.losses.Reduction.NONE):
+        """
+        NOTE: only support 4 GPUs like in AI Panthers
+        Vectorized computation of the loss for a batch of predicted features and their labels.
+        :param y_true: A batch of true label values, shape of [batch_size, 1].
+        :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
+        :param quadrant: The quadrant to compute (one of 'A', 'B', 'C', 'D').
+        :param sample_weights: A dictionary mapping label values to their corresponding reweight.
+        :param reduction: The type of reduction to apply to the loss.
+        :return: The average error for all unique combinations of the samples in the batch.
+        """
+
+        batch_size = tf.shape(y_true)[0]
+        half_batch = batch_size // 2
+
+        if quadrant == 'A':
+            y_true_i = y_true[:half_batch]
+            y_true_j = y_true[:half_batch]
+            z_pred_i = z_pred[:half_batch]
+            z_pred_j = z_pred[:half_batch]
+        elif quadrant == 'B':
+            y_true_i = y_true[:half_batch]
+            y_true_j = y_true[half_batch:]
+            z_pred_i = z_pred[:half_batch]
+            z_pred_j = z_pred[half_batch:]
+        elif quadrant == 'C':
+            y_true_i = y_true[half_batch:]
+            y_true_j = y_true[:half_batch]
+            z_pred_i = z_pred[half_batch:]
+            z_pred_j = z_pred[:half_batch]
+        elif quadrant == 'D':
+            y_true_i = y_true[half_batch:]
+            y_true_j = y_true[half_batch:]
+            z_pred_i = z_pred[half_batch:]
+            z_pred_j = z_pred[half_batch:]
+        else:
+            raise ValueError(f"Unsupported quadrant: {quadrant}.")
+
+        # Compute pairwise differences for z_pred and y_true using broadcasting within the specified quadrant
+        y_true_diff = y_true_i[:, tf.newaxis, :] - y_true_j[tf.newaxis, :, :]  # shape: [half_batch, half_batch, 1]
+        z_pred_diff = z_pred_i[:, tf.newaxis, :] - z_pred_j[tf.newaxis, :, :]  # shape: [half_batch, half_batch, d]
+
+        # Calculate squared L2 norm for z_pred differences
+        z_diff_squared = tf.reduce_sum(tf.square(z_pred_diff), axis=-1)  # shape: [half_batch, half_batch]
+        y_diff_squared = tf.squeeze(tf.square(y_true_diff), axis=-1)  # shape: [half_batch, half_batch]
+        # Compute the loss for each pair
+        pairwise_loss = tf.square(z_diff_squared - y_diff_squared)  # shape: [half_batch, half_batch]
+
+        # Apply sample weights if provided
+        if sample_weights is not None:
+            # Convert sample_weights keys to strings
+            keys = tf.constant(list(map(str, sample_weights.keys())), dtype=tf.string)
+            values = tf.constant(list(sample_weights.values()), dtype=tf.float32)
+            table = tf.lookup.StaticHashTable(tf.lookup.KeyValueTensorInitializer(keys, values), default_value=1.0)
+            # Lookup the weights for each y_true value
+            weights = table.lookup(tf.as_string(tf.reshape(y_true, [-1])))
+            weights_matrix = weights[:, None] * weights[None, :]
+            # Cast weights_matrix to the same data type as z_diff_squared
+            weights_matrix = tf.cast(weights_matrix, dtype=z_diff_squared.dtype)
+            # Apply the weights to the pairwise loss
+            pairwise_loss *= weights_matrix
+
+        # Sum over all unique pairs in the quadrant
+        total_error = tf.reduce_sum(pairwise_loss)
+        # Number of unique comparisons, excluding self-pairs
+        num_comparisons = tf.cast(half_batch * (half_batch - 1), dtype=tf.float32)
+
+        if reduction == tf.keras.losses.Reduction.SUM:
+            return total_error * 0.5  # upper triangle only
+        elif reduction == tf.keras.losses.Reduction.NONE:
+            return total_error / num_comparisons
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
