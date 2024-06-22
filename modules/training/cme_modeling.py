@@ -2551,11 +2551,11 @@ class ModelBuilder:
         ], exclusive=True)
 
         # Debugging statements
-        tf.print("Quadrant:", quadrant)
-        tf.print("y_true_i shape:", tf.shape(y_true_i))
-        tf.print("y_true_j shape:", tf.shape(y_true_j))
-        tf.print("z_pred_i shape:", tf.shape(z_pred_i))
-        tf.print("z_pred_j shape:", tf.shape(z_pred_j))
+        # tf.print("Quadrant:", quadrant)
+        # tf.print("y_true_i shape:", tf.shape(y_true_i))
+        # tf.print("y_true_j shape:", tf.shape(y_true_j))
+        # tf.print("z_pred_i shape:", tf.shape(z_pred_i))
+        # tf.print("z_pred_j shape:", tf.shape(z_pred_j))
 
         # Compute pairwise differences for z_pred and y_true using broadcasting within the specified quadrant
         y_true_diff = y_true_i[:, tf.newaxis, :] - y_true_j[tf.newaxis, :, :]  # shape: [half_batch, half_batch, 1]
