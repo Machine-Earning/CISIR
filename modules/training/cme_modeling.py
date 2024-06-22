@@ -2498,15 +2498,16 @@ class ModelBuilder:
         # Apply mask to exclude self-comparisons from the loss calculation
         pairwise_loss_masked = pairwise_loss * mask
         # Sum over all unique pairs
+        # take the upper triangle of the matrix so multiply by 0.5
         total_error = 0.5 * tf.reduce_sum(pairwise_loss_masked)
         # Number of unique comparisons, excluding self-pairs
-        num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=z_diff_squared.dtype)
+        num_comparisons = tf.cast(batch_size * (batch_size - 1) / 2, dtype=z_diff_squared.dtype)
 
         if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error / 2
+            return total_error
         elif reduction == tf.keras.losses.Reduction.NONE:
             # Avoid division by zero
-            return total_error / (num_comparisons + 1e-9)
+            return total_error / num_comparisons
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
@@ -2647,6 +2648,8 @@ class ModelBuilder:
         :param reduction: The type of reduction to apply to the loss.
         :return: The average error for all unique combinations of the samples in the batch.
         """
+
+        batch_size = tf.shape(y_true)[0]
         # Compute pairwise differences for z_pred and y_true using broadcasting
         y_true_diff = y_true - tf.transpose(y_true)  # labels are not normalized
         # Compute pairwise differences for z_pred using broadcasting
@@ -2668,12 +2671,9 @@ class ModelBuilder:
         pairwise_loss = tf.square(z_diff_squared - y_diff_squared)
 
         # Mask to exclude self-comparisons (where i == j)
-        batch_size = tf.shape(y_true)[0]
         mask = 1 - tf.eye(batch_size, dtype=tf.float32)
-
         # Apply mask to exclude self-comparisons from the loss calculation
         pairwise_loss_masked = pairwise_loss * mask
-
         # Sum over all unique pairs
         # take the upper triangle of the matrix so multiply by 0.5
         total_error = 0.5 * tf.reduce_sum(pairwise_loss_masked)  # pairwise_loss_masked)
