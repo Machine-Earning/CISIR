@@ -1853,17 +1853,13 @@ class ModelBuilder:
                     np.random.shuffle(batch_indices)
                     yield X[batch_indices], y[batch_indices]
 
-        # model.compile(
-        #     optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-        #     loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
-        #         y_true, y_pred, sample_weights=train_label_weights_dict
-        #     )
-        # )
-        # Compile the model
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            loss=self.pds_loss_vec
+            loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
+                y_true, y_pred, sample_weights=train_label_weights_dict
+            )
         )
+
 
         # Fit the model using the custom generator
         steps_per_epoch = len(freq_indices) // (batch_size - len(rare_indices))
