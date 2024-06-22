@@ -53,7 +53,7 @@ def main():
                 # add_slope = True
                 outputs_to_use = ['delta_p']
 
-                bs = 4096  # full dataset used
+                bs = 2048  # full dataset used
                 print(f'batch size : {bs}')
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -72,8 +72,8 @@ def main():
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
                     'epochs': int(100e4),  # 35k epochs
-                    'patience': int(2.5e4),
-                    'learning_rate': 1e-2,  # initial learning rate
+                    'patience': int(3e4),
+                    'learning_rate': 3e-2,  # initial learning rate
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.9,  # Added momentum beta1
                 }
@@ -104,7 +104,7 @@ def main():
                     patience=1000,
                     verbose=1,
                     min_delta=1e-5,
-                    min_lr=3e-3)
+                    min_lr=3e-4)
                 residual = True
                 skipped_layers = 2
                 N = 500  # number of samples to keep outside the threshold
