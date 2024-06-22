@@ -621,11 +621,20 @@ class ModelBuilder:
 
             dataset = strategy.experimental_distribute_dataset(dataset)
 
+            @tf.function
             def wrapped_loss(y_true, z_pred):
                 # Determine the replica context and ID
                 replica_context = tf.distribute.get_replica_context()
                 replica_id = replica_context.replica_id_in_sync_group
-                quadrant = ['A', 'B', 'C', 'D'][replica_id]
+
+                # Convert replica_id to an integer
+                replica_id = tf.cast(replica_id, tf.int32)
+                quadrant = tf.case([
+                    (tf.equal(replica_id, 0), lambda: tf.constant('A')),
+                    (tf.equal(replica_id, 1), lambda: tf.constant('B')),
+                    (tf.equal(replica_id, 2), lambda: tf.constant('C')),
+                    (tf.equal(replica_id, 3), lambda: tf.constant('D'))
+                ], exclusive=True)
 
                 # Compute the loss for the assigned quadrant
                 local_loss = self.pds_loss_vec_distr(y_true, z_pred, quadrant)
