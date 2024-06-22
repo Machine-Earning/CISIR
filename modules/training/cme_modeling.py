@@ -5,7 +5,6 @@
 ##############################################################################################################
 import subprocess
 import time
-from itertools import cycle
 # types for type hinting
 from typing import Tuple, List, Optional, Dict, Any, Generator
 
@@ -233,92 +232,6 @@ class ModelBuilder:
         model = Model(inputs=encoder_input, outputs=outputs if len(outputs) > 1 else outputs[0])
 
         return model
-
-    # def add_proj_head(self,
-    #                   model: Model,
-    #                   output_dim: int = 1,
-    #                   hiddens: Optional[List[int]] = None,
-    #                   freeze_features: bool = True,
-    #                   pds: bool = False,
-    #                   l2_reg: float = None,
-    #                   dropout_rate: float = 0.0,
-    #                   activation=None,
-    #                   norm: str = None,
-    #                   name: str = 'mlp') -> Model:
-    #     """
-    #     Add a regression head with one output unit and a projection layer to an existing model,
-    #     replacing the existing prediction layer and optionally the decoder layer.
-    #
-    #     :param model: The existing model
-    #     :param output_dim: The dimensionality of the output of the regression head.
-    #     :param freeze_features: Whether to freeze the layers of the base model or not.
-    #     :param hiddens: List of integers representing the hidden layers for the projection.
-    #     :param pds: Whether to adapt the model for PDS representations.
-    #     :param l2_reg: L2 regularization factor.
-    #     :param dropout_rate: Dropout rate for adding dropout layers.
-    #     :param activation: Activation function to use. If None, defaults to LeakyReLU.
-    #     :param norm: Type of normalization ('batch_norm' or 'layer_norm').
-    #     :param name: Name of the model.
-    #     :return: The modified model with a projection layer and a regression head.
-    #     """
-    #
-    #     if hiddens is None:
-    #         hiddens = [6]
-    #
-    #     if activation is None:
-    #         activation = LeakyReLU()
-    #
-    #     print(f'Features are frozen: {freeze_features}')
-    #
-    #     # Determine the layer to be kept based on whether PDS representations are used
-    #     layer_to_keep = 'normalize_layer' if pds else 'repr_layer'
-    #
-    #     # Remove the last layer(s) to keep only the representation layer
-    #     new_base_model = Model(inputs=model.input, outputs=model.get_layer(layer_to_keep).output)
-    #
-    #     # If freeze_features is True, freeze the layers of the new base model
-    #     if freeze_features:
-    #         for layer in new_base_model.layers:
-    #             layer.trainable = False
-    #
-    #     # Count existing dropout layers to avoid naming conflicts
-    #     dropout_count = sum(1 for layer in model.layers if isinstance(layer, Dropout))
-    #
-    #     # Extract the output of the last layer of the new base model (representation layer)
-    #     repr_output = new_base_model.output
-    #
-    #     # Projection Layer(s)
-    #     x_proj = repr_output
-    #     for i, nodes in enumerate(hiddens):
-    #         x_proj = Dense(
-    #             nodes, kernel_regularizer=l2(l2_reg) if l2_reg else None,
-    #             name=f"projection_layer_{i + 1}")(x_proj)
-    #
-    #         if norm == 'batch_norm':
-    #             x_proj = BatchNormalization(name=f"batch_norm_{i + 1}")(x_proj)
-    #         elif norm == 'layer_norm':
-    #             x_proj = LayerNormalization(name=f"layer_norm_{i + 1}")(x_proj)
-    #
-    #         if callable(activation):
-    #             x_proj = activation(x_proj)
-    #         else:
-    #             x_proj = LeakyReLU(name=f"activation_{i + 1}")(x_proj)
-    #
-    #         if dropout_rate > 0.0:
-    #             x_proj = Dropout(dropout_rate, name=f"proj_dropout_{dropout_count + i + 1}")(x_proj)
-    #
-    #     # Add a Dense layer with one output unit for regression
-    #     output_layer = Dense(output_dim, activation='linear', name=f"forecast_head")(x_proj)
-    #
-    #     # Create the new extended model
-    #     extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer], name=name)
-    #
-    #     # If freeze_features is False, make all layers trainable
-    #     if not freeze_features:
-    #         for layer in extended_model.layers:
-    #             layer.trainable = True
-    #
-    #     return extended_model
 
     def add_proj_head(self,
                       model: Model,
@@ -732,78 +645,6 @@ class ModelBuilder:
 
         return history
 
-    def overtrain_pds_inj_olin(self,
-                               model: tf.keras.Model,
-                               X_train: np.ndarray,
-                               y_train: np.ndarray,
-                               learning_rate: float = 1e-3,
-                               epochs: int = 100,
-                               batch_size: int = 32,
-                               lower_bound: float = -0.5,
-                               upper_bound: float = 0.5,
-                               save_tag=None,
-                               callbacks_list=None,
-                               verbose: int = 1):
-        """
-        Trains the model and returns the training history with specific batch constraints.
-
-        :param X_train: training and validation sets together
-        :param y_train: labels of training and validation sets together
-        :param save_tag: tag to use for saving experiments
-        :param model: The TensorFlow model to stage2.
-        :param learning_rate: The learning rate for the Adam optimizer.
-        :param epochs: The maximum number of epochs for training.
-        :param batch_size: The batch size for training.
-        :param lower_bound: The lower bound for selecting rare samples.
-        :param upper_bound: The upper bound for selecting rare samples.
-        :param callbacks_list: List of callback instances to apply during training.
-        :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
-
-        :return: The training history as a History object.
-        """
-
-        # Identify injected rare samples
-        rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
-        freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
-
-        # Check if the batch size is sufficient
-        if batch_size < len(rare_indices):
-            raise ValueError(f"Batch size must be at least the size of the injected rare samples. "
-                             f"Current batch size: {batch_size}, size of injected rare samples: {len(rare_indices)}")
-
-        # Custom data generator to yield batches
-        def data_generator(X, y, batch_size):
-            while True:
-                np.random.shuffle(freq_indices)
-                for start in range(0, len(freq_indices), batch_size - len(rare_indices)):
-                    end = min(start + batch_size - len(rare_indices), len(freq_indices))
-                    freq_batch_indices = freq_indices[start:end]
-                    batch_indices = np.concatenate([rare_indices, freq_batch_indices])
-                    np.random.shuffle(batch_indices)
-                    yield X[batch_indices], y[batch_indices]
-
-        # Compile the model
-        model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            loss=self.pds_olin_loss
-        )
-
-        # Fit the model using the custom generator
-        steps_per_epoch = len(freq_indices) // (batch_size - len(rare_indices))
-        history = model.fit(
-            data_generator(X_train, y_train, batch_size),
-            steps_per_epoch=steps_per_epoch,
-            epochs=epochs,
-            callbacks=callbacks_list,
-            verbose=verbose
-        )
-
-        # Save the model weights
-        model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
-        print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
-
-        return history
-
     def train_pds_inj(self,
                       model: tf.keras.Model,
                       X_subtrain: np.ndarray,
@@ -884,8 +725,12 @@ class ModelBuilder:
             raise ValueError(f"Batch size must be at least the size of the injected rare samples in final training. "
                              f"Current batch size: {batch_size}, size of final training rare samples: {len(train_rare_indices)}")
 
-        def data_generator(X: np.ndarray, y: np.ndarray, rare_indices: np.ndarray, freq_indices: np.ndarray,
-                           batch_size: int) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
+        def data_generator(
+                X: np.ndarray,
+                y: np.ndarray,
+                rare_indices: np.ndarray,
+                freq_indices: np.ndarray,
+                batch_size: int) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
             """
             Generalized data generator to yield batches with a mixture of rare and frequent samples.
 
@@ -1011,104 +856,104 @@ class ModelBuilder:
 
         return history
 
-    def investigate_pds(self,
-                        model: Model,
-                        X_subtrain: ndarray,
-                        y_subtrain: ndarray,
-                        X_val: ndarray,
-                        y_val: ndarray,
-                        X_train: ndarray,
-                        y_train: ndarray,
-                        learning_rate: float = 1e-3,
-                        epochs: int = 100,
-                        batch_size: int = 32,
-                        patience: int = 9,
-                        save_tag=None) -> callbacks.History:
-        """
-        Trains the model and returns the training history.
-
-        :param X_train:
-        :param y_train:
-        :param save_tag: tag to use for saving experiments
-        :param model: The TensorFlow model to stage2.
-        :param X_subtrain: The training feature set.
-        :param y_subtrain: The training labels.
-        :param X_val: Validation features.
-        :param y_val: Validation labels.
-        :param learning_rate: The learning rate for the Adam optimizer.
-        :param epochs: The maximum number of epochs for training.
-        :param batch_size: The batch size for training.
-        :param patience: The number of epochs with no improvement to wait before early stopping.
-        :return: The training history as a History object.
-        """
-
-        # Setup TensorBoard
-        # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        # tensorboard_cb = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
-        #
-        # print("Run the command line:\n tensorboard --logdir logs/fit")
-
-        # Initialize the custom callback
-        investigate_cb = InvestigateCallback(model, X_train, y_train, batch_size, self, save_tag)
-
-        # Setup early stopping
-        early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
-
-        # reduce learning rate on plateau
-        # Initialize the ReduceLROnPlateau callback
-        # reduce_lr_cb = callbacks.ReduceLROnPlateau(monitor='val_loss',
-        #                                            factor=0.1,
-        #                                            patience=5,
-        #                                            min_lr=1e-6)
-        # Setup model checkpointing
-        checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_{str(save_tag)}.h5", save_weights_only=True)
-
-        # Include weighted_loss_cb in callbacks only if sample_joint_weights is not None
-        callback_list = [early_stopping_cb, checkpoint_cb]
-
-        # Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
-
-        # First stage2 the model with a validation set to determine the best epoch
-        history = model.fit(X_subtrain, y_subtrain,
-                            epochs=epochs,
-                            batch_size=batch_size if batch_size > 0 else len(y_subtrain),
-                            validation_data=(X_val, y_val),
-                            validation_batch_size=batch_size if batch_size > 0 else len(y_val),
-                            callbacks=callback_list)
-
-        # Get the best epoch from early stopping
-        best_epoch = np.argmin(history.history['val_loss']) + 1
-
-        # Plot training loss and validation loss
-        plt.plot(history.history['loss'], label='Training Loss')
-        plt.plot(history.history['val_loss'], label='Validation Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.title('Training and Validation Loss Over Epochs')
-        plt.legend()
-        file_path = f"training_plot_{str(save_tag)}.png"
-        plt.savefig(file_path)
-        plt.close()
-
-        # Retrain the model on the combined dataset (training + validation) to the best epoch found
-        # X_combined = np.concatenate((X_subtrain, X_val), axis=0)
-        # y_combined = np.concatenate((y_subtrain, y_val), axis=0)
-
-        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
-        model.fit(X_train, y_train,
-                  epochs=best_epoch,
-                  batch_size=batch_size if batch_size > 0 else len(y_train),
-                  callbacks=[checkpoint_cb, investigate_cb])
-        # only investigates on the main training, not subtraining
-
-        # Evaluate the model on the entire training set
-        entire_training_loss = model.evaluate(X_train, y_train, batch_size=len(y_train))
-
-        # save the model weights
-        model.save_weights(f"model_weights_{str(save_tag)}.h5")
-
-        return history, entire_training_loss
+    # def investigate_pds(self,
+    #                     model: Model,
+    #                     X_subtrain: ndarray,
+    #                     y_subtrain: ndarray,
+    #                     X_val: ndarray,
+    #                     y_val: ndarray,
+    #                     X_train: ndarray,
+    #                     y_train: ndarray,
+    #                     learning_rate: float = 1e-3,
+    #                     epochs: int = 100,
+    #                     batch_size: int = 32,
+    #                     patience: int = 9,
+    #                     save_tag=None) -> callbacks.History:
+    #     """
+    #     Trains the model and returns the training history.
+    #
+    #     :param X_train:
+    #     :param y_train:
+    #     :param save_tag: tag to use for saving experiments
+    #     :param model: The TensorFlow model to stage2.
+    #     :param X_subtrain: The training feature set.
+    #     :param y_subtrain: The training labels.
+    #     :param X_val: Validation features.
+    #     :param y_val: Validation labels.
+    #     :param learning_rate: The learning rate for the Adam optimizer.
+    #     :param epochs: The maximum number of epochs for training.
+    #     :param batch_size: The batch size for training.
+    #     :param patience: The number of epochs with no improvement to wait before early stopping.
+    #     :return: The training history as a History object.
+    #     """
+    #
+    #     # Setup TensorBoard
+    #     # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    #     # tensorboard_cb = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+    #     #
+    #     # print("Run the command line:\n tensorboard --logdir logs/fit")
+    #
+    #     # Initialize the custom callback
+    #     investigate_cb = InvestigateCallback(model, X_train, y_train, batch_size, self, save_tag)
+    #
+    #     # Setup early stopping
+    #     early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
+    #
+    #     # reduce learning rate on plateau
+    #     # Initialize the ReduceLROnPlateau callback
+    #     # reduce_lr_cb = callbacks.ReduceLROnPlateau(monitor='val_loss',
+    #     #                                            factor=0.1,
+    #     #                                            patience=5,
+    #     #                                            min_lr=1e-6)
+    #     # Setup model checkpointing
+    #     checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_{str(save_tag)}.h5", save_weights_only=True)
+    #
+    #     # Include weighted_loss_cb in callbacks only if sample_joint_weights is not None
+    #     callback_list = [early_stopping_cb, checkpoint_cb]
+    #
+    #     # Compile the model
+    #     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
+    #
+    #     # First stage2 the model with a validation set to determine the best epoch
+    #     history = model.fit(X_subtrain, y_subtrain,
+    #                         epochs=epochs,
+    #                         batch_size=batch_size if batch_size > 0 else len(y_subtrain),
+    #                         validation_data=(X_val, y_val),
+    #                         validation_batch_size=batch_size if batch_size > 0 else len(y_val),
+    #                         callbacks=callback_list)
+    #
+    #     # Get the best epoch from early stopping
+    #     best_epoch = np.argmin(history.history['val_loss']) + 1
+    #
+    #     # Plot training loss and validation loss
+    #     plt.plot(history.history['loss'], label='Training Loss')
+    #     plt.plot(history.history['val_loss'], label='Validation Loss')
+    #     plt.xlabel('Epoch')
+    #     plt.ylabel('Loss')
+    #     plt.title('Training and Validation Loss Over Epochs')
+    #     plt.legend()
+    #     file_path = f"training_plot_{str(save_tag)}.png"
+    #     plt.savefig(file_path)
+    #     plt.close()
+    #
+    #     # Retrain the model on the combined dataset (training + validation) to the best epoch found
+    #     # X_combined = np.concatenate((X_subtrain, X_val), axis=0)
+    #     # y_combined = np.concatenate((y_subtrain, y_val), axis=0)
+    #
+    #     # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
+    #     model.fit(X_train, y_train,
+    #               epochs=best_epoch,
+    #               batch_size=batch_size if batch_size > 0 else len(y_train),
+    #               callbacks=[checkpoint_cb, investigate_cb])
+    #     # only investigates on the main training, not subtraining
+    #
+    #     # Evaluate the model on the entire training set
+    #     entire_training_loss = model.evaluate(X_train, y_train, batch_size=len(y_train))
+    #
+    #     # save the model weights
+    #     model.save_weights(f"model_weights_{str(save_tag)}.h5")
+    #
+    #     return history, entire_training_loss
 
     def process_batch_weights(self, batch_indices: np.ndarray, label_weights_dict: Dict[float, float]) -> np.ndarray:
         """
@@ -1130,45 +975,6 @@ class ModelBuilder:
                         batch_weights.append(weight)
 
         return np.array(batch_weights)
-
-    # def process_batch_weights_vec(self,
-    #                               batch_indices: np.ndarray,
-    #                               joint_weights: np.ndarray,
-    #                               joint_weight_indices: List[Tuple[int, int]]) -> np.ndarray:
-    #     """
-    #     Vectorized approach to return corresponding joint weights for upper diagonal pairs in the batch.
-    #      TODO: speed up more
-    #     :param batch_indices: A batch of sample indices.
-    #     :param joint_weights: An array containing all joint weights for the dataset.
-    #     :param joint_weight_indices: A list of tuples, each containing a pair of indices for which a joint weight exists.
-    #     :return: An array containing joint weights corresponding to the upper diagonal pairs in the batch of indices.
-    #     """
-    #     # Create an efficient mapping from pairs to weights
-    #     max_index = batch_indices.max() + 1
-    #     weight_matrix = np.full((max_index, max_index), -1, dtype=int)  # Use an invalid index initially
-    #
-    #     # Populate the matrix with valid indices from joint_weight_indices
-    #     for idx, (i, j) in enumerate(joint_weight_indices):
-    #         if i < max_index and j < max_index:
-    #             weight_matrix[i, j] = idx
-    #
-    #     # Generate upper diagonal pairs using broadcasting
-    #     i_indices, j_indices = np.triu_indices_from(weight_matrix, k=1)
-    #
-    #     # Filter pairs that are in batch_indices
-    #     valid_mask = np.isin(i_indices, batch_indices) & np.isin(j_indices, batch_indices)
-    #     i_indices, j_indices = i_indices[valid_mask], j_indices[valid_mask]
-    #
-    #     # Lookup indices in the weight matrix
-    #     weight_indices = weight_matrix[i_indices, j_indices]
-    #
-    #     # Filter out invalid indices
-    #     valid_weight_indices = weight_indices[weight_indices != -1]
-    #
-    #     # Retrieve corresponding weights using the valid weight indices
-    #     batch_weights = joint_weights[valid_weight_indices]
-    #
-    #     return batch_weights
 
     def train_for_one_epoch(self,
                             model: tf.keras.Model,
@@ -1446,16 +1252,6 @@ class ModelBuilder:
 
         best_epoch = early_stopping_cb.stopped_epoch + 1  # Adjust for the offset
 
-        # Plotting the losses
-        # plt.plot(history['loss'], label='Training Loss')
-        # plt.plot(history['val_loss'], label='Validation Loss')
-        # plt.xlabel('Epoch')
-        # plt.ylabel('Loss')
-        # plt.title('Training and Validation Loss Over Epochs')
-        # plt.legend()
-        # plt.savefig(f"training_plot_{str(save_tag)}.png")
-        # plt.close()
-
         # Retraining on the combined dataset
         print(f"Retraining to the best epoch: {best_epoch}")
         # Reset history for retraining
@@ -1679,7 +1475,257 @@ class ModelBuilder:
 
         return history
 
+    def train_pds_dl_inj(self,
+                         model: tf.keras.Model,
+                         X_subtrain: np.ndarray,
+                         y_subtrain: np.ndarray,
+                         X_val: np.ndarray,
+                         y_val: np.ndarray,
+                         X_train: np.ndarray,
+                         y_train: np.ndarray,
+                         train_label_weights_dict: Optional[Dict[float, float]] = None,
+                         learning_rate: float = 1e-3,
+                         epochs: int = 100,
+                         batch_size: int = 32,
+                         rare_injection_count: int = 2,
+                         lower_bound: float = -0.5,
+                         upper_bound: float = 0.5,
+                         patience: int = 9,
+                         save_tag: Optional[str] = None,
+                         callbacks_list=None,
+                         verbose: int = 1) -> tf.keras.callbacks.History:
+        """
+        Custom training loop to train the model with sample weights and injected rare samples.
 
+        :param X_train: training and validation sets together
+        :param y_train: labels of training and validation sets together
+        :param X_subtrain: The training feature set.
+        :param y_subtrain: The training labels.
+        :param X_val: Validation features.
+        :param y_val: Validation labels.
+        :param model: The TensorFlow model to train.
+        :param train_label_weights_dict: Dictionary containing label weights for the training set.
+        :param learning_rate: The learning rate for the Adam optimizer.
+        :param epochs: The maximum number of epochs for training.
+        :param batch_size: The batch size for training.
+        :param rare_injection_count: Number of rare samples to inject in each batch (-1 for all, 0 for none, default 2).
+        :param lower_bound: The lower bound for selecting rare samples.
+        :param upper_bound: The upper bound for selecting rare samples.
+        :param patience: The number of epochs with no improvement to wait before early stopping.
+        :param save_tag: Tag to use for saving experiments.
+        :param callbacks_list: List of callback instances to apply during training.
+        :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
+
+        :return: The training history as a History object.
+        """
+
+        if callbacks_list is None:
+            callbacks_list = []
+
+        # Initialize early stopping and model checkpointing for subtraining
+        early_stopping_cb = tf.keras.callbacks.EarlyStopping(
+            monitor='val_loss',
+            patience=patience,
+            restore_best_weights=True
+        )
+        checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
+            filepath=f"model_weights_{str(save_tag)}.h5",
+            monitor='val_loss',
+            save_best_only=True,
+            save_weights_only=True
+        )
+
+        # Append the early stopping and checkpoint callbacks to the custom callbacks list
+        subtrain_callbacks_list = callbacks_list + [early_stopping_cb, checkpoint_cb]
+
+        # Save initial weights for retraining on full training set after best epoch found
+        initial_weights = model.get_weights()
+
+        # Identify injected rare samples in the subtraining set
+        subtrain_rare_indices = np.where((y_subtrain < lower_bound) | (y_subtrain > upper_bound))[0]
+        subtrain_freq_indices = np.where((y_subtrain >= lower_bound) & (y_subtrain <= upper_bound))[0]
+
+        # Adjust rare_injection_count for subtraining
+        rare_injection_count_subtrain = rare_injection_count
+        if rare_injection_count_subtrain == -1:
+            rare_injection_count_subtrain = len(subtrain_rare_indices)
+        if rare_injection_count_subtrain > len(subtrain_rare_indices):
+            rare_injection_count_subtrain = len(subtrain_rare_indices)
+            print(
+                f"rare_injection_count_subtrain ({rare_injection_count_subtrain}) is greater than the number of rare samples "
+                f"({len(subtrain_rare_indices)}).")
+
+        num_batches_subtrain = len(y_subtrain) // batch_size
+        ratio_subtrain = len(subtrain_rare_indices) / num_batches_subtrain
+        if ratio_subtrain > rare_injection_count_subtrain:
+            rare_injection_count_subtrain = int(ratio_subtrain / rare_injection_count_subtrain)
+            print(
+                f"Adjusting rare_injection_count_subtrain to {rare_injection_count_subtrain} based on the ratio of rare samples to batches.")
+        else:
+            print(f"Injecting {rare_injection_count_subtrain} rare samples in each subtraining batch.")
+
+        if batch_size < rare_injection_count_subtrain:
+            raise ValueError(f"Batch size must be at least the number of injected rare samples for subtraining. "
+                             f"Current batch size: {batch_size}, rare_injection_count_subtrain: {rare_injection_count_subtrain}")
+
+        # Identify injected rare samples in the full training set
+        train_rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
+        train_freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
+
+        # Adjust rare_injection_count for final training
+        rare_injection_count_train = rare_injection_count
+        if rare_injection_count_train == -1:
+            rare_injection_count_train = len(train_rare_indices)
+        if rare_injection_count_train > len(train_rare_indices):
+            rare_injection_count_train = len(train_rare_indices)
+            print(
+                f"rare_injection_count_train ({rare_injection_count_train}) is greater than the number of rare samples "
+                f"({len(train_rare_indices)}).")
+
+        num_batches_train = len(y_train) // batch_size
+        ratio_train = len(train_rare_indices) / num_batches_train
+        if ratio_train > rare_injection_count_train:
+            rare_injection_count_train = int(ratio_train / rare_injection_count_train)
+            print(
+                f"Adjusting rare_injection_count_train to {rare_injection_count_train} based on the ratio of rare samples to batches.")
+        else:
+            print(f"Injecting {rare_injection_count_train} rare samples in each training batch.")
+
+        if batch_size < rare_injection_count_train:
+            raise ValueError(f"Batch size must be at least the number of injected rare samples for training. "
+                             f"Current batch size: {batch_size}, rare_injection_count_train: {rare_injection_count_train}")
+
+        def data_generator(
+                X: np.ndarray,
+                y: np.ndarray,
+                rare_indices: np.ndarray,
+                freq_indices: np.ndarray,
+                batch_size: int,
+                rare_injection_count: int
+        ) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
+            """
+            Generalized data generator to yield batches with a mixture of rare and frequent samples.
+
+            :param X: Feature set.
+            :param y: Labels.
+            :param rare_indices: Indices of the rare samples.
+            :param freq_indices: Indices of the frequent samples.
+            :param batch_size: Size of each batch.
+            :param rare_injection_count: Number of rare samples to inject in each batch.
+
+            :yield: Batches of (features, labels) with mixed rare and frequent samples.
+            """
+            while True:
+                # Shuffle the indices of frequent samples to ensure randomization in each epoch
+                np.random.shuffle(freq_indices)
+                # Iterate over the frequent samples in the feature set
+                for start in range(0, len(freq_indices), batch_size - rare_injection_count):
+                    # Determine the end index for the current batch
+                    end = min(start + batch_size - rare_injection_count, len(freq_indices))
+                    # Determine the indices of the frequent samples in the current batch
+                    freq_batch_indices = freq_indices[start:end]
+                    # Randomly select rare samples to inject in each batch
+                    rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
+                    # Combine the rare and frequent sample indices
+                    batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
+                    # Shuffle the combined batch indices to mix rare and frequent samples
+                    np.random.shuffle(batch_indices)
+                    # Extract the actual data (features and labels) for the current batch
+                    batch_X = X[batch_indices]
+                    batch_y = y[batch_indices]
+                    # Ensure that batch_y has the correct shape
+                    batch_y = batch_y.reshape(-1)
+                    # Yield the current batch (features and labels) to be used by the training loop
+                    yield batch_X, batch_y
+
+        def create_tf_dataset(
+                X: np.ndarray,
+                y: np.ndarray,
+                rare_indices: np.ndarray,
+                freq_indices: np.ndarray,
+                batch_size: int,
+                rare_injection_count: int
+        ) -> tf.data.Dataset:
+            """
+            Creates a TensorFlow dataset from the data generator.
+
+            :param X: Feature set.
+            :param y: Labels.
+            :param rare_indices: Indices of the rare samples.
+            :param freq_indices: Indices of the frequent samples.
+            :param batch_size: Size of each batch.
+            :param rare_injection_count: Number of rare samples to inject in each batch.
+
+            :return: A tf.data.Dataset object.
+            """
+            dataset = tf.data.Dataset.from_generator(
+                lambda: data_generator(X, y, rare_indices, freq_indices, batch_size, rare_injection_count),
+                output_signature=(
+                    tf.TensorSpec(shape=(None, X.shape[1]), dtype=tf.float32),
+                    tf.TensorSpec(shape=(None,), dtype=tf.float32)
+                )
+            )
+            return dataset.prefetch(tf.data.AUTOTUNE)
+
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
+                y_true, y_pred, sample_weights=train_label_weights_dict
+            )
+        )
+
+        steps_per_epoch_subtrain = len(subtrain_freq_indices) // (batch_size - rare_injection_count_subtrain)
+
+        subtrain_dataset = create_tf_dataset(
+            X_subtrain,
+            y_subtrain,
+            subtrain_rare_indices,
+            subtrain_freq_indices,
+            batch_size,
+            rare_injection_count_subtrain)
+
+        history = model.fit(
+            subtrain_dataset,
+            steps_per_epoch=steps_per_epoch_subtrain,
+            epochs=epochs,
+            validation_data=(X_val, y_val),
+            callbacks=subtrain_callbacks_list,
+            verbose=verbose
+        )
+
+        best_epoch = early_stopping_cb.stopped_epoch + 1
+
+        model.set_weights(initial_weights)
+
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
+                y_true, y_pred, sample_weights=train_label_weights_dict
+            )
+        )
+
+        steps_per_epoch_final = len(train_freq_indices) // (batch_size - rare_injection_count_train)
+
+        final_train_dataset = create_tf_dataset(
+            X_train,
+            y_train,
+            train_rare_indices,
+            train_freq_indices,
+            batch_size,
+            rare_injection_count_train)
+
+        model.fit(
+            final_train_dataset,
+            steps_per_epoch=steps_per_epoch_final,
+            epochs=best_epoch,
+            callbacks=callbacks_list,
+            verbose=verbose
+        )
+
+        model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
+        print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
+
+        return history
 
     def train_pds_dl_heads(self,
                            model: tf.keras.Model,
@@ -1829,222 +1875,6 @@ class ModelBuilder:
         model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
 
         return history
-
-    def custom_data_generator(self, X, y, batch_size):
-        """
-        Yields batches of cme_files such that the last two samples in each batch
-        have target labels above ln(10), and the remaining have labels below ln(10).
-        Below-threshold samples cycle through before repeating.
-        """
-        above_threshold_indices = np.where(y > np.log(10))[0]
-        below_threshold_indices = np.where(y <= np.log(10))[0]
-
-        # Create an iterator that will cycle through the below_threshold_indices
-        cyclic_below_threshold = cycle(below_threshold_indices)
-
-        while True:
-            # Select random above-threshold indices
-            batch_indices_above = np.random.choice(above_threshold_indices, 2, replace=False)
-
-            # Select (batch_size - 2) below-threshold indices in a cyclic manner
-            batch_indices_below = [next(cyclic_below_threshold) for _ in range(batch_size - 2)]
-
-            batch_indices = np.concatenate([batch_indices_below, batch_indices_above])
-
-            batch_X = X[batch_indices]
-            batch_y = y[batch_indices]
-
-            # Shuffle the entire batch
-            indices = np.arange(batch_X.shape[0])
-            np.random.shuffle(indices)
-            batch_X = batch_X[indices]
-            batch_y = batch_y[indices]
-
-            yield batch_X, batch_y
-
-    def train_pds_injection(self,
-                            model: Model,
-                            X_subtrain: Tensor,
-                            y_subtrain: Tensor,
-                            X_val: Tensor,
-                            y_val: Tensor,
-                            X_train: Tensor,
-                            y_train: Tensor,
-                            learning_rate: float = 1e-3,
-                            epochs: int = 100,
-                            batch_size: int = 32,
-                            patience: int = 9) -> callbacks.History:
-        """
-        Trains the model and returns the training history. injection of rare examples
-
-        :param y_train:
-        :param X_train:
-        :param model: The TensorFlow model to stage2.
-        :param X_subtrain: The training feature set.
-        :param y_subtrain: The training labels.
-        :param X_val: Validation features.
-        :param y_val: Validation labels.
-        :param learning_rate: The learning rate for the Adam optimizer.
-        :param epochs: The maximum number of epochs for training.
-        :param batch_size: The batch size for training.
-        :param patience: The number of epochs with no improvement to wait before early stopping.
-        :return: The training history as a History object.
-        """
-
-        # Create custom cme_files generators for training and validation
-        train_gen = self.custom_data_generator(X_subtrain, y_subtrain, batch_size)
-        val_gen = self.custom_data_generator(X_val, y_val, batch_size)
-
-        train_steps = len(y_subtrain) // batch_size
-        val_steps = len(y_val) // batch_size if len(y_val) > batch_size else len(y_val)
-
-        # Setup TensorBoard
-        # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        # tensorboard_cb = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
-        #
-        # print("Run the command line:\n tensorboard --logdir logs/fit")
-
-        # Setup early stopping
-        early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
-
-        # checkpoint callback
-        # Setup model checkpointing
-        checkpoint_cb = callbacks.ModelCheckpoint("model_weights.h5", save_weights_only=True)
-        # Create an instance of the custom callback
-
-        # Include weighted_loss_cb in callbacks only if sample_joint_weights is not None
-        callback_list = [early_stopping_cb, checkpoint_cb]
-
-        # Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
-
-        # First stage2 the model with a validation set to determine the best epoch
-        history = model.fit(train_gen,
-                            steps_per_epoch=train_steps,
-                            validation_data=val_gen,
-                            validation_steps=val_steps,
-                            epochs=epochs,
-                            batch_size=batch_size if batch_size > 0 else len(y_subtrain),
-                            validation_batch_size=batch_size if batch_size > 0 else len(y_val),
-                            callbacks=callback_list)
-
-        # Get the best epoch from early stopping
-        best_epoch = np.argmin(history.history['val_loss']) + 1
-
-        # Plot training loss and validation loss
-        plt.plot(history.history['loss'], label='Training Loss')
-        plt.plot(history.history['val_loss'], label='Validation Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.title('Training and Validation Loss Over Epochs')
-        plt.legend()
-        plt.show()
-
-        # Create custom generators for combined cme_files
-        train_gen_comb = self.custom_data_generator(X_train, y_train, batch_size)
-
-        # Calculate the number of steps per epoch for training
-        train_steps_comb = len(X_train) // batch_size
-
-        model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
-
-        model.fit(train_gen_comb,
-                  steps_per_epoch=train_steps_comb,
-                  epochs=best_epoch,
-                  batch_size=batch_size if batch_size > 0 else len(y_train),
-                  callbacks=[checkpoint_cb])
-
-        return history
-
-    # def train_pds_fast(self,
-    #                         model: Model,
-    #                         X_subtrain: Tensor,
-    #                         y_subtrain: Tensor,
-    #                         X_val: Tensor,
-    #                         y_val: Tensor,
-    #                         sample_joint_weights: ndarray = None,
-    #                         learning_rate: float = 1e-3,
-    #                         epochs: int = 100,
-    #                         batch_size: int = 32,
-    #                         patience: int = 9) -> callbacks.History:
-    #     """
-    #     Trains the model and returns the training history.
-    #     TODO: fix this issue where loss values are not correct
-    #     :param model: The TensorFlow model to stage2.
-    #     :param X_subtrain: The training feature set.
-    #     :param y_subtrain: The training labels.
-    #     :param X_val: Validation features.
-    #     :param y_val: Validation labels.
-    #     :param sample_joint_weights: The reweighting factors for pairs of labels.
-    #     :param learning_rate: The learning rate for the Adam optimizer.
-    #     :param epochs: The maximum number of epochs for training.
-    #     :param batch_size: The batch size for training.
-    #     :param patience: The number of epochs with no improvement to wait before early stopping.
-    #     :return: The training history as a History object.
-    #     """
-    #
-    #     # Setup TensorBoard
-    #     log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    #     tensorboard_cb = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
-    #
-    #     print("Run the command line:\n tensorboard --logdir logs/fit")
-    #
-    #     # Setup early stopping
-    #     early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
-    #
-    #     # In your Callback
-    #     class WeightedLossCallback(callbacks.Callback):
-    #         def on_subtrain_batch_begin(self, batch, logs=None):
-    #             idx1, idx2 = np.triu_indices(len(y_subtrain), k=1)
-    #             one_d_indices = [map_to_1D_idx(i, j, len(y_subtrain)) for i, j in zip(idx1, idx2)]
-    #             joint_weights_batch = sample_joint_weights[one_d_indices]  # Retrieve weights for this batch
-    #             self.model.loss_weights = joint_weights_batch  # Set loss weights for this batch
-    #
-    #     # Create an instance of the custom callback
-    #     weighted_loss_cb = WeightedLossCallback()
-    #
-    #     # Include weighted_loss_cb in callbacks only if sample_joint_weights is not None
-    #     callback_list = [ early_stopping_cb]
-    #     if sample_joint_weights is not None:
-    #         callback_list.append(weighted_loss_cb)
-    #
-    #     # Compile the model
-    #     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_fast)
-    #
-    #     # First stage2 the model with a validation set to determine the best epoch
-    #     history = model.fit(X_subtrain, y_subtrain,
-    #                         epochs=epochs,
-    #                         batch_size=batch_size,
-    #                         validation_data=(X_val, y_val),
-    #                         callbacks=callback_list)
-    #
-    #     # Get the best epoch from early stopping
-    #     best_epoch = np.argmin(history.history['val_loss']) + 1
-    #
-    #     # Plot training loss and validation loss
-    #     plt.plot(history.history['loss'], label='Training Loss')
-    #     plt.plot(history.history['val_loss'], label='Validation Loss')
-    #     plt.xlabel('Epoch')
-    #     plt.ylabel('Loss')
-    #     plt.title('Training and Validation Loss Over Epochs')
-    #     plt.legend()
-    #     plt.show()
-    #
-    #     # Retrain the model on the combined dataset (training + validation) to the best epoch found
-    #     X_combined = np.concatenate((X_subtrain, X_val), axis=0)
-    #     y_combined = np.concatenate((y_subtrain, y_val), axis=0)
-    #
-    #     if sample_joint_weights is not None:
-    #         sample_joint_weights_combined = np.concatenate((sample_joint_weights, sample_joint_weights), axis=0)
-    #
-    #     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_fast)
-    #     if sample_joint_weights is not None:
-    #         model.fit(X_combined, y_combined, epochs=best_epoch, batch_size=batch_size, callbacks=[weighted_loss_cb])
-    #     else:
-    #         model.fit(X_combined, y_combined, epochs=best_epoch, batch_size=batch_size)
-    #
-    #     return history
 
     def train_reg_head(self,
                        model: Model,
@@ -2511,34 +2341,6 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
-    # def expand_sample_weights_to_matrix(self, sample_weights, batch_size):
-    #     """
-    #     Expands a flat array of sample weights for unique pairs into a symmetric matrix.
-    #
-    #     :param sample_weights: A 1D tensor of sample weights for unique pairs.
-    #     :param batch_size: The number of samples in the batch.
-    #     :return weights_matrix: A 2D tensor of sample weights for all pairs in the batch.
-    #     """
-    #     # Ensure sample_weights is a 1D tensor
-    #     sample_weights = tf.reshape(sample_weights, [-1])
-    #
-    #     # Generate indices for the rows and columns
-    #     rows, cols = tf.meshgrid(tf.range(batch_size), tf.range(batch_size), indexing='ij')
-    #
-    #     # Identify the indices of the upper triangle (excluding the diagonal)
-    #     upper_tri_indices = tf.where(rows < cols)
-    #
-    #     # Create a matrix of zeros with the same shape as the desired output
-    #     weights_matrix = tf.zeros((batch_size, batch_size), dtype=sample_weights.dtype)
-    #
-    #     # Update the weights_matrix with sample_weights at the upper triangle indices
-    #     weights_matrix = tf.tensor_scatter_nd_update(weights_matrix, upper_tri_indices, sample_weights)
-    #
-    #     # Since the weights for the pairs are symmetric, we can add the transpose to fill in the lower triangle
-    #     weights_matrix += tf.transpose(weights_matrix)
-    #
-    #     return weights_matrix
-
     def update_pair_counts(self, label1, label2):
         label1 = label1[0]
         label2 = label2[0]
@@ -2745,60 +2547,6 @@ class ModelBuilder:
         elif reduction == tf.keras.losses.Reduction.NONE:
             # Avoid division by zero
             return total_error / num_comparisons  # average over all elements
-        else:
-            raise ValueError(f"Unsupported reduction type: {reduction}.")
-
-    def pds_olin_loss_vec(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
-        """
-        Computes the loss for a batch of predicted features and their labels using a specific pairing strategy.
-
-        :param y_true: A batch of true label values, shape of [batch_size, 1].
-        :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
-        :param reduction: The type of reduction to apply to the loss.
-        :return: The average error for the specified combinations of the samples in the batch.
-        """
-        int_batch_size = tf.shape(y_true)[0]
-
-        # Create indices for pairs (0, 1), (0, 2), (1, 2)
-        pairs_first_three = tf.constant([[0, 1], [0, 2], [1, 2]], dtype=tf.int32)
-
-        # Compute error for the first three pairs
-        z1_first_three = tf.gather(z_pred, pairs_first_three[:, 0])
-        z2_first_three = tf.gather(z_pred, pairs_first_three[:, 1])
-        y1_first_three = tf.gather(y_true, pairs_first_three[:, 0])
-        y2_first_three = tf.gather(y_true, pairs_first_three[:, 1])
-
-        first_three_errors = error(z1_first_three, z2_first_three, y1_first_three, y2_first_three)
-
-        # Indices for the rest of the points
-        rest_indices = tf.range(3, int_batch_size)
-
-        # Gather z_pred and y_true for the rest of the points
-        z_rest = tf.gather(z_pred, rest_indices)
-        y_rest = tf.gather(y_true, rest_indices)
-
-        # Gather z_pred and y_true for the previous points (i-1 and i-2)
-        z_rest_minus_1 = tf.gather(z_pred, rest_indices - 1)
-        y_rest_minus_1 = tf.gather(y_true, rest_indices - 1)
-
-        z_rest_minus_2 = tf.gather(z_pred, rest_indices - 2)
-        y_rest_minus_2 = tf.gather(y_true, rest_indices - 2)
-
-        # Compute errors for the rest of the points
-        rest_errors_1 = error(z_rest, z_rest_minus_1, y_rest, y_rest_minus_1)
-        rest_errors_2 = error(z_rest, z_rest_minus_2, y_rest, y_rest_minus_2)
-
-        # Combine all errors
-        total_error = tf.reduce_sum(first_three_errors) + tf.reduce_sum(rest_errors_1) + tf.reduce_sum(rest_errors_2)
-
-        # Calculate the number of pairs
-        num_pairs = tf.cast(2 * int_batch_size - 3, dtype=tf.float32)
-
-        # Apply reduction
-        if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error  # total loss
-        elif reduction == tf.keras.losses.Reduction.NONE:
-            return total_error / num_pairs  # average loss
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
