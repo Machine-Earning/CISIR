@@ -2542,14 +2542,17 @@ class ModelBuilder:
         def get_quadrant_3():
             return y_true[half_batch:], y_true[half_batch:], z_pred[half_batch:], z_pred[half_batch:]
 
-        # Use tf.case to select the appropriate quadrant
-        y_true_i, y_true_j, z_pred_i, z_pred_j = tf.case([
-            (tf.equal(quadrant, 0), get_quadrant_0),
-            (tf.equal(quadrant, 1), get_quadrant_1),
-            (tf.equal(quadrant, 2), get_quadrant_2),
-            (tf.equal(quadrant, 3), get_quadrant_3)
-        ], exclusive=True)
-
+        # Use tf.switch_case to select the appropriate quadrant
+        y_true_i, y_true_j, z_pred_i, z_pred_j = tf.switch_case(
+            quadrant,
+            branch_fns={
+                0: get_quadrant_0,
+                1: get_quadrant_1,
+                2: get_quadrant_2,
+                3: get_quadrant_3
+            },
+            default=lambda: (y_true, y_true, z_pred, z_pred)  # Provide a default case to handle unexpected values
+        )
         # Debugging statements
         # tf.print("Quadrant:", quadrant)
         # tf.print("y_true_i shape:", tf.shape(y_true_i))
