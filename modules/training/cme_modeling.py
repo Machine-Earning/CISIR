@@ -1823,8 +1823,6 @@ class ModelBuilder:
             raise ValueError(f"Batch size must be at least the number of injected rare samples. "
                              f"Current batch size: {batch_size}, rare_injection_count: {rare_injection_count}")
 
-        
-
         # def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
         #     while True:
         #         np.random.shuffle(freq_indices)
