@@ -621,7 +621,6 @@ class ModelBuilder:
 
             dataset = strategy.experimental_distribute_dataset(dataset)
 
-            @tf.function
             def wrapped_loss(y_true, z_pred):
                 # Determine the replica context and ID
                 replica_context = tf.distribute.get_replica_context()
