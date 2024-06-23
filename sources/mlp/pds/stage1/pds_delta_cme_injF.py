@@ -5,7 +5,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 import numpy as np
 import tensorflow as tf
@@ -53,14 +53,14 @@ def main():
                 # add_slope = True
                 outputs_to_use = ['delta_p']
 
-                bs = 2048  # full dataset used
+                bs = 4096  # full dataset used
                 print(f'batch size : {bs}')
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSinj_bs{bs}_CME{cme_speed_threshold}_lr'
+                title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSinj_bs{bs}_CME{cme_speed_threshold}'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -73,7 +73,7 @@ def main():
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
                     'epochs': int(100e4),  # 35k epochs
                     'patience': int(3e4),
-                    'learning_rate': 3e-2,  # initial learning rate
+                    'learning_rate': 1e-2,  # initial learning rate
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.9,  # Added momentum beta1
                 }
@@ -95,7 +95,7 @@ def main():
                 pds = True
                 target_change = ('delta_p' in outputs_to_use)
                 repr_dim = 128
-                dropout_rate = 0.5
+                dropout_rate = 0.2
                 activation = None
                 norm = 'batch_norm'
                 reduce_lr_on_plateau = ReduceLROnPlateau(

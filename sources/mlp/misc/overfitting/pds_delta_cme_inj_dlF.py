@@ -46,7 +46,7 @@ def main():
     for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
         for cme_speed_threshold in [0]:
             
-            for alpha in [1, 0.6, 0.3, 0]:
+            for alpha in [0, 1]:
                 for add_slope in [False]:
                     # PARAMS
                     # inputs_to_use = ['e0.5']
@@ -60,7 +60,7 @@ def main():
                     inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                     # Construct the title
-                    title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSinjdl_bs{bs}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                    title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSinjdl_bs{bs}_alpha{alpha:.2f}_CME{cme_speed_threshold}_l'
 
                     # Replace any other characters that are not suitable for filenames (if any)
                     title = title.replace(' ', '_').replace(':', '_')
@@ -111,7 +111,7 @@ def main():
                     N = 200  # number of samples to keep outside the threshold
                     lower_threshold = -0.5  # lower threshold for the delta_p
                     upper_threshold = 0.5  # upper threshold for the delta_p
-                    n_injects = 2  # number of injections
+                    n_injects = -1  # number of injections
 
                     # Initialize wandb
                     wandb.init(project="nasa-ts-delta-overfit", name=experiment_name, config={
