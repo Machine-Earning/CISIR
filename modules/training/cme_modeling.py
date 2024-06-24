@@ -390,7 +390,7 @@ class ModelBuilder:
         initial_weights = model.get_weights()
 
         # Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_dl_vec)
 
         # First stage2 the model with a validation set to determine the best epoch
         history = model.fit(X_subtrain, y_subtrain,
@@ -419,7 +419,7 @@ class ModelBuilder:
         # Reset model weights to initial state before retraining
         model.set_weights(initial_weights)
 
-        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
+        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_dl_vec)
         model.fit(X_train, y_train,
                   epochs=best_epoch,
                   batch_size=batch_size if batch_size > 0 else len(y_train),
@@ -466,10 +466,10 @@ class ModelBuilder:
         # Compile the model
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            loss=self.pds_loss_vec
+            loss=self.pds_loss_dl_vec
         )
 
-        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
+        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_dl_vec)
         model.fit(X_train, y_train,
                   epochs=epochs,
                   batch_size=batch_size if batch_size > 0 else len(y_train),
@@ -534,7 +534,7 @@ class ModelBuilder:
         # Compile the model
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            loss=self.pds_loss_vec
+            loss=self.pds_loss_dl_vec
         )
 
         # Fit the model using the custom generator
@@ -629,7 +629,7 @@ class ModelBuilder:
                 quadrant = tf.cast(replica_id, tf.int32)
 
                 # Compute the loss for the assigned quadrant
-                local_loss = self.pds_loss_vec_distr(y_true, z_pred, quadrant)
+                local_loss = self.pds_loss_dl_vec_distr(y_true, z_pred, quadrant)
 
                 # Aggregate losses from all replicas (workers)
                 total_loss = replica_context.all_reduce(tf.distribute.ReduceOp.SUM, local_loss)
@@ -805,7 +805,7 @@ class ModelBuilder:
         # Compile the model
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            loss=self.pds_loss_vec
+            loss=self.pds_loss_dl_vec
         )
 
         # Calculate steps per epoch for subtraining
@@ -838,7 +838,7 @@ class ModelBuilder:
         # IMPORTANT: Re-Compile the model to reset the learning rate scheduler
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            loss=self.pds_loss_vec
+            loss=self.pds_loss_dl_vec
         )
 
         # Calculate steps per epoch for final training
@@ -923,7 +923,7 @@ class ModelBuilder:
     #     callback_list = [early_stopping_cb, checkpoint_cb]
     #
     #     # Compile the model
-    #     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
+    #     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_dl_vec)
     #
     #     # First stage2 the model with a validation set to determine the best epoch
     #     history = model.fit(X_subtrain, y_subtrain,
@@ -951,7 +951,7 @@ class ModelBuilder:
     #     # X_combined = np.concatenate((X_subtrain, X_val), axis=0)
     #     # y_combined = np.concatenate((y_subtrain, y_val), axis=0)
     #
-    #     # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
+    #     # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_dl_vec)
     #     model.fit(X_train, y_train,
     #               epochs=best_epoch,
     #               batch_size=batch_size if batch_size > 0 else len(y_train),
@@ -2497,56 +2497,21 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
-    def pds_loss_vec(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
-        """
-        Vectorized computation of the loss for a batch of predicted features and their labels.
-        :param y_true: A batch of true label values, shape of [batch_size, 1].
-        :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
-        :param reduction: The type of reduction to apply to the loss.
-        :return: The average error for all unique combinations of the samples in the batch.
-        """
-
-        batch_size = tf.shape(y_true)[0]
-        # Compute pairwise differences for z_pred and y_true using broadcasting
-        y_true_diff = y_true - tf.transpose(y_true)  # labels are not normalized
-        # Compute pairwise differences for z_pred using broadcasting
-        # z_pred[:, tf.newaxis, :] has shape [batch_size, 1, d]
-        # z_pred[tf.newaxis, :, :] has shape [1, batch_size, d]
-        # Broadcasting these gives a shape of [batch_size, batch_size, d]
-        z_pred_diff = z_pred[:, tf.newaxis, :] - z_pred[tf.newaxis, :, :]
-
-        # Calculate squared L2 norm for z_pred differences
-        # tf.square(z_pred_diff) squares each element, keeping the shape [batch_size, batch_size, d]
-        # tf.reduce_sum(..., axis=-1) sums over the last dimension (d),
-        # resulting in shape [batch_size, batch_size]
-        # faster because square is done element-wise.
-        z_diff_squared = tf.reduce_sum(tf.square(z_pred_diff), axis=-1)
-        # Calculate squared differences for y_true
-        y_diff_squared = tf.square(y_true_diff)
-        # Compute the loss for each pair
-        pairwise_loss = tf.square(z_diff_squared - y_diff_squared)
-        # Get the total loss
-        total_error = tf.reduce_sum(pairwise_loss)
-        # Number of unique comparisons, excluding self-pairs (full matrix without diagonal)
-        num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=tf.float32)
-
-        if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error * 0.5  # upper triangle only
-        elif reduction == tf.keras.losses.Reduction.NONE:
-            # Avoid division by zero
-            return total_error / num_comparisons  # average over all elements
-        else:
-            raise ValueError(f"Unsupported reduction type: {reduction}.")
-
-    import tensorflow as tf
-
-    def pds_loss_vec_distr(self, y_true, z_pred, quadrant, reduction=tf.keras.losses.Reduction.NONE):
+    def pds_loss_dl_vec_distr(
+            self,
+            y_true,
+            z_pred,
+            quadrant,
+            sample_weights=None,
+            reduction=tf.keras.losses.Reduction.NONE
+    ):
         """
         NOTE: only support 4 GPUs like in AI Panthers
         Vectorized computation of the loss for a batch of predicted features and their labels.
         :param y_true: A batch of true label values, shape of [batch_size, 1].
         :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
         :param quadrant: The quadrant index to compute (0, 1, 2, 3).
+        :param sample_weights: A dictionary mapping label values to their corresponding reweight.
         :param reduction: The type of reduction to apply to the loss.
         :return: The average error for all unique combinations of the samples in the batch.
         """
@@ -2554,22 +2519,22 @@ class ModelBuilder:
         batch_size = tf.shape(y_true)[0]
         half_batch = batch_size // 2
 
-        # if quadrant == 0:
+        # if quadrant == 'A':
         #     y_true_i = y_true[:half_batch]
         #     y_true_j = y_true[:half_batch]
         #     z_pred_i = z_pred[:half_batch]
         #     z_pred_j = z_pred[:half_batch]
-        # elif quadrant == 1:
+        # elif quadrant == 'B':
         #     y_true_i = y_true[:half_batch]
         #     y_true_j = y_true[half_batch:]
         #     z_pred_i = z_pred[:half_batch]
         #     z_pred_j = z_pred[half_batch:]
-        # elif quadrant == 2:
+        # elif quadrant == 'C':
         #     y_true_i = y_true[half_batch:]
         #     y_true_j = y_true[:half_batch]
         #     z_pred_i = z_pred[half_batch:]
         #     z_pred_j = z_pred[:half_batch]
-        # elif quadrant == 3:
+        # elif quadrant == 'D':
         #     y_true_i = y_true[half_batch:]
         #     y_true_j = y_true[half_batch:]
         #     z_pred_i = z_pred[half_batch:]
@@ -2601,72 +2566,6 @@ class ModelBuilder:
             },
             default=lambda: (y_true, y_true, z_pred, z_pred)  # Provide a default case to handle unexpected values
         )
-        # Debugging statements
-        # tf.print("Quadrant:", quadrant)
-        # tf.print("y_true_i shape:", tf.shape(y_true_i))
-        # tf.print("y_true_j shape:", tf.shape(y_true_j))
-        # tf.print("z_pred_i shape:", tf.shape(z_pred_i))
-        # tf.print("z_pred_j shape:", tf.shape(z_pred_j))
-
-        # Compute pairwise differences for z_pred and y_true using broadcasting within the specified quadrant
-        y_true_diff = y_true_i[:, tf.newaxis, :] - y_true_j[tf.newaxis, :, :]  # shape: [half_batch, half_batch, 1]
-        z_pred_diff = z_pred_i[:, tf.newaxis, :] - z_pred_j[tf.newaxis, :, :]  # shape: [half_batch, half_batch, d]
-
-        # Calculate squared L2 norm for z_pred differences
-        z_diff_squared = tf.reduce_sum(tf.square(z_pred_diff), axis=-1)  # shape: [half_batch, half_batch]
-        y_diff_squared = tf.squeeze(tf.square(y_true_diff), axis=-1)  # shape: [half_batch, half_batch]
-        # Compute the loss for each pair
-        pairwise_loss = tf.square(z_diff_squared - y_diff_squared)  # shape: [half_batch, half_batch]
-        # Sum over all unique pairs in the quadrant
-        total_error = tf.reduce_sum(pairwise_loss)
-        # Number of unique comparisons, excluding self-pairs
-        num_comparisons = tf.cast(half_batch * (half_batch - 1), dtype=tf.float32)
-
-        if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error * 0.5  # upper triangle only
-        elif reduction == tf.keras.losses.Reduction.NONE:
-            return total_error / num_comparisons
-        else:
-            raise ValueError(f"Unsupported reduction type: {reduction}.")
-
-    def pds_loss_vec_dl_distr(self, y_true, z_pred, quadrant, sample_weights=None,
-                              reduction=tf.keras.losses.Reduction.NONE):
-        """
-        NOTE: only support 4 GPUs like in AI Panthers
-        Vectorized computation of the loss for a batch of predicted features and their labels.
-        :param y_true: A batch of true label values, shape of [batch_size, 1].
-        :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
-        :param quadrant: The quadrant to compute (one of 'A', 'B', 'C', 'D').
-        :param sample_weights: A dictionary mapping label values to their corresponding reweight.
-        :param reduction: The type of reduction to apply to the loss.
-        :return: The average error for all unique combinations of the samples in the batch.
-        """
-
-        batch_size = tf.shape(y_true)[0]
-        half_batch = batch_size // 2
-
-        if quadrant == 'A':
-            y_true_i = y_true[:half_batch]
-            y_true_j = y_true[:half_batch]
-            z_pred_i = z_pred[:half_batch]
-            z_pred_j = z_pred[:half_batch]
-        elif quadrant == 'B':
-            y_true_i = y_true[:half_batch]
-            y_true_j = y_true[half_batch:]
-            z_pred_i = z_pred[:half_batch]
-            z_pred_j = z_pred[half_batch:]
-        elif quadrant == 'C':
-            y_true_i = y_true[half_batch:]
-            y_true_j = y_true[:half_batch]
-            z_pred_i = z_pred[half_batch:]
-            z_pred_j = z_pred[:half_batch]
-        elif quadrant == 'D':
-            y_true_i = y_true[half_batch:]
-            y_true_j = y_true[half_batch:]
-            z_pred_i = z_pred[half_batch:]
-            z_pred_j = z_pred[half_batch:]
-        else:
-            raise ValueError(f"Unsupported quadrant: {quadrant}.")
 
         # Compute pairwise differences for z_pred and y_true using broadcasting within the specified quadrant
         y_true_diff = y_true_i[:, tf.newaxis, :] - y_true_j[tf.newaxis, :, :]  # shape: [half_batch, half_batch, 1]
@@ -3364,10 +3263,10 @@ if __name__ == '__main__':
     loss_tester = ModelBuilder()
     # Generate dummy data for testing
     np.random.seed(42)  # For reproducibility
-    batch_size = 4096
+    batchsize = 4096
     z_dim = 128
-    y_true_dummy = np.random.rand(batch_size, 1).astype(np.float32) - 0.5
-    z_pred_dummy = np.random.rand(batch_size, z_dim).astype(np.float32) - 0.5
+    y_true_dummy = np.random.rand(batchsize, 1).astype(np.float32) - 0.5
+    z_pred_dummy = np.random.rand(batchsize, z_dim).astype(np.float32) - 0.5
 
     # Fabricated data from the table
     fabricated_z = np.array(
@@ -3426,7 +3325,7 @@ if __name__ == '__main__':
     # Time and compute loss using the vectorized function
     print("Computing loss using the vectorized function...")
     start_time_vectorized = time.time()
-    loss_vectorized = loss_tester.pds_loss_vec(y_true_tensor, z_pred_tensor)
+    loss_vectorized = loss_tester.pds_loss_dl_vec(y_true_tensor, z_pred_tensor)
     end_time_vectorized = time.time()
     vectorized_duration = end_time_vectorized - start_time_vectorized
 
