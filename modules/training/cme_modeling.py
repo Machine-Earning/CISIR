@@ -1659,21 +1659,37 @@ class ModelBuilder:
 
             :yield: Batches of (features, labels) with mixed rare and frequent samples.
             """
+            # Initialize the start index for rare samples
+            rare_start_index = 0
+
             while True:
-                # Shuffle the indices of frequent samples to ensure randomization in each epoch
-                np.random.shuffle(freq_indices)
-                # Iterate over the frequent samples in the feature set
+                np.random.shuffle(freq_indices)  # Shuffle frequent indices for each epoch
+                rare_indices = np.random.permutation(
+                    rare_indices)  # Shuffle rare indices only at the start of each epoch
+
                 for start in range(0, len(freq_indices), batch_size - rare_injection_count):
-                    # Determine the end index for the current batch
                     end = min(start + batch_size - rare_injection_count, len(freq_indices))
-                    # Determine the indices of the frequent samples in the current batch
                     freq_batch_indices = freq_indices[start:end]
-                    # Randomly select rare samples to inject in each batch
-                    rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
-                    # Combine the rare and frequent sample indices
+
+                    # Calculate the end index for rare samples in this batch
+                    rare_end_index = rare_start_index + rare_injection_count
+                    if rare_end_index > len(rare_indices):
+                        # If we exceed the list, wrap around
+                        rare_sample_indices = np.concatenate(
+                            [rare_indices[rare_start_index:], rare_indices[:rare_end_index - len(rare_indices)]]
+                        )
+                        rare_start_index = rare_end_index - len(rare_indices)  # Update start index for next batch
+                    else:
+                        # Select consecutive rare samples
+                        rare_sample_indices = rare_indices[rare_start_index:rare_end_index]
+                        rare_start_index = rare_end_index  # Update start index for next batch
+
+                    # Reset rare index if needed
+                    if rare_start_index >= len(rare_indices):
+                        rare_start_index = 0
+
                     batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
-                    # Shuffle the combined batch indices to mix rare and frequent samples
-                    np.random.shuffle(batch_indices)
+                    np.random.shuffle(batch_indices)  # Shuffle indices to mix rare and frequent samples
                     # Extract the actual data (features and labels) for the current batch
                     batch_X = X[batch_indices]
                     batch_y = y[batch_indices]
