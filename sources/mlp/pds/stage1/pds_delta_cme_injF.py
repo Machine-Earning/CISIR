@@ -5,7 +5,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import numpy as np
 import tensorflow as tf
@@ -72,7 +72,7 @@ def main():
                 Options = {
                     'batch_size': bs,  # Assuming batch_size is defined elsewhere
                     'epochs': int(100e4),  # 35k epochs
-                    'patience': int(3e4),
+                    'patience': int(6e4),
                     'learning_rate': 1e-2,  # initial learning rate
                     'weight_decay': 1e-8,  # Added weight decay
                     'momentum_beta1': 0.9,  # Added momentum beta1
@@ -95,7 +95,7 @@ def main():
                 pds = True
                 target_change = ('delta_p' in outputs_to_use)
                 repr_dim = 128
-                dropout_rate = 0.2
+                dropout_rate = 0.4
                 activation = None
                 norm = 'batch_norm'
                 reduce_lr_on_plateau = ReduceLROnPlateau(
@@ -103,13 +103,13 @@ def main():
                     factor=0.9,
                     patience=1000,
                     verbose=1,
-                    min_delta=1e-5,
-                    min_lr=3e-4)
+                    min_lr=1e-4)
                 residual = True
                 skipped_layers = 2
                 N = 500  # number of samples to keep outside the threshold
                 lower_threshold = -0.5  # lower threshold for the delta_p
                 upper_threshold = 0.5  # upper threshold for the delta_p
+                n_inj = 2
 
                 # Initialize wandb
                 wandb.init(project="nasa-ts-delta-v6-pds", name=experiment_name, config={
@@ -140,7 +140,8 @@ def main():
                     "ds_version": 6,
                     "N_freq": N,
                     "lower_t": lower_threshold,
-                    "upper_t": upper_threshold
+                    "upper_t": upper_threshold,
+                    'n_injects': n_inj
                 })
 
                 # set the root directory
@@ -253,14 +254,16 @@ def main():
                 #     add_slope,
                 #     model_sep.name)
 
-                mb.train_pds_inj(
+                mb.train_pds_dl_inj(
                     model_sep,
                     X_subtrain, y_subtrain_norm,
                     X_val, y_val_norm,
                     X_train, y_train_norm,
+                    train_label_weights_dict=None,
                     learning_rate=Options['learning_rate'],
                     epochs=Options['epochs'],
                     batch_size=Options['batch_size'],
+                    rare_injection_count=n_inj,
                     patience=Options['patience'],
                     save_tag=current_time + title + "_features_128_g",
                     lower_bound=norm_lower_t,
