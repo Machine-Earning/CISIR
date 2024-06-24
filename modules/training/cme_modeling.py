@@ -554,7 +554,6 @@ class ModelBuilder:
 
         return history
 
-
     def overtrain_pds_inj_distr(self,
                                 model: tf.keras.Model,
                                 X_train: np.ndarray,
@@ -1456,15 +1455,48 @@ class ModelBuilder:
             raise ValueError(f"Batch size must be at least the number of injected rare samples. "
                              f"Current batch size: {batch_size}, rare_injection_count: {rare_injection_count}")
 
+        # def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
+        #     while True:
+        #         np.random.shuffle(freq_indices)
+        #         for start in range(0, len(freq_indices), batch_size - rare_injection_count):
+        #             end = min(start + batch_size - rare_injection_count, len(freq_indices))
+        #             freq_batch_indices = freq_indices[start:end]
+        #             rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
+        #             batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
+        #             np.random.shuffle(batch_indices)
+        #             yield X[batch_indices], y[batch_indices]
         def data_generator(X, y, batch_size, rare_indices, freq_indices, rare_injection_count):
+            # Initialize the start index for rare samples
+            rare_start_index = 0
+
             while True:
-                np.random.shuffle(freq_indices)
+                np.random.shuffle(freq_indices)  # Shuffle frequent indices for each epoch
+                rare_indices = np.random.permutation(
+                    rare_indices)  # Shuffle rare indices only at the start of each epoch
+
                 for start in range(0, len(freq_indices), batch_size - rare_injection_count):
                     end = min(start + batch_size - rare_injection_count, len(freq_indices))
                     freq_batch_indices = freq_indices[start:end]
-                    rare_sample_indices = np.random.choice(rare_indices, rare_injection_count, replace=False)
+
+                    # Calculate the end index for rare samples in this batch
+                    rare_end_index = rare_start_index + rare_injection_count
+                    if rare_end_index > len(rare_indices):
+                        # If we exceed the list, wrap around
+                        rare_sample_indices = np.concatenate(
+                            [rare_indices[rare_start_index:], rare_indices[:rare_end_index - len(rare_indices)]]
+                        )
+                        rare_start_index = rare_end_index - len(rare_indices)  # Update start index for next batch
+                    else:
+                        # Select consecutive rare samples
+                        rare_sample_indices = rare_indices[rare_start_index:rare_end_index]
+                        rare_start_index = rare_end_index  # Update start index for next batch
+
+                    # Reset rare index if needed
+                    if rare_start_index >= len(rare_indices):
+                        rare_start_index = 0
+
                     batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
-                    np.random.shuffle(batch_indices)
+                    np.random.shuffle(batch_indices)  # Shuffle indices to mix rare and frequent samples
                     yield X[batch_indices], y[batch_indices]
 
         model.compile(
