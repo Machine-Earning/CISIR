@@ -27,6 +27,39 @@ from tensorflow.keras.layers import (
 
 
 # from tensorflow.python.profiler import profiler_v2 as profiler
+class NormalizeLayer(layers.Layer):
+    def __init__(self, epsilon: float = 1e-9, **kwargs):
+        """
+        Initialization for the NormalizeLayer.
+
+        :param epsilon: A small constant to prevent division by zero during normalization. Default is 1e-9.
+        :param kwargs: Additional keyword arguments for the parent class.
+        """
+        self.epsilon = epsilon
+        super(NormalizeLayer, self).__init__(**kwargs)
+
+    def call(self, reprs: Tensor) -> Tensor:
+        """
+        Forward pass for the NormalizeLayer.
+
+        :param reprs: Input tensor of shape [batch_size, ...].
+        :return: Normalized input tensor of the same shape as inputs.
+        """
+        norm = tf.norm(reprs, axis=1, keepdims=True) + self.epsilon
+        return reprs / norm
+
+    def get_config(self) -> dict:
+        """
+        Returns the config of the layer. Contains the layer's configuration as a dict,
+        including the `epsilon` parameter and the configurations of the parent class.
+
+        :return: A dict containing the layer's configuration.
+        """
+        config = super().get_config()
+        config.update({
+            "epsilon": self.epsilon,
+        })
+        return config
 
 
 def error(z1, z2, label1, label2):
@@ -379,9 +412,13 @@ class ModelBuilder:
             callbacks_list = []
 
         # Initialize early stopping and model checkpointing
-        early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience,
-                                                    restore_best_weights=True)
-        checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_{str(save_tag)}.h5", save_weights_only=True)
+        early_stopping_cb = callbacks.EarlyStopping(
+            monitor='val_loss',
+            patience=patience,
+            restore_best_weights=True)
+        checkpoint_cb = callbacks.ModelCheckpoint(
+            f"model_weights_{str(save_tag)}.h5",
+            save_weights_only=True)
 
         # Append the early stopping and checkpoint callbacks to the custom callbacks list
         callbacks_list.extend([early_stopping_cb, checkpoint_cb])
@@ -390,7 +427,7 @@ class ModelBuilder:
         initial_weights = model.get_weights()
 
         # Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_dl_vec)
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
 
         # First stage2 the model with a validation set to determine the best epoch
         history = model.fit(X_subtrain, y_subtrain,
@@ -405,21 +442,13 @@ class ModelBuilder:
         best_epoch = early_stopping_cb.stopped_epoch + 1  # Adjust for the offset
         # best_epoch = np.argmin(history.history['val_loss']) + 1
 
-        # Plot training loss and validation loss
-        plt.plot(history.history['loss'], label='Training Loss')
-        plt.plot(history.history['val_loss'], label='Validation Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.title('Training and Validation Loss Over Epochs')
-        plt.legend()
-        file_path = f"training_plot_{str(save_tag)}.png"
-        plt.savefig(file_path)
-        plt.close()
-
         # Reset model weights to initial state before retraining
         model.set_weights(initial_weights)
 
-        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_dl_vec)
+        # re-Compile the model
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
+
+        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
         model.fit(X_train, y_train,
                   epochs=best_epoch,
                   batch_size=batch_size if batch_size > 0 else len(y_train),
@@ -466,10 +495,10 @@ class ModelBuilder:
         # Compile the model
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            loss=self.pds_loss_dl_vec
+            loss=self.pds_loss_vec
         )
 
-        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_dl_vec)
+        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
         model.fit(X_train, y_train,
                   epochs=epochs,
                   batch_size=batch_size if batch_size > 0 else len(y_train),
@@ -480,79 +509,6 @@ class ModelBuilder:
         model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
         # print where the model weights are saved
         print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
-
-    def overtrain_pds_inj(self,
-                          model: tf.keras.Model,
-                          X_train: np.ndarray,
-                          y_train: np.ndarray,
-                          learning_rate: float = 1e-3,
-                          epochs: int = 100,
-                          batch_size: int = 32,
-                          lower_bound: float = -0.5,
-                          upper_bound: float = 0.5,
-                          save_tag=None,
-                          callbacks_list=None,
-                          verbose: int = 1):
-        """
-        Trains the model and returns the training history with specific batch constraints.
-
-        :param X_train: training and validation sets together
-        :param y_train: labels of training and validation sets together
-        :param save_tag: tag to use for saving experiments
-        :param model: The TensorFlow model to stage2.
-        :param learning_rate: The learning rate for the Adam optimizer.
-        :param epochs: The maximum number of epochs for training.
-        :param batch_size: The batch size for training.
-        :param lower_bound: The lower bound for selecting rare samples.
-        :param upper_bound: The upper bound for selecting rare samples.
-        :param callbacks_list: List of callback instances to apply during training.
-        :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
-
-        :return: The training history as a History object.
-        """
-
-        # Identify injected rare samples
-        rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
-        freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
-
-        # Check if the batch size is sufficient
-        if batch_size < len(rare_indices):
-            raise ValueError(f"Batch size must be at least the size of the injected rare samples. "
-                             f"Current batch size: {batch_size}, size of injected rare samples: {len(rare_indices)}")
-
-        # Custom data generator to yield batches
-        def data_generator(X, y, batch_size, rare_indices, freq_indices):
-            while True:
-                np.random.shuffle(freq_indices)
-                for start in range(0, len(freq_indices), batch_size - len(rare_indices)):
-                    end = min(start + batch_size - len(rare_indices), len(freq_indices))
-                    freq_batch_indices = freq_indices[start:end]
-                    batch_indices = np.concatenate([rare_indices, freq_batch_indices])
-                    np.random.shuffle(batch_indices)
-                    yield X[batch_indices], y[batch_indices]
-
-        # Compile the model
-        model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            loss=self.pds_loss_dl_vec
-        )
-
-        # Fit the model using the custom generator
-        steps_per_epoch = len(freq_indices) // (batch_size - len(rare_indices))
-
-        history = model.fit(
-            data_generator(X_train, y_train, batch_size, rare_indices, freq_indices),
-            steps_per_epoch=steps_per_epoch,
-            epochs=epochs,
-            callbacks=callbacks_list,
-            verbose=verbose
-        )
-
-        # Save the model weights
-        model.save_weights(f"overfit_final_model_weights_{str(save_tag)}.h5")
-        print(f"Model weights are saved in overfit_final_model_weights_{str(save_tag)}.h5")
-
-        return history
 
     def overtrain_pds_inj_distr(self,
                                 model: tf.keras.Model,
@@ -629,7 +585,7 @@ class ModelBuilder:
                 quadrant = tf.cast(replica_id, tf.int32)
 
                 # Compute the loss for the assigned quadrant
-                local_loss = self.pds_loss_dl_vec_distr(y_true, z_pred, quadrant)
+                local_loss = self.pds_loss_vec_distr(y_true, z_pred, quadrant)
 
                 # Aggregate losses from all replicas (workers)
                 total_loss = replica_context.all_reduce(tf.distribute.ReduceOp.SUM, local_loss)
@@ -656,336 +612,26 @@ class ModelBuilder:
 
         return history
 
-    def train_pds_inj(self,
-                      model: tf.keras.Model,
-                      X_subtrain: np.ndarray,
-                      y_subtrain: np.ndarray,
-                      X_val: np.ndarray,
-                      y_val: np.ndarray,
-                      X_train: np.ndarray,
-                      y_train: np.ndarray,
-                      learning_rate: float = 1e-3,
-                      epochs: int = 100,
-                      batch_size: int = 32,
-                      lower_bound: float = -0.5,
-                      upper_bound: float = 0.5,
-                      patience: int = 9,
-                      save_tag: Optional[str] = None,
-                      callbacks_list: Optional[List[tf.keras.callbacks.Callback]] = None,
-                      verbose: int = 1) -> tf.keras.callbacks.History:
-        """
-        Trains the model and returns the training history with specific batch constraints.
-
-        :param X_train: training and validation sets together
-        :param y_train: labels of training and validation sets together
-        :param X_subtrain: The training feature set.
-        :param y_subtrain: The training labels.
-        :param X_val: Validation features.
-        :param y_val: Validation labels.
-        :param save_tag: tag to use for saving experiments
-        :param model: The TensorFlow model to stage2.
-        :param learning_rate: The learning rate for the Adam optimizer.
-        :param epochs: The maximum number of epochs for training.
-        :param batch_size: The batch size for training.
-        :param lower_bound: The lower bound for selecting rare samples.
-        :param upper_bound: The upper bound for selecting rare samples.
-        :param patience: The number of epochs with no improvement to wait before early stopping.
-        :param callbacks_list: List of callback instances to apply during training.
-        :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
-
-        :return: The training history as a History object.
-        """
-
-        if callbacks_list is None:
-            callbacks_list = []
-
-        # Initialize early stopping and model checkpointing for subtraining
-        early_stopping_cb = tf.keras.callbacks.EarlyStopping(
-            monitor='val_loss',
-            patience=patience,
-            restore_best_weights=True
-        )
-        checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
-            filepath=f"model_weights_{str(save_tag)}.h5",
-            monitor='val_loss',
-            save_best_only=True,
-            save_weights_only=True
-        )
-
-        # Append the early stopping and checkpoint callbacks to the custom callbacks list
-        subtrain_callbacks_list = callbacks_list + [early_stopping_cb, checkpoint_cb]
-
-        # Save initial weights for retraining on full training set after best epoch found
-        initial_weights = model.get_weights()
-
-        # Identify injected rare samples in the subtraining set
-        subtrain_rare_indices = np.where((y_subtrain < lower_bound) | (y_subtrain > upper_bound))[0]
-        subtrain_freq_indices = np.where((y_subtrain >= lower_bound) & (y_subtrain <= upper_bound))[0]
-
-        # Check if the batch size is sufficient for subtraining
-        if batch_size < len(subtrain_rare_indices):
-            raise ValueError(f"Batch size must be at least the size of the injected rare samples in subtraining. "
-                             f"Current batch size: {batch_size}, size of subtraining rare samples: {len(subtrain_rare_indices)}")
-
-        # Identify injected rare samples in the full training set
-        train_rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
-        train_freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
-
-        # Check if the batch size is sufficient for final training
-        if batch_size < len(train_rare_indices):
-            raise ValueError(f"Batch size must be at least the size of the injected rare samples in final training. "
-                             f"Current batch size: {batch_size}, size of final training rare samples: {len(train_rare_indices)}")
-
-        def data_generator(
-                X: np.ndarray,
-                y: np.ndarray,
-                rare_indices: np.ndarray,
-                freq_indices: np.ndarray,
-                batch_size: int) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
-            """
-            Generalized data generator to yield batches with a mixture of rare and frequent samples.
-
-            :param X: Feature set.
-            :param y: Labels.
-            :param rare_indices: Indices of the rare samples.
-            :param freq_indices: Indices of the frequent samples.
-            :param batch_size: Size of each batch.
-
-            :yield: Batches of (features, labels) with mixed rare and frequent samples.
-            """
-            while True:
-                # Shuffle the indices of frequent samples to ensure randomization in each epoch
-                np.random.shuffle(freq_indices)
-                # Iterate through the frequent samples in chunks (batches)
-                for start in range(0, len(freq_indices), batch_size - len(rare_indices)):
-                    # Determine the end of the current batch
-                    end = min(start + batch_size - len(rare_indices), len(freq_indices))
-                    # Select the current batch of frequent sample indices
-                    freq_batch_indices = freq_indices[start:end]
-                    # Combine the rare and frequent sample indices to form the final batch indices
-                    batch_indices = np.concatenate([rare_indices, freq_batch_indices])
-                    # Shuffle the combined batch indices to mix rare and frequent samples
-                    np.random.shuffle(batch_indices)
-                    # Extract the actual data (features and labels) for the current batch
-                    batch_X = X[batch_indices]
-                    batch_y = y[batch_indices]
-                    # Ensure that batch_y has the correct shape
-                    batch_y = batch_y.reshape(-1)
-                    # Yield the current batch (features and labels) to be used by the training loop
-                    yield batch_X, batch_y
-
-        # Create a TensorFlow Dataset from the data generator
-        def create_tf_dataset(
-                X: np.ndarray,
-                y: np.ndarray,
-                rare_indices: np.ndarray,
-                freq_indices: np.ndarray,
-                batch_size: int
-        ) -> tf.data.Dataset:
-            """
-            Creates a TensorFlow dataset from the data generator.
-
-            :param X: Feature set.
-            :param y: Labels.
-            :param rare_indices: Indices of the rare samples.
-            :param freq_indices: Indices of the frequent samples.
-            :param batch_size: Size of each batch.
-
-            :return: A tf.data.Dataset object.
-            """
-            dataset = tf.data.Dataset.from_generator(
-                lambda: data_generator(X, y, rare_indices, freq_indices, batch_size),
-                output_signature=(
-                    tf.TensorSpec(shape=(None, X.shape[1]), dtype=tf.float32),
-                    tf.TensorSpec(shape=(None,), dtype=tf.float32)
-                )
-            )
-            return dataset.prefetch(tf.data.AUTOTUNE)
-
-        # Compile the model
-        model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            loss=self.pds_loss_dl_vec
-        )
-
-        # Calculate steps per epoch for subtraining
-        steps_per_epoch_subtrain = len(subtrain_freq_indices) // (batch_size - len(subtrain_rare_indices))
-
-        # Create the TensorFlow dataset for subtraining
-        subtrain_dataset = create_tf_dataset(
-            X_subtrain,
-            y_subtrain,
-            subtrain_rare_indices,
-            subtrain_freq_indices,
-            batch_size)
-
-        # First, train the model with a validation set to determine the best epoch
-        history = model.fit(
-            subtrain_dataset,
-            steps_per_epoch=steps_per_epoch_subtrain,
-            epochs=epochs,
-            validation_data=(X_val, y_val),
-            callbacks=subtrain_callbacks_list,
-            verbose=verbose
-        )
-
-        # Get the best epoch from early stopping
-        best_epoch = early_stopping_cb.stopped_epoch + 1  # Adjust for the offset
-
-        # Reset model weights to initial state before retraining
-        model.set_weights(initial_weights)
-
-        # IMPORTANT: Re-Compile the model to reset the learning rate scheduler
-        model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            loss=self.pds_loss_dl_vec
-        )
-
-        # Calculate steps per epoch for final training
-        steps_per_epoch_final = len(train_freq_indices) // (batch_size - len(train_rare_indices))
-
-        # Create the TensorFlow dataset for final training
-        final_train_dataset = create_tf_dataset(
-            X_train,
-            y_train,
-            train_rare_indices,
-            train_freq_indices,
-            batch_size)
-
-        # Fit the model using the custom generator on the entire training set
-        model.fit(
-            final_train_dataset,
-            steps_per_epoch=steps_per_epoch_final,
-            epochs=best_epoch,
-            callbacks=callbacks_list,
-            verbose=verbose
-        )
-
-        # Save the final model weights
-        model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
-        print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
-
-        return history
-
-    # def investigate_pds(self,
-    #                     model: Model,
-    #                     X_subtrain: ndarray,
-    #                     y_subtrain: ndarray,
-    #                     X_val: ndarray,
-    #                     y_val: ndarray,
-    #                     X_train: ndarray,
-    #                     y_train: ndarray,
-    #                     learning_rate: float = 1e-3,
-    #                     epochs: int = 100,
-    #                     batch_size: int = 32,
-    #                     patience: int = 9,
-    #                     save_tag=None) -> callbacks.History:
+    # def process_batch_weights(self, batch_indices: np.ndarray, label_weights_dict: Dict[float, float]) -> np.ndarray:
     #     """
-    #     Trains the model and returns the training history.
-    #
-    #     :param X_train:
-    #     :param y_train:
-    #     :param save_tag: tag to use for saving experiments
-    #     :param model: The TensorFlow model to stage2.
-    #     :param X_subtrain: The training feature set.
-    #     :param y_subtrain: The training labels.
-    #     :param X_val: Validation features.
-    #     :param y_val: Validation labels.
-    #     :param learning_rate: The learning rate for the Adam optimizer.
-    #     :param epochs: The maximum number of epochs for training.
-    #     :param batch_size: The batch size for training.
-    #     :param patience: The number of epochs with no improvement to wait before early stopping.
-    #     :return: The training history as a History object.
+    #     Process a batch of indices to return the corresponding joint weights.
+    # 
+    #     :param batch_indices: A batch of sample indices.
+    #     :param label_weights_dict: Dictionary containing label weights.
+    #     :return: An array containing joint weights corresponding to the batch of indices.
     #     """
-    #
-    #     # Setup TensorBoard
-    #     # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    #     # tensorboard_cb = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
-    #     #
-    #     # print("Run the command line:\n tensorboard --logdir logs/fit")
-    #
-    #     # Initialize the custom callback
-    #     investigate_cb = InvestigateCallback(model, X_train, y_train, batch_size, self, save_tag)
-    #
-    #     # Setup early stopping
-    #     early_stopping_cb = callbacks.EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
-    #
-    #     # reduce learning rate on plateau
-    #     # Initialize the ReduceLROnPlateau callback
-    #     # reduce_lr_cb = callbacks.ReduceLROnPlateau(monitor='val_loss',
-    #     #                                            factor=0.1,
-    #     #                                            patience=5,
-    #     #                                            min_lr=1e-6)
-    #     # Setup model checkpointing
-    #     checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_{str(save_tag)}.h5", save_weights_only=True)
-    #
-    #     # Include weighted_loss_cb in callbacks only if sample_joint_weights is not None
-    #     callback_list = [early_stopping_cb, checkpoint_cb]
-    #
-    #     # Compile the model
-    #     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_dl_vec)
-    #
-    #     # First stage2 the model with a validation set to determine the best epoch
-    #     history = model.fit(X_subtrain, y_subtrain,
-    #                         epochs=epochs,
-    #                         batch_size=batch_size if batch_size > 0 else len(y_subtrain),
-    #                         validation_data=(X_val, y_val),
-    #                         validation_batch_size=batch_size if batch_size > 0 else len(y_val),
-    #                         callbacks=callback_list)
-    #
-    #     # Get the best epoch from early stopping
-    #     best_epoch = np.argmin(history.history['val_loss']) + 1
-    #
-    #     # Plot training loss and validation loss
-    #     plt.plot(history.history['loss'], label='Training Loss')
-    #     plt.plot(history.history['val_loss'], label='Validation Loss')
-    #     plt.xlabel('Epoch')
-    #     plt.ylabel('Loss')
-    #     plt.title('Training and Validation Loss Over Epochs')
-    #     plt.legend()
-    #     file_path = f"training_plot_{str(save_tag)}.png"
-    #     plt.savefig(file_path)
-    #     plt.close()
-    #
-    #     # Retrain the model on the combined dataset (training + validation) to the best epoch found
-    #     # X_combined = np.concatenate((X_subtrain, X_val), axis=0)
-    #     # y_combined = np.concatenate((y_subtrain, y_val), axis=0)
-    #
-    #     # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_dl_vec)
-    #     model.fit(X_train, y_train,
-    #               epochs=best_epoch,
-    #               batch_size=batch_size if batch_size > 0 else len(y_train),
-    #               callbacks=[checkpoint_cb, investigate_cb])
-    #     # only investigates on the main training, not subtraining
-    #
-    #     # Evaluate the model on the entire training set
-    #     entire_training_loss = model.evaluate(X_train, y_train, batch_size=len(y_train))
-    #
-    #     # save the model weights
-    #     model.save_weights(f"model_weights_{str(save_tag)}.h5")
-    #
-    #     return history, entire_training_loss
-
-    def process_batch_weights(self, batch_indices: np.ndarray, label_weights_dict: Dict[float, float]) -> np.ndarray:
-        """
-        Process a batch of indices to return the corresponding joint weights.
-
-        :param batch_indices: A batch of sample indices.
-        :param label_weights_dict: Dictionary containing label weights.
-        :return: An array containing joint weights corresponding to the batch of indices.
-        """
-        # Convert list of tuples into a dictionary for O(1) lookup
-        weight_dict = {pair: weight for pair, weight in zip(joint_weight_indices, joint_weights)}
-
-        batch_weights = []
-        for i in batch_indices:
-            for j in batch_indices:
-                if i < j:  # Only consider pairs (i, j) where i < j
-                    weight = label_weights_dict
-                    if weight is not None:
-                        batch_weights.append(weight)
-
-        return np.array(batch_weights)
+    #     # Convert list of tuples into a dictionary for O(1) lookup
+    #     weight_dict = {pair: weight for pair, weight in zip(joint_weight_indices, joint_weights)}
+    # 
+    #     batch_weights = []
+    #     for i in batch_indices:
+    #         for j in batch_indices:
+    #             if i < j:  # Only consider pairs (i, j) where i < j
+    #                 weight = label_weights_dict
+    #                 if weight is not None:
+    #                     batch_weights.append(weight)
+    # 
+    #     return np.array(batch_weights)
 
     def train_for_one_epoch(self,
                             model: tf.keras.Model,
@@ -1237,13 +883,13 @@ class ModelBuilder:
             for cb in callbacks_list:
                 cb.on_epoch_begin(epoch, logs=logs)
             train_loss = self.train_for_one_epoch(
-                model, optimizer, self.pds_loss_dl_vec,
+                model, optimizer, self.pds_loss_vec,
                 X_subtrain, y_subtrain,
                 batch_size=batch_size if batch_size > 0 else len(y_subtrain),
                 label_weights_dict=subtrain_label_weights_dict)
 
             val_loss = self.train_for_one_epoch(
-                model, optimizer, self.pds_loss_dl_vec, X_val, y_val,
+                model, optimizer, self.pds_loss_vec, X_val, y_val,
                 batch_size=batch_size if batch_size > 0 else len(y_val),
                 label_weights_dict=None, training=False)
 
@@ -1280,7 +926,7 @@ class ModelBuilder:
 
             retrain_loss = self.train_for_one_epoch(
                 model, optimizer,
-                self.pds_loss_dl_vec,
+                self.pds_loss_vec,
                 X_train, y_train,
                 batch_size=batch_size if batch_size > 0 else len(y_train),
                 label_weights_dict=train_label_weights_dict)
@@ -1368,7 +1014,7 @@ class ModelBuilder:
 
             retrain_loss = self.train_for_one_epoch(
                 model, optimizer,
-                self.pds_loss_dl_vec,
+                self.pds_loss_vec,
                 X_train, y_train,
                 batch_size=batch_size if batch_size > 0 else len(y_train),
                 label_weights_dict=train_label_weights_dict)
@@ -1392,20 +1038,20 @@ class ModelBuilder:
 
         return retrain_history
 
-    def overtrain_pds_dl_inj(self,
-                             model: tf.keras.Model,
-                             X_train: np.ndarray,
-                             y_train: np.ndarray,
-                             train_label_weights_dict: Optional[Dict[float, float]] = None,
-                             learning_rate: float = 1e-3,
-                             epochs: int = 100,
-                             batch_size: int = 32,
-                             rare_injection_count: int = 2,
-                             lower_bound: float = -0.5,
-                             upper_bound: float = 0.5,
-                             save_tag: Optional[str] = None,
-                             callbacks_list=None,
-                             verbose: int = 1) -> Dict[str, List[Any]]:
+    def overtrain_pds_inj(self,
+                          model: tf.keras.Model,
+                          X_train: np.ndarray,
+                          y_train: np.ndarray,
+                          train_label_weights_dict: Optional[Dict[float, float]] = None,
+                          learning_rate: float = 1e-3,
+                          epochs: int = 100,
+                          batch_size: int = 32,
+                          rare_injection_count: int = -1,
+                          lower_bound: float = -0.5,
+                          upper_bound: float = 0.5,
+                          save_tag: Optional[str] = None,
+                          callbacks_list=None,
+                          verbose: int = 1) -> Dict[str, List[Any]]:
         """
         Custom training loop to train the model with sample weights and injected rare samples.
 
@@ -1431,22 +1077,22 @@ class ModelBuilder:
 
         if rare_injection_count == -1:
             rare_injection_count = len(rare_indices)
-        if rare_injection_count > len(rare_indices):
+        elif rare_injection_count > len(rare_indices):
             rare_injection_count = len(rare_indices)
             print(f"rare_injection_count ({rare_injection_count}) is greater than the number of rare samples "
                   f"({len(rare_indices)}).")
-
-        # initial number of batches = number of samples / batch size
-        num_batches = len(y_train) // batch_size
-        ratio = len(rare_indices) / num_batches
-        if ratio > rare_injection_count:
-            # insert ratio  / rare_injection_count rare samples in each batch
-            rare_injection_count = int(ratio / rare_injection_count)
-            print(f"Adjusting rare_injection_count to {ratio} based on the ratio of rare samples to batches.")
         else:
-            # insert rare_injection_count rare samples in each batch
-            # rare_injection_count = rare_injection_count
-            print(f"Injecting {rare_injection_count} rare samples in each batch.")
+            # initial number of batches = number of samples / batch size
+            num_batches = len(y_train) // batch_size
+            ratio = len(rare_indices) / num_batches
+            if ratio > rare_injection_count:
+                # insert ratio  / rare_injection_count rare samples in each batch
+                rare_injection_count = int(ratio / rare_injection_count)
+                print(f"Adjusting rare_injection_count to {ratio} based on the ratio of rare samples to batches.")
+            else:
+                # insert rare_injection_count rare samples in each batch
+                # rare_injection_count = rare_injection_count
+                print(f"Injecting {rare_injection_count} rare samples in each batch.")
 
         steps_per_epoch = len(freq_indices) // (batch_size - rare_injection_count)
 
@@ -1501,7 +1147,7 @@ class ModelBuilder:
 
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
+            loss=lambda y_true, y_pred: self.pds_loss_vec(
                 y_true, y_pred, sample_weights=train_label_weights_dict
             )
         )
@@ -1519,25 +1165,25 @@ class ModelBuilder:
 
         return history
 
-    def train_pds_dl_inj(self,
-                         model: tf.keras.Model,
-                         X_subtrain: np.ndarray,
-                         y_subtrain: np.ndarray,
-                         X_val: np.ndarray,
-                         y_val: np.ndarray,
-                         X_train: np.ndarray,
-                         y_train: np.ndarray,
-                         train_label_weights_dict: Optional[Dict[float, float]] = None,
-                         learning_rate: float = 1e-3,
-                         epochs: int = 100,
-                         batch_size: int = 32,
-                         rare_injection_count: int = 2,
-                         lower_bound: float = -0.5,
-                         upper_bound: float = 0.5,
-                         patience: int = 9,
-                         save_tag: Optional[str] = None,
-                         callbacks_list=None,
-                         verbose: int = 1) -> tf.keras.callbacks.History:
+    def train_pds_inj(self,
+                      model: tf.keras.Model,
+                      X_subtrain: np.ndarray,
+                      y_subtrain: np.ndarray,
+                      X_val: np.ndarray,
+                      y_val: np.ndarray,
+                      X_train: np.ndarray,
+                      y_train: np.ndarray,
+                      train_label_weights_dict: Optional[Dict[float, float]] = None,
+                      learning_rate: float = 1e-3,
+                      epochs: int = 100,
+                      batch_size: int = 32,
+                      rare_injection_count: int = -1,
+                      lower_bound: float = -0.5,
+                      upper_bound: float = 0.5,
+                      patience: int = 9,
+                      save_tag: Optional[str] = None,
+                      callbacks_list=None,
+                      verbose: int = 1) -> tf.keras.callbacks.History:
         """
         Custom training loop to train the model with sample weights and injected rare samples.
 
@@ -1593,20 +1239,20 @@ class ModelBuilder:
         rare_injection_count_subtrain = rare_injection_count
         if rare_injection_count_subtrain == -1:
             rare_injection_count_subtrain = len(subtrain_rare_indices)
-        if rare_injection_count_subtrain > len(subtrain_rare_indices):
+        elif rare_injection_count_subtrain > len(subtrain_rare_indices):
             rare_injection_count_subtrain = len(subtrain_rare_indices)
             print(
                 f"rare_injection_count_subtrain ({rare_injection_count_subtrain}) is greater than the number of rare samples "
                 f"({len(subtrain_rare_indices)}).")
-
-        num_batches_subtrain = len(y_subtrain) // batch_size
-        ratio_subtrain = len(subtrain_rare_indices) / num_batches_subtrain
-        if ratio_subtrain > rare_injection_count_subtrain:
-            rare_injection_count_subtrain = int(ratio_subtrain / rare_injection_count_subtrain)
-            print(
-                f"Adjusting rare_injection_count_subtrain to {rare_injection_count_subtrain} based on the ratio of rare samples to batches.")
         else:
-            print(f"Injecting {rare_injection_count_subtrain} rare samples in each subtraining batch.")
+            num_batches_subtrain = len(y_subtrain) // batch_size
+            ratio_subtrain = len(subtrain_rare_indices) / num_batches_subtrain
+            if ratio_subtrain > rare_injection_count_subtrain:
+                rare_injection_count_subtrain = int(ratio_subtrain / rare_injection_count_subtrain)
+                print(
+                    f"Adjusting rare_injection_count_subtrain to {rare_injection_count_subtrain} based on the ratio of rare samples to batches.")
+            else:
+                print(f"Injecting {rare_injection_count_subtrain} rare samples in each subtraining batch.")
 
         if batch_size < rare_injection_count_subtrain:
             raise ValueError(f"Batch size must be at least the number of injected rare samples for subtraining. "
@@ -1620,20 +1266,20 @@ class ModelBuilder:
         rare_injection_count_train = rare_injection_count
         if rare_injection_count_train == -1:
             rare_injection_count_train = len(train_rare_indices)
-        if rare_injection_count_train > len(train_rare_indices):
+        elif rare_injection_count_train > len(train_rare_indices):
             rare_injection_count_train = len(train_rare_indices)
             print(
                 f"rare_injection_count_train ({rare_injection_count_train}) is greater than the number of rare samples "
                 f"({len(train_rare_indices)}).")
-
-        num_batches_train = len(y_train) // batch_size
-        ratio_train = len(train_rare_indices) / num_batches_train
-        if ratio_train > rare_injection_count_train:
-            rare_injection_count_train = int(ratio_train / rare_injection_count_train)
-            print(
-                f"Adjusting rare_injection_count_train to {rare_injection_count_train} based on the ratio of rare samples to batches.")
         else:
-            print(f"Injecting {rare_injection_count_train} rare samples in each training batch.")
+            num_batches_train = len(y_train) // batch_size
+            ratio_train = len(train_rare_indices) / num_batches_train
+            if ratio_train > rare_injection_count_train:
+                rare_injection_count_train = int(ratio_train / rare_injection_count_train)
+                print(
+                    f"Adjusting rare_injection_count_train to {rare_injection_count_train} based on the ratio of rare samples to batches.")
+            else:
+                print(f"Injecting {rare_injection_count_train} rare samples in each training batch.")
 
         if batch_size < rare_injection_count_train:
             raise ValueError(f"Batch size must be at least the number of injected rare samples for training. "
@@ -1729,7 +1375,7 @@ class ModelBuilder:
 
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
+            loss=lambda y_true, y_pred: self.pds_loss_vec(
                 y_true, y_pred, sample_weights=train_label_weights_dict
             )
         )
@@ -1759,7 +1405,7 @@ class ModelBuilder:
 
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-            loss=lambda y_true, y_pred: self.pds_loss_dl_vec(
+            loss=lambda y_true, y_pred: self.pds_loss_vec(
                 y_true, y_pred, sample_weights=train_label_weights_dict
             )
         )
@@ -1847,7 +1493,7 @@ class ModelBuilder:
         epochs_for_estimation = 5
 
         gamma_coeff, lambda_coeff = self.estimate_gamma_lambda_coeffs(
-            model, X_subtrain, y_subtrain, self.pds_loss_dl_vec,
+            model, X_subtrain, y_subtrain, self.pds_loss_vec,
             sample_weights, sample_joint_weights, sample_joint_weights_indices,
             learning_rate=learning_rate, n_epochs=epochs_for_estimation,
             batch_size=batch_size if batch_size > 0 else len(y_subtrain),
@@ -1867,14 +1513,14 @@ class ModelBuilder:
 
         for epoch in range(epochs):
             train_loss = self.train_for_one_epoch_mh(
-                model, optimizer, self.pds_loss_dl_vec, X_subtrain, y_subtrain,
+                model, optimizer, self.pds_loss_vec, X_subtrain, y_subtrain,
                 batch_size=batch_size if batch_size > 0 else len(y_subtrain)
                 , gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
                 sample_weights=sample_weights, joint_weights=sample_joint_weights,
                 joint_weight_indices=sample_joint_weights_indices, with_reg=with_reg, with_ae=with_ae)
 
             val_loss = self.train_for_one_epoch_mh(
-                model, optimizer, self.pds_loss_dl_vec, X_val, y_val,
+                model, optimizer, self.pds_loss_vec, X_val, y_val,
                 batch_size=batch_size if batch_size > 0 else len(y_val),
                 gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
                 sample_weights=val_sample_weights, joint_weights=val_sample_joint_weights,
@@ -1919,7 +1565,7 @@ class ModelBuilder:
         # Retrain up to the best epoch
         for epoch in range(best_epoch):
             retrain_loss = self.train_for_one_epoch_mh(
-                model, optimizer, self.pds_loss_dl_vec, X_train, y_train,
+                model, optimizer, self.pds_loss_vec, X_train, y_train,
                 batch_size=batch_size if batch_size > 0 else len(y_train),
                 gamma_coeff=gamma_coeff, lambda_coeff=lambda_coeff,
                 sample_weights=train_sample_weights,
@@ -1973,12 +1619,6 @@ class ModelBuilder:
         :param patience: Number of epochs for early stopping.
         :return: Training history.
         """
-
-        # Setup TensorBoard
-        # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        # tensorboard_cb = callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
-        #
-        # print("Run the command line:\n tensorboard --logdir logs/fit")
 
         # Early stopping callback
         early_stopping_cb = callbacks.EarlyStopping(monitor='val_regression_head_loss', patience=patience,
@@ -2345,7 +1985,7 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
-    def pds_loss_dl_vec(self, y_true, z_pred, sample_weights=None, reduction=tf.keras.losses.Reduction.NONE):
+    def pds_loss_vec(self, y_true, z_pred, sample_weights=None, reduction=tf.keras.losses.Reduction.NONE):
         """
         Computes the weighted loss for a batch of predicted features and their labels.
 
@@ -2497,7 +2137,7 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
-    def pds_loss_dl_vec_distr(
+    def pds_loss_vec_distr(
             self,
             y_true,
             z_pred,
@@ -2662,601 +2302,8 @@ class ModelBuilder:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
 
-class NormalizeLayer(layers.Layer):
-    def __init__(self, epsilon: float = 1e-9, **kwargs):
-        """
-        Initialization for the NormalizeLayer.
-
-        :param epsilon: A small constant to prevent division by zero during normalization. Default is 1e-9.
-        :param kwargs: Additional keyword arguments for the parent class.
-        """
-        self.epsilon = epsilon
-        super(NormalizeLayer, self).__init__(**kwargs)
-
-    def call(self, reprs: Tensor) -> Tensor:
-        """
-        Forward pass for the NormalizeLayer.
-
-        :param reprs: Input tensor of shape [batch_size, ...].
-        :return: Normalized input tensor of the same shape as inputs.
-        """
-        norm = tf.norm(reprs, axis=1, keepdims=True) + self.epsilon
-        return reprs / norm
-
-    def get_config(self) -> dict:
-        """
-        Returns the config of the layer. Contains the layer's configuration as a dict,
-        including the `epsilon` parameter and the configurations of the parent class.
-
-        :return: A dict containing the layer's configuration.
-        """
-        config = super().get_config()
-        config.update({
-            "epsilon": self.epsilon,
-        })
-        return config
-
-
-class InvestigateCallback(callbacks.Callback):
-    """
-    Custom callback to evaluate the model on SEP samples at the end of each epoch.
-    """
-
-    def __init__(self,
-                 model: Model,
-                 X_train: ndarray,
-                 y_train: ndarray,
-                 batch_size: int,
-                 model_builder: ModelBuilder,
-                 save_tag: Optional[str] = None):
-        super().__init__()
-        self.model = model
-        self.X_train = X_train
-        self.y_train = y_train
-        self.batch_size = batch_size if batch_size > 0 else None
-        self.sep_threshold = np.log(10)
-        self.threshold = np.log(10.0 / np.exp(2))
-        self.save_tag = save_tag
-        self.sep_sep_losses = []
-        # self.losses = []
-        # self.epochs_10s = []
-        self.model_builder = model_builder
-        self.sep_sep_count = 0
-        self.sep_sep_counts = []
-        self.cumulative_sep_sep_count = 0  # Initialize cumulative count
-        self.cumulative_sep_sep_counts = []
-        self.total_counts = []
-        self.batch_counts = []
-        self.sep_sep_percentages = []
-        # the losses
-        self.pair_type_losses = {  # Store losses for each pair type
-            'sep_sep': [],
-            'sep_elevated': [],
-            'sep_background': [],
-            'elevated_elevated': [],
-            'elevated_background': [],
-            'background_background': []
-        }
-        self.overall_losses = []  # Store overall losses
-
-    def on_batch_end(self, batch, logs=None):
-        """
-        Actions to be taken at the end of each batch.
-
-        :param batch: the index of the batch within the current epoch.
-        :param logs: the logs containing the metrics results.
-        """
-        sep_indices = self.find_sep_samples(self.y_train)
-        if len(sep_indices) > 0:
-            X_sep = self.X_train[sep_indices]
-            y_sep = self.y_train[sep_indices]
-            # Evaluate the model on SEP samples
-            # sep_sep_loss = self.model.evaluate(X_sep, y_sep, batch_size=len(self.y_train), verbose=0)
-            sep_sep_loss = evaluate(self.model, X_sep, y_sep)
-            self.sep_sep_losses.append(sep_sep_loss)
-
-        # Add the SEP-SEP count for the current batch to the cumulative count
-        batch_sep_sep_count = int(self.model_builder.sep_sep_count.numpy())
-        print(f'end of batch: {batch}, sep_sep_count: {batch_sep_sep_count} in')
-        self.sep_sep_count += batch_sep_sep_count
-        self.cumulative_sep_sep_count += batch_sep_sep_count
-        self.cumulative_sep_sep_counts.append(self.cumulative_sep_sep_count)
-        # Reset for next batch
-        self.model_builder.sep_sep_count.assign(0)
-
-    def on_epoch_begin(self, epoch, logs=None):
-        """
-        Actions to be taken at the beginning of each epoch.
-
-        :param epoch: the index of the epoch.
-        :param logs: the logs containing the metrics results.
-        """
-        # Resetting the counts
-        self.sep_sep_count = 0
-        self.cumulative_sep_sep_count = 0
-        self.model_builder.sep_sep_count.assign(0)
-        self.model_builder.sep_elevated_count.assign(0)
-        self.model_builder.sep_background_count.assign(0)
-        self.model_builder.elevated_elevated_count.assign(0)
-        self.model_builder.elevated_background_count.assign(0)
-        self.model_builder.background_background_count.assign(0)
-        self.model_builder.number_of_batches = 0
-
-    def on_epoch_end(self, epoch, logs=None):
-        # Find SEP samples
-        # sep_indices = self.find_sep_samples(self.y_train, self.sep_threshold)
-        # if len(sep_indices) > 0:
-        #     X_sep = self.X_train[sep_indices]
-        #     y_sep = self.y_train[sep_indices]
-        #     # Evaluate the model on SEP samples
-        #     sep_sep_loss = self.model.evaluate(X_sep, y_sep, verbose=0)
-        #     self.sep_sep_losses.append(sep_sep_loss)
-        #     print(f" Epoch {epoch + 1}: SEP-SEP Loss: {sep_sep_loss}")
-
-        self.collect_losses(epoch)
-
-        # Save the current counts
-        self.sep_sep_counts.append(self.sep_sep_count)
-        total_count = (
-                self.sep_sep_count +
-                int(self.model_builder.sep_elevated_count.numpy()) +
-                int(self.model_builder.sep_background_count.numpy()) +
-                int(self.model_builder.elevated_elevated_count.numpy()) +
-                int(self.model_builder.elevated_background_count.numpy()) +
-                int(self.model_builder.background_background_count.numpy())
-        )
-        self.total_counts.append(total_count)
-        self.batch_counts.append(self.model_builder.number_of_batches)
-
-        # Calculate and save the percentage of SEP-SEP pairs
-        if total_count > 0:
-            self.sep_sep_percentages.append((self.sep_sep_count / total_count) * 100)
-        else:
-            self.sep_sep_percentages.append(0)
-
-        # Reset the counts for the next epoch
-        # self.model_builder.sep_sep_count.assign(0)
-        self.model_builder.sep_elevated_count.assign(0)
-        self.model_builder.sep_background_count.assign(0)
-        self.model_builder.elevated_elevated_count.assign(0)
-        self.model_builder.elevated_background_count.assign(0)
-        self.model_builder.background_background_count.assign(0)
-        self.sep_sep_count = 0
-        self.model_builder.number_of_batches = 0
-
-        # if epoch % 10 == 9:  # every 10th epoch (considering the first epoch is 0)
-        #     loss = self.model.evaluate(self.X_train, self.y_train, batch_size=len(self.y_train), verbose=0)
-        #     self.losses.append(loss)
-        #     self.epochs_10s.append(epoch + 1)
-
-    def collect_losses(self, epoch):
-        """
-        Collects and stores the losses for each pair type and overall loss for the given epoch.
-
-        :param epoch: Current epoch number.
-        """
-        # Evaluate the model and get losses for each pair type, including overall
-        pair_losses = evaluate(self.model, self.X_train, self.y_train, pairs=True)
-
-        # Store and print pair type losses
-        for pair_type, loss in pair_losses.items():
-            if pair_type != 'overall':  # Exclude overall loss here
-                self.pair_type_losses[pair_type].append(loss)
-                print(f"Epoch {epoch + 1}, {pair_type} Loss: {loss}")
-
-        # Store and print overall loss
-        overall_loss = pair_losses['overall']
-        self.overall_losses.append(overall_loss)
-        print(f"Epoch {epoch + 1}, Overall Loss: {overall_loss}")
-
-    def on_train_end(self, logs=None):
-        # At the end of training, save the loss plot
-        # self.save_loss_plot()
-        # self._save_plot()
-        self.save_percent_plot()
-        self.save_sep_sep_loss_vs_frequency()
-        self.save_slope_of_loss_vs_frequency()
-        self.save_combined_loss_plot()
-
-    def find_sep_samples(self, y_train: ndarray) -> ndarray:
-        """
-        Identifies the indices of SEP samples in the training labels.
-
-        :param y_train: The array of training labels.
-        :return: The indices of SEP samples.
-        """
-        is_sep = y_train > self.sep_threshold
-        return np.where(is_sep)[0]
-
-    def find_sample_indices(self, y_train: ndarray) -> Tuple[ndarray, ndarray, ndarray]:
-        """
-        Identifies the indices of SEP, elevated, and background samples in the training labels.
-
-        :param y_train: The array of training labels.
-        :return: Three arrays containing the indices of SEP, elevated, and background samples respectively.
-        """
-        is_sep = y_train > self.sep_threshold
-        is_elevated = (y_train > self.threshold) & (y_train <= self.sep_threshold)
-        is_background = y_train <= self.threshold
-
-        sep_indices = np.where(is_sep)[0]
-        elevated_indices = np.where(is_elevated)[0]
-        background_indices = np.where(is_background)[0]
-
-        return sep_indices, elevated_indices, background_indices
-
-    # def save_combined_loss_plot(self): """ Saves a combined plot of the losses for each pair type and the overall
-    # loss. """ epochs = range(1, len(self.overall_losses) + 1) plt.figure() colors = ['blue', 'green', 'red',
-    # 'cyan', 'magenta', 'yellow', 'black']  # Different colors for different curves pair_types = list(
-    # self.pair_type_losses.keys()) + ['overall']
-    #
-    #     for i, pair_type in enumerate(pair_types):
-    #         if pair_type == 'overall':
-    #             losses = self.overall_losses
-    #         else:
-    #             losses = self.pair_type_losses[pair_type]
-    #         plt.plot(epochs, losses, '-o', label=f'{pair_type} Loss', color=colors[i], markersize=3)
-    #
-    #     plt.title(f'Losses per Pair Type and Overall Loss Per Epoch, Batch Size {self.batch_size}')
-    #     plt.xlabel('Epoch')
-    #     plt.ylabel('Loss')
-    #     plt.legend()
-    #     plt.grid(True)
-    #
-    #     if self.save_tag:
-    #         file_path = f"./investigation/combined_loss_plot_{self.save_tag}.png"
-    #     else:
-    #         file_path = "./investigation/combined_loss_plot.png"
-    #     plt.savefig(file_path)
-    #     plt.close()
-    #     print(f"Saved combined loss plot at {file_path}")
-
-    def save_combined_loss_plot(self):
-        """
-        Saves a combined plot of the losses for each pair type and the overall loss as separate subplots.
-        """
-        epochs = range(1, len(self.overall_losses) + 1)
-        pair_types = list(self.pair_type_losses.keys()) + ['overall']
-        num_subplots = len(pair_types)
-        colors = ['blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black']  # Different colors for each subplot
-
-        plt.figure(figsize=(15, 10))  # Adjust the figure size as needed
-        for i, pair_type in enumerate(pair_types):
-            plt.subplot(num_subplots, 1, i + 1)
-            losses = self.pair_type_losses[pair_type] if pair_type != 'overall' else self.overall_losses
-            plt.plot(epochs, losses, '-o', label=f'{pair_type} Loss', color=colors[i], markersize=3)
-            plt.title(f'{pair_type} Loss')
-            plt.xlabel('Epoch')
-            plt.ylabel('Loss')
-            plt.legend()
-            plt.grid(True)
-
-        plt.tight_layout()  # Adjust subplots to fit into the figure area.
-
-        file_name = f"combined_loss_plot_{self.save_tag}.png" if self.save_tag else "combined_loss_plot.png"
-        file_path = f"./investigation/{file_name}"
-        plt.savefig(file_path)
-        plt.close()
-        print(f"Saved combined loss plot at {file_path}")
-
-    def save_percent_plot(self):
-        # Plot the percentage of SEP-SEP pairs per epoch
-        epochs = list(range(1, len(self.sep_sep_percentages) + 1))
-        plt.figure()
-        plt.plot(epochs, self.sep_sep_percentages, '-o', label='Percentage of SEP-SEP Pairs', markersize=3)
-        plt.title(f'Percentage of SEP-SEP Pairs Per Epoch, Batch Size {self.batch_size}')
-        plt.xlabel('Epoch')
-        plt.ylabel('Percentage')
-        plt.legend()
-        plt.grid(True)
-        # plt.show()  # or save the figure if preferred
-        if self.save_tag:
-            file_path = f"./investigation/percent_sep_sep_plot_{str(self.save_tag)}.png"
-        else:
-            file_path = f"./investigation/percent_sep_sep_plot.png"
-        plt.savefig(file_path)
-        plt.close()
-        print(f"Saved plot at {file_path}")
-
-    def save_sep_sep_loss_vs_frequency(self) -> None:
-        """
-        Plots the SEP-SEP loss against the SEP-SEP counts at the end of training.
-        """
-        plt.figure()
-        plt.scatter(self.cumulative_sep_sep_counts, self.sep_sep_losses, c='blue', label='SEP-SEP Loss vs Frequency',
-                    s=9)
-        plt.title(f'SEP-SEP Loss vs Frequency, Batch Size {self.batch_size}')
-        plt.xlabel('SEP-SEP Frequency')
-        plt.ylabel('SEP-SEP Loss')
-        plt.legend()
-        plt.grid(True)
-
-        if self.save_tag:
-            file_path = f"./investigation/sep_sep_loss_vs_frequency_{self.save_tag}.png"
-        else:
-            file_path = "./investigation/sep_sep_loss_vs_frequency.png"
-
-        plt.savefig(file_path)
-        plt.close()
-        print(f"Saved SEP-SEP Loss vs Counts plot at {file_path}")
-
-    def save_slope_of_loss_vs_frequency(self) -> None:
-        """
-        Plots the slope of the change in SEP-SEP loss with respect to the change in SEP-SEP frequency vs epochs.
-        """
-        # Calculate the differences (delta) between consecutive losses and counts
-        delta_losses = np.diff(self.sep_sep_losses)
-        delta_counts = np.diff(self.cumulative_sep_sep_counts)
-
-        # To avoid division by zero, we will replace zeros with a small value (epsilon)
-        epsilon = 1e-8
-        delta_counts = np.where(delta_counts == 0, epsilon, delta_counts)
-
-        # Calculate the slope (change in loss / change in frequency)
-        slopes = delta_losses / delta_counts
-
-        # Prepare the epochs for x-axis, which are one less than the number of losses due to diff operation
-        epochs = range(1, len(self.sep_sep_losses))
-
-        plt.figure()
-        plt.plot(epochs, slopes, '-o', label='Slope of SEP-SEP Loss vs Frequency', markersize=3)
-        plt.title(f'Slope of SEP-SEP Loss vs Frequency Change Per Epoch, Batch Size {self.batch_size}')
-        plt.xlabel('Epoch')
-        plt.ylabel('Slope')
-        plt.legend()
-        plt.grid(True)
-
-        if self.save_tag:
-            file_path = f"./investigation/slope_sep_sep_loss_vs_frequency_{self.save_tag}.png"
-        else:
-            file_path = "./investigation/slope_sep_sep_loss_vs_frequency.png"
-
-        plt.savefig(file_path)
-        plt.close()
-        print(f"Saved Slope of Loss vs Counts plot at {file_path}")
-
-    # def _save_plot(self):
-    #     plt.figure()
-    #     plt.plot(self.epochs_10s, self.losses, '-o', label='Training Loss', markersize=3)
-    #     plt.title(f'Training Loss, Batch Size {self.batch_size}')
-    #     plt.xlabel('Epoch')
-    #     plt.ylabel('Loss')
-    #     plt.legend()
-    #     plt.grid(True)
-    #     if self.save_tag:
-    #         file_path = f"./investigation/training_loss_plot_{str(self.save_tag)}.png"
-    #     else:
-    #         file_path = f"./investigation/training_loss_plot.png"
-    #     plt.savefig(file_path)
-    #     plt.close()
-    #     print(f"Saved plot at {file_path}")
-
-    # def save_loss_plot(self):
-    #     """
-    #     Saves a plot of the SEP loss at each epoch.
-    #     """
-    #     plt.figure()
-    #     plt.plot(range(1, len(self.sep_sep_losses) + 1), self.sep_sep_losses, '-o', label='SEP Loss', markersize=3)
-    #     plt.title(f'SEP Loss vs Batches, Batch Size {self.batch_size}')
-    #     plt.xlabel('batches')
-    #     plt.ylabel('Loss')
-    #     plt.legend()
-    #     plt.grid(True)
-    #     if self.save_tag:
-    #         file_path = f"./investigation/sep_loss_plot_{self.save_tag}.png"
-    #     else:
-    #         file_path = "./investigation/sep_loss_plot.png"
-    #     plt.savefig(file_path)
-    #     plt.close()
-    #     print(f"Saved SEP loss plot at {file_path}")
-
-
-def pds_loss_eval(y_true, z_pred, reduction='none'):
-    """
-    Computes the loss for a batch of predicted features and their labels.
-
-    :param y_true: A batch of true label values, shape of [batch_size, 1].
-    :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
-    :param reduction: The type of reduction to apply to the loss ('sum', 'none', or 'mean').
-    :return: The average error for all unique combinations of the samples in the batch.
-    """
-    int_batch_size = len(z_pred)
-    total_error = 0.0
-
-    # print("received batch size in custom eval:", int_batch_size)
-
-    # Loop through all unique pairs of samples in the batch
-    for i in range(int_batch_size):
-        for j in range(i + 1, int_batch_size):
-            z1, z2 = z_pred[i], z_pred[j]
-            label1, label2 = y_true[i], y_true[j]
-            # Update pair counts (implement this function as needed)
-            # update_pair_counts(label1, label2)
-            err = error(z1, z2, label1, label2)  # Make sure 'error' function uses NumPy or standard Python
-            total_error += err
-
-    if reduction == 'sum':
-        return total_error  # total loss
-    elif reduction == 'none' or reduction == 'mean':
-        denom = int_batch_size * (int_batch_size - 1) / 2 + 1e-9
-        return total_error / denom  # average loss
-    else:
-        raise ValueError(f"Unsupported reduction type: {reduction}.")
-
-
-def pds_loss_eval_pairs(y_true, z_pred, reduction='none'):
-    """
-    Computes the loss for a batch of predicted features and their labels.
-    Returns a dictionary of average losses for each pair type and overall.
-
-    :param y_true: A batch of true label values, shape of [batch_size, 1].
-    :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
-    :param reduction: The type of reduction to apply to the loss ('sum', 'none', or 'mean').
-    :return: A dictionary containing the average errors for all pair types and overall.
-    """
-    int_batch_size = len(z_pred)
-    total_error = 0.0
-    pair_errors = {
-        'sep_sep': 0.0,
-        'sep_elevated': 0.0,
-        'sep_background': 0.0,
-        'elevated_elevated': 0.0,
-        'elevated_background': 0.0,
-        'background_background': 0.0
-    }
-    pair_counts = {key: 0 for key in pair_errors.keys()}
-
-    # print("Received batch size in custom eval:", int_batch_size)
-
-    # Loop through all unique pairs of samples in the batch
-    for i in range(int_batch_size):
-        for j in range(i + 1, int_batch_size):
-            z1, z2 = z_pred[i], z_pred[j]
-            label1, label2 = y_true[i], y_true[j]
-
-            # Determine the pair type
-            pair_type = determine_pair_type(label1, label2)  # Implement this function
-            err = error(z1, z2, label1, label2)  # Make sure 'error' function uses NumPy or standard Python
-            pair_errors[pair_type] += err
-            pair_counts[pair_type] += 1
-            total_error += err
-
-    # Apply reduction
-    if reduction == 'sum':
-        avg_pair_errors = {key: error_sum for key, error_sum in pair_errors.items()}
-        avg_pair_errors['overall'] = total_error
-    elif reduction == 'none' or reduction == 'mean':
-        avg_pair_errors = {key: pair_errors[key] / pair_counts[key] if pair_counts[key] > 0 else 0 for key in
-                           pair_errors}
-        denom = int_batch_size * (int_batch_size - 1) / 2 + 1e-9
-        avg_pair_errors['overall'] = total_error / denom
-    else:
-        raise ValueError(f"Unsupported reduction type: {reduction}.")
-
-    return avg_pair_errors
-
-
-def determine_pair_type(label1, label2, sep_threshold=None, elevated_threshold=None):
-    """
-    Determines the pair type based on the labels.
-
-    :param label1: The label of the first sample.
-    :param label2: The label of the second sample.
-    :param sep_threshold: The threshold to classify SEP samples.
-    :param elevated_threshold: The threshold to classify elevated samples.
-    :return: A string representing the pair type.
-    """
-
-    if sep_threshold is None:
-        sep_threshold = np.log(10)
-
-    if elevated_threshold is None:
-        elevated_threshold = np.log(10.0 / np.exp(2))
-
-    if label1 > sep_threshold and label2 > sep_threshold:
-        return 'sep_sep'
-    elif (label1 > sep_threshold and label2 > elevated_threshold) or (
-            label2 > sep_threshold and label1 > elevated_threshold):
-        return 'sep_elevated'
-    elif (label1 > sep_threshold and label2 <= elevated_threshold) or (
-            label2 > sep_threshold and label1 <= elevated_threshold):
-        return 'sep_background'
-    elif label1 > elevated_threshold and label2 > elevated_threshold:
-        return 'elevated_elevated'
-    elif (label1 > elevated_threshold >= label2) or (
-            label2 > elevated_threshold >= label1):
-        return 'elevated_background'
-    else:
-        return 'background_background'
-
-
-def evaluate(model, X, y, batch_size=-1, pairs=False):
-    """
-    Custom evaluate function to compute loss over the dataset.
-
-    :param model: The trained model.
-    :param X: Input features.
-    :param y: True labels.
-    :param batch_size: Size of the batch, use the whole dataset if batch_size <= 0.
-    :param pairs: If True, uses pds_loss_eval_pairs to evaluate loss on pairs.
-    :return: Calculated loss over the dataset or a dictionary of losses for each pair type.
-    """
-    if batch_size <= 0:
-        z_pred = model.predict(X)
-        return pds_loss_eval_pairs(y, z_pred) if pairs else pds_loss_eval(y, z_pred)
-
-    total_loss = 0
-    pair_losses = {key: 0.0 for key in
-                   ['sep_sep', 'sep_elevated', 'sep_background', 'elevated_elevated', 'elevated_background',
-                    'background_background']}
-    pair_counts = {key: 0 for key in pair_losses}
-    total_batches = 0
-
-    for i in range(0, len(X), batch_size):
-        X_batch = X[i:i + batch_size]
-        y_batch = y[i:i + batch_size]
-        z_pred = model.predict(X_batch)
-
-        if pairs:
-            batch_pair_losses = pds_loss_eval_pairs(y_batch, z_pred)
-            for key in batch_pair_losses:
-                pair_losses[key] += batch_pair_losses[key]
-                pair_counts[key] += 1  # Count each batch for each pair type
-        else:
-            total_loss += pds_loss_eval(y_batch, z_pred)
-
-        total_batches += 1
-
-    if pairs:
-        # Compute average losses for each pair type
-        avg_pair_losses = {key: pair_losses[key] / pair_counts[key] if pair_counts[key] > 0 else 0 for key in
-                           pair_losses}
-        return avg_pair_losses
-
-    return total_loss / total_batches if total_batches > 0 else 0
-
-
-# def evaluate(model, X, y, batch_size=-1):
-#     """
-#     Custom evaluate function to compute loss over the dataset.
-#
-#     :param model: The trained model.
-#     :param X: Input features.
-#     :param y: True labels.
-#     :param batch_size: Size of the batch, use the whole dataset if batch_size <= 0.
-#     :return: Calculated loss over the dataset.
-#     """
-#     total_loss = 0
-#     total_batches = 0
-#
-#     # print batch size received
-#     print(f'batch size received: {batch_size}')
-#
-#     if batch_size <= 0:
-#         # Use the whole dataset
-#         z_pred = model.predict(X)
-#         total_loss = pds_loss_eval(y, z_pred, reduction='none')
-#         total_batches = 1
-#     else:
-#         # Process in batches
-#         for i in range(0, len(X), batch_size):
-#             X_batch = X[i:i + batch_size]
-#             y_batch = y[i:i + batch_size]
-#             z_pred = model.predict(X_batch)  # model prediction
-#             batch_loss = pds_loss_eval(y_batch, z_pred, reduction='none')
-#             total_loss += batch_loss
-#             total_batches += 1
-#
-#     average_loss = total_loss / total_batches
-#     return average_loss
-
-
-# Helper function to map 2D indices to 1D indices (assuming it's defined elsewhere in your code)
-# def map_to_1D_idx(i, j, n):
-#     return n * i + j
-
-
 # main run
+
 if __name__ == '__main__':
     print("Testing the vectorized loss function...")
     print("WITHOUT SAMPLE WEIGHTS")
@@ -3325,7 +2372,7 @@ if __name__ == '__main__':
     # Time and compute loss using the vectorized function
     print("Computing loss using the vectorized function...")
     start_time_vectorized = time.time()
-    loss_vectorized = loss_tester.pds_loss_dl_vec(y_true_tensor, z_pred_tensor)
+    loss_vectorized = loss_tester.pds_loss_vec(y_true_tensor, z_pred_tensor)
     end_time_vectorized = time.time()
     vectorized_duration = end_time_vectorized - start_time_vectorized
 
@@ -3403,7 +2450,7 @@ if __name__ == '__main__':
     # # Time and compute loss using the vectorized function with sample weights
     # print("Computing loss using the vectorized function with sample weights...")
     # start_time_vectorized = time.time()
-    # loss_vectorized = loss_tester.pds_loss_dl_vec(y_true_tensor, z_pred_tensor, sample_weights=sample_weights_tensor)
+    # loss_vectorized = loss_tester.pds_loss_vec(y_true_tensor, z_pred_tensor, sample_weights=sample_weights_tensor)
     # end_time_vectorized = time.time()
     # vectorized_duration = end_time_vectorized - start_time_vectorized
     #

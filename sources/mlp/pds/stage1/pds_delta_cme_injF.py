@@ -254,7 +254,7 @@ def main():
                 #     add_slope,
                 #     model_sep.name)
 
-                mb.train_pds_dl_inj(
+                mb.train_pds_inj(
                     model_sep,
                     X_subtrain, y_subtrain_norm,
                     X_val, y_val_norm,

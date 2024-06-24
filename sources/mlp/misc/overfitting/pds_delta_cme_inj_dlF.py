@@ -239,7 +239,7 @@ def main():
                     #     add_slope,
                     #     model_sep.name)
 
-                    mb.overtrain_pds_dl_inj(
+                    mb.overtrain_pds_inj(
                         model_sep,
                         X_train, y_train_norm,
                         train_label_weights_dict=train_weights_dict,

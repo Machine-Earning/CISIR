@@ -4,17 +4,223 @@
 ##############################################################################################################
 
 
-# imports
-import numpy as np
 import math
-import matplotlib.pyplot as plt
-import tensorflow as tf
 # types for type hinting
 from typing import Tuple, List, Optional, Any, Dict, Union
-from numpy import ndarray
-from tensorflow.keras import Model
-from sklearn.metrics import confusion_matrix, f1_score
 
+import matplotlib.pyplot as plt
+# imports
+import numpy as np
+import tensorflow as tf
+from numpy import ndarray
+from sklearn.metrics import confusion_matrix, f1_score
+from tensorflow.keras import Model
+from modules.training.cme_modeling import error
+
+
+def pds_loss_eval(y_true, z_pred, reduction='none'):
+    """
+    Computes the loss for a batch of predicted features and their labels.
+
+    :param y_true: A batch of true label values, shape of [batch_size, 1].
+    :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
+    :param reduction: The type of reduction to apply to the loss ('sum', 'none', or 'mean').
+    :return: The average error for all unique combinations of the samples in the batch.
+    """
+    int_batch_size = len(z_pred)
+    total_error = 0.0
+
+    # print("received batch size in custom eval:", int_batch_size)
+
+    # Loop through all unique pairs of samples in the batch
+    for i in range(int_batch_size):
+        for j in range(i + 1, int_batch_size):
+            z1, z2 = z_pred[i], z_pred[j]
+            label1, label2 = y_true[i], y_true[j]
+            # Update pair counts (implement this function as needed)
+            # update_pair_counts(label1, label2)
+            err = error(z1, z2, label1, label2)  # Make sure 'error' function uses NumPy or standard Python
+            total_error += err
+
+    if reduction == 'sum':
+        return total_error  # total loss
+    elif reduction == 'none' or reduction == 'mean':
+        denom = int_batch_size * (int_batch_size - 1) / 2 + 1e-9
+        return total_error / denom  # average loss
+    else:
+        raise ValueError(f"Unsupported reduction type: {reduction}.")
+
+
+def pds_loss_eval_pairs(y_true, z_pred, reduction='none'):
+    """
+    Computes the loss for a batch of predicted features and their labels.
+    Returns a dictionary of average losses for each pair type and overall.
+
+    :param y_true: A batch of true label values, shape of [batch_size, 1].
+    :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
+    :param reduction: The type of reduction to apply to the loss ('sum', 'none', or 'mean').
+    :return: A dictionary containing the average errors for all pair types and overall.
+    """
+    int_batch_size = len(z_pred)
+    total_error = 0.0
+    pair_errors = {
+        'sep_sep': 0.0,
+        'sep_elevated': 0.0,
+        'sep_background': 0.0,
+        'elevated_elevated': 0.0,
+        'elevated_background': 0.0,
+        'background_background': 0.0
+    }
+    pair_counts = {key: 0 for key in pair_errors.keys()}
+
+    # print("Received batch size in custom eval:", int_batch_size)
+
+    # Loop through all unique pairs of samples in the batch
+    for i in range(int_batch_size):
+        for j in range(i + 1, int_batch_size):
+            z1, z2 = z_pred[i], z_pred[j]
+            label1, label2 = y_true[i], y_true[j]
+
+            # Determine the pair type
+            pair_type = determine_pair_type(label1, label2)  # Implement this function
+            err = error(z1, z2, label1, label2)  # Make sure 'error' function uses NumPy or standard Python
+            pair_errors[pair_type] += err
+            pair_counts[pair_type] += 1
+            total_error += err
+
+    # Apply reduction
+    if reduction == 'sum':
+        avg_pair_errors = {key: error_sum for key, error_sum in pair_errors.items()}
+        avg_pair_errors['overall'] = total_error
+    elif reduction == 'none' or reduction == 'mean':
+        avg_pair_errors = {key: pair_errors[key] / pair_counts[key] if pair_counts[key] > 0 else 0 for key in
+                           pair_errors}
+        denom = int_batch_size * (int_batch_size - 1) / 2 + 1e-9
+        avg_pair_errors['overall'] = total_error / denom
+    else:
+        raise ValueError(f"Unsupported reduction type: {reduction}.")
+
+    return avg_pair_errors
+
+
+def determine_pair_type(label1, label2, sep_threshold=None, elevated_threshold=None):
+    """
+    Determines the pair type based on the labels.
+
+    :param label1: The label of the first sample.
+    :param label2: The label of the second sample.
+    :param sep_threshold: The threshold to classify SEP samples.
+    :param elevated_threshold: The threshold to classify elevated samples.
+    :return: A string representing the pair type.
+    """
+
+    if sep_threshold is None:
+        sep_threshold = np.log(10)
+
+    if elevated_threshold is None:
+        elevated_threshold = np.log(10.0 / np.exp(2))
+
+    if label1 > sep_threshold and label2 > sep_threshold:
+        return 'sep_sep'
+    elif (label1 > sep_threshold and label2 > elevated_threshold) or (
+            label2 > sep_threshold and label1 > elevated_threshold):
+        return 'sep_elevated'
+    elif (label1 > sep_threshold and label2 <= elevated_threshold) or (
+            label2 > sep_threshold and label1 <= elevated_threshold):
+        return 'sep_background'
+    elif label1 > elevated_threshold and label2 > elevated_threshold:
+        return 'elevated_elevated'
+    elif (label1 > elevated_threshold >= label2) or (
+            label2 > elevated_threshold >= label1):
+        return 'elevated_background'
+    else:
+        return 'background_background'
+
+
+def evaluate(model, X, y, batch_size=-1, pairs=False):
+    """
+    Custom evaluate function to compute loss over the dataset.
+
+    :param model: The trained model.
+    :param X: Input features.
+    :param y: True labels.
+    :param batch_size: Size of the batch, use the whole dataset if batch_size <= 0.
+    :param pairs: If True, uses pds_loss_eval_pairs to evaluate loss on pairs.
+    :return: Calculated loss over the dataset or a dictionary of losses for each pair type.
+    """
+    if batch_size <= 0:
+        z_pred = model.predict(X)
+        return pds_loss_eval_pairs(y, z_pred) if pairs else pds_loss_eval(y, z_pred)
+
+    total_loss = 0
+    pair_losses = {key: 0.0 for key in
+                   ['sep_sep', 'sep_elevated', 'sep_background', 'elevated_elevated', 'elevated_background',
+                    'background_background']}
+    pair_counts = {key: 0 for key in pair_losses}
+    total_batches = 0
+
+    for i in range(0, len(X), batch_size):
+        X_batch = X[i:i + batch_size]
+        y_batch = y[i:i + batch_size]
+        z_pred = model.predict(X_batch)
+
+        if pairs:
+            batch_pair_losses = pds_loss_eval_pairs(y_batch, z_pred)
+            for key in batch_pair_losses:
+                pair_losses[key] += batch_pair_losses[key]
+                pair_counts[key] += 1  # Count each batch for each pair type
+        else:
+            total_loss += pds_loss_eval(y_batch, z_pred)
+
+        total_batches += 1
+
+    if pairs:
+        # Compute average losses for each pair type
+        avg_pair_losses = {key: pair_losses[key] / pair_counts[key] if pair_counts[key] > 0 else 0 for key in
+                           pair_losses}
+        return avg_pair_losses
+
+    return total_loss / total_batches if total_batches > 0 else 0
+
+
+# def evaluate(model, X, y, batch_size=-1):
+#     """
+#     Custom evaluate function to compute loss over the dataset.
+#
+#     :param model: The trained model.
+#     :param X: Input features.
+#     :param y: True labels.
+#     :param batch_size: Size of the batch, use the whole dataset if batch_size <= 0.
+#     :return: Calculated loss over the dataset.
+#     """
+#     total_loss = 0
+#     total_batches = 0
+#
+#     # print batch size received
+#     print(f'batch size received: {batch_size}')
+#
+#     if batch_size <= 0:
+#         # Use the whole dataset
+#         z_pred = model.predict(X)
+#         total_loss = pds_loss_eval(y, z_pred, reduction='none')
+#         total_batches = 1
+#     else:
+#         # Process in batches
+#         for i in range(0, len(X), batch_size):
+#             X_batch = X[i:i + batch_size]
+#             y_batch = y[i:i + batch_size]
+#             z_pred = model.predict(X_batch)  # model prediction
+#             batch_loss = pds_loss_eval(y_batch, z_pred, reduction='none')
+#             total_loss += batch_loss
+#             total_batches += 1
+#
+#     average_loss = total_loss / total_batches
+#     return average_loss
+
+
+# Helper function to map 2D indices to 1D indices (assuming it's defined elsewhere in your code)
+# def map_to_1D_idx(i, j, n):
+#     return n * i + j
 
 class Evaluator:
     """
