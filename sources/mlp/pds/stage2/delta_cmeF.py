@@ -21,7 +21,10 @@ from modules.training.ts_modeling import (
     evaluate_model_cond,
     process_sep_events,
     get_loss,
-    reshape_X, filter_ds, stratified_split, plot_error_hist)
+    reshape_X,
+    filter_ds,
+    stratified_split,
+    plot_error_hist)
 from modules.training.utils import get_weight_path
 
 mb = ModelBuilder()
