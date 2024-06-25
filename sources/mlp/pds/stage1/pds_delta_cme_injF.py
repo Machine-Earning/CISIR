@@ -249,35 +249,6 @@ def main():
                     )
                     model_sep.summary()
 
-                    print('Reshaping input for model')
-                    X_subtrain = reshape_X(
-                        X_subtrain,
-                        [n_features],
-                        inputs_to_use,
-                        add_slope,
-                        model_sep.name)
-
-                    X_val = reshape_X(
-                        X_val,
-                        [n_features],
-                        inputs_to_use,
-                        add_slope,
-                        model_sep.name)
-
-                    X_train = reshape_X(
-                        X_train,
-                        [n_features],
-                        inputs_to_use,
-                        add_slope,
-                        model_sep.name)
-
-                    # X_test = reshape_X(
-                    #     X_test,
-                    #     [n_features],
-                    #     inputs_to_use,
-                    #     add_slope,
-                    #     model_sep.name)
-
                     mb.train_pds_inj(
                         model_sep,
                         X_subtrain, y_subtrain_norm,

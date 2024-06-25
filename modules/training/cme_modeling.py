@@ -539,182 +539,182 @@ class ModelBuilder:
     # 
     #     return np.array(batch_weights)
 
-    def train_for_one_epoch(self,
-                            model: tf.keras.Model,
-                            optimizer: tf.keras.optimizers.Optimizer,
-                            loss_fn,
-                            X: np.ndarray,
-                            y: np.ndarray,
-                            batch_size: int,
-                            label_weights_dict: Optional[Dict[float, float]] = None,
-                            training: bool = True) -> float:
-        """
-        Train or evaluate the model for one epoch.
-        processing the batches with indices is what making it slow
-        :param model: The model to stage2 or evaluate.
-        :param optimizer: The optimizer to use.
-        :param loss_fn: The loss function to use.
-        :param X: The feature set.
-        :param y: The labels.
-        :param batch_size: The batch size for training or evaluation.
-        :param label_weights_dict: Dictionary containing label weights.
-        :param training: Whether to apply training (True) or run evaluation (False).
-        :return: The average loss for the epoch.
-        """
-        epoch_loss = 0.0
-        num_batches = 0
+    # def train_for_one_epoch(self,
+    #                         model: tf.keras.Model,
+    #                         optimizer: tf.keras.optimizers.Optimizer,
+    #                         loss_fn,
+    #                         X: np.ndarray,
+    #                         y: np.ndarray,
+    #                         batch_size: int,
+    #                         label_weights_dict: Optional[Dict[float, float]] = None,
+    #                         training: bool = True) -> float:
+    #     """
+    #     Train or evaluate the model for one epoch.
+    #     processing the batches with indices is what making it slow
+    #     :param model: The model to stage2 or evaluate.
+    #     :param optimizer: The optimizer to use.
+    #     :param loss_fn: The loss function to use.
+    #     :param X: The feature set.
+    #     :param y: The labels.
+    #     :param batch_size: The batch size for training or evaluation.
+    #     :param label_weights_dict: Dictionary containing label weights.
+    #     :param training: Whether to apply training (True) or run evaluation (False).
+    #     :return: The average loss for the epoch.
+    #     """
+    #     epoch_loss = 0.0
+    #     num_batches = 0
+    #
+    #     for batch_idx in range(0, len(X), batch_size):
+    #         batch_X = X[batch_idx:batch_idx + batch_size]
+    #         batch_y = y[batch_idx:batch_idx + batch_size]
+    #
+    #         if len(batch_y) <= 1:
+    #             # can't form a pair so skip
+    #             continue
+    #
+    #         # print(f"batch_weights: {batch_weights}")
+    #         # print(f"batch_y: {batch_y}")
+    #         # print(f"batch_X: {batch_X}")
+    #         with tf.GradientTape() as tape:
+    #             predictions = model(batch_X, training=training)
+    #             loss = loss_fn(batch_y, predictions, sample_weights=label_weights_dict)
+    #
+    #         if training:
+    #             gradients = tape.gradient(loss, model.trainable_variables)
+    #             # print(f"Gradients: {gradients}")
+    #             optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    #
+    #         epoch_loss += loss.numpy()
+    #         num_batches += 1
+    #
+    #         print(f"batch: {num_batches}/{len(X) // batch_size}")
+    #
+    #     return epoch_loss / num_batches
 
-        for batch_idx in range(0, len(X), batch_size):
-            batch_X = X[batch_idx:batch_idx + batch_size]
-            batch_y = y[batch_idx:batch_idx + batch_size]
-
-            if len(batch_y) <= 1:
-                # can't form a pair so skip
-                continue
-
-            # print(f"batch_weights: {batch_weights}")
-            # print(f"batch_y: {batch_y}")
-            # print(f"batch_X: {batch_X}")
-            with tf.GradientTape() as tape:
-                predictions = model(batch_X, training=training)
-                loss = loss_fn(batch_y, predictions, sample_weights=label_weights_dict)
-
-            if training:
-                gradients = tape.gradient(loss, model.trainable_variables)
-                # print(f"Gradients: {gradients}")
-                optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-
-            epoch_loss += loss.numpy()
-            num_batches += 1
-
-            print(f"batch: {num_batches}/{len(X) // batch_size}")
-
-        return epoch_loss / num_batches
-
-    def train_for_one_epoch_mh(
-            self,
-            model: tf.keras.Model,
-            optimizer: tf.keras.optimizers.Optimizer,
-            primary_loss_fn,
-            X: np.ndarray,
-            y: np.ndarray,
-            batch_size: int,
-            gamma_coeff: Optional[float] = None,
-            lambda_coeff: Optional[float] = None,
-            sample_weights: Optional[np.ndarray] = None,
-            joint_weights: Optional[np.ndarray] = None,
-            joint_weight_indices: Optional[List[Tuple[int, int]]] = None,
-            with_reg=False,
-            with_ae=False,
-            training: bool = True) -> float:
-        """
-        Train the model for one epoch.
-        processing the batches with indices is what making it slow
-        :param with_ae:
-        :param with_reg:
-        :param model: The model to stage2.
-        :param optimizer: The optimizer to use.
-        :param primary_loss_fn: The primary loss function to use.
-        :param X: The feature set.
-        :param y: The labels.
-        :param batch_size: The batch size for training.
-        :param gamma_coeff: Coefficient for the regressor loss.
-        :param lambda_coeff: Coefficient for the decoder loss.
-        :param sample_weights: Individual sample weights.
-        :param joint_weights: Optional array containing all joint weights for the dataset.
-        :param joint_weight_indices: Optional list of tuples, each containing a pair of indices for which a joint weight exists.
-        :param training: Whether to apply training or evaluation (default is True for training).
-        :return: The average loss for the epoch.
-        """
-
-        epoch_loss = 0.0
-        num_batches = 0
-
-        for batch_idx in range(0, len(X), batch_size):
-            batch_X = X[batch_idx:batch_idx + batch_size]
-            batch_y = y[batch_idx:batch_idx + batch_size]
-            batch_sample_weights = None if sample_weights is None \
-                else sample_weights[batch_idx:batch_idx + batch_size]
-
-            if len(batch_y) <= 1:
-                # can't form a pair so skip
-                continue
-
-            # Get the corresponding joint weights for this batch
-            batch_weights = None
-            if joint_weights is not None and joint_weight_indices is not None:
-                batch_weights = self.process_batch_weights(
-                    np.arange(batch_idx, batch_idx + batch_size), joint_weights, joint_weight_indices)
-
-            with tf.GradientTape() as tape:
-                outputs = model(batch_X, training=training)
-
-                # Unpack the outputs based on the model configuration
-                if with_reg and with_ae:
-                    primary_predictions, regressor_predictions, decoder_predictions = outputs
-                elif with_reg:
-                    primary_predictions, regressor_predictions = outputs
-                    decoder_predictions = None
-                elif with_ae:
-                    primary_predictions, decoder_predictions = outputs
-                    regressor_predictions = None
-                else:
-                    primary_predictions = outputs
-                    regressor_predictions, decoder_predictions = None, None
-
-                # Primary loss
-                primary_loss = primary_loss_fn(batch_y, primary_predictions, sample_weights=batch_weights)
-
-                # Regressor loss
-                regressor_loss = 0
-                if with_reg and gamma_coeff is not None:
-                    regressor_loss = tf.keras.losses.mean_squared_error(batch_y, regressor_predictions)
-                    if batch_sample_weights is not None:
-                        regressor_loss = tf.cast(regressor_loss, batch_sample_weights.dtype)
-                        regressor_loss = tf.reduce_sum(regressor_loss * batch_sample_weights) / tf.reduce_sum(
-                            batch_sample_weights)
-                    regressor_loss *= gamma_coeff
-
-                # Decoder loss
-                decoder_loss = 0
-                if with_ae and lambda_coeff is not None:
-                    decoder_loss = tf.keras.losses.mean_squared_error(batch_X, decoder_predictions)
-                    decoder_loss *= lambda_coeff
-
-                # Make sure all loss tensors have the same dtype
-                dtype_to_use = tf.float32  # or tf.float64 based on your preference
-
-                primary_loss = tf.cast(primary_loss, dtype_to_use)
-                regressor_loss = tf.cast(regressor_loss, dtype_to_use)
-                decoder_loss = tf.cast(decoder_loss, dtype_to_use)
-
-                # Total loss
-                total_loss = primary_loss + regressor_loss + decoder_loss
-
-            if training:
-                gradients = tape.gradient(total_loss, model.trainable_variables)
-                optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-
-            # Make sure total_loss is reduced to a single scalar value.
-            total_loss_scalar = tf.reduce_sum(total_loss)
-
-            # Update epoch_loss
-            epoch_loss += total_loss_scalar.numpy()
-
-            num_batches += 1
-
-            print(f"batch: {num_batches}/{len(X) // batch_size}")
-
-        return epoch_loss / num_batches
+    # def train_for_one_epoch_mh(
+    #         self,
+    #         model: tf.keras.Model,
+    #         optimizer: tf.keras.optimizers.Optimizer,
+    #         primary_loss_fn,
+    #         X: np.ndarray,
+    #         y: np.ndarray,
+    #         batch_size: int,
+    #         gamma_coeff: Optional[float] = None,
+    #         lambda_coeff: Optional[float] = None,
+    #         sample_weights: Optional[np.ndarray] = None,
+    #         joint_weights: Optional[np.ndarray] = None,
+    #         joint_weight_indices: Optional[List[Tuple[int, int]]] = None,
+    #         with_reg=False,
+    #         with_ae=False,
+    #         training: bool = True) -> float:
+    #     """
+    #     Train the model for one epoch.
+    #     processing the batches with indices is what making it slow
+    #     :param with_ae:
+    #     :param with_reg:
+    #     :param model: The model to stage2.
+    #     :param optimizer: The optimizer to use.
+    #     :param primary_loss_fn: The primary loss function to use.
+    #     :param X: The feature set.
+    #     :param y: The labels.
+    #     :param batch_size: The batch size for training.
+    #     :param gamma_coeff: Coefficient for the regressor loss.
+    #     :param lambda_coeff: Coefficient for the decoder loss.
+    #     :param sample_weights: Individual sample weights.
+    #     :param joint_weights: Optional array containing all joint weights for the dataset.
+    #     :param joint_weight_indices: Optional list of tuples, each containing a pair of indices for which a joint weight exists.
+    #     :param training: Whether to apply training or evaluation (default is True for training).
+    #     :return: The average loss for the epoch.
+    #     """
+    #
+    #     epoch_loss = 0.0
+    #     num_batches = 0
+    #
+    #     for batch_idx in range(0, len(X), batch_size):
+    #         batch_X = X[batch_idx:batch_idx + batch_size]
+    #         batch_y = y[batch_idx:batch_idx + batch_size]
+    #         batch_sample_weights = None if sample_weights is None \
+    #             else sample_weights[batch_idx:batch_idx + batch_size]
+    #
+    #         if len(batch_y) <= 1:
+    #             # can't form a pair so skip
+    #             continue
+    #
+    #         # Get the corresponding joint weights for this batch
+    #         batch_weights = None
+    #         if joint_weights is not None and joint_weight_indices is not None:
+    #             batch_weights = self.process_batch_weights(
+    #                 np.arange(batch_idx, batch_idx + batch_size), joint_weights, joint_weight_indices)
+    #
+    #         with tf.GradientTape() as tape:
+    #             outputs = model(batch_X, training=training)
+    #
+    #             # Unpack the outputs based on the model configuration
+    #             if with_reg and with_ae:
+    #                 primary_predictions, regressor_predictions, decoder_predictions = outputs
+    #             elif with_reg:
+    #                 primary_predictions, regressor_predictions = outputs
+    #                 decoder_predictions = None
+    #             elif with_ae:
+    #                 primary_predictions, decoder_predictions = outputs
+    #                 regressor_predictions = None
+    #             else:
+    #                 primary_predictions = outputs
+    #                 regressor_predictions, decoder_predictions = None, None
+    #
+    #             # Primary loss
+    #             primary_loss = primary_loss_fn(batch_y, primary_predictions, sample_weights=batch_weights)
+    #
+    #             # Regressor loss
+    #             regressor_loss = 0
+    #             if with_reg and gamma_coeff is not None:
+    #                 regressor_loss = tf.keras.losses.mean_squared_error(batch_y, regressor_predictions)
+    #                 if batch_sample_weights is not None:
+    #                     regressor_loss = tf.cast(regressor_loss, batch_sample_weights.dtype)
+    #                     regressor_loss = tf.reduce_sum(regressor_loss * batch_sample_weights) / tf.reduce_sum(
+    #                         batch_sample_weights)
+    #                 regressor_loss *= gamma_coeff
+    #
+    #             # Decoder loss
+    #             decoder_loss = 0
+    #             if with_ae and lambda_coeff is not None:
+    #                 decoder_loss = tf.keras.losses.mean_squared_error(batch_X, decoder_predictions)
+    #                 decoder_loss *= lambda_coeff
+    #
+    #             # Make sure all loss tensors have the same dtype
+    #             dtype_to_use = tf.float32  # or tf.float64 based on your preference
+    #
+    #             primary_loss = tf.cast(primary_loss, dtype_to_use)
+    #             regressor_loss = tf.cast(regressor_loss, dtype_to_use)
+    #             decoder_loss = tf.cast(decoder_loss, dtype_to_use)
+    #
+    #             # Total loss
+    #             total_loss = primary_loss + regressor_loss + decoder_loss
+    #
+    #         if training:
+    #             gradients = tape.gradient(total_loss, model.trainable_variables)
+    #             optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    #
+    #         # Make sure total_loss is reduced to a single scalar value.
+    #         total_loss_scalar = tf.reduce_sum(total_loss)
+    #
+    #         # Update epoch_loss
+    #         epoch_loss += total_loss_scalar.numpy()
+    #
+    #         num_batches += 1
+    #
+    #         print(f"batch: {num_batches}/{len(X) // batch_size}")
+    #
+    #     return epoch_loss / num_batches
 
     def train_pds(self,
                   model: tf.keras.Model,
+                  X_train: np.ndarray,
+                  y_train: np.ndarray,
                   X_subtrain: np.ndarray,
                   y_subtrain: np.ndarray,
                   X_val: np.ndarray,
                   y_val: np.ndarray,
-                  X_train: np.ndarray,
-                  y_train: np.ndarray,
                   train_label_weights_dict: Optional[Dict[float, float]] = None,
                   learning_rate: float = 1e-3,
                   epochs: int = 100,
