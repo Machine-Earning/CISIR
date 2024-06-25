@@ -61,12 +61,12 @@ def main():
                         reduce_lr_on_plateau = ReduceLROnPlateau(
                             monitor='loss',
                             factor=0.9,
-                            patience=300,
+                            patience=1000,
                             verbose=1,
                             min_delta=1e-5,
                             min_lr=1e-4)
 
-                        weight_decay = 1e-6  # higher weight decay
+                        weight_decay = 1e-2  # higher weight decay
                         momentum_beta1 = 0.9  # higher momentum beta1
                         batch_size = 4096
                         epochs = 50000  # higher epochs
