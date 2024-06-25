@@ -249,7 +249,7 @@ def main():
                         add_slope,
                         mlp_model_sep.name)
 
-                    mb.train_pds_dl(mlp_model_sep,
+                    mb.train_pds(mlp_model_sep,
                                     X_subtrain, y_subtrain,
                                     X_val, y_val,
                                     X_train, y_train,

@@ -127,7 +127,7 @@ def main():
             }
             # print options used
             print(Options)
-            mb.train_pds_dl(feature_extractor,
+            mb.train_pds(feature_extractor,
                             shuffled_train_x, shuffled_train_y,
                             shuffled_val_x, shuffled_val_y,
                             combined_train_x, combined_train_y,

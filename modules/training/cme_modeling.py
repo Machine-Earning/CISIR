@@ -371,100 +371,6 @@ class ModelBuilder:
 
         return extended_model
 
-    def train_pds(self,
-                  model: Model,
-                  X_subtrain: ndarray,
-                  y_subtrain: ndarray,
-                  X_val: ndarray,
-                  y_val: ndarray,
-                  X_train: ndarray,
-                  y_train: ndarray,
-                  learning_rate: float = 1e-3,
-                  epochs: int = 100,
-                  batch_size: int = 32,
-                  patience: int = 9,
-                  save_tag=None,
-                  callbacks_list=None,
-                  verbose: int = 1) -> callbacks.History:
-        """
-        Trains the model and returns the training history.
-
-        :param X_train: training and validation sets together
-        :param y_train: labels of training and validation sets together
-        :param save_tag: tag to use for saving experiments
-        :param model: The TensorFlow model to stage2.
-        :param X_subtrain: The training feature set.
-        :param y_subtrain: The training labels.
-        :param X_val: Validation features.
-        :param y_val: Validation labels.
-        :param learning_rate: The learning rate for the Adam optimizer.
-        :param epochs: The maximum number of epochs for training.
-        :param batch_size: The batch size for training.
-        :param patience: The number of epochs with no improvement to wait before early stopping.
-        :param callbacks_list: List of callback instances to apply during training.
-        :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
-
-
-        :return: The training history as a History object.
-        """
-
-        if callbacks_list is None:
-            callbacks_list = []
-
-        # Initialize early stopping and model checkpointing
-        early_stopping_cb = callbacks.EarlyStopping(
-            monitor='val_loss',
-            patience=patience,
-            restore_best_weights=True)
-        checkpoint_cb = callbacks.ModelCheckpoint(
-            f"model_weights_{str(save_tag)}.h5",
-            save_weights_only=True)
-
-        # Append the early stopping and checkpoint callbacks to the custom callbacks list
-        callbacks_list.extend([early_stopping_cb, checkpoint_cb])
-
-        # Save initial weights for retraining on full training set after best epoch found
-        initial_weights = model.get_weights()
-
-        # Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
-
-        # First stage2 the model with a validation set to determine the best epoch
-        history = model.fit(X_subtrain, y_subtrain,
-                            epochs=epochs,
-                            batch_size=batch_size if batch_size > 0 else len(y_subtrain),
-                            validation_data=(X_val, y_val),
-                            validation_batch_size=batch_size if batch_size > 0 else len(y_val),
-                            callbacks=callbacks_list,
-                            verbose=verbose)
-
-        # Get the best epoch from early stopping
-        best_epoch = early_stopping_cb.stopped_epoch + 1  # Adjust for the offset
-        # best_epoch = np.argmin(history.history['val_loss']) + 1
-
-        # Reset model weights to initial state before retraining
-        model.set_weights(initial_weights)
-
-        # re-Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
-
-        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
-        model.fit(X_train, y_train,
-                  epochs=best_epoch,
-                  batch_size=batch_size if batch_size > 0 else len(y_train),
-                  callbacks=[checkpoint_cb],
-                  verbose=verbose)
-
-        # Evaluate the model on the entire training set
-        # entire_training_loss = model.evaluate(X_train, y_train)
-
-        # save the model weights
-        model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
-        # print where the model weights are saved
-        print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
-
-        return history  # , entire_training_loss
-
     def overtrain_pds(self,
                       model: Model,
                       X_train: ndarray,
@@ -801,35 +707,33 @@ class ModelBuilder:
 
         return epoch_loss / num_batches
 
-    def train_pds_dl(self,
-                     model: tf.keras.Model,
-                     X_subtrain: np.ndarray,
-                     y_subtrain: np.ndarray,
-                     X_val: np.ndarray,
-                     y_val: np.ndarray,
-                     X_train: np.ndarray,
-                     y_train: np.ndarray,
-                     subtrain_label_weights_dict: Optional[Dict[float, float]] = None,
-                     train_label_weights_dict: Optional[Dict[float, float]] = None,
-                     learning_rate: float = 1e-3,
-                     epochs: int = 100,
-                     batch_size: int = 32,
-                     patience: int = 9,
-                     save_tag: Optional[str] = None,
-                     callbacks_list=None,
-                     verbose: int = 1) -> dict:
+    def train_pds(self,
+                  model: tf.keras.Model,
+                  X_subtrain: np.ndarray,
+                  y_subtrain: np.ndarray,
+                  X_val: np.ndarray,
+                  y_val: np.ndarray,
+                  X_train: np.ndarray,
+                  y_train: np.ndarray,
+                  train_label_weights_dict: Optional[Dict[float, float]] = None,
+                  learning_rate: float = 1e-3,
+                  epochs: int = 100,
+                  batch_size: int = 32,
+                  patience: int = 9,
+                  save_tag: Optional[str] = None,
+                  callbacks_list=None,
+                  verbose: int = 1) -> dict:
         """
         Custom training loop to stage2 the model and returns the training history.
 
         :param X_train: training and validation sets together
         :param y_train: labels of training and validation sets together
-        :param model: The TensorFlow model to stage2.
         :param X_subtrain: The training feature set.
         :param y_subtrain: The training labels.
         :param X_val: Validation features.
         :param y_val: Validation labels.
-        :param subtrain_label_weights_dict: Dictionary containing label weights for the subtrain set.
-        :param train_label_weights_dict: Dictionary containing label weights for the stage2 set.
+        :param model: The TensorFlow model to train.
+        :param train_label_weights_dict: Dictionary containing label weights for the training set.
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
         :param batch_size: The batch size for training.
@@ -845,103 +749,65 @@ class ModelBuilder:
         if callbacks_list is None:
             callbacks_list = []
 
-        # Initialize early stopping and model checkpointing if not explicitly provided
-        early_stopping_cb = callbacks.EarlyStopping(
-            monitor='val_loss', patience=patience, restore_best_weights=True)
-        callbacks_list.append(early_stopping_cb)
+        # Initialize early stopping and model checkpointing for subtraining
+        early_stopping_cb = tf.keras.callbacks.EarlyStopping(
+            monitor='val_loss',
+            patience=patience,
+            restore_best_weights=True
+        )
+        checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
+            filepath=f"model_weights_{str(save_tag)}.h5",
+            monitor='val_loss',
+            save_best_only=True,
+            save_weights_only=True
+        )
 
-        if not any(isinstance(cb, callbacks.ModelCheckpoint) for cb in callbacks_list):
-            checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_{str(save_tag)}.h5", save_weights_only=True)
-            callbacks_list.append(checkpoint_cb)
-
-        # Setting up callback environment
-        params = {
-            'epochs': epochs,
-            'steps': None,
-            'verbose': verbose,
-            'do_validation': True,
-            'metrics': ['loss', 'val_loss'],
-        }
-        for cb in callbacks_list:
-            cb.set_model(model)
-            cb.set_params(params)
-
-        logs = {}
-        # Signal the beginning of training
-        for cb in callbacks_list:
-            cb.on_train_begin(logs=logs)
+        # Append the early stopping and checkpoint callbacks to the custom callbacks list
+        subtrain_callbacks_list = callbacks_list + [early_stopping_cb, checkpoint_cb]
 
         # Save initial weights for retraining on full training set after best epoch found
         initial_weights = model.get_weights()
 
         # Optimizer and history initialization
-        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-        model.compile(optimizer=optimizer)  # Set the optimizer for the model
-        history = {'loss': [], 'val_loss': []}
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            loss=lambda y_true, y_pred: self.pds_loss_vec(
+                y_true, y_pred, sample_weights=train_label_weights_dict
+            )
+        )
 
-        for epoch in range(epochs):
-            for cb in callbacks_list:
-                cb.on_epoch_begin(epoch, logs=logs)
-            train_loss = self.train_for_one_epoch(
-                model, optimizer, self.pds_loss_vec,
-                X_subtrain, y_subtrain,
-                batch_size=batch_size if batch_size > 0 else len(y_subtrain),
-                label_weights_dict=subtrain_label_weights_dict)
-
-            val_loss = self.train_for_one_epoch(
-                model, optimizer, self.pds_loss_vec, X_val, y_val,
-                batch_size=batch_size if batch_size > 0 else len(y_val),
-                label_weights_dict=None, training=False)
-
-            # Log and save epoch losses
-            history['loss'].append(train_loss)
-            history['val_loss'].append(val_loss)
-
-            print(f"Epoch {epoch + 1}/{epochs}, Loss: {train_loss}, Validation Loss: {val_loss}")
-
-            logs = {'loss': train_loss, 'val_loss': val_loss}  # Update logs with your training and validation loss
-
-            for cb in callbacks_list:
-                cb.on_epoch_end(epoch, logs=logs)
-
-        for cb in callbacks_list:
-            cb.on_train_end(logs=logs)
+        history = model.fit(
+            X_subtrain, y_subtrain,
+            epochs=epochs,
+            batch_size=batch_size if batch_size > 0 else len(y_subtrain),
+            validation_data=(X_val, y_val),
+            validation_batch_size=batch_size if batch_size > 0 else len(y_val),
+            callbacks=subtrain_callbacks_list,
+            verbose=verbose
+        )
 
         best_epoch = early_stopping_cb.stopped_epoch + 1  # Adjust for the offset
 
         # Retraining on the combined dataset
         print(f"Retraining to the best epoch: {best_epoch}")
-        # Reset history for retraining
-        retrain_history = {'loss': []}
 
         # Reset model weights to initial state before retraining
         model.set_weights(initial_weights)
 
-        # Remove early stopping callback before retraining
-        callbacks_list = [cb for cb in callbacks_list if not isinstance(cb, callbacks.EarlyStopping)]
-        # Retrain up to the best epoch
-        for epoch in range(best_epoch):
-            for cb in callbacks_list:
-                cb.on_epoch_begin(epoch, logs=logs)
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            loss=lambda y_true, y_pred: self.pds_loss_vec(
+                y_true, y_pred, sample_weights=train_label_weights_dict
+            )
+        )
 
-            retrain_loss = self.train_for_one_epoch(
-                model, optimizer,
-                self.pds_loss_vec,
-                X_train, y_train,
-                batch_size=batch_size if batch_size > 0 else len(y_train),
-                label_weights_dict=train_label_weights_dict)
-
-            # Log the retrain loss
-            retrain_history['loss'].append(retrain_loss)
-            print(f"Retrain Epoch {epoch + 1}/{best_epoch}, Loss: {retrain_loss}")
-
-            logs = {'loss': retrain_loss}  # Update logs with retrain loss
-
-            for cb in callbacks_list:
-                cb.on_epoch_end(epoch, logs=logs)
-
-        for cb in callbacks_list:
-            cb.on_train_end(logs=logs)
+        model.fit(
+            X_train, y_train,
+            epochs=best_epoch,
+            batch_size=batch_size if batch_size > 0 else len(y_train),
+            callbacks=callbacks_list,
+            verbose=verbose
+        )
 
         # Save the final model
         model.save_weights(f"final_model_weights_{str(save_tag)}.h5")

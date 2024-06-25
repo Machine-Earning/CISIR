@@ -16,7 +16,6 @@ from modules.training import cme_modeling
 from modules.training.ts_modeling import build_dataset, create_mlp, reshape_X
 
 
-
 def main():
     """
     Main function to run the PDS model
@@ -28,13 +27,10 @@ def main():
     # Define the dataset options, including the sharding policy
 
     for SEED in [456789]:
-
         # Set NumPy seed
         np.random.seed(SEED)
-
         # Set TensorFlow seed
         tf.random.set_seed(SEED)
-
         # Set random seed
         random.seed(SEED)
 
@@ -134,25 +130,25 @@ def main():
                     root_dir = "data/electron_cme_data_split"
                     # build the dataset
                     X_train, y_train = build_dataset(root_dir + '/training',
-                                                    inputs_to_use=inputs_to_use,
-                                                    add_slope=add_slope,
-                                                    outputs_to_use=outputs_to_use,
-                                                    cme_speed_threshold=cme_speed_threshold)
+                                                     inputs_to_use=inputs_to_use,
+                                                     add_slope=add_slope,
+                                                     outputs_to_use=outputs_to_use,
+                                                     cme_speed_threshold=cme_speed_threshold)
                     X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining',
-                                                        inputs_to_use=inputs_to_use,
-                                                        add_slope=add_slope,
-                                                        outputs_to_use=outputs_to_use,
-                                                        cme_speed_threshold=cme_speed_threshold)
+                                                           inputs_to_use=inputs_to_use,
+                                                           add_slope=add_slope,
+                                                           outputs_to_use=outputs_to_use,
+                                                           cme_speed_threshold=cme_speed_threshold)
                     X_test, y_test = build_dataset(root_dir + '/testing',
-                                                inputs_to_use=inputs_to_use,
-                                                add_slope=add_slope,
-                                                outputs_to_use=outputs_to_use,
-                                                cme_speed_threshold=cme_speed_threshold)
+                                                   inputs_to_use=inputs_to_use,
+                                                   add_slope=add_slope,
+                                                   outputs_to_use=outputs_to_use,
+                                                   cme_speed_threshold=cme_speed_threshold)
                     X_val, y_val = build_dataset(root_dir + '/validation',
-                                                inputs_to_use=inputs_to_use,
-                                                add_slope=add_slope,
-                                                outputs_to_use=outputs_to_use,
-                                                cme_speed_threshold=cme_speed_threshold)
+                                                 inputs_to_use=inputs_to_use,
+                                                 add_slope=add_slope,
+                                                 outputs_to_use=outputs_to_use,
+                                                 cme_speed_threshold=cme_speed_threshold)
 
                     # print all cme_files shapes
                     print(f'X_train.shape: {X_train.shape}')
@@ -217,14 +213,14 @@ def main():
                         mlp_model_sep.name)
 
                     mb.train_pds(mlp_model_sep,
-                                X_subtrain, y_subtrain,
-                                X_val, y_val,
-                                X_train, y_train,
-                                learning_rate=Options['learning_rate'],
-                                epochs=Options['epochs'],
-                                batch_size=Options['batch_size'],
-                                patience=Options['patience'], save_tag=current_time + title + "_features",
-                                callbacks_list=[WandbCallback(save_model=False), reduce_lr_on_plateau])
+                                 X_subtrain, y_subtrain,
+                                 X_val, y_val,
+                                 X_train, y_train,
+                                 learning_rate=Options['learning_rate'],
+                                 epochs=Options['epochs'],
+                                 batch_size=Options['batch_size'],
+                                 patience=Options['patience'], save_tag=current_time + title + "_features",
+                                 callbacks_list=[WandbCallback(save_model=False), reduce_lr_on_plateau])
 
                     file_path = plot_tsne_delta(
                         mlp_model_sep,
