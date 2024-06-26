@@ -787,6 +787,8 @@ class ModelBuilder:
         )
 
         best_epoch = early_stopping_cb.best_epoch + 1  # Adjust for the offset
+        # hist = model.history.history['val_acc']
+        # best_epoch = np.argmax(hist)
 
         # Retraining on the combined dataset
         print(f"Retraining to the best epoch: {best_epoch}")
