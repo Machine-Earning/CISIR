@@ -2,10 +2,11 @@ import os
 import random
 from datetime import datetime
 
-from modules.training.cme_modeling import pds_space_norm
+from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density
+from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 import numpy as np
 import tensorflow as tf
@@ -13,17 +14,16 @@ import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from wandb.keras import WandbCallback
 
-from modules.evaluate.utils import plot_tsne_delta, plot_repr_correlation, plot_repr_corr_dist, plot_repr_corr_density
 from modules.training import cme_modeling
-from modules.training.ts_modeling import build_dataset, create_mlp, filter_ds, stratified_split
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.training.cme_modeling import pds_space_norm
+from modules.training.ts_modeling import (
+    build_dataset,
+    create_mlp,
+    reshape_X,
+    filter_ds,
+    stratified_split)
 
 
-# from tensorflow.keras.mixed_precision import experimental as mixed_precision
-#
-# # Set up mixed precision
-# policy = mixed_precision.Policy('mixed_float16')
-# mixed_precision.set_policy(policy)
 
 
 def main():
@@ -39,18 +39,19 @@ def main():
     for SEED in [456789]:
         # Set NumPy seed
         np.random.seed(SEED)
+
         # Set TensorFlow seed
         tf.random.set_seed(SEED)
+
         # Set random seed
         random.seed(SEED)
 
         mb = cme_modeling.ModelBuilder()
+
         for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
             for cme_speed_threshold in [0]:
                 for add_slope in [False]:
-                    for alpha in [0, 0.6]:
-                        # PARAMS
-                        # inputs_to_use = ['e0.5']
+                    for alpha in [.3, 0.6, 0, 1]:
                         # add_slope = True
                         outputs_to_use = ['delta_p']
 
@@ -59,8 +60,10 @@ def main():
 
                         # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                         inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
+
                         # Construct the title
-                        title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDS_bs{bs}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                        title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSinj_bs{bs}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+
                         # Replace any other characters that are not suitable for filenames (if any)
                         title = title.replace(' ', '_').replace(':', '_')
 
@@ -70,13 +73,12 @@ def main():
                         # Set the early stopping patience and learning rate as variables
                         Options = {
                             'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                            'epochs': int(100e4),  # 35k epochs
-                            'patience': int(5e4),
+                            'epochs': int(1e6),  # 35k epochs
+                            'patience': int(25e3),
                             'learning_rate': 1e-2,  # initial learning rate
-                            'weight_decay': 1e-2,  # Added weight decay
+                            'weight_decay': 1e-6,  # Added weight decay
                             'momentum_beta1': 0.9,  # Added momentum beta1
                         }
-
                         hiddens = [
                             2048, 1024,
                             2048, 1024,
@@ -101,7 +103,7 @@ def main():
                         reduce_lr_on_plateau = ReduceLROnPlateau(
                             monitor='loss',
                             factor=0.9,
-                            patience=1500,
+                            patience=1000,
                             verbose=1,
                             min_delta=1e-5,
                             min_lr=1e-4)
@@ -112,6 +114,7 @@ def main():
                         N = 500  # number of samples to keep outside the threshold
                         lower_threshold = -0.5  # lower threshold for the delta_p
                         upper_threshold = 0.5  # upper threshold for the delta_p
+                        n_inj = 2
 
                         # Initialize wandb
                         wandb.init(project="nasa-ts-delta-v6-pds", name=experiment_name, config={
@@ -135,6 +138,7 @@ def main():
                             "norm": norm,
                             "optimizer": "adam",
                             "architecture": "mlp",
+                            'cme_speed_threshold': cme_speed_threshold,
                             "reweighting": True,
                             "alpha": alpha_rw,
                             "bandwidth": bandwidth,
@@ -145,6 +149,7 @@ def main():
                             "N_freq": N,
                             "lower_t": lower_threshold,
                             "upper_t": upper_threshold,
+                            'n_injects': n_inj
                         })
 
                         # set the root directory
@@ -213,15 +218,18 @@ def main():
                             debug=False)
 
                         # filter validation set
-                        X_val, y_val_norm = filter_ds(
-                            X_val, y_val_norm,
-                            low_threshold=norm_lower_t,
-                            high_threshold=norm_upper_t,
-                            N=200, seed=SEED)
+                        # X_val, y_val_norm = filter_ds(
+                        #     X_val, y_val_norm,
+                        #     low_threshold=norm_lower_t,
+                        #     high_threshold=norm_upper_t,
+                        #     N=200, seed=SEED)
 
-                        print(f'done rebalancing the subtraining set...')
                         print(f'X_val.shape: {X_val.shape}')
                         print(f'y_val.shape: {y_val_norm.shape}')
+
+                        # print a sample of the training cme_files
+                        # print(f'X_train[0]: {X_train[0]}')
+                        # print(f'y_train[0]: {y_train[0]}')
 
                         # get the number of features
                         n_features = X_train.shape[1]
@@ -242,17 +250,20 @@ def main():
                         )
                         model_sep.summary()
 
-                        mb.train_pds(
+                        mb.train_pds_inj(
                             model_sep,
-                            X_train, y_train,
+                            X_train, y_train_norm,
                             X_subtrain, y_subtrain_norm,
                             X_val, y_val_norm,
                             train_label_weights_dict=train_weights_dict,
                             learning_rate=Options['learning_rate'],
                             epochs=Options['epochs'],
                             batch_size=Options['batch_size'],
+                            rare_injection_count=n_inj,
                             patience=Options['patience'],
-                            save_tag=current_time + title + "_features_noinj",
+                            save_tag=current_time + title + "_features_all",
+                            lower_bound=norm_lower_t,
+                            upper_bound=norm_upper_t,
                             callbacks_list=[
                                 WandbCallback(save_model=False),
                                 reduce_lr_on_plateau

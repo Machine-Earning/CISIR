@@ -786,7 +786,7 @@ class ModelBuilder:
             verbose=verbose
         )
 
-        best_epoch = early_stopping_cb.stopped_epoch + 1  # Adjust for the offset
+        best_epoch = early_stopping_cb.best_epoch + 1  # Adjust for the offset
 
         # Retraining on the combined dataset
         print(f"Retraining to the best epoch: {best_epoch}")
@@ -1033,12 +1033,12 @@ class ModelBuilder:
 
     def train_pds_inj(self,
                       model: tf.keras.Model,
+                      X_train: np.ndarray,
+                      y_train: np.ndarray,
                       X_subtrain: np.ndarray,
                       y_subtrain: np.ndarray,
                       X_val: np.ndarray,
                       y_val: np.ndarray,
-                      X_train: np.ndarray,
-                      y_train: np.ndarray,
                       train_label_weights_dict: Optional[Dict[float, float]] = None,
                       learning_rate: float = 1e-3,
                       epochs: int = 100,
@@ -1265,7 +1265,7 @@ class ModelBuilder:
             verbose=verbose
         )
 
-        best_epoch = early_stopping_cb.stopped_epoch + 1
+        best_epoch = early_stopping_cb.best_epoch + 1
 
         model.set_weights(initial_weights)
 

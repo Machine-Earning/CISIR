@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import tensorflow as tf
 import wandb
@@ -32,7 +32,7 @@ def main():
     for seed in [456789]:
         for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
             for cme_speed_threshold in [0]:
-                for alpha in [0.3]:
+                for alpha in [0.3, 0.2, 0, 0.4]:
                     for add_slope in [False]:
                         # PARAMS
                         # inputs_to_use = ['e0.5']
@@ -55,13 +55,13 @@ def main():
                         # Set the early stopping patience and learning rate as variables
                         tf.random.set_seed(seed)
                         np.random.seed(seed)
-                        patience = 40000  # higher patience
+                        patience = int(25e3)  # higher patience
                         learning_rate = 1e-2  # og learning rate
 
                         reduce_lr_on_plateau = ReduceLROnPlateau(
                             monitor='loss',
                             factor=0.9,
-                            patience=500,
+                            patience=1000,
                             verbose=1,
                             min_delta=1e-5,
                             min_lr=1e-4)
@@ -69,7 +69,7 @@ def main():
                         weight_decay = 1e-6  # higher weight decay
                         momentum_beta1 = 0.9  # higher momentum beta1
                         batch_size = 4096
-                        epochs = 100000  # higher epochs
+                        epochs = int(1e6)  # higher epochs
                         hiddens = [
                             2048, 1024,
                             2048, 1024,
@@ -296,7 +296,7 @@ def main():
                         )
 
                         # Determine the optimal number of epochs from early stopping
-                        optimal_epochs = early_stopping.stopped_epoch + 1  # Adjust for the offset
+                        optimal_epochs = early_stopping.best_epoch + 1  # Adjust for the offset
 
                         final_model_sep = create_mlp(
                             input_dim=n_features,
