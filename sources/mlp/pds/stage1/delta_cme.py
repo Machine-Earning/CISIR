@@ -95,7 +95,7 @@ def main():
                         pds = True
                         target_change = ('delta_p' in outputs_to_use)
                         repr_dim = 128
-                        dropout_rate = 0.5
+                        dropout_rate = 0.1
                         activation = None
                         norm = 'batch_norm'
                         reduce_lr_on_plateau = ReduceLROnPlateau(

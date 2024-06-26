@@ -753,7 +753,7 @@ class ModelBuilder:
         early_stopping_cb = tf.keras.callbacks.EarlyStopping(
             monitor='val_loss',
             patience=patience,
-            restore_best_weights=True
+            restore_best_weights=False
         )
         checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
             filepath=f"model_weights_{str(save_tag)}.h5",
@@ -786,9 +786,9 @@ class ModelBuilder:
             verbose=verbose
         )
 
-        best_epoch = early_stopping_cb.best_epoch + 1  # Adjust for the offset
-        # hist = model.history.history['val_acc']
-        # best_epoch = np.argmax(hist)
+        # Determine the optimal number of epochs from the fit history
+        best_epoch = np.argmin(history.history['val_loss']) + 1  # +1 to adjust for 0-based index
+
 
         # Retraining on the combined dataset
         print(f"Retraining to the best epoch: {best_epoch}")
@@ -1084,7 +1084,7 @@ class ModelBuilder:
         early_stopping_cb = tf.keras.callbacks.EarlyStopping(
             monitor='val_loss',
             patience=patience,
-            restore_best_weights=True
+            restore_best_weights=False
         )
         checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
             filepath=f"model_weights_{str(save_tag)}.h5",
@@ -1267,7 +1267,8 @@ class ModelBuilder:
             verbose=verbose
         )
 
-        best_epoch = early_stopping_cb.best_epoch + 1
+        # Determine the optimal number of epochs from the fit history
+        best_epoch = np.argmin(history.history['val_loss']) + 1  # +1 to adjust for 0-based index
 
         model.set_weights(initial_weights)
 

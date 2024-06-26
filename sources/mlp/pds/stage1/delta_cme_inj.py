@@ -6,7 +6,7 @@ from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_re
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import numpy as np
 import tensorflow as tf
@@ -97,7 +97,7 @@ def main():
                         pds = True
                         target_change = ('delta_p' in outputs_to_use)
                         repr_dim = 128
-                        dropout_rate = 0.5
+                        dropout_rate = 0.1
                         activation = None
                         norm = 'batch_norm'
                         reduce_lr_on_plateau = ReduceLROnPlateau(

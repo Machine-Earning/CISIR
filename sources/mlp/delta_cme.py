@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 import tensorflow as tf
 import wandb
@@ -93,7 +93,7 @@ def main():
                         bandwidth = 4.42e-2
                         repr_dim = 128
                         output_dim = len(outputs_to_use)
-                        dropout = 0
+                        dropout = 0.1
                         activation = None
                         norm = 'batch_norm'
                         cme_speed_threshold = cme_speed_threshold
