@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import tensorflow as tf
 import wandb
@@ -66,7 +66,7 @@ def main():
                             min_delta=1e-5,
                             min_lr=1e-4)
 
-                        weight_decay = 1e-6  # higher weight decay
+                        weight_decay = 1e-2  # higher weight decay
                         momentum_beta1 = 0.9  # higher momentum beta1
                         batch_size = 4096
                         epochs = int(1e6)  # higher epochs
@@ -93,7 +93,7 @@ def main():
                         bandwidth = 4.42e-2
                         repr_dim = 128
                         output_dim = len(outputs_to_use)
-                        dropout = 0.5
+                        dropout = 0
                         activation = None
                         norm = 'batch_norm'
                         cme_speed_threshold = cme_speed_threshold
@@ -252,7 +252,7 @@ def main():
                         )
 
                         # Train the model with the callback
-                        model_sep.fit(
+                        history = model_sep.fit(
                             X_subtrain,
                             {'forecast_head': y_subtrain},
                             sample_weight=y_subtrain_weights,
@@ -267,7 +267,12 @@ def main():
                         )
 
                         # Determine the optimal number of epochs from early stopping
-                        optimal_epochs = early_stopping.best_epoch + 1  # Adjust for the offset
+                        # optimal_epochs = early_stopping.best_epoch + 1  # Adjust for the offset
+
+                        # Determine the optimal number of epochs from the fit history
+                        optimal_epochs = np.argmin(history.history['val_loss']) + 1  # +1 to adjust for 0-based index
+
+
 
                         final_model_sep = create_mlp(
                             input_dim=n_features,
