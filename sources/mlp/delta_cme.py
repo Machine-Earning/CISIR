@@ -21,7 +21,7 @@ from modules.training.ts_modeling import (
     evaluate_model_cond,
     process_sep_events,
     get_loss,
-    reshape_X, filter_ds, stratified_split, plot_error_hist)
+    filter_ds, stratified_split, plot_error_hist)
 
 
 def main():
@@ -271,8 +271,6 @@ def main():
 
                         # Determine the optimal number of epochs from the fit history
                         optimal_epochs = np.argmin(history.history['val_loss']) + 1  # +1 to adjust for 0-based index
-
-
 
                         final_model_sep = create_mlp(
                             input_dim=n_features,
