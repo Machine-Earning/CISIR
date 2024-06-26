@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 import tensorflow as tf
 import wandb
@@ -236,41 +236,12 @@ def main():
                         )
                         model_sep.summary()
 
-                        print('Reshaping input for model')
-                        X_subtrain = reshape_X(
-                            X_subtrain,
-                            [n_features],
-                            inputs_to_use,
-                            add_slope,
-                            model_sep.name)
-
-                        X_val = reshape_X(
-                            X_val,
-                            [n_features],
-                            inputs_to_use,
-                            add_slope,
-                            model_sep.name)
-
-                        X_train = reshape_X(
-                            X_train,
-                            [n_features],
-                            inputs_to_use,
-                            add_slope,
-                            model_sep.name)
-
-                        X_test = reshape_X(
-                            X_test,
-                            [n_features],
-                            inputs_to_use,
-                            add_slope,
-                            model_sep.name)
-
                         # Define the EarlyStopping callback
                         early_stopping = EarlyStopping(
                             monitor='val_loss',
                             patience=patience,
                             verbose=1,
-                            restore_best_weights=True, )
+                            restore_best_weights=False)
 
                         # Compile the model with the specified learning rate
                         model_sep.compile(
@@ -281,7 +252,7 @@ def main():
                         )
 
                         # Train the model with the callback
-                        history = model_sep.fit(
+                        model_sep.fit(
                             X_subtrain,
                             {'forecast_head': y_subtrain},
                             sample_weight=y_subtrain_weights,
