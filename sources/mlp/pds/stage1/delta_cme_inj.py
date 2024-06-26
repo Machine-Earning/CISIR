@@ -76,7 +76,7 @@ def main():
                             'epochs': int(1e6),  # 35k epochs
                             'patience': int(25e3),
                             'learning_rate': 1e-2,  # initial learning rate
-                            'weight_decay': 1e-6,  # Added weight decay
+                            'weight_decay': 1e-2,  # Added weight decay
                             'momentum_beta1': 0.9,  # Added momentum beta1
                         }
                         hiddens = [

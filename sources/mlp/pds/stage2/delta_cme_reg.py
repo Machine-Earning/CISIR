@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import tensorflow as tf
 import wandb
@@ -225,7 +225,7 @@ def main():
                         min_norm_weight = 0.01 / len(delta_val)
                         y_val_weights = exDenseReweights(
                             X_val, delta_val,
-                            alpha=alpha_rw, bw=bandwidth,
+                            alpha=1, bw=bandwidth,
                             min_norm_weight=min_norm_weight,
                             debug=False).reweights
                         print(f'validation set rebalanced.')

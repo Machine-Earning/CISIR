@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import tensorflow as tf
 import wandb
@@ -32,7 +32,7 @@ def main():
     for seed in [456789]:
         for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
             for cme_speed_threshold in [0]:
-                for alpha in [0.3, 0.2, 0, 0.4]:
+                for alpha in [0, 0.4]:
                     for add_slope in [False]:
                         # PARAMS
                         # inputs_to_use = ['e0.5']
@@ -213,7 +213,7 @@ def main():
                         min_norm_weight = 0.01 / len(delta_val)
                         y_val_weights = exDenseReweights(
                             X_val, delta_val,
-                            alpha=alpha_rw, bw=bandwidth,
+                            alpha=1, bw=bandwidth,
                             min_norm_weight=min_norm_weight,
                             debug=False).reweights
                         print(f'validation set rebalanced.')
