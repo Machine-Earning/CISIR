@@ -89,6 +89,8 @@ def pds_space_norm(y_train: np.ndarray,
                    rho: float = 1.5,
                    lower_threshold: float = -0.5,
                    upper_threshold: float = 0.5,
+                   y_min: float = None,
+                   y_max: float = None,
                    debug: bool = False) -> (np.ndarray, float, float):
     """
     Normalize the input labels according to the equation:
@@ -99,6 +101,8 @@ def pds_space_norm(y_train: np.ndarray,
     - rho (float): A factor allowing additional room outside the dataset for the representation space. Default is 1.5.
     - lower_threshold (float): The lower threshold value for normalization. Default is -0.5.
     - upper_threshold (float): The upper threshold value for normalization. Default is 0.5.
+    - y_min (float): The minimum value in the original labels. Default is None. best when dealing with subset of larger dataset
+    - y_max (float): The maximum value in the original labels. Default is None. best when dealing with subset of larger dataset
     - debug (bool): If True, show a sample of 5 instances before and after normalization. Default is False.
 
     Returns:
@@ -110,7 +114,10 @@ def pds_space_norm(y_train: np.ndarray,
     Dz_max = 2
 
     # Calculate the maximum difference in the y labels
-    Dy_max = np.max(y_train) - np.min(y_train)
+    if y_min is not None and y_max is not None:
+        Dy_max = y_max - y_min # Use the provided y_min and y_max
+    else:
+        Dy_max = np.max(y_train) - np.min(y_train)
 
     # Print the calculated Dy_max
     print(f"Dy_max: {Dy_max}")
@@ -788,7 +795,6 @@ class ModelBuilder:
 
         # Determine the optimal number of epochs from the fit history
         best_epoch = np.argmin(history.history['val_loss']) + 1  # +1 to adjust for 0-based index
-
 
         # Retraining on the combined dataset
         print(f"Retraining to the best epoch: {best_epoch}")
