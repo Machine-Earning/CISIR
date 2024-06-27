@@ -6,7 +6,7 @@ from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_re
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import numpy as np
 import tensorflow as tf
@@ -51,7 +51,7 @@ def main():
         for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
             for cme_speed_threshold in [0]:
                 for add_slope in [False]:
-                    for alpha in [1, 0.2]:
+                    for alpha in [0]:
                         # add_slope = True
                         outputs_to_use = ['delta_p']
 
@@ -114,7 +114,7 @@ def main():
                         N = 500  # number of samples to keep outside the threshold
                         lower_threshold = -0.5  # lower threshold for the delta_p
                         upper_threshold = 0.5  # upper threshold for the delta_p
-                        n_inj = 2
+                        n_inj = -1
 
                         # Initialize wandb
                         wandb.init(project="nasa-ts-delta-v6-pds", name=experiment_name, config={

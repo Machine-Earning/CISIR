@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import tensorflow as tf
 import wandb
@@ -30,13 +30,16 @@ mb = ModelBuilder()
 
 # Define the lookup dictionary
 weight_paths = {
-    # (True, 0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240524-134308MLP_e0_5_e1_8_p_slopeTrue_PDSinj_bs4096_CME0_features_128_sl.h5',
-    # # (True, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406
-    # # -183733MLP_e0_5_e1_8_p_slopeTrue_PDS_bs12000_CME500_features.h5',
+    # No inj
+    # (False,
+    #  0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-012209MLP_e0_5_e1_8_p_slopeFalse_PDS_bs4096_alpha0.20_CME0_features_noinj.h5',
+    # # inj all
+    # (False,
+    #  0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240524-090941MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_CME0_features_128_sl.h5',
+    # inj min 
     (False,
-     0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240524-090941MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_CME0_features_128_sl.h5',
-    # (False, 500): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240406
-    # -200720MLP_e0_5_e1_8_p_slopeFalse_PDS_bs12000_CME500_features.h5',
+     0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240626-201049MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_alpha1.00_CME0_features_min.h5',
+   
 }
 
 
@@ -48,9 +51,9 @@ def main():
     for seed in [456789]:
         for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
             for add_slope in [False]:
-                for freeze in [False, True]:
+                for freeze in [True]:
                     for cme_speed_threshold in [0]:
-                        for alpha in [0.3, 0.2, 0, 0.4]:
+                        for alpha in [0.1, 0, 0.4]:
                             # PARAMS
                             # inputs_to_use = ['e0.5']
                             # add_slope = True
@@ -59,7 +62,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'MLP_S2_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                            title = f'MLP_S2min_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -236,7 +239,7 @@ def main():
                             min_norm_weight = 0.01 / len(delta_val)
                             y_val_weights = exDenseReweights(
                                 X_val, delta_val,
-                                alpha=alpha_rw, bw=bandwidth,
+                                alpha=1, bw=bandwidth,
                                 min_norm_weight=min_norm_weight,
                                 debug=False).reweights
                             print(f'validation set rebalanced.')
