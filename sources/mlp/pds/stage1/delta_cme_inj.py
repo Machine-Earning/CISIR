@@ -51,7 +51,7 @@ def main():
         for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
             for cme_speed_threshold in [0]:
                 for add_slope in [False]:
-                    for alpha in [.3, 0.6, 0, 1]:
+                    for alpha in [1, 0.2]:
                         # add_slope = True
                         outputs_to_use = ['delta_p']
 

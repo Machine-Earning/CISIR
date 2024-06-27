@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 import tensorflow as tf
 import wandb
@@ -39,7 +39,7 @@ def main():
         for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
             for add_slope in [False]:
                 for cme_speed_threshold in [0]:
-                    for alpha in [0.3, 0.2, 0, 0.4]:
+                    for alpha in [0.1, 0.5]:
                         # PARAMS
                         outputs_to_use = ['delta_p']
                         # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'

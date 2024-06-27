@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 import tensorflow as tf
 import wandb
@@ -32,7 +32,7 @@ def main():
     for seed in [456789]:
         for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
             for cme_speed_threshold in [0]:
-                for alpha in [0, 0.4]:
+                for alpha in [0.1, 0.5]:
                     for add_slope in [False]:
                         # PARAMS
                         # inputs_to_use = ['e0.5']
