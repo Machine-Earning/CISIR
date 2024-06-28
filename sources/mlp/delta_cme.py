@@ -102,6 +102,7 @@ def main():
                         N = 500
                         lower_threshold = -0.5  # lower threshold for the delta_p
                         upper_threshold = 0.5  # upper threshold for the delta_p
+                        mae_plus_threshold = 0.5
 
                         # Initialize wandb
                         wandb.init(project="nasa-ts-delta-v6", name=experiment_name, config={
@@ -134,6 +135,7 @@ def main():
                             'residual': residual,
                             'skipped_layers': skipped_layers,
                             'ds_version': 6,
+                            'mae_plus_th': mae_plus_threshold
                         })
 
                         # set the root directory
@@ -356,7 +358,7 @@ def main():
                             wandb.log({f'training_{log_title}': wandb.Image(filename)})
 
                         # evaluate the model on test cme_files
-                        above_threshold = 0.1
+                        above_threshold = mae_plus_threshold
                         error_mae_cond = evaluate_model_cond(
                             final_model_sep, X_test, y_test, above_threshold=above_threshold)
 

@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import tensorflow as tf
 import wandb
@@ -33,12 +33,12 @@ weight_paths = {
     # No inj
     # (False,
     #  0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-012209MLP_e0_5_e1_8_p_slopeFalse_PDS_bs4096_alpha0.20_CME0_features_noinj.h5',
-    # # inj all
-    # (False,
-    #  0): '/home1/jmoukpe2016/keras-functional-api/overfit_final_model_weights_20240524-090941MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_CME0_features_128_sl.h5',
-    # inj min 
+    # inj all
     (False,
-     0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240626-201049MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_alpha1.00_CME0_features_min.h5',
+     0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-030006MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_alpha0.20_CME0_features_all.h5',
+    # # inj min 
+    # (False,
+    #  0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240626-201049MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_alpha1.00_CME0_features_min.h5',
    
 }
 
@@ -62,7 +62,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'MLP_S2min_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                            title = f'MLP_S2all_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -122,6 +122,7 @@ def main():
                             N = 500  # number of samples to keep outside the threshold
                             lower_threshold = -0.5  # lower threshold for the delta_p
                             upper_threshold = 0.5  # upper threshold for the delta_p
+                            mae_plus_threshold = 0.5 # threshold to measure raising edges in delta
 
                             # Initialize wandb
                             wandb.init(project="nasa-ts-delta-v6", name=experiment_name, config={
@@ -158,6 +159,7 @@ def main():
                                 "residual": residual,
                                 "skipped_layers": skipped_layers,
                                 'ds_version': 6,
+                                'mae_plus_th': mae_plus_threshold
                             })
 
                             # set the root directory
@@ -443,7 +445,7 @@ def main():
                                 wandb.log({f'training_{log_title}': wandb.Image(filename)})
 
                             # evaluate the model on test cme_files
-                            above_threshold = 0.1
+                            above_threshold = mae_plus_threshold
                             error_mae_cond = evaluate_model_cond(
                                 final_model_sep, X_test, y_test, above_threshold=above_threshold)
 

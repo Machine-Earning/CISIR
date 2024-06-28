@@ -104,6 +104,7 @@ def main():
                         N = 500  # number of samples to keep outside the threshold
                         lower_threshold = -0.5  # lower threshold for the delta_p
                         upper_threshold = 0.5  # upper threshold for the delta_p
+                        mae_plus_threshold = 0.5  # positive
 
                         # Initialize wandb
                         wandb.init(project="nasa-ts-delta-v6", name=experiment_name, config={
