@@ -23,21 +23,23 @@ from modules.training.ts_modeling import (
     get_loss,
     filter_ds, stratified_split, plot_error_hist)
 
+from modules.shared.globals import *
+
 
 def main():
     """
     Main function to run the E-MLP model
     :return:
     """
-    for seed in [456789]:
-        for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-            for cme_speed_threshold in [0]:
-                for alpha in [0.1, 0.5]:
-                    for add_slope in [False]:
+    for seed in SEEDS:
+        for inputs_to_use in INPUTS_TO_USE:
+            for cme_speed_threshold in CME_SPEED_THRESHOLD:
+                for alpha in ALPHAS:
+                    for add_slope in ADD_SLOPE:
                         # PARAMS
                         # inputs_to_use = ['e0.5']
                         # add_slope = True
-                        outputs_to_use = ['delta_p']
+                        outputs_to_use = OUTPUTS_TO_USE
 
                         # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                         inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
@@ -55,54 +57,39 @@ def main():
                         # Set the early stopping patience and learning rate as variables
                         tf.random.set_seed(seed)
                         np.random.seed(seed)
-                        patience = int(25e3)  # higher patience
-                        learning_rate = 1e-2  # og learning rate
+                        patience = PATIENCE  # higher patience
+                        learning_rate = START_LR  # og learning rate
 
                         reduce_lr_on_plateau = ReduceLROnPlateau(
-                            monitor='loss',
-                            factor=0.9,
-                            patience=1000,
-                            verbose=1,
-                            min_delta=1e-5,
-                            min_lr=1e-4)
+                            monitor=LR_CB_MONITOR,
+                            factor=LR_CB_FACTOR,
+                            patience=LR_CB_PATIENCE,
+                            verbose=VERBOSE,
+                            min_delta=LR_CB_MIN_DELTA,
+                            min_lr=LR_CB_MIN_LR)
 
-                        weight_decay = 1e-6  # higher weight decay
-                        momentum_beta1 = 0.9  # higher momentum beta1
-                        batch_size = 4096
-                        epochs = int(1e6)  # higher epochs
-                        hiddens = [
-                            2048, 1024,
-                            2048, 1024,
-                            1024, 512,
-                            1024, 512,
-                            512, 256,
-                            512, 256,
-                            256, 128,
-                            256, 128,
-                            256, 128,
-                            128, 128,
-                            128, 128,
-                            128, 128
-                        ]
+                        weight_decay = WEIGHT_DECAY  # higher weight decay
+                        momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
+                        batch_size = BATCH_SIZE  # higher batch size
+                        epochs = EPOCHS  # higher epochs
+                        hiddens = MLP_HIDDENS
                         hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-                        loss_key = 'mse'
+                        loss_key = LOSS_KEY
                         target_change = ('delta_p' in outputs_to_use)
-                        # print_batch_mse_cb = PrintBatchMSE()
-                        rebalacing = True
                         alpha_rw = alpha
-                        bandwidth = 4.42e-2
-                        repr_dim = 128
+                        bandwidth = BANDWIDTH
+                        repr_dim = REPR_DIM
                         output_dim = len(outputs_to_use)
-                        dropout = 0.1
-                        activation = None
-                        norm = 'batch_norm'
+                        dropout = DROPOUT
+                        activation = ACTIVATION
+                        norm = NORM
                         cme_speed_threshold = cme_speed_threshold
-                        residual = True
-                        skipped_layers = 2
-                        N = 500
-                        lower_threshold = -0.5  # lower threshold for the delta_p
-                        upper_threshold = 0.5  # upper threshold for the delta_p
-                        mae_plus_threshold = 0.5
+                        residual = RESIDUAL
+                        skipped_layers = SKIPPED_LAYERS
+                        N = N_FILTERED  # number of samples to keep outside the threshold
+                        lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
+                        upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
+                        mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                         # Initialize wandb
                         wandb.init(project="nasa-ts-delta-v6", name=experiment_name, config={
@@ -123,7 +110,7 @@ def main():
                             "rebalancing": rebalacing,
                             "alpha_rw": alpha_rw,
                             "bandwidth": bandwidth,
-                            "reciprocal_reweight": True,
+                            "reciprocal_reweight": RECIPROCAL_WEIGHTS,
                             "repr_dim": repr_dim,
                             "dropout": dropout,
                             "activation": 'LeakyReLU',
@@ -134,12 +121,12 @@ def main():
                             'cme_speed_threshold': cme_speed_threshold,
                             'residual': residual,
                             'skipped_layers': skipped_layers,
-                            'ds_version': 6,
+                            'ds_version': DS_VERSION,
                             'mae_plus_th': mae_plus_threshold
                         })
 
                         # set the root directory
-                        root_dir = 'data/electron_cme_data_split_v5'
+                        root_dir = DS_PATH
                         # build the dataset
                         X_train, y_train = build_dataset(
                             root_dir + '/training',
@@ -172,7 +159,7 @@ def main():
                             y_train,
                             shuffle=True,
                             seed=seed,
-                            split=0.25,
+                            split=VAL_SPLIT,
                             debug=False)
 
                         # print all cme_files shapes
@@ -194,7 +181,7 @@ def main():
                         print(f'delta_val.shape: {delta_val.shape}')
 
                         print(f'rebalancing the training set...')
-                        min_norm_weight = 0.01 / len(delta_train)
+                        min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
                         y_train_weights = exDenseReweights(
                             X_train, delta_train,
                             alpha=alpha_rw, bw=bandwidth,
@@ -203,7 +190,7 @@ def main():
                         print(f'training set rebalanced.')
 
                         print(f'rebalancing the subtraining set...')
-                        min_norm_weight = 0.01 / len(delta_subtrain)
+                        min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
                         y_subtrain_weights = exDenseReweights(
                             X_subtrain, delta_subtrain,
                             alpha=alpha_rw, bw=bandwidth,
@@ -212,10 +199,10 @@ def main():
                         print(f'subtraining set rebalanced.')
 
                         print(f'rebalancing the validation set...')
-                        min_norm_weight = 0.01 / len(delta_val)
+                        min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
                         y_val_weights = exDenseReweights(
                             X_val, delta_val,
-                            alpha=1, bw=bandwidth,
+                            alpha=COMMON_VAL_ALPHA, bw=bandwidth,
                             min_norm_weight=min_norm_weight,
                             debug=False).reweights
                         print(f'validation set rebalanced.')
@@ -240,10 +227,10 @@ def main():
 
                         # Define the EarlyStopping callback
                         early_stopping = EarlyStopping(
-                            monitor='val_loss',
+                            monitor=ES_CB_MONITOR,
                             patience=patience,
-                            verbose=1,
-                            restore_best_weights=False)
+                            verbose=VERBOSE,
+                            restore_best_weights=ES_CB_RESTORE_WEIGHTS)
 
                         # Compile the model with the specified learning rate
                         model_sep.compile(
@@ -263,16 +250,16 @@ def main():
                             callbacks=[
                                 early_stopping,
                                 reduce_lr_on_plateau,
-                                WandbCallback(save_model=False)
+                                WandbCallback(save_model=WANDB_SAVE_MODEL)
                             ],
-                            verbose=1
+                            verbose=VERBOSE
                         )
 
                         # Determine the optimal number of epochs from early stopping
                         # optimal_epochs = early_stopping.best_epoch + 1  # Adjust for the offset
 
                         # Determine the optimal number of epochs from the fit history
-                        optimal_epochs = np.argmin(history.history['val_loss']) + 1  # +1 to adjust for 0-based index
+                        optimal_epochs = np.argmin(history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
 
                         final_model_sep = create_mlp(
                             input_dim=n_features,
@@ -303,7 +290,7 @@ def main():
                             batch_size=batch_size,
                             callbacks=[
                                 reduce_lr_on_plateau,
-                                WandbCallback(save_model=False)
+                                WandbCallback(save_model=WANDB_SAVE_MODEL)
                             ],
                             verbose=1
                         )
