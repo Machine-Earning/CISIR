@@ -53,9 +53,9 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
-                for freeze in [True, False]:
-                    for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                        for alpha in ALPHAS:
+                for cme_speed_threshold in CME_SPEED_THRESHOLD:
+                    for alpha in ALPHAS:
+                        for freeze in [True, False]:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -124,7 +124,6 @@ def main():
                                 "loss": loss_key,
                                 "target_change": target_change,
                                 "seed": seed,
-                                "rebalancing": rebalacing,
                                 "alpha_rw": alpha_rw,
                                 "bandwidth": bandwidth,
                                 "reciprocal_reweight": RECIPROCAL_WEIGHTS,
