@@ -37,8 +37,6 @@ def main():
                 for alpha in ALPHAS:
                     for add_slope in ADD_SLOPE:
                         # PARAMS
-                        # inputs_to_use = ['e0.5']
-                        # add_slope = True
                         outputs_to_use = OUTPUTS_TO_USE
 
                         # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -105,7 +103,6 @@ def main():
                             "hiddens": hiddens_str,
                             "loss": loss_key,
                             "target_change": target_change,
-                            "printing_batch_mse": False,
                             "seed": seed,
                             "alpha_rw": alpha_rw,
                             "bandwidth": bandwidth,
@@ -134,6 +131,7 @@ def main():
                             outputs_to_use=outputs_to_use,
                             cme_speed_threshold=cme_speed_threshold,
                             shuffle_data=True)
+
                         X_test, y_test = build_dataset(
                             root_dir + '/testing',
                             inputs_to_use=inputs_to_use,
@@ -233,9 +231,11 @@ def main():
 
                         # Compile the model with the specified learning rate
                         model_sep.compile(
-                            optimizer=AdamW(learning_rate=learning_rate,
-                                            weight_decay=weight_decay,
-                                            beta_1=momentum_beta1),
+                            optimizer=AdamW(
+                                learning_rate=learning_rate,
+                                weight_decay=weight_decay,
+                                beta_1=momentum_beta1
+                            ),
                             loss={'forecast_head': get_loss(loss_key)}
                         )
 
@@ -274,9 +274,11 @@ def main():
 
                         # Recreate the model architecture
                         final_model_sep.compile(
-                            optimizer=AdamW(learning_rate=learning_rate,
-                                            weight_decay=weight_decay,
-                                            beta_1=momentum_beta1),
+                            optimizer=AdamW(
+                                learning_rate=learning_rate,
+                                weight_decay=weight_decay,
+                                beta_1=momentum_beta1
+                            ),
                             loss={'forecast_head': get_loss(loss_key)}
                         )
 
@@ -291,7 +293,7 @@ def main():
                                 reduce_lr_on_plateau,
                                 WandbCallback(save_model=WANDB_SAVE_MODEL)
                             ],
-                            verbose=1
+                            verbose=VERBOSE
                         )
 
                         # Save the final model

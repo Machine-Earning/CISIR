@@ -33,15 +33,15 @@ mb = ModelBuilder()
 # Define the lookup dictionary
 weight_paths = {
     # No inj
-    (False,
-     0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-012209MLP_e0_5_e1_8_p_slopeFalse_PDS_bs4096_alpha0.20_CME0_features_noinj.h5',
-    # inj all
     # (False,
-    #  0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-030006MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_alpha0.20_CME0_features_all.h5',
+    #  0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-012209MLP_e0_5_e1_8_p_slopeFalse_PDS_bs4096_alpha0.20_CME0_features_noinj.h5',
+    # inj all
+    (False,
+     0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-030006MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_alpha0.20_CME0_features_all.h5',
     # # inj min 
     # (False,
     #  0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240626-201049MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_alpha1.00_CME0_features_min.h5',
-   
+
 }
 
 
@@ -62,7 +62,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'MLP_S2n_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                            title = f'MLP_S2all_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -380,9 +380,9 @@ def main():
                             )
 
                             # Save the final model
-                            final_model_sep.save_weights(f"final_model_weights_{experiment_name}_s2n_reg.h5")
+                            final_model_sep.save_weights(f"final_model_weights_{experiment_name}_s2all_reg.h5")
                             # print where the model weights are saved
-                            print(f"Model weights are saved in final_model_weights_{experiment_name}_s2n_reg.h5")
+                            print(f"Model weights are saved in final_model_weights_{experiment_name}_s2all_reg.h5")
 
                             # evaluate the model on test cme_files
                             error_mae = evaluate_model(final_model_sep, X_test, y_test)

@@ -27,6 +27,8 @@ from modules.training.ts_modeling import (
     stratified_split,
     plot_error_hist)
 
+from modules.shared.globals import *
+
 mb = ModelBuilder()
 
 
@@ -35,9 +37,9 @@ def main():
     Main function to run the E-MLP model
     :return:
     """
-    for seed in [456789]:
-        for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-            for add_slope in [False]:
+    for seed in SEEDS:
+        for inputs_to_use in INPUTS_TO_USE:
+            for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in [0]:
                     for alpha in [0.1, 0.5]:
                         # PARAMS
