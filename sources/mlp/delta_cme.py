@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import tensorflow as tf
 import wandb
@@ -107,7 +107,6 @@ def main():
                             "target_change": target_change,
                             "printing_batch_mse": False,
                             "seed": seed,
-                            "rebalancing": rebalacing,
                             "alpha_rw": alpha_rw,
                             "bandwidth": bandwidth,
                             "reciprocal_reweight": RECIPROCAL_WEIGHTS,
@@ -294,6 +293,11 @@ def main():
                             ],
                             verbose=1
                         )
+
+                        # Save the final model
+                        final_model_sep.save_weights(f"final_model_weights_{experiment_name}_reg.h5")
+                        # print where the model weights are saved
+                        print(f"Model weights are saved in final_model_weights_{experiment_name}_reg.h5")
 
                         # evaluate the model on test cme_files
                         error_mae = evaluate_model(final_model_sep, X_test, y_test)
