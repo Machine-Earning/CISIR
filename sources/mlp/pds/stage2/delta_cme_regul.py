@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import tensorflow as tf
 import wandb
