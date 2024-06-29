@@ -26,6 +26,8 @@ from modules.training.ts_modeling import (
     plot_error_hist)
 from modules.training.utils import get_weight_path
 
+from modules.shared.globals import *
+
 mb = ModelBuilder()
 
 # Define the lookup dictionary
@@ -48,8 +50,8 @@ def main():
     Main function to run the E-MLP model
     :return:
     """
-    for seed in [456789]:
-        for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
+    for seed in SEEDS:
+        for inputs_to_use in INPUTS_TO_USE:
             for add_slope in [False]:
                 for freeze in [True]:
                     for cme_speed_threshold in [0]:
