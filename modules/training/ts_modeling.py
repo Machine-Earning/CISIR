@@ -1,17 +1,15 @@
-import os
-import random
-import traceback
-from collections import Counter
-from typing import Tuple, List, Optional, Union
-
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import pandas as pd
+import random
 import tensorflow as tf
+import traceback
+from collections import Counter
 from matplotlib.lines import Line2D
 from numpy import ndarray
-from scipy.signal import correlate, correlation_lags
 from scipy import stats
+from scipy.signal import correlate, correlation_lags
 from sklearn.metrics import mean_absolute_error
 from sklearn.utils import shuffle
 from tensorflow.keras.callbacks import Callback
@@ -29,9 +27,12 @@ from tensorflow.keras.layers import (
     MaxPooling1D,
     AveragePooling1D,
     Add,
+    Softmax,
+    Multiply
 )
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
+from typing import Tuple, List, Optional, Union
 
 from modules.training.cme_modeling import NormalizeLayer
 
@@ -485,11 +486,8 @@ def create_mlp(
     model = Model(inputs=input_layer, outputs=model_output, name=name)
     return model
 
-from tensorflow.keras.layers import Input, Dense, Add, BatchNormalization, LayerNormalization, Dropout, LeakyReLU, Softmax, Multiply
-from tensorflow.keras.models import Model
-from tensorflow.keras.regularizers import l2
 
-def create_mlp(
+def create_mlp_moe(
         input_dim: int = 25,
         output_dim: int = 1,
         hiddens=None,
@@ -531,7 +529,7 @@ def create_mlp(
         activation = LeakyReLU()
 
     input_layer = Input(shape=(input_dim,))
-    
+
     # Expert 1
     x1 = input_layer
     residual_layer1 = None
@@ -563,7 +561,8 @@ def create_mlp(
         repr_layer1 = activation(final_repr_output1) if callable(activation) else LeakyReLU()(final_repr_output1)
         final_repr_output1 = NormalizeLayer(name='normalize_layer_1')(repr_layer1)
     else:
-        final_repr_output1 = activation(final_repr_output1) if callable(activation) else LeakyReLU(name='repr_layer_1')(final_repr_output1)
+        final_repr_output1 = activation(final_repr_output1) if callable(activation) else LeakyReLU(name='repr_layer_1')(
+            final_repr_output1)
 
     # Expert 2
     x2 = input_layer
@@ -596,11 +595,12 @@ def create_mlp(
         repr_layer2 = activation(final_repr_output2) if callable(activation) else LeakyReLU()(final_repr_output2)
         final_repr_output2 = NormalizeLayer(name='normalize_layer_2')(repr_layer2)
     else:
-        final_repr_output2 = activation(final_repr_output2) if callable(activation) else LeakyReLU(name='repr_layer_2')(final_repr_output2)
+        final_repr_output2 = activation(final_repr_output2) if callable(activation) else LeakyReLU(name='repr_layer_2')(
+            final_repr_output2)
 
     # Gating network
     gating_network = Dense(2, activation='softmax')(input_layer)
-    
+
     # Combine experts' outputs using the gating network's weights
     combined_output = Add()([
         Multiply()([final_repr_output1, gating_network[:, 0:1]]),
@@ -615,7 +615,6 @@ def create_mlp(
 
     model = Model(inputs=input_layer, outputs=model_output, name=name)
     return model
-
 
 
 def create_hybrid_model(
