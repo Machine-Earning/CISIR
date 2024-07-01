@@ -54,7 +54,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha in ALPHAS:
+                    for alpha in [0.3, 1, 0.5, 0]:
                         for freeze in [False]:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -96,7 +96,7 @@ def main():
                             bandwidth = BANDWIDTH
                             repr_dim = REPR_DIM
                             output_dim = len(outputs_to_use)
-                            dropout = DROPOUT
+                            dropout = 0.95
                             activation = ACTIVATION
                             norm = NORM
                             pds = True
@@ -190,8 +190,8 @@ def main():
                             # print(f'y_subtrain.shape: {y_subtrain.shape}')
                             print(f'X_test.shape: {X_test.shape}')
                             print(f'y_test.shape: {y_test.shape}')
-                            print(f'X_val.shape: {X_val.shape}')
-                            print(f'y_val.shape: {y_val.shape}')
+                            # print(f'X_val.shape: {X_val.shape}')
+                            # print(f'y_val.shape: {y_val.shape}')
 
                             # Compute the sample weights
                             delta_train = y_train[:, 0]
