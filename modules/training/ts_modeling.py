@@ -671,65 +671,52 @@ def create_mlp_moe(
 
     input_layer = Input(shape=(input_dim,))
 
-    def create_expert(input_layer, hiddens, repr_dim, activation, norm, dropout_rate, l2_reg, residual, skipped_layers,
-                      pds, name_prefix):
-        x = input_layer
-        residual_layer = None
-        for i, units in enumerate(hiddens):
-            if i % skipped_layers == 0 and i > 0 and residual:
-                if residual_layer is not None:
-                    if x.shape[-1] != residual_layer.shape[-1]:
-                        residual_layer = Dense(x.shape[-1], kernel_regularizer=l2(l2_reg) if l2_reg else None,
-                                               use_bias=False)(residual_layer)
-                    x = Add()([x, residual_layer])
-                residual_layer = x
-            else:
-                if i % skipped_layers == 0 or residual_layer is None:
-                    residual_layer = x
-            x = Dense(units, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x)
-            if norm == 'batch_norm':
-                x = BatchNormalization()(x)
-            elif norm == 'layer_norm':
-                x = LayerNormalization()(x)
-            if callable(activation):
-                x = activation(x)
-            else:
-                x = LeakyReLU()(x)
-            if dropout_rate > 0.0:
-                x = Dropout(dropout_rate)(x)
+    # Create experts using the create_mlp function
+    expert_high = create_mlp(
+        input_dim=input_dim,
+        output_dim=1,  # Single output for regression
+        hiddens=hiddens,
+        skipped_layers=skipped_layers,
+        repr_dim=repr_dim,
+        pds=pds,
+        l2_reg=l2_reg,
+        dropout_rate=dropout_rate,
+        activation=activation,
+        norm=norm,
+        residual=residual,
+        name='expert_high'
+    )
 
-        final_repr_output = Dense(repr_dim)(x)
-        if pds:
-            repr_layer = activation(final_repr_output) if callable(activation) else LeakyReLU()(final_repr_output)
-            final_repr_output = NormalizeLayer(name=f'normalize_layer_{name_prefix}')(repr_layer)
-        else:
-            final_repr_output = activation(final_repr_output) if callable(activation) else LeakyReLU(
-                name=f'repr_layer_{name_prefix}')(
-                final_repr_output)
+    expert_low = create_mlp(
+        input_dim=input_dim,
+        output_dim=1,  # Single output for regression
+        hiddens=hiddens,
+        skipped_layers=skipped_layers,
+        repr_dim=repr_dim,
+        pds=pds,
+        l2_reg=l2_reg,
+        dropout_rate=dropout_rate,
+        activation=activation,
+        norm=norm,
+        residual=residual,
+        name='expert_low'
+    )
 
-        return final_repr_output
-
-    # Expert 1
-    final_repr_output1 = create_expert(input_layer, hiddens, repr_dim, activation, norm, dropout_rate, l2_reg, residual,
-                                       skipped_layers, pds, '1')
-
-    # Expert 2
-    final_repr_output2 = create_expert(input_layer, hiddens, repr_dim, activation, norm, dropout_rate, l2_reg, residual,
-                                       skipped_layers, pds, '2')
-
+    # Load weights for experts if paths are provided
     if expert_high_path:
-        high_expert_model = load_model(expert_high_path)
-        final_repr_output1 = high_expert_model(input_layer)
+        expert_high.load_weights(expert_high_path)
         if freeze_experts:
-            for layer in high_expert_model.layers:
+            for layer in expert_high.layers:
                 layer.trainable = False
 
     if expert_low_path:
-        low_expert_model = load_model(expert_low_path)
-        final_repr_output2 = low_expert_model(input_layer)
+        expert_low.load_weights(expert_low_path)
         if freeze_experts:
-            for layer in low_expert_model.layers:
+            for layer in expert_low.layers:
                 layer.trainable = False
+
+    final_repr_output1 = expert_high(input_layer)
+    final_repr_output2 = expert_low(input_layer)
 
     # Gating network
     if router_hiddens is None:
