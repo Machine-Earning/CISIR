@@ -34,7 +34,7 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha in [1]:
+                for alpha in [0]:
                     for add_slope in ADD_SLOPE:
                         # PARAMS
                         outputs_to_use = OUTPUTS_TO_USE
@@ -56,7 +56,7 @@ def main():
                         tf.random.set_seed(seed)
                         np.random.seed(seed)
                         patience = PATIENCE  # higher patience
-                        learning_rate = 1e-3  # og learning rate
+                        learning_rate = START_LR
 
                         reduce_lr_on_plateau = ReduceLROnPlateau(
                             monitor=LR_CB_MONITOR,
@@ -66,13 +66,11 @@ def main():
                             min_delta=LR_CB_MIN_DELTA,
                             min_lr=LR_CB_MIN_LR)
 
-                        weight_decay = 1e-6  # higher weight decay
+                        weight_decay = WEIGHT_DECAY  # higher weight decay
                         momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                         batch_size = BATCH_SIZE  # higher batch size
                         epochs = EPOCHS  # higher epochs
-                        hiddens =  [
-                            512, 256, 128, 256, 128, 64, 128
-                        ]  # Hidden layers
+                        hiddens =  MLP_HIDDENS  # Hidden layers
                         hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                         loss_key = LOSS_KEY
                         target_change = ('delta_p' in outputs_to_use)
@@ -80,12 +78,12 @@ def main():
                         bandwidth = BANDWIDTH
                         repr_dim = REPR_DIM
                         output_dim = len(outputs_to_use)
-                        dropout = 0.5
+                        dropout = DROPOUT
                         activation = ACTIVATION
                         norm = NORM
                         cme_speed_threshold = cme_speed_threshold
                         residual = RESIDUAL
-                        skipped_layers = 3
+                        skipped_layers = SKIPPED_LAYERS
                         N = N_FILTERED  # number of samples to keep outside the threshold
                         lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                         upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
@@ -212,7 +210,7 @@ def main():
                         min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_test)
                         y_test_weights = exDenseReweights(
                             X_test, delta_test,
-                            alpha=COMMON_VAL_ALPHA, bw=bandwidth,
+                            alpha=alpha_rw, bw=bandwidth,
                             min_norm_weight=min_norm_weight,
                             debug=False).reweights
                         print(f'validation set rebalanced.')
@@ -242,7 +240,7 @@ def main():
                             verbose=VERBOSE,
                             restore_best_weights=True)
 
-                        best_weights_filepath = f"inves_model_weights_{experiment_name}_reg.h5"
+                        best_weights_filepath = f"inves_model_weights_{experiment_name}_reg_moe.h5"
                         model_checkpoint = ModelCheckpoint(
                             filepath=best_weights_filepath,
                             save_weights_only=True,
