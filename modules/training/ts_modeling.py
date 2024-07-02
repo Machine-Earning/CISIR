@@ -28,11 +28,14 @@ from tensorflow.keras.layers import (
     AveragePooling1D,
     Add,
     Softmax,
-    Multiply
+    Multiply,
+    Lambda
 )
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
 from typing import Tuple, List, Optional, Union
+from tensorflow.keras.models import load_model
+import tensorflow.keras.backend as K
 
 from modules.training.cme_modeling import NormalizeLayer
 

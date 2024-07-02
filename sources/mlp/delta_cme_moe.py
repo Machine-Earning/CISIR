@@ -34,7 +34,7 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha in [1]:
+                for alpha in [0.5]:
                     for add_slope in ADD_SLOPE:
                         # PARAMS
                         outputs_to_use = OUTPUTS_TO_USE
@@ -220,8 +220,8 @@ def main():
                         print(f'n_features: {n_features}')
 
                         # Parameters for the mixture of experts model
-                        expert_high_path = 'path/to/expert_high_model.h5'
-                        expert_low_path = 'path/to/expert_low_model.h5'
+                        expert_high_path = '/home1/jmoukpe2016/keras-functional-api/inves_model_weights_Inves_MLP__e0_5_e1_8_p_slopeFalse_alpha1.00_CME0_20240701-235026_reg_moe.h5'
+                        expert_low_path = '/home1/jmoukpe2016/keras-functional-api/inves_model_weights_Inves_MLP__e0_5_e1_8_p_slopeFalse_alpha0.00_CME0_20240701-235026_reg_moe.h5'
                         router_hiddens = MLP_HIDDENS
                         temperature = 0.1 # Example temperature
 
