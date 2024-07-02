@@ -34,7 +34,7 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha in [0]:
+                for alpha in [1]:
                     for add_slope in ADD_SLOPE:
                         # PARAMS
                         outputs_to_use = OUTPUTS_TO_USE
@@ -210,7 +210,7 @@ def main():
                         min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_test)
                         y_test_weights = exDenseReweights(
                             X_test, delta_test,
-                            alpha=alpha_rw, bw=bandwidth,
+                            alpha=COMMON_VAL_ALPHA, bw=bandwidth,
                             min_norm_weight=min_norm_weight,
                             debug=False).reweights
                         print(f'validation set rebalanced.')
