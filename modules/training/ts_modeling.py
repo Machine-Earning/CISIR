@@ -487,6 +487,136 @@ def create_mlp(
     return model
 
 
+# def create_mlp_moe(
+#         input_dim: int = 25,
+#         output_dim: int = 1,
+#         hiddens=None,
+#         skipped_layers: int = 2,
+#         repr_dim: int = 9,
+#         pds: bool = False,
+#         l2_reg: float = None,
+#         dropout_rate: float = 0.0,
+#         activation=None,
+#         norm: str = None,
+#         residual: bool = False,
+#         name: str = 'mlp'
+# ) -> Model:
+#     """
+#     Create an MLP model with fully connected dense layers, optional dropout, and configurable activation functions,
+#     with the option to include residual connections, batch normalization, or layer normalization.
+#
+#     Parameters:
+#     - input_dim (int): The number of features in the input data.
+#     - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
+#     - hiddens (list): A list of integers where each integer is the number of units in a hidden layer.
+#     - repr_dim (int): The number of features in the final representation vector.
+#     - pds (bool): If True, the model will use PDS and there will have its representations normalized.
+#     - l2_reg (float): L2 regularization factor. Default is None (no regularization).
+#     - dropout_rate (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
+#     - activation: Optional activation function to use. If None, defaults to LeakyReLU.
+#     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None (no normalization).
+#     - skipped_layers (int): Number of layers between residual connections.
+#     - residual (bool): If True, add residual connections for every 'skipped_layers' hidden layers.
+#
+#     Returns:
+#     - Model: A Keras model instance.
+#     """
+#
+#     if hiddens is None:
+#         hiddens = [50, 50]  # Default hidden layers configuration
+#
+#     if activation is None:
+#         activation = LeakyReLU()
+#
+#     input_layer = Input(shape=(input_dim,))
+#
+#     # Expert 1
+#     x1 = input_layer
+#     residual_layer1 = None
+#     for i, units in enumerate(hiddens):
+#         if i % skipped_layers == 0 and i > 0 and residual:
+#             if residual_layer1 is not None:
+#                 if x1.shape[-1] != residual_layer1.shape[-1]:
+#                     residual_layer1 = Dense(x1.shape[-1], kernel_regularizer=l2(l2_reg) if l2_reg else None,
+#                                             use_bias=False)(residual_layer1)
+#                 x1 = Add()([x1, residual_layer1])
+#             residual_layer1 = x1
+#         else:
+#             if i % skipped_layers == 0 or residual_layer1 is None:
+#                 residual_layer1 = x1
+#         x1 = Dense(units, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x1)
+#         if norm == 'batch_norm':
+#             x1 = BatchNormalization()(x1)
+#         elif norm == 'layer_norm':
+#             x1 = LayerNormalization()(x1)
+#         if callable(activation):
+#             x1 = activation(x1)
+#         else:
+#             x1 = LeakyReLU()(x1)
+#         if dropout_rate > 0.0:
+#             x1 = Dropout(dropout_rate)(x1)
+#
+#     final_repr_output1 = Dense(repr_dim)(x1)
+#     if pds:
+#         repr_layer1 = activation(final_repr_output1) if callable(activation) else LeakyReLU()(final_repr_output1)
+#         final_repr_output1 = NormalizeLayer(name='normalize_layer_1')(repr_layer1)
+#     else:
+#         final_repr_output1 = activation(final_repr_output1) if callable(activation) else LeakyReLU(name='repr_layer_1')(
+#             final_repr_output1)
+#
+#     # Expert 2
+#     x2 = input_layer
+#     residual_layer2 = None
+#     for i, units in enumerate(hiddens):
+#         if i % skipped_layers == 0 and i > 0 and residual:
+#             if residual_layer2 is not None:
+#                 if x2.shape[-1] != residual_layer2.shape[-1]:
+#                     residual_layer2 = Dense(x2.shape[-1], kernel_regularizer=l2(l2_reg) if l2_reg else None,
+#                                             use_bias=False)(residual_layer2)
+#                 x2 = Add()([x2, residual_layer2])
+#             residual_layer2 = x2
+#         else:
+#             if i % skipped_layers == 0 or residual_layer2 is None:
+#                 residual_layer2 = x2
+#         x2 = Dense(units, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x2)
+#         if norm == 'batch_norm':
+#             x2 = BatchNormalization()(x2)
+#         elif norm == 'layer_norm':
+#             x2 = LayerNormalization()(x2)
+#         if callable(activation):
+#             x2 = activation(x2)
+#         else:
+#             x2 = LeakyReLU()(x2)
+#         if dropout_rate > 0.0:
+#             x2 = Dropout(dropout_rate)(x2)
+#
+#     final_repr_output2 = Dense(repr_dim)(x2)
+#     if pds:
+#         repr_layer2 = activation(final_repr_output2) if callable(activation) else LeakyReLU()(final_repr_output2)
+#         final_repr_output2 = NormalizeLayer(name='normalize_layer_2')(repr_layer2)
+#     else:
+#         final_repr_output2 = activation(final_repr_output2) if callable(activation) else LeakyReLU(name='repr_layer_2')(
+#             final_repr_output2)
+#
+#     # Gating network
+#     gating_network = Dense(2, activation='softmax')(input_layer)
+#
+#     # Combine experts' outputs using the gating network's weights
+#     combined_output = Add()([
+#         Multiply()([final_repr_output1, gating_network[:, 0:1]]),
+#         Multiply()([final_repr_output2, gating_network[:, 1:2]])
+#     ])
+#
+#     if output_dim > 0:
+#         output_layer = Dense(output_dim, name='forecast_head')(combined_output)
+#         model_output = [combined_output, output_layer]
+#     else:
+#         model_output = combined_output
+#
+#     model = Model(inputs=input_layer, outputs=model_output, name=name)
+#     return model
+
+
 def create_mlp_moe(
         input_dim: int = 25,
         output_dim: int = 1,
@@ -499,11 +629,17 @@ def create_mlp_moe(
         activation=None,
         norm: str = None,
         residual: bool = False,
-        name: str = 'mlp'
+        name: str = 'mlp',
+        expert_high_path: str = None,
+        expert_low_path: str = None,
+        router_hiddens=None,
+        freeze_experts: bool = False,
+        temperature: float = 1.0
 ) -> Model:
     """
     Create an MLP model with fully connected dense layers, optional dropout, and configurable activation functions,
     with the option to include residual connections, batch normalization, or layer normalization.
+    Also includes a mixture of experts with pre-trained weights and a configurable gating network.
 
     Parameters:
     - input_dim (int): The number of features in the input data.
@@ -517,6 +653,11 @@ def create_mlp_moe(
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None (no normalization).
     - skipped_layers (int): Number of layers between residual connections.
     - residual (bool): If True, add residual connections for every 'skipped_layers' hidden layers.
+    - expert_high_path (str): Path to the stored weights of the high expert.
+    - expert_low_path (str): Path to the stored weights of the low expert.
+    - router_hiddens (list): A list of integers where each integer is the number of units in a hidden layer for the router.
+    - freeze_experts (bool): If True, freeze the expert layers.
+    - temperature (float): Temperature parameter for the softmax function in the gating network.
 
     Returns:
     - Model: A Keras model instance.
@@ -530,76 +671,79 @@ def create_mlp_moe(
 
     input_layer = Input(shape=(input_dim,))
 
-    # Expert 1
-    x1 = input_layer
-    residual_layer1 = None
-    for i, units in enumerate(hiddens):
-        if i % skipped_layers == 0 and i > 0 and residual:
-            if residual_layer1 is not None:
-                if x1.shape[-1] != residual_layer1.shape[-1]:
-                    residual_layer1 = Dense(x1.shape[-1], kernel_regularizer=l2(l2_reg) if l2_reg else None,
-                                            use_bias=False)(residual_layer1)
-                x1 = Add()([x1, residual_layer1])
-            residual_layer1 = x1
-        else:
-            if i % skipped_layers == 0 or residual_layer1 is None:
-                residual_layer1 = x1
-        x1 = Dense(units, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x1)
-        if norm == 'batch_norm':
-            x1 = BatchNormalization()(x1)
-        elif norm == 'layer_norm':
-            x1 = LayerNormalization()(x1)
-        if callable(activation):
-            x1 = activation(x1)
-        else:
-            x1 = LeakyReLU()(x1)
-        if dropout_rate > 0.0:
-            x1 = Dropout(dropout_rate)(x1)
+    def create_expert(input_layer, hiddens, repr_dim, activation, norm, dropout_rate, l2_reg, residual, skipped_layers,
+                      pds, name_prefix):
+        x = input_layer
+        residual_layer = None
+        for i, units in enumerate(hiddens):
+            if i % skipped_layers == 0 and i > 0 and residual:
+                if residual_layer is not None:
+                    if x.shape[-1] != residual_layer.shape[-1]:
+                        residual_layer = Dense(x.shape[-1], kernel_regularizer=l2(l2_reg) if l2_reg else None,
+                                               use_bias=False)(residual_layer)
+                    x = Add()([x, residual_layer])
+                residual_layer = x
+            else:
+                if i % skipped_layers == 0 or residual_layer is None:
+                    residual_layer = x
+            x = Dense(units, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x)
+            if norm == 'batch_norm':
+                x = BatchNormalization()(x)
+            elif norm == 'layer_norm':
+                x = LayerNormalization()(x)
+            if callable(activation):
+                x = activation(x)
+            else:
+                x = LeakyReLU()(x)
+            if dropout_rate > 0.0:
+                x = Dropout(dropout_rate)(x)
 
-    final_repr_output1 = Dense(repr_dim)(x1)
-    if pds:
-        repr_layer1 = activation(final_repr_output1) if callable(activation) else LeakyReLU()(final_repr_output1)
-        final_repr_output1 = NormalizeLayer(name='normalize_layer_1')(repr_layer1)
-    else:
-        final_repr_output1 = activation(final_repr_output1) if callable(activation) else LeakyReLU(name='repr_layer_1')(
-            final_repr_output1)
+        final_repr_output = Dense(repr_dim)(x)
+        if pds:
+            repr_layer = activation(final_repr_output) if callable(activation) else LeakyReLU()(final_repr_output)
+            final_repr_output = NormalizeLayer(name=f'normalize_layer_{name_prefix}')(repr_layer)
+        else:
+            final_repr_output = activation(final_repr_output) if callable(activation) else LeakyReLU(
+                name=f'repr_layer_{name_prefix}')(
+                final_repr_output)
+
+        return final_repr_output
+
+    # Expert 1
+    final_repr_output1 = create_expert(input_layer, hiddens, repr_dim, activation, norm, dropout_rate, l2_reg, residual,
+                                       skipped_layers, pds, '1')
 
     # Expert 2
-    x2 = input_layer
-    residual_layer2 = None
-    for i, units in enumerate(hiddens):
-        if i % skipped_layers == 0 and i > 0 and residual:
-            if residual_layer2 is not None:
-                if x2.shape[-1] != residual_layer2.shape[-1]:
-                    residual_layer2 = Dense(x2.shape[-1], kernel_regularizer=l2(l2_reg) if l2_reg else None,
-                                            use_bias=False)(residual_layer2)
-                x2 = Add()([x2, residual_layer2])
-            residual_layer2 = x2
-        else:
-            if i % skipped_layers == 0 or residual_layer2 is None:
-                residual_layer2 = x2
-        x2 = Dense(units, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x2)
-        if norm == 'batch_norm':
-            x2 = BatchNormalization()(x2)
-        elif norm == 'layer_norm':
-            x2 = LayerNormalization()(x2)
-        if callable(activation):
-            x2 = activation(x2)
-        else:
-            x2 = LeakyReLU()(x2)
-        if dropout_rate > 0.0:
-            x2 = Dropout(dropout_rate)(x2)
+    final_repr_output2 = create_expert(input_layer, hiddens, repr_dim, activation, norm, dropout_rate, l2_reg, residual,
+                                       skipped_layers, pds, '2')
 
-    final_repr_output2 = Dense(repr_dim)(x2)
-    if pds:
-        repr_layer2 = activation(final_repr_output2) if callable(activation) else LeakyReLU()(final_repr_output2)
-        final_repr_output2 = NormalizeLayer(name='normalize_layer_2')(repr_layer2)
-    else:
-        final_repr_output2 = activation(final_repr_output2) if callable(activation) else LeakyReLU(name='repr_layer_2')(
-            final_repr_output2)
+    if expert_high_path:
+        high_expert_model = load_model(expert_high_path)
+        final_repr_output1 = high_expert_model(input_layer)
+        if freeze_experts:
+            for layer in high_expert_model.layers:
+                layer.trainable = False
+
+    if expert_low_path:
+        low_expert_model = load_model(expert_low_path)
+        final_repr_output2 = low_expert_model(input_layer)
+        if freeze_experts:
+            for layer in low_expert_model.layers:
+                layer.trainable = False
 
     # Gating network
-    gating_network = Dense(2, activation='softmax')(input_layer)
+    if router_hiddens is None:
+        router_hiddens = hiddens
+    x_router = input_layer
+    for units in router_hiddens:
+        x_router = Dense(units, activation=activation)(x_router)
+
+    # Apply temperature to the softmax
+    def softmax_with_temperature(logits, temperature=1.0):
+        return Softmax()(logits / temperature)
+
+    gating_logits = Dense(2)(x_router)
+    gating_network = Lambda(lambda x: softmax_with_temperature(x, temperature))(gating_logits)
 
     # Combine experts' outputs using the gating network's weights
     combined_output = Add()([
