@@ -619,7 +619,6 @@ def create_mlp(
 #     model = Model(inputs=input_layer, outputs=model_output, name=name)
 #     return model
 
-
 def create_mlp_moe(
         input_dim: int = 25,
         output_dim: int = 1,
@@ -632,7 +631,7 @@ def create_mlp_moe(
         activation=None,
         norm: str = None,
         residual: bool = False,
-        name: str = 'mlp',
+        name: str = 'mlp_moe',
         expert_high_path: str = None,
         expert_low_path: str = None,
         router_hiddens=None,
@@ -727,19 +726,22 @@ def create_mlp_moe(
     x_router = input_layer
     for units in router_hiddens:
         x_router = Dense(units, activation=activation)(x_router)
-
+    
     # Apply temperature to the softmax
     def softmax_with_temperature(logits, temperature=1.0):
         return Softmax()(logits / temperature)
-
+    
     gating_logits = Dense(2)(x_router)
     gating_network = Lambda(lambda x: softmax_with_temperature(x, temperature))(gating_logits)
 
+    # Extract weights for the experts
+    expert1_weight = Lambda(lambda x: x[:, 0:1])(gating_network)
+    expert2_weight = Lambda(lambda x: x[:, 1:2])(gating_network)
+
     # Combine experts' outputs using the gating network's weights
-    combined_output = Add()([
-        Multiply()([final_repr_output1, gating_network[:, 0:1]]),
-        Multiply()([final_repr_output2, gating_network[:, 1:2]])
-    ])
+    expert1_weighted = Multiply()([final_repr_output1[1], expert1_weight])
+    expert2_weighted = Multiply()([final_repr_output2[1], expert2_weight])
+    combined_output = Add()([expert1_weighted, expert2_weighted])
 
     if output_dim > 0:
         output_layer = Dense(output_dim, name='forecast_head')(combined_output)
@@ -749,7 +751,6 @@ def create_mlp_moe(
 
     model = Model(inputs=input_layer, outputs=model_output, name=name)
     return model
-
 
 def create_hybrid_model(
         tsf_extractor: Model,

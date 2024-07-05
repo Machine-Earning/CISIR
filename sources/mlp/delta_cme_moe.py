@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import tensorflow as tf
 import wandb
@@ -43,7 +43,7 @@ def main():
                         inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                         # Construct the title
-                        title = f'Inves_MLP__{inputs_str}_slope{str(add_slope)}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                        title = f'Invesf_MLP__{inputs_str}_slope{str(add_slope)}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
 
                         # Replace any other characters that are not suitable for filenames (if any)
                         title = title.replace(' ', '_').replace(':', '_')
@@ -239,7 +239,7 @@ def main():
                             expert_high_path=expert_high_path,
                             expert_low_path=expert_low_path,
                             router_hiddens=router_hiddens,
-                            freeze_experts=False,  # Change to True if you want to freeze the experts
+                            freeze_experts=True,  # Change to True if you want to freeze the experts
                             temperature=temperature
                         )
                         model_sep.summary()
@@ -359,72 +359,72 @@ def main():
                         wandb.log({"mae_error_cond_train": error_mae_cond_train})
                         # Log the MAE error to wandb
 
-                        # Evaluate the model correlation with colored
-                        file_path = plot_repr_corr_dist(
-                            model_sep,
-                            X_train_filtered, y_train_filtered,
-                            title + "_training",
-                            model_type='features_reg'
-                        )
-                        wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
-                        print('file_path: ' + file_path)
+                        # # Evaluate the model correlation with colored
+                        # file_path = plot_repr_corr_dist(
+                        #     model_sep,
+                        #     X_train_filtered, y_train_filtered,
+                        #     title + "_training",
+                        #     model_type='features_reg'
+                        # )
+                        # wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
+                        # print('file_path: ' + file_path)
 
-                        file_path = plot_repr_corr_dist(
-                            model_sep,
-                            X_test_filtered, y_test_filtered,
-                            title + "_test",
-                            model_type='features_reg'
-                        )
-                        wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
-                        print('file_path: ' + file_path)
+                        # file_path = plot_repr_corr_dist(
+                        #     model_sep,
+                        #     X_test_filtered, y_test_filtered,
+                        #     title + "_test",
+                        #     model_type='features_reg'
+                        # )
+                        # wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
+                        # print('file_path: ' + file_path)
 
-                        # Log t-SNE plot
-                        # Log the training t-SNE plot to wandb
-                        stage1_file_path = plot_tsne_delta(
-                            model_sep,
-                            X_train_filtered, y_train_filtered, title,
-                            'stage2_training',
-                            model_type='features_reg',
-                            save_tag=current_time, seed=seed)
-                        wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
-                        print('stage1_file_path: ' + stage1_file_path)
+                        # # Log t-SNE plot
+                        # # Log the training t-SNE plot to wandb
+                        # stage1_file_path = plot_tsne_delta(
+                        #     model_sep,
+                        #     X_train_filtered, y_train_filtered, title,
+                        #     'stage2_training',
+                        #     model_type='features_reg',
+                        #     save_tag=current_time, seed=seed)
+                        # wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
+                        # print('stage1_file_path: ' + stage1_file_path)
 
-                        # Log the testing t-SNE plot to wandb
-                        stage1_file_path = plot_tsne_delta(
-                            model_sep,
-                            X_test_filtered, y_test_filtered, title,
-                            'stage2_testing',
-                            model_type='features_reg',
-                            save_tag=current_time, seed=seed)
-                        wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
-                        print('stage1_file_path: ' + stage1_file_path)
+                        # # Log the testing t-SNE plot to wandb
+                        # stage1_file_path = plot_tsne_delta(
+                        #     model_sep,
+                        #     X_test_filtered, y_test_filtered, title,
+                        #     'stage2_testing',
+                        #     model_type='features_reg',
+                        #     save_tag=current_time, seed=seed)
+                        # wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
+                        # print('stage1_file_path: ' + stage1_file_path)
 
-                        # Plot the error histograms
-                        filename = plot_error_hist(
-                            model_sep,
-                            X_train, y_train,
-                            sample_weights=None,
-                            title=title,
-                            prefix='training')
-                        wandb.log({"training_error_hist": wandb.Image(filename)})
+                        # # Plot the error histograms
+                        # filename = plot_error_hist(
+                        #     model_sep,
+                        #     X_train, y_train,
+                        #     sample_weights=None,
+                        #     title=title,
+                        #     prefix='training')
+                        # wandb.log({"training_error_hist": wandb.Image(filename)})
 
-                        # Plot the error weighted histograms
-                        filename = plot_error_hist(
-                            model_sep,
-                            X_train, y_train,
-                            sample_weights=y_train_weights,
-                            title=title,
-                            prefix='training_weighted')
-                        wandb.log({"training_weighted_error_hist": wandb.Image(filename)})
+                        # # Plot the error weighted histograms
+                        # filename = plot_error_hist(
+                        #     model_sep,
+                        #     X_train, y_train,
+                        #     sample_weights=y_train_weights,
+                        #     title=title,
+                        #     prefix='training_weighted')
+                        # wandb.log({"training_weighted_error_hist": wandb.Image(filename)})
 
-                        # Plot the error histograms on the testing set
-                        filename = plot_error_hist(
-                            model_sep,
-                            X_test, y_test,
-                            sample_weights=None,
-                            title=title,
-                            prefix='testing')
-                        wandb.log({"testing_error_hist": wandb.Image(filename)})
+                        # # Plot the error histograms on the testing set
+                        # filename = plot_error_hist(
+                        #     model_sep,
+                        #     X_test, y_test,
+                        #     sample_weights=None,
+                        #     title=title,
+                        #     prefix='testing')
+                        # wandb.log({"testing_error_hist": wandb.Image(filename)})
 
                         # Finish the wandb run
                         wandb.finish()
