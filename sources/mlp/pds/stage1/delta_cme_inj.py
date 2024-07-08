@@ -6,7 +6,7 @@ from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_re
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import numpy as np
 import tensorflow as tf
@@ -24,6 +24,7 @@ from modules.training.ts_modeling import (
     stratified_split)
 
 
+from modules.shared.globals import *
 
 
 def main():
@@ -36,26 +37,27 @@ def main():
     print(f'devices: {devices}')
     # Define the dataset options, including the sharding policy
 
-    for SEED in [456789]:
-        # Set NumPy seed
-        np.random.seed(SEED)
-
-        # Set TensorFlow seed
-        tf.random.set_seed(SEED)
-
-        # Set random seed
-        random.seed(SEED)
+    for SEED in SEEDS:
+        
 
         mb = cme_modeling.ModelBuilder()
 
-        for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-            for cme_speed_threshold in [0]:
-                for add_slope in [False]:
-                    for alpha in [0]:
-                        # add_slope = True
-                        outputs_to_use = ['delta_p']
+        for inputs_to_use in INPUTS_TO_USE:
+            for cme_speed_threshold in CME_SPEED_THRESHOLD:
+                for add_slope in ADD_SLOPE:
+                    for alpha in [0.3, 0.4, 0.5, 0.6, 0.7]:
+                        # Set NumPy seed
+                        np.random.seed(SEED)
 
-                        bs = 4096  # full dataset used
+                        # Set TensorFlow seed
+                        tf.random.set_seed(SEED)
+
+                        # Set random seed
+                        random.seed(SEED)
+                        # add_slope = True
+                        outputs_to_use = OUTPUTS_TO_USE
+
+                        bs = BATCH_SIZE  # full dataset used
                         print(f'batch size : {bs}')
 
                         # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -73,48 +75,38 @@ def main():
                         # Set the early stopping patience and learning rate as variables
                         Options = {
                             'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                            'epochs': int(1e6),  # 35k epochs
-                            'patience': int(25e3),
-                            'learning_rate': 1e-2,  # initial learning rate
-                            'weight_decay': 1e-2,  # Added weight decay
-                            'momentum_beta1': 0.9,  # Added momentum beta1
+                            'epochs': EPOCHS,  # 35k epochs
+                            'patience': PATIENCE,
+                            'learning_rate': START_LR,  # initial learning rate
+                            'weight_decay': WEIGHT_DECAY_PDS,  # Added weight decay
+                            'momentum_beta1': MOMENTUM_BETA1,  # Added momentum beta1
                         }
-                        hiddens = [
-                            2048, 1024,
-                            2048, 1024,
-                            1024, 512,
-                            1024, 512,
-                            512, 256,
-                            512, 256,
-                            256, 128,
-                            256, 128,
-                            256, 128,
-                            128, 128,
-                            128, 128,
-                            128, 128
-                        ]
+
+                        hiddens = MLP_HIDDENS
                         hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                         pds = True
                         target_change = ('delta_p' in outputs_to_use)
-                        repr_dim = 128
-                        dropout_rate = 0.1
-                        activation = None
-                        norm = 'batch_norm'
+                        repr_dim = OUTPUT_DIM
+                        dropout_rate = DROPOUT
+                        activation = ACTIVATION
+                        norm = NORM
                         reduce_lr_on_plateau = ReduceLROnPlateau(
-                            monitor='loss',
-                            factor=0.9,
-                            patience=1000,
-                            verbose=1,
-                            min_delta=1e-5,
-                            min_lr=1e-4)
-                        bandwidth = 4.42e-2
+                            monitor=LR_CB_MONITOR,
+                            factor=LR_CB_FACTOR,
+                            patience=LR_CB_PATIENCE,
+                            verbose=VERBOSE,
+                            min_delta=LR_CB_MIN_DELTA,
+                            min_lr=LR_CB_MIN_LR)
+                        
+                        bandwidth = BANDWIDTH
                         alpha_rw = alpha
-                        residual = True
-                        skipped_layers = 2
-                        N = 500  # number of samples to keep outside the threshold
-                        lower_threshold = -0.5  # lower threshold for the delta_p
-                        upper_threshold = 0.5  # upper threshold for the delta_p
-                        n_inj = -1
+                        residual = RESIDUAL
+                        skipped_layers = SKIPPED_LAYERS
+                        N = N_FILTERED  # number of samples to keep outside the threshold
+                        lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
+                        upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
+                        mae_plus_threshold = MAE_PLUS_THRESHOLD
+                        n_inj = 2
 
                         # Initialize wandb
                         wandb.init(project="nasa-ts-delta-v6-pds", name=experiment_name, config={
@@ -145,7 +137,7 @@ def main():
                             "residual": residual,
                             "skipped_layers": skipped_layers,
                             "repr_dim": repr_dim,
-                            "ds_version": 6,
+                            "ds_version": DS_VERSION,
                             "N_freq": N,
                             "lower_t": lower_threshold,
                             "upper_t": upper_threshold,
@@ -153,7 +145,7 @@ def main():
                         })
 
                         # set the root directory
-                        root_dir = "data/electron_cme_data_split_v5"
+                        root_dir = DS_PATH
                         # build the dataset
                         X_train, y_train = build_dataset(
                             root_dir + '/training',
@@ -200,12 +192,13 @@ def main():
                         print(f'delta_train.shape: {delta_train.shape}')
 
                         print(f'rebalancing the training set...')
-                        min_norm_weight = 0.01 / len(delta_train)
+                        min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
 
                         train_weights_dict = exDenseReweightsD(
                             X_train, delta_train,
                             alpha=alpha_rw, bw=bandwidth,
-                            min_norm_weight=min_norm_weight, debug=False).label_reweight_dict
+                            min_norm_weight=min_norm_weight, 
+                            debug=False).label_reweight_dict
                         print(f'done rebalancing the training set...')
 
                         # get subtrain and val
@@ -214,7 +207,7 @@ def main():
                             y_train_norm,
                             shuffle=True,
                             seed=SEED,
-                            split=0.25,
+                            split=VAL_SPLIT,
                             debug=False)
 
                         # filter validation set
@@ -261,7 +254,7 @@ def main():
                             batch_size=Options['batch_size'],
                             rare_injection_count=n_inj,
                             patience=Options['patience'],
-                            save_tag=current_time + title + "_features_all",
+                            save_tag=current_time + title + "_features_inj",
                             lower_bound=norm_lower_t,
                             upper_bound=norm_upper_t,
                             callbacks_list=[

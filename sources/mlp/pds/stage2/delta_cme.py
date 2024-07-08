@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import tensorflow as tf
 import wandb
@@ -54,7 +54,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha in ALPHAS:
+                    for alpha in [0.3, 0.4, 0.5]:
                         for freeze in [True, False]:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
