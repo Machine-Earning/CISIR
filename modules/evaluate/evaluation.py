@@ -4,6 +4,7 @@
 ##############################################################################################################
 
 
+import logging
 import math
 # types for type hinting
 from typing import Tuple, List, Optional, Any, Dict, Union
@@ -14,8 +15,95 @@ import numpy as np
 import tensorflow as tf
 from numpy import ndarray
 from sklearn.metrics import confusion_matrix, f1_score
+from sklearn.neighbors import NearestNeighbors
 from tensorflow.keras import Model
+
 from modules.training.cme_modeling import error
+
+
+def find_k_nearest_neighbors(
+        X_test: np.ndarray,
+        y_test: np.ndarray,
+        predictions: np.ndarray,
+        k_neighbors: int = 3,
+        threshold: float = 0.5,
+        max_samples: Optional[int] = None,
+        log_results: bool = True,
+        logger: Optional[logging.Logger] = None
+) -> List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]:
+    """
+    Find the k nearest neighbors for each point in the test set with target labels greater than the threshold.
+
+    Args:
+        X_test (np.ndarray): Test data features.
+        y_test (np.ndarray): Test data target labels (1D array).
+        predictions (np.ndarray): Model predictions for the test data (1D array).
+        k_neighbors (int): Number of nearest neighbors to find.
+        threshold (float): Threshold for selecting positive samples.
+        max_samples (Optional[int]): Maximum number of samples to process.
+        log_results (bool): Whether to log the results.
+        logger (Optional[logging.Logger]): Logger object to use. If None, a new logger will be created.
+
+    Returns:
+        List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]: List of tuples containing:
+            - Test point index
+            - Actual target label
+            - Predicted label
+            - List of tuples for each neighbor:
+                - Distance
+                - Neighbor index
+                - Neighbor's target label
+                - Neighbor's predicted label
+    """
+    if k_neighbors >= len(X_test):
+        raise ValueError(f"k ({k_neighbors}) must be less than the number of test samples ({len(X_test)})")
+
+    if len(X_test) != len(y_test) or len(X_test) != len(predictions):
+        raise ValueError("Inconsistent lengths of input arrays")
+
+    if log_results and logger is None:
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+
+    # k+1 because the point itself is included
+    nbrs = NearestNeighbors(n_neighbors=k_neighbors + 1, algorithm='auto').fit(X_test)
+
+    y_test = y_test.flatten()
+    predictions = predictions.flatten()
+
+    large_positives_indices = np.where(y_test > threshold)[0]
+    if max_samples:
+        large_positives_indices = large_positives_indices[:max_samples]
+
+    if log_results:
+        logger.info(f"Processing {len(large_positives_indices)} samples with target labels > {threshold}")
+
+    results = []
+    for idx in large_positives_indices:
+        distances, indices = nbrs.kneighbors([X_test[idx]])
+        # Remove the first neighbor (which is the point itself)
+        neighbors = [
+            (float(dist), int(neighbor_idx), float(y_test[neighbor_idx]), float(predictions[neighbor_idx]))
+            for dist, neighbor_idx in zip(distances[0][1:], indices[0][1:])
+        ]
+        result = (int(idx), float(y_test[idx]), float(predictions[idx]), neighbors)
+        results.append(result)
+
+        if log_results:
+            logger.info(f"Test point {idx}: true={y_test[idx]:.2f}, pred={predictions[idx]:.2f}")
+            for i, (dist, neighbor_idx, neighbor_true, neighbor_pred) in enumerate(neighbors):
+                logger.info(
+                    f"  Neighbor {i + 1}: idx={neighbor_idx}, dist={dist:.4f}, true={neighbor_true:.2f}, pred={neighbor_pred:.2f}")
+
+    if log_results:
+        logger.info(f"Processed {len(results)} samples")
+
+    return results
 
 
 def pds_loss_eval(y_true, z_pred, reduction='none'):
