@@ -33,7 +33,7 @@ def find_k_nearest_neighbors(
 ) -> List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]:
     """
     Find the k nearest neighbors for each point in the test set with target labels greater than the threshold.
-    Results are sorted in ascending order of the test points' true labels.
+    Results are sorted in ascending order of the test points' actual target labels before logging.
 
     Args:
         X_test (np.ndarray): Test data features.
@@ -95,18 +95,17 @@ def find_k_nearest_neighbors(
         result = (int(idx), float(y_test[idx]), float(predictions[idx]), neighbors)
         results.append(result)
 
-        if log_results:
-            logger.info(f"Test point {idx}: true={y_test[idx]:.2f}, pred={predictions[idx]:.2f}")
-            for i, (dist, neighbor_idx, neighbor_true, neighbor_pred) in enumerate(neighbors):
-                logger.info(
-                    f"  Neighbor {i + 1}: idx={neighbor_idx}, dist={dist:.4f}, true={neighbor_true:.2f}, pred={neighbor_pred:.2f}")
-
-    # Sort results based on the true labels of test points
+    # Sort results based on the actual target labels of test points
     sorted_results = sorted(results, key=lambda x: x[1])
 
     if log_results:
         logger.info(f"Processed and sorted {len(sorted_results)} samples")
-        logger.info("Results sorted in ascending order of test points' true labels")
+        logger.info("Results sorted in ascending order of test points' actual target labels")
+        for idx, true_label, pred_label, neighbors in sorted_results:
+            logger.info(f"Test point {idx}: true={true_label:.2f}, pred={pred_label:.2f}")
+            for i, (dist, neighbor_idx, neighbor_true, neighbor_pred) in enumerate(neighbors):
+                logger.info(
+                    f"  Neighbor {i + 1}: idx={neighbor_idx}, dist={dist:.4f}, true={neighbor_true:.2f}, pred={neighbor_pred:.2f}")
 
     return sorted_results
 
