@@ -33,6 +33,7 @@ def find_k_nearest_neighbors(
 ) -> List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]:
     """
     Find the k nearest neighbors for each point in the test set with target labels greater than the threshold.
+    Results are sorted in ascending order of the test points' true labels.
 
     Args:
         X_test (np.ndarray): Test data features.
@@ -45,7 +46,7 @@ def find_k_nearest_neighbors(
         logger (Optional[logging.Logger]): Logger object to use. If None, a new logger will be created.
 
     Returns:
-        List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]: List of tuples containing:
+        List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]: Sorted list of tuples containing:
             - Test point index
             - Actual target label
             - Predicted label
@@ -100,10 +101,14 @@ def find_k_nearest_neighbors(
                 logger.info(
                     f"  Neighbor {i + 1}: idx={neighbor_idx}, dist={dist:.4f}, true={neighbor_true:.2f}, pred={neighbor_pred:.2f}")
 
-    if log_results:
-        logger.info(f"Processed {len(results)} samples")
+    # Sort results based on the true labels of test points
+    sorted_results = sorted(results, key=lambda x: x[1])
 
-    return results
+    if log_results:
+        logger.info(f"Processed and sorted {len(sorted_results)} samples")
+        logger.info("Results sorted in ascending order of test points' true labels")
+
+    return sorted_results
 
 
 def pds_loss_eval(y_true, z_pred, reduction='none'):

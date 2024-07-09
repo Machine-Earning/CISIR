@@ -1,5 +1,5 @@
 from datetime import datetime
-
+import os
 import numpy as np
 import tensorflow as tf
 
@@ -10,6 +10,9 @@ from modules.training.cme_modeling import ModelBuilder
 from modules.training.ts_modeling import (
     build_dataset,
     create_mlp)
+
+# Set the environment variable for CUDA (in case it is necessary)
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 mb = ModelBuilder()
 
@@ -78,8 +81,7 @@ def main() -> None:
                         n_features = X_test.shape[1]
                         print(f'n_features: {n_features}')
 
-                        weight_path = (f"final_model_weights_MLP_S2n_e0_5_e1_8_p_slopeFalse_frozenTrue_alpha0"
-                                       f".60_CME0_20240706-133311_s2n_reg.h5")
+                        weight_path = (f"/home1/jmoukpe2016/keras-functional-api/sources/mlp/misc/investigations/final_model_weights_MLP_S2n_e0_5_e1_8_p_slopeFalse_frozenTrue_alpha0.60_CME0_20240706-133311_s2n_reg.h5")
                         final_model_sep_stage1 = create_mlp(
                             input_dim=n_features,
                             hiddens=hiddens,
@@ -114,10 +116,10 @@ def main() -> None:
                         print(f"Model weights are loaded from {weight_path}")
 
                         # Get model predictions
-                        predictions = final_model_sep.predict(X_test)['forecast_head']
+                        _, predictions = final_model_sep.predict(X_test)
 
                         # Find and print the k nearest neighbors for large positives in the test set
-                        k = 5  # Set the number of nearest neighbors to find
+                        k = 3  # Set the number of nearest neighbors to find
 
                         res = find_k_nearest_neighbors(X_test, y_test, predictions, k, log_results=True)
 
