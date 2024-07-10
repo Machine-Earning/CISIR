@@ -1,7 +1,7 @@
 # from tsnecuda import TSNE
 import itertools
 from datetime import datetime
-from typing import List
+from typing import List, Union
 from typing import Tuple, Optional
 
 import matplotlib.pyplot as plt
@@ -257,6 +257,78 @@ def plot_repr_corr_density(model, X, y, title, model_type='features'):
     return plot_filename
 
 
+def evaluate_pcc(
+        model: tf.keras.Model,
+        X_test: Union[np.ndarray, List[np.ndarray]],
+        y_test: np.ndarray,
+        i_below_threshold: float = None,
+        i_above_threshold: float = None,
+        j_below_threshold: float = None,
+        j_above_threshold: float = None,
+        model_type: str = 'features') -> float:
+    """
+    Evaluates a given model using Pearson Correlation Coefficient (PCC) between
+    distances in target values and distances in the representation space.
+    TODO: test this function but it is likely to be correct
+
+    Parameters:
+    - model (tf.keras.Model): The trained model to evaluate.
+    - X_test (np.ndarray or List[np.ndarray]): Test features.
+    - y_test (np.ndarray): True target values for the test set.
+    - i_below_threshold (float, optional): The lower bound threshold for y_test[i] to be included in PCC calculation.
+    - i_above_threshold (float, optional): The upper bound threshold for y_test[i] to be included in PCC calculation.
+    - j_below_threshold (float, optional): The lower bound threshold for y_test[j] to be included in PCC calculation.
+    - j_above_threshold (float, optional): The upper bound threshold for y_test[j] to be included in PCC calculation.
+    - model_type (str): The type of model to use (features, features_reg, features_dec, features_reg_dec).
+
+    Returns:
+    - float: The PCC between distances in target values and distances in the representation space.
+    """
+    # Get representations
+    if model_type in ['features_reg_dec', 'features_reg', 'features_dec']:
+        representations = model.predict(X_test)[0]  # Assuming the first output is always features
+    else:
+        representations = model.predict(X_test)
+
+    # Calculate pairwise distances
+    distances_target = pdist(y_test.reshape(-1, 1), 'euclidean')
+    distances_repr = pdist(representations, 'euclidean')
+
+    # Create mask for filtering based on thresholds
+    n = len(y_test)
+    mask = np.ones(len(distances_target), dtype=bool)
+
+    if any([i_below_threshold, i_above_threshold, j_below_threshold, j_above_threshold]):
+        upper_tri_indices = np.triu_indices(n, k=1)
+        for k, (i, j) in enumerate(zip(*upper_tri_indices)):
+            i_condition = True
+            j_condition = True
+
+            if i_below_threshold is not None:
+                i_condition &= y_test[i] <= i_below_threshold
+            if i_above_threshold is not None:
+                i_condition &= y_test[i] >= i_above_threshold
+            if j_below_threshold is not None:
+                j_condition &= y_test[j] <= j_below_threshold
+            if j_above_threshold is not None:
+                j_condition &= y_test[j] >= j_above_threshold
+
+            mask[k] = i_condition and j_condition
+
+    # Apply mask
+    filtered_distances_target = distances_target[mask]
+    filtered_distances_repr = distances_repr[mask]
+
+    # Normalize distances
+    scaler = MinMaxScaler()
+    distances_target_norm = scaler.fit_transform(filtered_distances_target.reshape(-1, 1)).flatten()
+    distances_repr_norm = scaler.fit_transform(filtered_distances_repr.reshape(-1, 1)).flatten()
+
+    # Calculate Pearson correlation
+    r, _ = pearsonr(distances_target_norm, distances_repr_norm)
+
+    return r
+
 def plot_repr_corr_dist(model, X, y, title, model_type='features'):
     """
     Plots the correlation between distances in target values and distances in the representation space,
@@ -427,69 +499,6 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
 
     return f"representation_correlation_density_{title}.png"
 
-
-def plot_repr_corr_colored(model, X, y, title, model_type='features'):
-    """
-    TODO: doesn't work. Needs to be fixed
-    Plots the correlation between distances in target values and distances in the representation space,
-    with color and marker variations based on the category of the label. Labels are categorized into 'BB', 'BS/SB', and 'SS' with specific colors and markers for each.
-
-    Parameters:
-    - model: The trained model used to transform input features into a representation space.
-    - X: Input features (NumPy array or compatible).
-    - y: Target values (NumPy array or compatible).
-    - title: Title for the plot.
-    - model_type: The type of model to use (features, features_reg, features_dec, features_reg_dec).
-
-    Returns:
-    - Plots the representation distance correlation plot with categorized coloring and markers.
-    """
-    print('In plot_repr_correlation_colored')
-    if model_type in ['features_reg_dec', 'features_reg', 'features_dec']:
-        representations = model.predict(X)[0]  # Assuming the first output is always features
-    else:
-        representations = model.predict(X)
-
-    print('calculating the pairwise distances')
-    distances_target = pdist(y.reshape(-1, 1), 'euclidean')
-    distances_repr = pdist(representations, 'euclidean')
-
-    scaler = MinMaxScaler()
-    distances_target_norm = scaler.fit_transform(distances_target.reshape(-1, 1)).flatten()
-    distances_repr_norm = scaler.fit_transform(distances_repr.reshape(-1, 1)).flatten()
-
-    categories = np.where(np.abs(y) <= 0.5, 'B', 'S')
-    indices = np.arange(len(y))
-    index_pairs = list(itertools.combinations(indices, 2))
-    pair_categories = np.array(
-        [f'{min(categories[i], categories[j])}{max(categories[i], categories[j])}' for i, j in index_pairs])
-
-    r, _ = pearsonr(distances_target_norm, distances_repr_norm)
-    print('Categories:', np.unique(pair_categories, return_counts=True))
-
-    print('plotting with specified markers and colors')
-    plt.figure(figsize=(8, 6))
-    mask_bb = pair_categories == 'BB'
-    mask_bs_sb = np.logical_or(pair_categories == 'BS', pair_categories == 'SB')
-    mask_ss = pair_categories == 'SS'
-
-    plt.scatter(distances_target_norm[mask_bb], distances_repr_norm[mask_bb], c='gray', s=10, marker='o', label='BB',
-                alpha=0.5)
-    plt.scatter(distances_target_norm[mask_bs_sb], distances_repr_norm[mask_bs_sb], c='blue', s=30, marker='d',
-                label='BS/SB', alpha=0.5)
-    plt.scatter(distances_target_norm[mask_ss], distances_repr_norm[mask_ss], c='red', s=50, marker='x', label='SS',
-                alpha=0.5)
-
-    plt.plot([0, 1], [0, 1], 'k--')
-    plt.xlabel('Normalized Distance in Target Space')
-    plt.ylabel('Normalized Distance in Representation Space')
-    plt.title(f'{title}\nRepresentation Space Correlation (pearson r= {r:.2f})')
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(f"representation_correlation_density_colored_{title}.png")
-    plt.close()
-
-    return f"representation_correlation_density_colored_{title}.png"
 
 
 def plot_shepard(features, tsne_result):
@@ -864,227 +873,7 @@ def investigate_tsne_delta(
     return file_path
 
 
-# def plot_tsne_extended(
-#         model, X, y,
-#         title, prefix,
-#         model_type='features_reg',
-#         threshold: float = None, sep_threshold: float = None,
-#         show_plot=False,
-#         save_tag=None, seed=42):
-#     """
-#     Applies t-SNE to the features extracted by the given model and saves the plot in 2D with a timestamp.
-#     The color of the points is determined by their label values.
-#
-#     Parameters:
-#     - model: Trained feature extractor model
-#     - X: Input cme_files (NumPy array or compatible)
-#     - y: Target labels (NumPy array or compatible)
-#     - title: Title for the plot
-#     - prefix: Prefix for the file name
-#     - sep_shape: The shape of the marker to use for SEP events (above threshold).
-#     - model_type: The type of model to use (feature, feature_reg, features_reg_dec)
-#     - threshold: Threshold for elevated events
-#     - sep_threshold: Threshold for SEP events
-#     - save_tag: Optional tag to add to the saved file name
-#     - seed: Random seed for t-SNE
-#
-#
-#     Returns:
-#     - Saves a 2D t-SNE plot to a file with a timestamp
-#     """
-#     # T = 1.57381089527  # 0.4535
-#     # # Define the thresholds
-#     # if threshold is None:
-#     #     threshold = np.log(T / np.exp(2)) + 1e-4
-#     # if sep_threshold is None:
-#     #     sep_threshold = np.log(T)
-#
-#     # threshold = np.log(10 / np.exp(2)) + 1e-4
-#     # sep_threshold = np.log(10)
-#
-#     # Extract features using the trained extended model
-#     if model_type == 'features_reg_dec':
-#         features, _, _ = model.predict(X)
-#     elif model_type == 'features_reg' or model_type == 'features_dec':
-#         features, _ = model.predict(X)
-#     else:  # model_type == 'features'
-#         features = model.predict(X)
-#
-#     # Apply t-SNE
-#     tsne = TSNE(n_components=2, random_state=seed)
-#     tsne_result = tsne.fit_transform(features)
-#
-#     # # Identify indices based on thresholds
-#     # above_sep_threshold_indices = np.where(y > sep_threshold)[0]
-#     # elevated_event_indices = np.where((y > threshold) & (y <= sep_threshold))[0]
-#     # below_threshold_indices = np.where(y <= threshold)[0]
-#
-#     # plt.figure(figsize=(12, 8))
-#     # Adjusted subplot layout
-#     fig, axs = plt.subplots(2, 1, figsize=(18, 16), gridspec_kw={'height_ratios': [2, 1]})  # Adjust size as needed
-#
-#     # Plot t-SNE on the first subplot
-#     plt.sca(axs[0])
-#     # Create scatter plot for below-threshold points (in gray)
-#     plt.scatter(tsne_result[below_threshold_indices, 0], tsne_result[below_threshold_indices, 1], marker='o',
-#                 color='gray', alpha=0.6)
-#
-#     # Normalize y-values for better color mapping
-#     norm = plt.Normalize(y.min(), y.max())
-#
-#     # Compute marker sizes based on y-values. Squaring to amplify differences.
-#     marker_sizes_elevated = 50 * ((y[elevated_event_indices] - y.min()) / (y.max() - y.min())) ** 2 + 10
-#     marker_sizes_sep = 50 * ((y[above_sep_threshold_indices] - y.min()) / (y.max() - y.min())) ** 2 + 10
-#
-#     # Create scatter plot for elevated events (square marker)
-#     plt.scatter(tsne_result[elevated_event_indices, 0], tsne_result[elevated_event_indices, 1],
-#                 c=y[elevated_event_indices], cmap='plasma', norm=norm, alpha=0.6, marker='o', s=marker_sizes_elevated)
-#
-#     # Create scatter plot for SEPs (diamond marker)
-#     plt.scatter(tsne_result[above_sep_threshold_indices, 0], tsne_result[above_sep_threshold_indices, 1],
-#                 c=y[above_sep_threshold_indices], cmap='plasma', norm=norm, alpha=0.6, marker='d', s=marker_sizes_sep)
-#
-#     # Add a color bar
-#     sm = plt.cm.ScalarMappable(cmap='plasma', norm=norm)
-#     sm.set_array([])
-#     cbar = plt.colorbar(sm)
-#     cbar.set_label('ln Intensity')
-#
-#     # Add a legend
-#     legend_labels = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=10),
-#                      plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='blue', markersize=10),
-#                      plt.Line2D([0], [0], marker='d', color='w', markerfacecolor='red', markersize=10)]
-#
-#     plt.legend(legend_labels, ['Background', 'Elevated Events (darker colors)', 'SEPs (lighter colors)'],
-#                loc='upper left')
-#
-#     plt.title(f'{title}\n2D t-SNE Visualization')
-#     # plt.xlabel('Dimension 1')
-#     # plt.ylabel('Dimension 2')
-#
-#     # Plot Shepard plot on the second subplot
-#     plt.sca(axs[1])
-#     plot_shepard(features, tsne_result)
-#
-#     # Adjust the subplot layout
-#     plt.tight_layout()
-#
-#     # Save the plot
-#     file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
-#     plt.savefig(file_path)
-#
-#     if show_plot:
-#         plt.show()
-#
-#     plt.close()
-#
-#     return file_path
-#
-# def plot_tsne_pds(model, X, y, title, prefix, save_tag=None, seed=42):
-#     """
-#     Applies t-SNE to the features extracted by the given model and saves the plot in 2D with a timestamp.
-#     The color of the points is determined by their label values.
-#
-#     Parameters:
-#     - model: Trained feature extractor model
-#     - X: Input cme_files (NumPy array or compatible)
-#     - y: Target labels (NumPy array or compatible)
-#     - prefix: Prefix for the file name
-#
-#     Returns:
-#     - Saves a 2D t-SNE plot to a file with a timestamp
-#     """
-#     T = 1.57381089527  # 0.4535
-#     # Define the thresholds
-#     threshold = np.log(T / np.exp(2)) + 1e-4
-#     sep_threshold = np.log(T)
-#
-#     # Extract features using the trained model
-#     features = model.predict(X)
-#
-#     # Apply t-SNE
-#     tsne = TSNE(n_components=2, random_state=seed)
-#     tsne_result = tsne.fit_transform(features)
-#
-#     # Identify indices based on thresholds
-#     above_sep_threshold_indices = np.where(y > sep_threshold)[0]
-#     elevated_event_indices = np.where((y > threshold) & (y <= sep_threshold))[0]
-#     below_threshold_indices = np.where(y <= threshold)[0]
-#
-#     # plt.figure(figsize=(12, 8))
-#     # Adjusted subplot layout
-#     fig, axs = plt.subplots(2, 1, figsize=(18, 16), gridspec_kw={'height_ratios': [2, 1]})  # Adjust size as needed
-#
-#     # Plot t-SNE on the first subplot
-#     plt.sca(axs[0])
-#     # Create scatter plot for below-threshold points (in gray)
-#     plt.scatter(tsne_result[below_threshold_indices, 0],
-#                 tsne_result[below_threshold_indices, 1],
-#                 marker='o',
-#                 color='gray', alpha=0.6)
-#
-#     # Normalize y-values for better color mapping
-#     norm = plt.Normalize(y.min(), y.max())
-#
-#     # Compute marker sizes based on y-values
-#     marker_sizes_elevated = 50 * ((y[elevated_event_indices] - y.min()) / (y.max() - y.min())) ** 2 + 10
-#     marker_sizes_sep = 50 * ((y[above_sep_threshold_indices] - y.min()) / (y.max() - y.min())) ** 2 + 10
-#
-#     # Create scatter plot for elevated events (square marker)
-#     plt.scatter(tsne_result[elevated_event_indices, 0],
-#                 tsne_result[elevated_event_indices, 1],
-#                 c=y[elevated_event_indices],
-#                 cmap='plasma',
-#                 norm=norm,
-#                 alpha=0.6,
-#                 marker='o',
-#                 s=marker_sizes_elevated)
-#
-#     # Create scatter plot for SEPs (diamond marker)
-#     plt.scatter(tsne_result[above_sep_threshold_indices, 0],
-#                 tsne_result[above_sep_threshold_indices, 1],
-#                 c=y[above_sep_threshold_indices],
-#                 cmap='plasma',
-#                 norm=norm,
-#                 alpha=0.6,
-#                 marker='d',
-#                 s=marker_sizes_sep)
-#
-#     # Add a color bar
-#     sm = plt.cm.ScalarMappable(cmap='plasma', norm=norm)
-#     sm.set_array([])
-#     cbar = plt.colorbar(sm)
-#     cbar.set_label('Label Value')
-#
-#     # Add legend
-#     # Add a legend
-#     legend_labels = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=10),
-#                      plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='blue', markersize=10),
-#                      plt.Line2D([0], [0], marker='d', color='w', markerfacecolor='red', markersize=10)]
-#
-#     plt.legend(legend_labels,
-#                ['Background', 'Elevated Events (darker colors)', 'SEPs (lighter colors)'],
-#                loc='upper left')
-#
-#     plt.title(f'{title}\nT-SNE Visualization')
-#     # plt.xlabel('Dimension 1')
-#     # plt.ylabel('Dimension 2')
-#
-#     print("Done with t-sne, starting with shepard...")
-#
-#     # Plot Shepard plot on the second subplot
-#     plt.sca(axs[1])
-#     plot_shepard(features, tsne_result)
-#
-#     # Adjust the subplot layout
-#     plt.tight_layout()
-#
-#     # Save the plot
-#     file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
-#     plt.savefig(file_path)
-#     plt.close()
-#
-#     return file_path
+
 
 
 def plot_2D_pds(model, X, y, title, prefix, save_tag=None):

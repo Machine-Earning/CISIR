@@ -5,7 +5,7 @@ from datetime import datetime
 from modules.training.cme_modeling import pds_space_norm
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2' # left is 1
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'  # left is 1
 
 import numpy as np
 import tensorflow as tf
@@ -13,7 +13,7 @@ import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from wandb.keras import WandbCallback
 
-from modules.evaluate.utils import plot_tsne_delta, plot_repr_correlation, plot_repr_corr_dist, plot_repr_corr_density
+from modules.evaluate.utils import plot_tsne_delta, plot_repr_correlation, plot_repr_corr_dist, plot_repr_corr_density, evaluate_pcc
 from modules.training import cme_modeling
 from modules.training.ts_modeling import build_dataset, create_mlp, filter_ds, stratified_split
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
@@ -86,7 +86,7 @@ def main():
                             verbose=VERBOSE,
                             min_delta=LR_CB_MIN_DELTA,
                             min_lr=LR_CB_MIN_LR)
-                        
+
                         bandwidth = BANDWIDTH
                         alpha_rw = alpha
                         residual = RESIDUAL
@@ -183,7 +183,7 @@ def main():
                         train_weights_dict = exDenseReweightsD(
                             X_train, delta_train,
                             alpha=alpha_rw, bw=bandwidth,
-                            min_norm_weight=min_norm_weight, 
+                            min_norm_weight=min_norm_weight,
                             debug=False).label_reweight_dict
                         print(f'done rebalancing the training set...')
 
@@ -242,6 +242,15 @@ def main():
                                 reduce_lr_on_plateau
                             ]
                         )
+
+                        # evaluate the model on test cme_files
+                        above_threshold = mae_plus_threshold
+                        error_pcc_cond = evaluate_pcc(
+                            model_sep, X_test, y_test, i_above_threshold=above_threshold)
+
+                        print(f'pcc error delta i>= 0.5 test: {error_pcc_cond}')
+                        # Log the MAE error to wandb
+                        wandb.log({"pcc_error_cond_test": error_pcc_cond})
 
                         # Evaluate the model correlation with colored
                         file_path = plot_repr_corr_dist(

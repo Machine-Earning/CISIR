@@ -1,11 +1,13 @@
-import matplotlib.pyplot as plt
-import numpy as np
 import os
-import pandas as pd
 import random
-import tensorflow as tf
 import traceback
 from collections import Counter
+from typing import Tuple, List, Optional, Union
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import tensorflow as tf
 from matplotlib.lines import Line2D
 from numpy import ndarray
 from scipy import stats
@@ -33,9 +35,6 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
-from typing import Tuple, List, Optional, Union
-from tensorflow.keras.models import load_model
-import tensorflow.keras.backend as K
 
 from modules.training.cme_modeling import NormalizeLayer
 
@@ -726,11 +725,11 @@ def create_mlp_moe(
     x_router = input_layer
     for units in router_hiddens:
         x_router = Dense(units, activation=activation)(x_router)
-    
+
     # Apply temperature to the softmax
     def softmax_with_temperature(logits, temperature=1.0):
         return Softmax()(logits / temperature)
-    
+
     gating_logits = Dense(2)(x_router)
     gating_network = Lambda(lambda x: softmax_with_temperature(x, temperature))(gating_logits)
 
@@ -751,6 +750,7 @@ def create_mlp_moe(
 
     model = Model(inputs=input_layer, outputs=model_output, name=name)
     return model
+
 
 def create_hybrid_model(
         tsf_extractor: Model,
