@@ -36,7 +36,7 @@ def main():
     # Set up constant parameters
     inputs_to_use = INPUTS_TO_USE[0]
     add_slope = ADD_SLOPE[0]  # Adjust as needed
-    outputs_to_use = OUTPUTS_TO_USE[0]
+    outputs_to_use = OUTPUTS_TO_USE
     cme_speed_threshold = CME_SPEED_THRESHOLD[0]  # Adjust as needed
 
     # Other constant parameters...
