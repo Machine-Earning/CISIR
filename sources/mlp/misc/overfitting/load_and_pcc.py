@@ -13,7 +13,7 @@ from modules.evaluate.utils import (
 from modules.training.cme_modeling import ModelBuilder
 from modules.training.ts_modeling import (
     build_dataset,
-    create_mlp)
+    create_mlp, filter_ds)
 from modules.shared.globals import *
 
 mb = ModelBuilder()
@@ -40,7 +40,7 @@ def main():
     cme_speed_threshold = CME_SPEED_THRESHOLD[0]  # Adjust as needed
 
     # Other constant parameters...
-    seed = SEEDS
+    seed = SEEDS[0]
     tf.random.set_seed(seed)
     np.random.seed(seed)
 
@@ -52,13 +52,12 @@ def main():
         add_slope=add_slope,
         outputs_to_use=outputs_to_use,
         cme_speed_threshold=cme_speed_threshold)
-    
-    X_test_filtered, y_test_filtered = filter_ds(
-    X_test, y_test,
-    low_threshold=lower_threshold,
-    high_threshold=upper_threshold,
-    N=N, seed=SEED)
 
+    X_test_filtered, y_test_filtered = filter_ds(
+        X_test, y_test,
+        low_threshold=LOWER_THRESHOLD,
+        high_threshold=UPPER_THRESHOLD,
+        N=N_FILTERED, seed=seed)
 
     n_features = X_test.shape[1]
 
@@ -89,11 +88,11 @@ def main():
         print(f"Weights loaded successfully from: {weight_path}")
 
         # Evaluate PCC
-        pcc = evaluate_pcc(model, X_test, y_test)
+        pcc = evaluate_pcc(model, X_test_filtered, y_test_filtered)
         print(f"PCC for {key}: {pcc}")
 
         # Evaluate conditional PCC (i >= 0.5)
-        pcc_cond = evaluate_pcc(model, X_test, y_test, i_above_threshold=0.5)
+        pcc_cond = evaluate_pcc(model, X_test_filtered, y_test_filtered, i_above_threshold=0.5)
         print(f"Conditional PCC (i >= 0.5) for {key}: {pcc_cond}")
 
         # Log to wandb
