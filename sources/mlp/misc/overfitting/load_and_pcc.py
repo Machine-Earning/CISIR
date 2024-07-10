@@ -34,11 +34,10 @@ def main():
     Main function to run the E-MLP model and evaluate PCC for each weight configuration
     """
     # Set up constant parameters
-    inputs_to_use = INPUTS_TO_USE
-    add_slope = ADD_SLOPE  # Adjust as needed
-    outputs_to_use = OUTPUTS_TO_USE
-    cme_speed_threshold = CME_SPEED_THRESHOLD  # Adjust as needed
-    alpha = ALPHAS  # Adjust as needed
+    inputs_to_use = INPUTS_TO_USE[0]
+    add_slope = ADD_SLOPE[0]  # Adjust as needed
+    outputs_to_use = OUTPUTS_TO_USE[0]
+    cme_speed_threshold = CME_SPEED_THRESHOLD[0]  # Adjust as needed
 
     # Other constant parameters...
     seed = SEEDS
@@ -53,6 +52,13 @@ def main():
         add_slope=add_slope,
         outputs_to_use=outputs_to_use,
         cme_speed_threshold=cme_speed_threshold)
+    
+    X_test_filtered, y_test_filtered = filter_ds(
+    X_test, y_test,
+    low_threshold=lower_threshold,
+    high_threshold=upper_threshold,
+    N=N, seed=SEED)
+
 
     n_features = X_test.shape[1]
 
@@ -99,9 +105,6 @@ def main():
     # Finish the wandb run
     wandb.finish()
 
-
-if __name__ == '__main__':
-    main()
 
 if __name__ == '__main__':
     main()
