@@ -96,7 +96,7 @@ def main():
                             bandwidth = BANDWIDTH
                             repr_dim = REPR_DIM
                             output_dim = len(outputs_to_use)
-                            dropout = 0.95
+                            dropout = DROPOUT
                             activation = ACTIVATION
                             norm = NORM
                             pds = True
