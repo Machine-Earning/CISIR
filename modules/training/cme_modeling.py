@@ -24,6 +24,7 @@ from tensorflow.keras.layers import (
     LayerNormalization,
     Add
 )
+from modules.training.sam_keras import SAMModel
 
 
 # from tensorflow.python.profiler import profiler_v2 as profiler
@@ -285,7 +286,8 @@ class ModelBuilder:
                       norm: str = None,
                       residual: bool = False,
                       skipped_layers: int = 2,
-                      name: str = 'mlp') -> Model:
+                      name: str = 'mlp',
+                      sam: bool = True) -> Model:
         """
         Add a regression head with one output unit and a projection layer to an existing model,
         replacing the existing prediction layer and optionally the decoder layer.
@@ -302,6 +304,7 @@ class ModelBuilder:
         :param residual: Whether to add residual connections for every 'skipped_layers' hidden layers.
         :param skipped_layers: Number of layers between residual connections.
         :param name: Name of the model.
+        :param sam: Whether to use the Sharpness-Aware Minimization (SAM) optimizer.
         :return: The modified model with a projection layer and a regression head.
         """
 
@@ -368,8 +371,12 @@ class ModelBuilder:
         # Add a Dense layer with one output unit for regression
         output_layer = Dense(output_dim, activation='linear', name=f"forecast_head")(x_proj)
 
-        # Create the new extended model
-        extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer], name=name)
+        if sam:
+            # create the new extended SAM model
+            extended_model = SAMModel(inputs=new_base_model.input, outputs=[repr_output, output_layer], name=name)
+        else:
+            # Create the new extended model
+            extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer], name=name)
 
         # If freeze_features is False, make all layers trainable
         if not freeze_features:

@@ -21,7 +21,6 @@ from modules.training.ts_modeling import (
     process_sep_events,
     get_loss,
     filter_ds,
-    stratified_split,
     plot_error_hist)
 from modules.training.utils import get_weight_path
 
@@ -61,7 +60,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'InvesNoSAM_MLP_S2n_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                            title = f'InvesSAM_MLP_S2n_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -141,7 +140,8 @@ def main():
                                 "residual": residual,
                                 "skipped_layers": skipped_layers,
                                 'ds_version': DS_VERSION,
-                                'mae_plus_th': mae_plus_threshold
+                                'mae_plus_th': mae_plus_threshold,
+                                'sam': True
                             })
 
                             # set the root directory
@@ -295,7 +295,8 @@ def main():
                                 norm=norm,
                                 residual=residual,
                                 skipped_layers=skipped_layers,
-                                name='mlp'
+                                name='mlp',
+                                sam=True
                             )
                             model_sep.summary()
 
