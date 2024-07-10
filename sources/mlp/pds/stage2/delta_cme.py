@@ -17,7 +17,7 @@ from modules.training.cme_modeling import ModelBuilder
 from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
-    evaluate_model,
+    evaluate_mae,
     evaluate_model_cond,
     process_sep_events,
     get_loss,
@@ -384,13 +384,13 @@ def main():
                             print(f"Model weights are saved in final_model_weights_{experiment_name}_s2n_reg.h5")
 
                             # evaluate the model on test cme_files
-                            error_mae = evaluate_model(final_model_sep, X_test, y_test)
+                            error_mae = evaluate_mae(final_model_sep, X_test, y_test)
                             print(f'mae error: {error_mae}')
                             # Log the MAE error to wandb
                             wandb.log({"mae_error": error_mae})
 
                             # evaluate the model on stage2 cme_files
-                            error_mae_train = evaluate_model(final_model_sep, X_train, y_train)
+                            error_mae_train = evaluate_mae(final_model_sep, X_train, y_train)
                             print(f'mae error train: {error_mae_train}')
                             # Log the MAE error to wandb
                             wandb.log({"train_mae_error": error_mae_train})

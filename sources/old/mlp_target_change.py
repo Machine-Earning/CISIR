@@ -10,7 +10,7 @@ from wandb.keras import WandbCallback
 from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
-    evaluate_model,
+    evaluate_mae,
     process_sep_events,
     get_loss,
     PrintBatchMSE)
@@ -160,7 +160,7 @@ def main():
                 verbose=1)
 
             # evaluate the model on test cme_files
-            error_mae = evaluate_model(final_mlp_model_sep, X_test, y_test)
+            error_mae = evaluate_mae(final_mlp_model_sep, X_test, y_test)
             print(f'mae error: {error_mae}')
             # Log the MAE error to wandb
             wandb.log({"mae_error": error_mae})

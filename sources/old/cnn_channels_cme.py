@@ -10,7 +10,7 @@ from modules.training.ts_modeling import (
     build_full_dataset,
     create_cnns_ch,
     create_hybrid_model,
-    evaluate_model,
+    evaluate_mae,
     process_sep_events,
     prepare_hybrid_inputs)
 
@@ -161,7 +161,7 @@ def main():
                                         batch_size=32, verbose=1)
 
                 # evaluate the model on test cme_files
-                error_mae = evaluate_model(final_cnn_model_sep, X_test_cnn, y_test)
+                error_mae = evaluate_mae(final_cnn_model_sep, X_test_cnn, y_test)
                 print(f'mae error: {error_mae}')
                 # Log the MAE error to wandb
                 wandb.log({"mae_error": error_mae})

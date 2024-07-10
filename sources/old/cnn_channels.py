@@ -9,7 +9,7 @@ from wandb.keras import WandbCallback
 from modules.training.ts_modeling import (
     build_dataset,
     create_cnns_ch,
-    evaluate_model,
+    evaluate_mae,
     process_sep_events,
     prepare_cnn_inputs)
 
@@ -128,7 +128,7 @@ def main():
                                     batch_size=32, verbose=1)
 
             # evaluate the model on test cme_files
-            error_mae = evaluate_model(final_cnn_model_sep, X_test_cnn, y_test)
+            error_mae = evaluate_mae(final_cnn_model_sep, X_test_cnn, y_test)
             print(f'mae error: {error_mae}')
             # Log the MAE error to wandb
             wandb.log({"mae_error": error_mae})
