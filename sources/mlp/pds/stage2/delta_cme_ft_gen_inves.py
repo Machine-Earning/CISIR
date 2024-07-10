@@ -18,7 +18,6 @@ from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
     evaluate_mae,
-    evaluate_model_cond,
     process_sep_events,
     get_loss,
     filter_ds,
@@ -54,7 +53,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha in [0.3, 1, 0.5, 0]:
+                    for alpha in [0.3, 1, 0.6, 0]:
                         for freeze in [False]:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -62,7 +61,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'Inves_MLP_S2n_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                            title = f'InvesNoSAM_MLP_S2n_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -110,7 +109,7 @@ def main():
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                             # Initialize wandb
-                            wandb.init(project="nasa-ts-delta-v6", name=experiment_name, config={
+                            wandb.init(project="nasa-ts-delta-v6-sam", name=experiment_name, config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
                                 "patience": patience,
@@ -398,18 +397,18 @@ def main():
 
                             # evaluate the model on test cme_files
                             above_threshold = mae_plus_threshold
-                            error_mae_cond = evaluate_model_cond(
+                            error_mae_cond = evaluate_mae(
                                 model_sep, X_test, y_test, above_threshold=above_threshold)
 
-                            print(f'mae error delta >= 0.1 test: {error_mae_cond}')
+                            print(f'mae error delta >= 0.5 test: {error_mae_cond}')
                             # Log the MAE error to wandb
                             wandb.log({"mae_error_cond_test": error_mae_cond})
 
                             # evaluate the model on training cme_files
-                            error_mae_cond_train = evaluate_model_cond(
+                            error_mae_cond_train = evaluate_mae(
                                 model_sep, X_train, y_train, above_threshold=above_threshold)
 
-                            print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
+                            print(f'mae error delta >= 0.5 train: {error_mae_cond_train}')
                             # Log the MAE error to wandb
                             wandb.log({"mae_error_cond_train": error_mae_cond_train})
 
