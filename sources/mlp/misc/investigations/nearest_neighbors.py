@@ -119,7 +119,7 @@ def main() -> None:
                         _, predictions = final_model_sep.predict(X_test)
 
                         # Find and print the k nearest neighbors for large positives in the test set
-                        k = 3  # Set the number of nearest neighbors to find
+                        k = 21  # Set the number of nearest neighbors to find
 
                         res = find_k_nearest_neighbors(X_test, y_test, predictions, k, log_results=True)
 
