@@ -209,7 +209,7 @@ from modules.training.cme_modeling import error
 #     return sorted_results
 
 
-def find_k_nearest_neighbors_and_plot(
+def find_k_nearest_neighbors(
         X_test: np.ndarray,
         y_test: np.ndarray,
         predictions: np.ndarray,
