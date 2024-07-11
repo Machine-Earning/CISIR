@@ -890,7 +890,7 @@ def load_file_data(
     if inputs_to_use is None:
         inputs_to_use = ['e0.5', 'e1.8', 'p']
     if outputs_to_use is None:
-        outputs_to_use = ['delta_p', 'p', ]
+        outputs_to_use = ['delta_p']
 
     # Dynamically define input columns based on inputs_to_use
     input_columns = []

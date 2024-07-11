@@ -63,7 +63,7 @@ class SAM:
 def sam_train_step(
         self,
         data: Union[Tuple[tf.Tensor, tf.Tensor], Tuple[tf.Tensor, tf.Tensor, tf.Tensor]],
-        rho: float = 0.05,
+        rho: float = 0.1,
         eps: float = 1e-12
 ) -> dict:
     """
