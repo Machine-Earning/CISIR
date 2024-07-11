@@ -126,7 +126,7 @@ def main() -> None:
                         # Find and print the k nearest neighbors for large positives in the test set
                         k = 21  # Set the number of nearest neighbors to find
 
-                        res = find_k_nearest_neighbors(X_test, y_test, predictions, third_e_x, k, log_results=True)
+                        res = find_k_nearest_neighbors(X_test, y_test, predictions, third_e_x, k)
 
 
 if __name__ == '__main__':
