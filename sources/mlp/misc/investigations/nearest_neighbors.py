@@ -22,7 +22,7 @@ def main() -> None:
     Main function to run the E-MLP model.
     """
     for seed in SEEDS:
-        for inputs_to_use in INPUTS_TO_USE:
+        for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha in [0.6]:
                     for add_slope in ADD_SLOPE:
@@ -58,8 +58,13 @@ def main() -> None:
                             inputs_to_use=inputs_to_use,
                             add_slope=add_slope,
                             outputs_to_use=outputs_to_use,
-                            cme_speed_threshold=cme_speed_threshold,
-                            shuffle_data=True)
+                            cme_speed_threshold=cme_speed_threshold)
+
+                        third_e_x, third_e_y = build_dataset(
+                            root_dir + '/testing',
+                            inputs_to_use=['e4.4'],
+                            add_slope=add_slope,
+                            outputs_to_use=outputs_to_use)
 
                         print(f'X_test.shape: {X_test.shape}')
                         print(f'y_test.shape: {y_test.shape}')
@@ -121,7 +126,7 @@ def main() -> None:
                         # Find and print the k nearest neighbors for large positives in the test set
                         k = 21  # Set the number of nearest neighbors to find
 
-                        res = find_k_nearest_neighbors(X_test, y_test, predictions, k, log_results=True)
+                        res = find_k_nearest_neighbors(X_test, y_test, predictions, third_e_x, k, log_results=True)
 
 
 if __name__ == '__main__':
