@@ -7,6 +7,7 @@
 import math
 # types for type hinting
 from typing import Tuple, List, Optional, Any, Dict, Union
+import os
 
 import matplotlib.pyplot as plt
 # imports
@@ -266,11 +267,11 @@ def plot_feature_channels(features, third_e_features, idx, true_label, pred_labe
     fig, ax = plt.subplots(figsize=(12, 8))
 
     # Plot each channel
-    ax.plot(range(25), first_electron, label='First Electron', color='blue')
-    ax.plot(range(25), second_electron, label='Second Electron', color='green')
-    ax.plot(range(25), proton, label='Proton', color='red')
-    ax.plot(range(len(cme)), cme, label='CME', color='purple')
-    ax.plot(range(25), third_electron, label='Third Electron', color='orange')
+    ax.plot(range(25), first_electron, label='First Electron', color='orange')
+    ax.plot(range(25), second_electron, label='Second Electron', color='yellow')
+    ax.plot(range(25), proton, label='Proton', color='blue')
+    # ax.plot(range(len(cme)), cme, label='CME', color='purple')
+    ax.plot(range(25), third_electron, label='Third Electron', color='purple')
 
     # Set labels and title
     ax.set_xlabel('Feature Index')
