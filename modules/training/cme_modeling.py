@@ -1488,6 +1488,9 @@ class ModelBuilder:
                 np.random.shuffle(batch_indices)
                 batch_X = X[batch_indices]
                 batch_y = y[batch_indices]
+                # Ensure that batch_y has the correct shape
+                batch_y = batch_y.reshape(-1)
+                # Yield the current batch (features and labels) to be used by the training loop
                 yield batch_X, batch_y
 
         def create_stratified_tf_dataset(
