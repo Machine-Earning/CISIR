@@ -2,7 +2,8 @@ import os
 import random
 from datetime import datetime
 
-from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density
+from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density, \
+    evaluate_pcc
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
@@ -19,10 +20,8 @@ from modules.training.cme_modeling import pds_space_norm
 from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
-    reshape_X,
     filter_ds,
     stratified_split)
-
 
 from modules.shared.globals import *
 
@@ -38,14 +37,13 @@ def main():
     # Define the dataset options, including the sharding policy
 
     for SEED in SEEDS:
-        
 
         mb = cme_modeling.ModelBuilder()
 
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for add_slope in ADD_SLOPE:
-                    for alpha in [0.3, 0.4, 0.5, 0.6, 0.7]:
+                    for alpha in [0, 0.2, 1, 0.3, 0.5, 0.6, 0.7, 0.1, 0.4, 0.8, 0.9]:
                         # Set NumPy seed
                         np.random.seed(SEED)
 
@@ -97,7 +95,7 @@ def main():
                             verbose=VERBOSE,
                             min_delta=LR_CB_MIN_DELTA,
                             min_lr=LR_CB_MIN_LR)
-                        
+
                         bandwidth = BANDWIDTH
                         alpha_rw = alpha
                         residual = RESIDUAL
@@ -197,7 +195,7 @@ def main():
                         train_weights_dict = exDenseReweightsD(
                             X_train, delta_train,
                             alpha=alpha_rw, bw=bandwidth,
-                            min_norm_weight=min_norm_weight, 
+                            min_norm_weight=min_norm_weight,
                             debug=False).label_reweight_dict
                         print(f'done rebalancing the training set...')
 
@@ -334,6 +332,17 @@ def main():
                         )
                         wandb.log({'representation_correlation_density_plot_test': wandb.Image(file_path)})
                         print('file_path: ' + file_path)
+
+                        # Evaluate PCC
+                        pcc = evaluate_pcc(model_sep, X_test_filtered, y_test_filtered)
+                        print(f"PCC: {pcc}")
+
+                        # Evaluate conditional PCC (i >= 0.5)
+                        pcc_cond = evaluate_pcc(model_sep, X_test_filtered, y_test_filtered, i_above_threshold=0.5)
+                        print(f"Conditional PCC (i >= 0.5): {pcc_cond}")
+
+                        # Log to wandb
+                        wandb.log({f"pcc": pcc, f"pcc_plus": pcc_cond})
 
                         # Finish the wandb run
                         wandb.finish()
