@@ -1337,6 +1337,7 @@ class ModelBuilder:
                       verbose: int = 1
                       ) -> tf.keras.callbacks.History:
         """
+        TODO: implement when ratio < rare_injection_count
         Custom training loop to train the model with sample weights and injected rare samples.
 
         :param X_train: training and validation sets together
@@ -1483,7 +1484,7 @@ class ModelBuilder:
             while True:
                 batch_indices = []
                 for group in groups:
-                    batch_indices.append(np.random.choice(group, 1)[0])
+                    batch_indices.append(np.random.choice(group, 1, replace=False)[0])
                 batch_indices = np.array(batch_indices)
                 np.random.shuffle(batch_indices)
                 batch_X = X[batch_indices]
