@@ -1047,276 +1047,276 @@ class ModelBuilder:
 
         return history
 
-    # def train_pds_inj(self,
-    #                   model: tf.keras.Model,
-    #                   X_train: np.ndarray,
-    #                   y_train: np.ndarray,
-    #                   X_subtrain: np.ndarray,
-    #                   y_subtrain: np.ndarray,
-    #                   X_val: np.ndarray,
-    #                   y_val: np.ndarray,
-    #                   train_label_weights_dict: Optional[Dict[float, float]] = None,
-    #                   learning_rate: float = 1e-3,
-    #                   epochs: int = 100,
-    #                   batch_size: int = 32,
-    #                   rare_injection_count: int = -1,
-    #                   lower_bound: float = -0.5,
-    #                   upper_bound: float = 0.5,
-    #                   patience: int = 9,
-    #                   save_tag: Optional[str] = None,
-    #                   callbacks_list=None,
-    #                   verbose: int = 1) -> tf.keras.callbacks.History:
-    #     """
-    #     Custom training loop to train the model with sample weights and injected rare samples.
-    #
-    #     :param X_train: training and validation sets together
-    #     :param y_train: labels of training and validation sets together
-    #     :param X_subtrain: The training feature set.
-    #     :param y_subtrain: The training labels.
-    #     :param X_val: Validation features.
-    #     :param y_val: Validation labels.
-    #     :param model: The TensorFlow model to train.
-    #     :param train_label_weights_dict: Dictionary containing label weights for the training set.
-    #     :param learning_rate: The learning rate for the Adam optimizer.
-    #     :param epochs: The maximum number of epochs for training.
-    #     :param batch_size: The batch size for training.
-    #     :param rare_injection_count: Number of rare samples to inject in each batch (-1 for all, 0 for none, default 2).
-    #     :param lower_bound: The lower bound for selecting rare samples.
-    #     :param upper_bound: The upper bound for selecting rare samples.
-    #     :param patience: The number of epochs with no improvement to wait before early stopping.
-    #     :param save_tag: Tag to use for saving experiments.
-    #     :param callbacks_list: List of callback instances to apply during training.
-    #     :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
-    #
-    #     :return: The training history as a History object.
-    #     """
-    #
-    #     if callbacks_list is None:
-    #         callbacks_list = []
-    #
-    #     # Initialize early stopping and model checkpointing for subtraining
-    #     early_stopping_cb = tf.keras.callbacks.EarlyStopping(
-    #         monitor='val_loss',
-    #         patience=patience,
-    #         restore_best_weights=False
-    #     )
-    #     checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
-    #         filepath=f"model_weights_{str(save_tag)}.h5",
-    #         monitor='val_loss',
-    #         save_best_only=True,
-    #         save_weights_only=True
-    #     )
-    #
-    #     # Append the early stopping and checkpoint callbacks to the custom callbacks list
-    #     subtrain_callbacks_list = callbacks_list + [early_stopping_cb, checkpoint_cb]
-    #
-    #     # Save initial weights for retraining on full training set after best epoch found
-    #     initial_weights = model.get_weights()
-    #
-    #     # Identify injected rare samples in the subtraining set
-    #     subtrain_rare_indices = np.where((y_subtrain < lower_bound) | (y_subtrain > upper_bound))[0]
-    #     subtrain_freq_indices = np.where((y_subtrain >= lower_bound) & (y_subtrain <= upper_bound))[0]
-    #
-    #     # Adjust rare_injection_count for subtraining
-    #     rare_injection_count_subtrain = rare_injection_count
-    #     if rare_injection_count_subtrain == -1:
-    #         rare_injection_count_subtrain = len(subtrain_rare_indices)
-    #     elif rare_injection_count_subtrain > len(subtrain_rare_indices):
-    #         rare_injection_count_subtrain = len(subtrain_rare_indices)
-    #         print(
-    #             f"rare_injection_count_subtrain ({rare_injection_count_subtrain}) is greater than the number of rare samples "
-    #             f"({len(subtrain_rare_indices)}).")
-    #     else:
-    #         num_batches_subtrain = len(y_subtrain) // batch_size
-    #         ratio_subtrain = len(subtrain_rare_indices) / num_batches_subtrain
-    #         if ratio_subtrain > rare_injection_count_subtrain:
-    #             rare_injection_count_subtrain = int(ratio_subtrain / rare_injection_count_subtrain)
-    #             print(
-    #                 f"Adjusting rare_injection_count_subtrain to {rare_injection_count_subtrain} based on the ratio of rare samples to batches.")
-    #         else:
-    #             print(f"Injecting {rare_injection_count_subtrain} rare samples in each subtraining batch.")
-    #
-    #     if batch_size < rare_injection_count_subtrain:
-    #         raise ValueError(f"Batch size must be at least the number of injected rare samples for subtraining. "
-    #                          f"Current batch size: {batch_size}, rare_injection_count_subtrain: {rare_injection_count_subtrain}")
-    #
-    #     # Identify injected rare samples in the full training set
-    #     train_rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
-    #     train_freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
-    #
-    #     # Adjust rare_injection_count for final training
-    #     rare_injection_count_train = rare_injection_count
-    #     if rare_injection_count_train == -1:
-    #         rare_injection_count_train = len(train_rare_indices)
-    #     elif rare_injection_count_train > len(train_rare_indices):
-    #         rare_injection_count_train = len(train_rare_indices)
-    #         print(
-    #             f"rare_injection_count_train ({rare_injection_count_train}) is greater than the number of rare samples "
-    #             f"({len(train_rare_indices)}).")
-    #     else:
-    #         num_batches_train = len(y_train) // batch_size
-    #         ratio_train = len(train_rare_indices) / num_batches_train
-    #         if ratio_train > rare_injection_count_train:
-    #             rare_injection_count_train = int(ratio_train / rare_injection_count_train)
-    #             print(
-    #                 f"Adjusting rare_injection_count_train to {rare_injection_count_train} based on the ratio of rare samples to batches.")
-    #         else:
-    #             print(f"Injecting {rare_injection_count_train} rare samples in each training batch.")
-    #
-    #     if batch_size < rare_injection_count_train:
-    #         raise ValueError(f"Batch size must be at least the number of injected rare samples for training. "
-    #                          f"Current batch size: {batch_size}, rare_injection_count_train: {rare_injection_count_train}")
-    #
-    #     def data_generator(
-    #             X: np.ndarray,
-    #             y: np.ndarray,
-    #             rare_indices: np.ndarray,
-    #             freq_indices: np.ndarray,
-    #             batch_size: int,
-    #             rare_injection_count: int
-    #     ) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
-    #         """
-    #         Generalized data generator to yield batches with a mixture of rare and frequent samples.
-    #
-    #         :param X: Feature set.
-    #         :param y: Labels.
-    #         :param rare_indices: Indices of the rare samples.
-    #         :param freq_indices: Indices of the frequent samples.
-    #         :param batch_size: Size of each batch.
-    #         :param rare_injection_count: Number of rare samples to inject in each batch.
-    #
-    #         :yield: Batches of (features, labels) with mixed rare and frequent samples.
-    #         """
-    #         # Initialize the start index for rare samples
-    #         rare_start_index = 0
-    #
-    #         while True:
-    #             np.random.shuffle(freq_indices)  # Shuffle frequent indices for each epoch
-    #             rare_indices = np.random.permutation(
-    #                 rare_indices)  # Shuffle rare indices only at the start of each epoch
-    #
-    #             for start in range(0, len(freq_indices), batch_size - rare_injection_count):
-    #                 end = min(start + batch_size - rare_injection_count, len(freq_indices))
-    #                 freq_batch_indices = freq_indices[start:end]
-    #
-    #                 # Calculate the end index for rare samples in this batch
-    #                 rare_end_index = rare_start_index + rare_injection_count
-    #                 if rare_end_index > len(rare_indices):
-    #                     # If we exceed the list, wrap around
-    #                     rare_sample_indices = np.concatenate(
-    #                         [rare_indices[rare_start_index:], rare_indices[:rare_end_index - len(rare_indices)]]
-    #                     )
-    #                     rare_start_index = rare_end_index - len(rare_indices)  # Update start index for next batch
-    #                 else:
-    #                     # Select consecutive rare samples
-    #                     rare_sample_indices = rare_indices[rare_start_index:rare_end_index]
-    #                     rare_start_index = rare_end_index  # Update start index for next batch
-    #
-    #                 # Reset rare index if needed
-    #                 if rare_start_index >= len(rare_indices):
-    #                     rare_start_index = 0
-    #
-    #                 batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
-    #                 np.random.shuffle(batch_indices)  # Shuffle indices to mix rare and frequent samples
-    #                 # Extract the actual data (features and labels) for the current batch
-    #                 batch_X = X[batch_indices]
-    #                 batch_y = y[batch_indices]
-    #                 # Ensure that batch_y has the correct shape
-    #                 batch_y = batch_y.reshape(-1)
-    #                 # Yield the current batch (features and labels) to be used by the training loop
-    #                 yield batch_X, batch_y
-    #
-    #     def create_tf_dataset(
-    #             X: np.ndarray,
-    #             y: np.ndarray,
-    #             rare_indices: np.ndarray,
-    #             freq_indices: np.ndarray,
-    #             batch_size: int,
-    #             rare_injection_count: int
-    #     ) -> tf.data.Dataset:
-    #         """
-    #         Creates a TensorFlow dataset from the data generator.
-    #
-    #         :param X: Feature set.
-    #         :param y: Labels.
-    #         :param rare_indices: Indices of the rare samples.
-    #         :param freq_indices: Indices of the frequent samples.
-    #         :param batch_size: Size of each batch.
-    #         :param rare_injection_count: Number of rare samples to inject in each batch.
-    #
-    #         :return: A tf.data.Dataset object.
-    #         """
-    #         dataset = tf.data.Dataset.from_generator(
-    #             lambda: data_generator(X, y, rare_indices, freq_indices, batch_size, rare_injection_count),
-    #             output_signature=(
-    #                 tf.TensorSpec(shape=(None, X.shape[1]), dtype=tf.float32),
-    #                 tf.TensorSpec(shape=(None,), dtype=tf.float32)
-    #             )
-    #         )
-    #         return dataset.prefetch(tf.data.AUTOTUNE)
-    #
-    #     model.compile(
-    #         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-    #         loss=lambda y_true, y_pred: self.pds_loss_vec(
-    #             y_true, y_pred, sample_weights=train_label_weights_dict
-    #         )
-    #     )
-    #
-    #     steps_per_epoch_subtrain = len(subtrain_freq_indices) // (batch_size - rare_injection_count_subtrain)
-    #
-    #     subtrain_dataset = create_tf_dataset(
-    #         X_subtrain,
-    #         y_subtrain,
-    #         subtrain_rare_indices,
-    #         subtrain_freq_indices,
-    #         batch_size,
-    #         rare_injection_count_subtrain)
-    #
-    #     history = model.fit(
-    #         subtrain_dataset,
-    #         steps_per_epoch=steps_per_epoch_subtrain,
-    #         epochs=epochs,
-    #         validation_data=(X_val, y_val),
-    #         callbacks=subtrain_callbacks_list,
-    #         verbose=verbose
-    #     )
-    #
-    #     # Determine the optimal number of epochs from the fit history
-    #     best_epoch = np.argmin(history.history['val_loss']) + 1  # +1 to adjust for 0-based index
-    #
-    #     model.set_weights(initial_weights)
-    #
-    #     model.compile(
-    #         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-    #         loss=lambda y_true, y_pred: self.pds_loss_vec(
-    #             y_true, y_pred, sample_weights=train_label_weights_dict
-    #         )
-    #     )
-    #
-    #     steps_per_epoch_final = len(train_freq_indices) // (batch_size - rare_injection_count_train)
-    #
-    #     final_train_dataset = create_tf_dataset(
-    #         X_train,
-    #         y_train,
-    #         train_rare_indices,
-    #         train_freq_indices,
-    #         batch_size,
-    #         rare_injection_count_train)
-    #
-    #     model.fit(
-    #         final_train_dataset,
-    #         steps_per_epoch=steps_per_epoch_final,
-    #         epochs=best_epoch,
-    #         callbacks=callbacks_list,
-    #         verbose=verbose
-    #     )
-    #
-    #     model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
-    #     print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
-    #
-    #     return history
-
     def train_pds_inj(self,
+                      model: tf.keras.Model,
+                      X_train: np.ndarray,
+                      y_train: np.ndarray,
+                      X_subtrain: np.ndarray,
+                      y_subtrain: np.ndarray,
+                      X_val: np.ndarray,
+                      y_val: np.ndarray,
+                      train_label_weights_dict: Optional[Dict[float, float]] = None,
+                      learning_rate: float = 1e-3,
+                      epochs: int = 100,
+                      batch_size: int = 32,
+                      rare_injection_count: int = -1,
+                      lower_bound: float = -0.5,
+                      upper_bound: float = 0.5,
+                      patience: int = 9,
+                      save_tag: Optional[str] = None,
+                      callbacks_list=None,
+                      verbose: int = 1) -> tf.keras.callbacks.History:
+        """
+        Custom training loop to train the model with sample weights and injected rare samples.
+
+        :param X_train: training and validation sets together
+        :param y_train: labels of training and validation sets together
+        :param X_subtrain: The training feature set.
+        :param y_subtrain: The training labels.
+        :param X_val: Validation features.
+        :param y_val: Validation labels.
+        :param model: The TensorFlow model to train.
+        :param train_label_weights_dict: Dictionary containing label weights for the training set.
+        :param learning_rate: The learning rate for the Adam optimizer.
+        :param epochs: The maximum number of epochs for training.
+        :param batch_size: The batch size for training.
+        :param rare_injection_count: Number of rare samples to inject in each batch (-1 for all, 0 for none, default 2).
+        :param lower_bound: The lower bound for selecting rare samples.
+        :param upper_bound: The upper bound for selecting rare samples.
+        :param patience: The number of epochs with no improvement to wait before early stopping.
+        :param save_tag: Tag to use for saving experiments.
+        :param callbacks_list: List of callback instances to apply during training.
+        :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
+
+        :return: The training history as a History object.
+        """
+
+        if callbacks_list is None:
+            callbacks_list = []
+
+        # Initialize early stopping and model checkpointing for subtraining
+        early_stopping_cb = tf.keras.callbacks.EarlyStopping(
+            monitor='val_loss',
+            patience=patience,
+            restore_best_weights=False
+        )
+        checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
+            filepath=f"model_weights_{str(save_tag)}.h5",
+            monitor='val_loss',
+            save_best_only=True,
+            save_weights_only=True
+        )
+
+        # Append the early stopping and checkpoint callbacks to the custom callbacks list
+        subtrain_callbacks_list = callbacks_list + [early_stopping_cb, checkpoint_cb]
+
+        # Save initial weights for retraining on full training set after best epoch found
+        initial_weights = model.get_weights()
+
+        # Identify injected rare samples in the subtraining set
+        subtrain_rare_indices = np.where((y_subtrain < lower_bound) | (y_subtrain > upper_bound))[0]
+        subtrain_freq_indices = np.where((y_subtrain >= lower_bound) & (y_subtrain <= upper_bound))[0]
+
+        # Adjust rare_injection_count for subtraining
+        rare_injection_count_subtrain = rare_injection_count
+        if rare_injection_count_subtrain == -1:
+            rare_injection_count_subtrain = len(subtrain_rare_indices)
+        elif rare_injection_count_subtrain > len(subtrain_rare_indices):
+            rare_injection_count_subtrain = len(subtrain_rare_indices)
+            print(
+                f"rare_injection_count_subtrain ({rare_injection_count_subtrain}) is greater than the number of rare samples "
+                f"({len(subtrain_rare_indices)}).")
+        else:
+            num_batches_subtrain = len(y_subtrain) // batch_size
+            ratio_subtrain = len(subtrain_rare_indices) / num_batches_subtrain
+            if ratio_subtrain > rare_injection_count_subtrain:
+                rare_injection_count_subtrain = int(ratio_subtrain / rare_injection_count_subtrain)
+                print(
+                    f"Adjusting rare_injection_count_subtrain to {rare_injection_count_subtrain} based on the ratio of rare samples to batches.")
+            else:
+                print(f"Injecting {rare_injection_count_subtrain} rare samples in each subtraining batch.")
+
+        if batch_size < rare_injection_count_subtrain:
+            raise ValueError(f"Batch size must be at least the number of injected rare samples for subtraining. "
+                             f"Current batch size: {batch_size}, rare_injection_count_subtrain: {rare_injection_count_subtrain}")
+
+        # Identify injected rare samples in the full training set
+        train_rare_indices = np.where((y_train < lower_bound) | (y_train > upper_bound))[0]
+        train_freq_indices = np.where((y_train >= lower_bound) & (y_train <= upper_bound))[0]
+
+        # Adjust rare_injection_count for final training
+        rare_injection_count_train = rare_injection_count
+        if rare_injection_count_train == -1:
+            rare_injection_count_train = len(train_rare_indices)
+        elif rare_injection_count_train > len(train_rare_indices):
+            rare_injection_count_train = len(train_rare_indices)
+            print(
+                f"rare_injection_count_train ({rare_injection_count_train}) is greater than the number of rare samples "
+                f"({len(train_rare_indices)}).")
+        else:
+            num_batches_train = len(y_train) // batch_size
+            ratio_train = len(train_rare_indices) / num_batches_train
+            if ratio_train > rare_injection_count_train:
+                rare_injection_count_train = int(ratio_train / rare_injection_count_train)
+                print(
+                    f"Adjusting rare_injection_count_train to {rare_injection_count_train} based on the ratio of rare samples to batches.")
+            else:
+                print(f"Injecting {rare_injection_count_train} rare samples in each training batch.")
+
+        if batch_size < rare_injection_count_train:
+            raise ValueError(f"Batch size must be at least the number of injected rare samples for training. "
+                             f"Current batch size: {batch_size}, rare_injection_count_train: {rare_injection_count_train}")
+
+        def data_generator(
+                X: np.ndarray,
+                y: np.ndarray,
+                rare_indices: np.ndarray,
+                freq_indices: np.ndarray,
+                batch_size: int,
+                rare_injection_count: int
+        ) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
+            """
+            Generalized data generator to yield batches with a mixture of rare and frequent samples.
+
+            :param X: Feature set.
+            :param y: Labels.
+            :param rare_indices: Indices of the rare samples.
+            :param freq_indices: Indices of the frequent samples.
+            :param batch_size: Size of each batch.
+            :param rare_injection_count: Number of rare samples to inject in each batch.
+
+            :yield: Batches of (features, labels) with mixed rare and frequent samples.
+            """
+            # Initialize the start index for rare samples
+            rare_start_index = 0
+
+            while True:
+                np.random.shuffle(freq_indices)  # Shuffle frequent indices for each epoch
+                rare_indices = np.random.permutation(
+                    rare_indices)  # Shuffle rare indices only at the start of each epoch
+
+                for start in range(0, len(freq_indices), batch_size - rare_injection_count):
+                    end = min(start + batch_size - rare_injection_count, len(freq_indices))
+                    freq_batch_indices = freq_indices[start:end]
+
+                    # Calculate the end index for rare samples in this batch
+                    rare_end_index = rare_start_index + rare_injection_count
+                    if rare_end_index > len(rare_indices):
+                        # If we exceed the list, wrap around
+                        rare_sample_indices = np.concatenate(
+                            [rare_indices[rare_start_index:], rare_indices[:rare_end_index - len(rare_indices)]]
+                        )
+                        rare_start_index = rare_end_index - len(rare_indices)  # Update start index for next batch
+                    else:
+                        # Select consecutive rare samples
+                        rare_sample_indices = rare_indices[rare_start_index:rare_end_index]
+                        rare_start_index = rare_end_index  # Update start index for next batch
+
+                    # Reset rare index if needed
+                    if rare_start_index >= len(rare_indices):
+                        rare_start_index = 0
+
+                    batch_indices = np.concatenate([rare_sample_indices, freq_batch_indices])
+                    np.random.shuffle(batch_indices)  # Shuffle indices to mix rare and frequent samples
+                    # Extract the actual data (features and labels) for the current batch
+                    batch_X = X[batch_indices]
+                    batch_y = y[batch_indices]
+                    # Ensure that batch_y has the correct shape
+                    batch_y = batch_y.reshape(-1)
+                    # Yield the current batch (features and labels) to be used by the training loop
+                    yield batch_X, batch_y
+
+        def create_tf_dataset(
+                X: np.ndarray,
+                y: np.ndarray,
+                rare_indices: np.ndarray,
+                freq_indices: np.ndarray,
+                batch_size: int,
+                rare_injection_count: int
+        ) -> tf.data.Dataset:
+            """
+            Creates a TensorFlow dataset from the data generator.
+
+            :param X: Feature set.
+            :param y: Labels.
+            :param rare_indices: Indices of the rare samples.
+            :param freq_indices: Indices of the frequent samples.
+            :param batch_size: Size of each batch.
+            :param rare_injection_count: Number of rare samples to inject in each batch.
+
+            :return: A tf.data.Dataset object.
+            """
+            dataset = tf.data.Dataset.from_generator(
+                lambda: data_generator(X, y, rare_indices, freq_indices, batch_size, rare_injection_count),
+                output_signature=(
+                    tf.TensorSpec(shape=(None, X.shape[1]), dtype=tf.float32),
+                    tf.TensorSpec(shape=(None,), dtype=tf.float32)
+                )
+            )
+            return dataset.prefetch(tf.data.AUTOTUNE)
+
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            loss=lambda y_true, y_pred: self.pds_loss_vec(
+                y_true, y_pred, sample_weights=train_label_weights_dict
+            )
+        )
+
+        steps_per_epoch_subtrain = len(subtrain_freq_indices) // (batch_size - rare_injection_count_subtrain)
+
+        subtrain_dataset = create_tf_dataset(
+            X_subtrain,
+            y_subtrain,
+            subtrain_rare_indices,
+            subtrain_freq_indices,
+            batch_size,
+            rare_injection_count_subtrain)
+
+        history = model.fit(
+            subtrain_dataset,
+            steps_per_epoch=steps_per_epoch_subtrain,
+            epochs=epochs,
+            validation_data=(X_val, y_val),
+            callbacks=subtrain_callbacks_list,
+            verbose=verbose
+        )
+
+        # Determine the optimal number of epochs from the fit history
+        best_epoch = np.argmin(history.history['val_loss']) + 1  # +1 to adjust for 0-based index
+
+        model.set_weights(initial_weights)
+
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            loss=lambda y_true, y_pred: self.pds_loss_vec(
+                y_true, y_pred, sample_weights=train_label_weights_dict
+            )
+        )
+
+        steps_per_epoch_final = len(train_freq_indices) // (batch_size - rare_injection_count_train)
+
+        final_train_dataset = create_tf_dataset(
+            X_train,
+            y_train,
+            train_rare_indices,
+            train_freq_indices,
+            batch_size,
+            rare_injection_count_train)
+
+        model.fit(
+            final_train_dataset,
+            steps_per_epoch=steps_per_epoch_final,
+            epochs=best_epoch,
+            callbacks=callbacks_list,
+            verbose=verbose
+        )
+
+        model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
+        print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
+
+        return history
+
+    def train_pds_inj_strat(self,
                       model: tf.keras.Model,
                       X_train: np.ndarray,
                       y_train: np.ndarray,
@@ -1339,6 +1339,7 @@ class ModelBuilder:
         """
         TODO: implement when ratio < rare_injection_count
         Custom training loop to train the model with sample weights and injected rare samples.
+          stratified sampling is used
 
         :param X_train: training and validation sets together
         :param y_train: labels of training and validation sets together
@@ -1468,7 +1469,7 @@ class ModelBuilder:
         train_groups = stratified_groups(X_train, y_train, batch_size)
 
         def stratified_data_generator(
-                X: np.ndarray, 
+                X: np.ndarray,
                 y: np.ndarray,
                 groups: List[np.ndarray]
         ) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
