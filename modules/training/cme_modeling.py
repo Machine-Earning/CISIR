@@ -1317,25 +1317,24 @@ class ModelBuilder:
         return history
 
     def train_pds_inj_strat(self,
-                      model: tf.keras.Model,
-                      X_train: np.ndarray,
-                      y_train: np.ndarray,
-                      X_subtrain: np.ndarray,
-                      y_subtrain: np.ndarray,
-                      X_val: np.ndarray,
-                      y_val: np.ndarray,
-                      train_label_weights_dict: Optional[Dict[float, float]] = None,
-                      learning_rate: float = 1e-3,
-                      epochs: int = 100,
-                      batch_size: int = 32,
-                      rare_injection_count: int = -1,
-                      lower_bound: float = -0.5,
-                      upper_bound: float = 0.5,
-                      patience: int = 9,
-                      save_tag: Optional[str] = None,
-                      callbacks_list=None,
-                      verbose: int = 1
-                      ) -> tf.keras.callbacks.History:
+                            model: tf.keras.Model,
+                            X_train: np.ndarray,
+                            y_train: np.ndarray,
+                            X_subtrain: np.ndarray,
+                            y_subtrain: np.ndarray,
+                            X_val: np.ndarray,
+                            y_val: np.ndarray,
+                            train_label_weights_dict: Optional[Dict[float, float]] = None,
+                            learning_rate: float = 1e-3,
+                            epochs: int = 100,
+                            batch_size: int = 32,
+                            rare_injection_count: int = -1,
+                            lower_bound: float = -0.5,
+                            upper_bound: float = 0.5,
+                            patience: int = 9,
+                            save_tag: Optional[str] = None,
+                            callbacks_list=None,
+                            verbose: int = 1) -> tf.keras.callbacks.History:
         """
         TODO: implement when ratio < rare_injection_count
         Custom training loop to train the model with sample weights and injected rare samples.
@@ -1486,7 +1485,7 @@ class ModelBuilder:
             while True:
                 batch_indices = []
                 for group in groups:
-                    batch_indices.append(np.random.choice(group, 1, replace=False)[0])
+                    batch_indices.append(np.random.choice(group, 1, replace=True)[0])
                 batch_indices = np.array(batch_indices)
                 np.random.shuffle(batch_indices)
                 batch_X = X[batch_indices]
