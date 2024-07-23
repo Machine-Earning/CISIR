@@ -1,5 +1,5 @@
 # Global configurations
-SEEDS = [456789]  # Seeds for reproducibility
+SEEDS = [42]  # Seeds for reproducibility
 INPUTS_TO_USE = [['e0.5', 'e1.8', 'p']]  # Inputs to use
 OUTPUTS_TO_USE = ['delta_p']  # Output to use
 CME_SPEED_THRESHOLD = [0]  # CME speed threshold
@@ -17,7 +17,7 @@ PROJ_HIDDENS = [64]  # Projection hidden layers
 LOSS_KEY = 'mse'  # Mean squared error regression loss
 REPR_DIM = 128  # Representation dimension
 OUTPUT_DIM = len(OUTPUTS_TO_USE)  # Number of outputs
-DROPOUT = 0.5  # Dropout rate
+DROPOUT = 0.1  # Dropout rate
 ACTIVATION = None  # No activation for regression
 NORM = 'batch_norm'  # Use batch normalization
 RESIDUAL = True  # Use residual connections

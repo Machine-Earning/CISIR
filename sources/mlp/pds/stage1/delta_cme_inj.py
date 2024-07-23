@@ -75,7 +75,7 @@ def main():
                             'batch_size': bs,  # Assuming batch_size is defined elsewhere
                             'epochs': EPOCHS,  # 35k epochs
                             'patience': PATIENCE,
-                            'learning_rate': 1e-4,  # initial learning rate
+                            'learning_rate': START_LR,  # initial learning rate
                             'weight_decay': WEIGHT_DECAY_PDS,  # Added weight decay
                             'momentum_beta1': MOMENTUM_BETA1,  # Added momentum beta1
                         }
@@ -84,7 +84,7 @@ def main():
                         hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                         pds = True
                         target_change = ('delta_p' in outputs_to_use)
-                        repr_dim = OUTPUT_DIM
+                        repr_dim = REPR_DIM
                         dropout_rate = DROPOUT
                         activation = ACTIVATION
                         norm = NORM
@@ -94,7 +94,7 @@ def main():
                             patience=LR_CB_PATIENCE,
                             verbose=VERBOSE,
                             min_delta=LR_CB_MIN_DELTA,
-                            min_lr=1e-6)
+                            min_lr=LR_CB_MIN_LR)
 
                         bandwidth = BANDWIDTH
                         alpha_rw = alpha
