@@ -7,7 +7,7 @@ from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_re
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import numpy as np
 import tensorflow as tf
@@ -43,7 +43,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for add_slope in ADD_SLOPE:
-                    for alpha in [0, 0.2, 1, 0.3, 0.5, 0.6, 0.7, 0.1, 0.4, 0.8, 0.9]:
+                    for alpha in [0.2, 1]:
                         # Set NumPy seed
                         np.random.seed(SEED)
 
@@ -75,7 +75,7 @@ def main():
                             'batch_size': bs,  # Assuming batch_size is defined elsewhere
                             'epochs': EPOCHS,  # 35k epochs
                             'patience': PATIENCE,
-                            'learning_rate': START_LR,  # initial learning rate
+                            'learning_rate': 1e-4,  # initial learning rate
                             'weight_decay': WEIGHT_DECAY_PDS,  # Added weight decay
                             'momentum_beta1': MOMENTUM_BETA1,  # Added momentum beta1
                         }
@@ -94,7 +94,7 @@ def main():
                             patience=LR_CB_PATIENCE,
                             verbose=VERBOSE,
                             min_delta=LR_CB_MIN_DELTA,
-                            min_lr=LR_CB_MIN_LR)
+                            min_lr=1e-6)
 
                         bandwidth = BANDWIDTH
                         alpha_rw = alpha

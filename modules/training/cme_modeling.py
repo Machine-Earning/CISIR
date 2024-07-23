@@ -1468,8 +1468,9 @@ class ModelBuilder:
         train_groups = stratified_groups(X_train, y_train, batch_size)
 
         def stratified_data_generator(
-                X: np.ndarray, y: np.ndarray,
-                groups: List[np.ndarray], batch_size: int
+                X: np.ndarray, 
+                y: np.ndarray,
+                groups: List[np.ndarray]
         ) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
             """
             Generalized data generator to yield batches with stratified sampling.
@@ -1497,8 +1498,7 @@ class ModelBuilder:
         def create_stratified_tf_dataset(
                 X: np.ndarray,
                 y: np.ndarray,
-                groups: List[np.ndarray],
-                batch_size: int
+                groups: List[np.ndarray]
         ) -> tf.data.Dataset:
             """
             Creates a TensorFlow dataset from the stratified data generator.
@@ -1511,7 +1511,7 @@ class ModelBuilder:
             :return: A tf.data.Dataset object.
             """
             dataset = tf.data.Dataset.from_generator(
-                lambda: stratified_data_generator(X, y, groups, batch_size),
+                lambda: stratified_data_generator(X, y, groups),
                 output_signature=(
                     tf.TensorSpec(shape=(None, X.shape[1]), dtype=tf.float32),
                     tf.TensorSpec(shape=(None,), dtype=tf.float32)
@@ -1531,8 +1531,7 @@ class ModelBuilder:
         subtrain_dataset = create_stratified_tf_dataset(
             X_subtrain,
             y_subtrain,
-            subtrain_groups,
-            batch_size)
+            subtrain_groups)
 
         history = model.fit(
             subtrain_dataset,
@@ -1560,8 +1559,7 @@ class ModelBuilder:
         final_train_dataset = create_stratified_tf_dataset(
             X_train,
             y_train,
-            train_groups,
-            batch_size)
+            train_groups)
 
         model.fit(
             final_train_dataset,
