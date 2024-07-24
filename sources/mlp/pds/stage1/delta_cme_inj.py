@@ -7,7 +7,7 @@ from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_re
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import numpy as np
 import tensorflow as tf
@@ -43,7 +43,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for add_slope in ADD_SLOPE:
-                    for alpha in [0.2, 1]:
+                    for alpha in [2, 5]:
                         # Set NumPy seed
                         np.random.seed(SEED)
 
@@ -62,7 +62,7 @@ def main():
                         inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                         # Construct the title
-                        title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSinj_bs{bs}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                        title = f'MLP_strat_{inputs_str}_slope{str(add_slope)}_PDSinj_bs{bs}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
 
                         # Replace any other characters that are not suitable for filenames (if any)
                         title = title.replace(' ', '_').replace(':', '_')
@@ -75,7 +75,7 @@ def main():
                             'batch_size': bs,  # Assuming batch_size is defined elsewhere
                             'epochs': EPOCHS,  # 35k epochs
                             'patience': PATIENCE,
-                            'learning_rate': START_LR,  # initial learning rate
+                            'learning_rate': START_LR_PDS,  # initial learning rate
                             'weight_decay': WEIGHT_DECAY_PDS,  # Added weight decay
                             'momentum_beta1': MOMENTUM_BETA1,  # Added momentum beta1
                         }
@@ -241,7 +241,7 @@ def main():
                         )
                         model_sep.summary()
 
-                        mb.train_pds_inj(
+                        mb.train_pds_inj_strat(
                             model_sep,
                             X_train, y_train_norm,
                             X_subtrain, y_subtrain_norm,

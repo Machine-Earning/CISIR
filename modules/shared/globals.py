@@ -1,5 +1,5 @@
 # Global configurations
-SEEDS = [42]  # Seeds for reproducibility
+SEEDS = [456789]  # Seeds for reproducibility
 INPUTS_TO_USE = [['e0.5', 'e1.8', 'p']]  # Inputs to use
 OUTPUTS_TO_USE = ['delta_p']  # Output to use
 CME_SPEED_THRESHOLD = [0]  # CME speed threshold
@@ -28,14 +28,15 @@ UPPER_THRESHOLD = 0.5  # Upper threshold for delta_p
 MAE_PLUS_THRESHOLD = 0.5  # Threshold for measuring raising edges in delta
 START_LR_FT = 3e-3  # Lower due to fine-tuning
 START_LR = 1e-2  # starting learning rate
+START_LR_PDS = 7e-2  # starting learning rate
 WEIGHT_DECAY = 1e-5  # Higher weight decay
 WEIGHT_DECAY_PDS = 1e-2  # Higher weight decay for projection layers
 MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 BANDWIDTH = 4.42e-2  # Bandwidth for rebalancing
-PATIENCE = int(7e3)  # Higher patience
+PATIENCE = int(12e3)  # Higher patience
 LR_CB_FACTOR = 0.9  # factor for reducing learning rate
-LR_CB_PATIENCE = 700  # patience for reducing learning rate
-LR_CB_MIN_LR = 1e-4  # minimum learning rate
+LR_CB_PATIENCE = 1000  # patience for reducing learning rate
+LR_CB_MIN_LR = 1e-6  # minimum learning rate
 VERBOSE = 1  # Verbose
 SAVE_BEST = False  # Save best model
 LR_CB_MIN_DELTA = 1e-5  # Minimum delta for reducing learning rate
