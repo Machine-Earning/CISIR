@@ -82,13 +82,14 @@ def create_model(block_class, input_shape: Tuple[int]) -> Model:
         Model: The Keras model.
     """
     inputs = Input(shape=input_shape)
-    block = block_class(attn_hidden_units=[10, 20], activation='relu', output_activation='linear')
+    block = block_class(attn_hidden_units=[4, 4], activation='tanh', output_activation='linear')
     outputs = block(inputs)
     model = Model(inputs, outputs)
     return model
 
 
 def train_and_print_results(
+        block_name: str,
         model: Model,
         x_train: np.ndarray,
         y_train: np.ndarray,
@@ -103,6 +104,7 @@ def train_and_print_results(
     Train the model and print the results, including learned weights and attention scores.
 
     Args:
+        block_name (str): Name of the attention block.
         model (Model): The Keras model to train.
         x_train (np.ndarray): Training features.
         y_train (np.ndarray): Training labels.
@@ -115,9 +117,16 @@ def train_and_print_results(
         batch_size (int): Batch size for training.
     """
     model.compile(optimizer=Adam(learning_rate=learning_rate), loss='mse')
-    wandb.init(project="attention_models", entity="your_wandb_entity", reinit=True)
-    model.fit(x_train, y_train, epochs=epochs, batch_size=batch_size, verbose=0, validation_data=(x_test, y_test),
-              callbacks=[WandbCallback()])
+    wandb.init(project="attention_models", entity=block_name)
+    model.fit(
+        x_train,
+        y_train,
+        epochs=epochs,
+        batch_size=batch_size,
+        verbose=0,
+        validation_data=(x_test, y_test),
+        callbacks=[WandbCallback()]
+    )
 
     # Evaluate the model
     loss = model.evaluate(x_test, y_test, verbose=0)
@@ -137,7 +146,8 @@ def train_and_print_results(
         results[i].extend(attention_scores[i])
 
     # Print results in a table
-    headers = ['x1', 'x2', 'True y', 'Predicted y'] + [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])]
+    headers = (['x1', 'x2', 'True y', 'Predicted y'] +
+               [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])])
     df_results = pd.DataFrame(results, columns=headers)
     print(df_results)
     wandb.log({"results": df_results})
@@ -152,5 +162,9 @@ for i, block_class in enumerate(block_classes, start=1):
     model = create_model(block_class, input_shape)
     model.summary()
     tf.keras.utils.plot_model(model, to_file=f'./model_{i}.png', show_shapes=True)
-    train_and_print_results(model, x_train, y_train, x_test, y_test, initial_x, initial_y, learning_rate=0.001,
-                            epochs=500, batch_size=32)
+    train_and_print_results(
+        f'Attention Typ {i}',
+        model, x_train, y_train, x_test, y_test,
+        initial_x, initial_y,
+        learning_rate=0.001,
+        epochs=500, batch_size=32)
