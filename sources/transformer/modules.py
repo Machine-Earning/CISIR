@@ -1,7 +1,8 @@
 from typing import List, Optional, Tuple
 
 import tensorflow as tf
-from tensorflow.keras.layers import Layer, Dense, Multiply
+from tensorflow.keras import backend as K
+from tensorflow.keras.layers import Layer, Dense, Multiply, Softmax, Activation
 
 
 class AttentionBlock(Layer):
@@ -273,7 +274,7 @@ class BlockT3(BlockBase):
         activation (str): The activation function to use in the attention block.
         output_activation (Optional[str]): The activation function to use in the final output.
         attention_block (AttentionBlock): The block used to compute attention scores.
-        dense_layers (List[Dense]): The dense layers used to compute weights.
+        dense_layer (Dense): The dense layer used to compute weights.
     """
 
     def __init__(self,
@@ -281,7 +282,7 @@ class BlockT3(BlockBase):
                  activation: str = 'tanh',
                  output_activation: Optional[str] = None):
         super().__init__(attn_hidden_units, activation, output_activation)
-        self.dense_layers = None
+        self.dense_layer = None
 
     def build(self, input_shape: tf.TensorShape) -> None:
         """
@@ -297,8 +298,9 @@ class BlockT3(BlockBase):
             output_dim=input_shape[-1],
             activation=self.activation
         )
-        # Create the dense layers for weights
-        self.dense_layers = [Dense(1) for _ in range(input_shape[-1] + 1)]
+
+        # Create a single dense layer for weights (w0, w1, w2, ...)
+        self.dense_layer = Dense(input_shape[-1] + 1)
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         """
@@ -316,32 +318,315 @@ class BlockT3(BlockBase):
         # Compute attention scores
         attention_scores = self.attention_block(inputs)
 
-        # Initialize the output with w0
-        output = self.dense_layers[0](inputs)
+        # Compute weights (w0, w1, w2, ...)
+        weights = self.dense_layer(inputs)
 
-        # Iterate over each input feature and apply the attention scores
-        for i in range(inputs.shape[-1]):
-            attn_score = attention_scores[:, i:i + 1]
-            x_i = inputs[:, i:i + 1]
-            weight = self.dense_layers[i + 1](x_i)
-            output += (weight + attn_score) * x_i
+        # Separate w0 from the rest of the weights
+        w0 = weights[:, 0:1]
+        w_rest = weights[:, 1:]
+
+        # Add attention scores to the rest of the weights
+        combined_weights = w_rest + attention_scores
+
+        # Element-wise multiplication of combined weights with input features
+        weighted_inputs = combined_weights * inputs
+
+        # Sum up all components
+        output = w0 + tf.reduce_sum(weighted_inputs, axis=-1, keepdims=True)
 
         if self.output_activation:
             output = tf.keras.activations.get(self.output_activation)(output)
 
         return output
 
-    def get_config(self) -> dict:
+    def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
         """
-        Get the config of the layer.
+        Retrieve the weights and bias of the output dense layer.
 
         Returns:
-            dict: Configuration of the layer.
+            Tuple[tf.Tensor, tf.Tensor]: A tuple containing the weights and bias of the dense layer.
+                                         The first element is the weight tensor, and the second
+                                         is the bias tensor.
         """
-        config = super().get_config()
-        config.update({
-            'attn_hidden_units': self.attn_hidden_units,
-            'activation': self.activation,
-            'output_activation': self.output_activation
-        })
-        return config
+        return self.dense_layer.get_weights()
+
+
+class BlockT4(BlockBase):
+    """
+        A custom layer that applies attention mechanism followed by a dense layer.
+
+        This block consists of an attention layer that computes attention scores,
+        applies these scores to the input via element-wise multiplication,
+        and then passes the result through a dense layer.
+
+        y = w0 + w1 * a1 * x1 + w2 * a2 * x2 + ... + wn * an * xn where softmax is applied to attention scores.
+
+        Attributes:
+            attn_hidden_units (List[int]): A list of integers representing the number of units
+                                           in each hidden layer of the attention mechanism.
+            activation (str): The activation function to use in the attention layer.
+            output_activation (Optional[str]): The activation function to use in the final dense layer.
+            attention_block (AttentionBlock): The layer used to compute attention scores.
+            dense_layer (Dense): The final dense layer that produces the output.
+            attention_scores (tf.Tensor): The most recently computed attention scores.
+        """
+
+    def __init__(self,
+                 attn_hidden_units: Optional[List[int]] = None,
+                 activation: str = 'tanh',
+                 output_activation: Optional[str] = None):
+        """
+        Initialize the BlockT4.
+
+        Args:
+            attn_hidden_units (Optional[List[int]]): List of integers for hidden layer units in attention mechanism.
+            activation (str): Activation function to use in attention layers.
+            output_activation (Optional[str]): Activation function to use in the final dense layer.
+        """
+        super().__init__(attn_hidden_units, activation, output_activation)
+        self.dense_layer = None
+        self.softmax = Softmax(axis=-1)
+
+    def build(self, input_shape: tf.TensorShape) -> None:
+        """
+        Build the layer. This method is called automatically by Keras when the layer is first used.
+
+        Args:
+            input_shape (tf.TensorShape): The shape of the input tensor.
+        """
+        # Create the attention block
+        self.attention_block = AttentionBlock(
+            input_dim=input_shape[-1],
+            hidden_units=self.attn_hidden_units,
+            output_dim=input_shape[-1],
+            activation=self.activation
+        )
+        # Create the final dense layer
+        self.dense_layer = Dense(1, activation=self.output_activation)
+
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        """
+        Perform the forward pass of the BlockT4 layer.
+
+        This method applies the attention mechanism to the inputs,
+        applies softmax to the attention scores, then passes the weighted inputs through a dense layer.
+
+        Args:
+            inputs (tf.Tensor): The input tensor.
+
+        Returns:
+            tf.Tensor: The output tensor after applying attention, softmax, and the dense layer.
+        """
+        # Compute attention scores
+        self.attention_scores = self.attention_block(inputs)
+
+        # Apply softmax to obtain attention probabilities
+        attention_probs = self.softmax(self.attention_scores)
+
+        # Apply attention probabilities to inputs via element-wise multiplication
+        weighted_inputs = Multiply()([inputs, attention_probs])
+
+        # Pass the weighted inputs through the final dense layer
+        output = self.dense_layer(weighted_inputs)
+
+        return output
+
+    def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
+        """
+        Retrieve the weights and bias of the output dense layer.
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor]: A tuple containing the weights and bias of the dense layer.
+                                         The first element is the weight tensor, and the second
+                                         is the bias tensor.
+        """
+        return self.dense_layer.get_weights()
+
+
+class BlockT5(BlockBase):
+    """
+    A custom layer that applies attention mechanism followed by a dense layer.
+
+    This block consists of an attention layer that computes attention scores,
+    applies these scores to the input via element-wise multiplication,
+    and then passes the result through a dense layer.
+
+    y = w0 + w1 * a1 * x1 + w2 * a2 * x2 + ... + wn * an * xn where sigmoid is applied to attention scores.
+
+    Attributes:
+        attn_hidden_units (List[int]): A list of integers representing the number of units
+                                       in each hidden layer of the attention mechanism.
+        activation (str): The activation function to use in the attention layer.
+        output_activation (Optional[str]): The activation function to use in the final dense layer.
+        attention_block (AttentionBlock): The layer used to compute attention scores.
+        dense_layer (Dense): The final dense layer that produces the output.
+        attention_scores (tf.Tensor): The most recently computed attention scores.
+    """
+
+    def __init__(self,
+                 attn_hidden_units: Optional[List[int]] = None,
+                 activation: str = 'tanh',
+                 output_activation: Optional[str] = None):
+        """
+        Initialize the BlockT5.
+
+        Args:
+            attn_hidden_units (Optional[List[int]]): List of integers for hidden layer units in attention mechanism.
+            activation (str): Activation function to use in attention layers.
+            output_activation (Optional[str]): Activation function to use in the final dense layer.
+        """
+        super().__init__(attn_hidden_units, activation, output_activation)
+        self.dense_layer = None
+        self.sigmoid = Activation('sigmoid')
+
+    def build(self, input_shape: tf.TensorShape) -> None:
+        """
+        Build the layer. This method is called automatically by Keras when the layer is first used.
+
+        Args:
+            input_shape (tf.TensorShape): The shape of the input tensor.
+        """
+        # Create the attention block
+        self.attention_block = AttentionBlock(
+            input_dim=input_shape[-1],
+            hidden_units=self.attn_hidden_units,
+            output_dim=input_shape[-1],
+            activation=self.activation
+        )
+        # Create the final dense layer
+        self.dense_layer = Dense(1, activation=self.output_activation)
+
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        """
+        Perform the forward pass of the BlockT5 layer.
+
+        This method applies the attention mechanism to the inputs,
+        applies sigmoid to the attention scores, then passes the weighted inputs through a dense layer.
+
+        Args:
+            inputs (tf.Tensor): The input tensor.
+
+        Returns:
+            tf.Tensor: The output tensor after applying attention, sigmoid, and the dense layer.
+        """
+        # Compute attention scores
+        self.attention_scores = self.attention_block(inputs)
+
+        # Apply sigmoid to obtain attention weights between 0 and 1
+        attention_weights = self.sigmoid(self.attention_scores)
+
+        # Apply attention weights to inputs via element-wise multiplication
+        weighted_inputs = Multiply()([inputs, attention_weights])
+
+        # Pass the weighted inputs through the final dense layer
+        output = self.dense_layer(weighted_inputs)
+
+        return output
+
+    def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
+        """
+        Retrieve the weights and bias of the output dense layer.
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor]: A tuple containing the weights and bias of the dense layer.
+                                         The first element is the weight tensor, and the second
+                                         is the bias tensor.
+        """
+        return self.dense_layer.get_weights()
+
+    class BlockT6(BlockBase):
+        """
+        A custom layer that applies attention mechanism followed by a dense layer.
+
+        This block consists of an attention layer that computes attention scores,
+        applies these scores to the input via element-wise multiplication,
+        normalizes the attention scores, and then passes the result through a dense layer.
+
+        y = w0 + w1 * a1 * x1 + w2 * a2 * x2 + ... + wn * an * xn where sigmoid is applied to attention scores.
+        Then attention scores are normalized to sum to 1.
+
+        Attributes:
+            attn_hidden_units (List[int]): A list of integers representing the number of units
+                                           in each hidden layer of the attention mechanism.
+            activation (str): The activation function to use in the attention layer.
+            output_activation (Optional[str]): The activation function to use in the final dense layer.
+            attention_block (AttentionBlock): The layer used to compute attention scores.
+            dense_layer (Dense): The final dense layer that produces the output.
+            attention_scores (tf.Tensor): The most recently computed attention scores.
+        """
+
+        def __init__(self,
+                     attn_hidden_units: Optional[List[int]] = None,
+                     activation: str = 'tanh',
+                     output_activation: Optional[str] = None):
+            """
+            Initialize the BlockT6.
+
+            Args:
+                attn_hidden_units (Optional[List[int]]): List of integers for hidden layer units in attention mechanism.
+                activation (str): Activation function to use in attention layers.
+                output_activation (Optional[str]): Activation function to use in the final dense layer.
+            """
+            super().__init__(attn_hidden_units, activation, output_activation)
+            self.dense_layer = None
+            self.sigmoid = Activation('sigmoid')
+
+        def build(self, input_shape: tf.TensorShape) -> None:
+            """
+            Build the layer. This method is called automatically by Keras when the layer is first used.
+
+            Args:
+                input_shape (tf.TensorShape): The shape of the input tensor.
+            """
+            # Create the attention block
+            self.attention_block = AttentionBlock(
+                input_dim=input_shape[-1],
+                hidden_units=self.attn_hidden_units,
+                output_dim=input_shape[-1],
+                activation=self.activation
+            )
+            # Create the final dense layer
+            self.dense_layer = Dense(1, activation=self.output_activation)
+
+        def call(self, inputs: tf.Tensor) -> tf.Tensor:
+            """
+            Perform the forward pass of the BlockT6 layer.
+
+            This method applies the attention mechanism to the inputs,
+            applies sigmoid to the attention scores, normalizes them to sum to 1,
+            then passes the weighted inputs through a dense layer.
+
+            Args:
+                inputs (tf.Tensor): The input tensor.
+
+            Returns:
+                tf.Tensor: The output tensor after applying attention, sigmoid, normalization, and the dense layer.
+            """
+            # Compute attention scores
+            self.attention_scores = self.attention_block(inputs)
+
+            # Apply sigmoid to obtain attention weights between 0 and 1
+            attention_weights = self.sigmoid(self.attention_scores)
+
+            # Normalize attention weights to sum to 1
+            attention_weights_sum = K.sum(attention_weights, axis=-1, keepdims=True)
+            normalized_attention_weights = attention_weights / attention_weights_sum
+
+            # Apply attention weights to inputs via element-wise multiplication
+            weighted_inputs = Multiply()([inputs, normalized_attention_weights])
+
+            # Pass the weighted inputs through the final dense layer
+            output = self.dense_layer(weighted_inputs)
+
+            return output
+
+        def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
+            """
+            Retrieve the weights and bias of the output dense layer.
+
+            Returns:
+                Tuple[tf.Tensor, tf.Tensor]: A tuple containing the weights and bias of the dense layer.
+                                             The first element is the weight tensor, and the second
+                                             is the bias tensor.
+            """
+            return self.dense_layer.get_weights()
