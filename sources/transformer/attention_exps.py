@@ -168,6 +168,10 @@ def train_and_print_results(
     print(f"Test loss: {loss}")
     print(f"MAE loss: {mae}")
 
+    # log the results
+    wandb.log({"loss": loss, "mae": mae})
+    
+
     # Predict on initial data
     predictions = model.predict(x_test)
     output_predictions = predictions['output']
