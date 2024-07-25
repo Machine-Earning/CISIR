@@ -1,6 +1,6 @@
 import os
-from typing import Tuple
 from datetime import datetime
+from typing import Tuple
 
 # Set the environment variable for CUDA (in case it is necessary)
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
@@ -18,6 +18,7 @@ import random
 # Importing the Blocks
 from sources.transformer.modules import BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6
 
+
 def set_seed(seed: int) -> None:
     """
     Set the seed for reproducibility.
@@ -33,7 +34,9 @@ def set_seed(seed: int) -> None:
     # Set TensorFlow to use deterministic operations
     os.environ['TF_DETERMINISTIC_OPS'] = '1'
 
+
 set_seed(42)  # Set seed for reproducibility
+
 
 def generate_dataset(n_points: int) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -113,8 +116,6 @@ def train_and_print_results(
         y_train: np.ndarray,
         x_test: np.ndarray,
         y_test: np.ndarray,
-        initial_x: np.ndarray,
-        initial_y: np.ndarray,
         learning_rate: float = 0.003,
         epochs: int = 500,
         batch_size: int = 32) -> None:
@@ -128,26 +129,23 @@ def train_and_print_results(
         y_train (np.ndarray): Training labels.
         x_test (np.ndarray): Test features.
         y_test (np.ndarray): Test labels.
-        initial_x (np.ndarray): Initial test features for detailed output.
-        initial_y (np.ndarray): Initial test labels for detailed output.
         learning_rate (float): Learning rate for the optimizer.
         epochs (int): Number of epochs to train the model.
         batch_size (int): Batch size for training.
     """
     model.compile(
-        optimizer=Adam(learning_rate=learning_rate), 
-        loss={'output': 'mse'}, 
+        optimizer=Adam(learning_rate=learning_rate),
+        loss={'output': 'mse'},
         metrics={'output': 'mae'}
     )
-                  
-    
+
     model.fit(
         x_train,
         {'output': y_train},
         epochs=epochs,
         batch_size=batch_size,
         verbose=0,
-        validation_data=(x_test,{'output': y_test}),
+        validation_data=(x_test, {'output': y_test}),
         callbacks=[WandbCallback(save_model=False)]
     )
 
@@ -161,21 +159,37 @@ def train_and_print_results(
     print(f"MAE loss: {mae}")
 
     # Predict on initial data
-    predictions = model.predict(initial_x)
+    predictions = model.predict(x_test)
     output_predictions = predictions['output']
     attention_scores = predictions['attention_scores']
     print("Predictions on initial data:")
 
+    # Retrieve the weights and bias of the last dense layer
+    dense_layer_weights, dense_layer_bias = model.layers[-1].get_dense_weights()
+
+    # results = []
+    # for pred, true, inp, attn in zip(output_predictions, y_test, x_test, attention_scores):
+    #     results.append([inp[0], inp[1], true, pred[0]] + attn.tolist())
+    #
+    # # Print results in a table
+    # headers = (['x1', 'x2', 'True y', 'Predicted y'] +
+    #            [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])])
+    # df_results = pd.DataFrame(results, columns=headers)
+    # print(df_results)
+    # wandb.log({"results": df_results})  # so coool you can log dataframes
+
     results = []
     for pred, true, inp, attn in zip(output_predictions, initial_y, initial_x, attention_scores):
-        results.append([inp[0], inp[1], true, pred[0]] + attn.tolist())
+        results.append(
+            [inp[0], inp[1], true, pred[0]] + attn.tolist() + [dense_layer_bias[0]] + dense_layer_weights[:,0].tolist())
 
     # Print results in a table
     headers = (['x1', 'x2', 'True y', 'Predicted y'] +
-               [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])])
+               [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])] +
+               ['Bias'] + [f'Weight_{i + 1}' for i in range(dense_layer_weights.shape[0])])
     df_results = pd.DataFrame(results, columns=headers)
     print(df_results)
-    wandb.log({"results": df_results}) # so coool you can log dataframes
+    wandb.log({"results": df_results})  # so cool you can log dataframes
 
 
 # Training and printing results for each attention type
@@ -190,18 +204,22 @@ for i, block_class in enumerate(block_classes, start=1):
     LR = 0.001
     EPOCHS = 2000
     BS = 32
-    
-    wandb.init(project="attention-exps", name=experiment_name)
+
+    wandb.init(project="attention-exps", name=experiment_name, config={
+        "learning_rate": LR,
+        "epochs": EPOCHS,
+        "batch_size": BS,
+        "attention_type": i
+    })
+
     print(f"\nAttention Type {i}")
     model = create_model(block_class, input_shape)
     model.summary()
     # tf.keras.utils.plot_model(model, to_file=f'./model_{i}.png', show_shapes=True)
-    train_and_print_results(
-        i,
-        model, x_train, y_train, x_test, y_test,
-        initial_x, initial_y,
-        learning_rate=0.001,
-        epochs=500, batch_size=32)
+    train_and_print_results(i, model,
+                            x_train, y_train, x_test, y_test,
+                            learning_rate=0.001,
+                            epochs=500, batch_size=32)
 
     # Finish the wandb run
     wandb.finish()
