@@ -17,7 +17,7 @@ from wandb.keras import WandbCallback
 import random
 
 # Importing the Blocks
-from sources.transformer.modules import BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6
+from sources.transformer.modules import *
 
 
 def set_seed(seed: int) -> None:
@@ -88,7 +88,7 @@ initial_y = np.array([
 ])
 
 # Generate additional data points for training
-x_train, y_train = generate_dataset(1000)
+x_train, y_train = generate_dataset(10)
 x_test, y_test = initial_x, initial_y
 
 
@@ -217,9 +217,9 @@ def train_and_print_results(
 
 # Training and printing results for each attention type
 input_shape = (2,)
-block_classes = [BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6]
+block_classes = [BlockT0, BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6]
 
-for i, block_class in enumerate(block_classes, start=1):
+for i, block_class in enumerate(block_classes):
     # Create a unique experiment name with a timestamp
     current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
     experiment_name = f'Attention_Type{i}_{current_time}'

@@ -640,3 +640,57 @@ class BlockT6(BlockBase):
                                          is the bias tensor.
         """
         return self.dense_layer.get_weights()
+
+class BlockT0(BlockBase):
+    """
+    A simple dense layer block with no attention mechanism.
+
+    This block consists of a dense layer that directly learns weights for the inputs.
+
+    y = w0 + w1 * x1 + w2 * x2 + ... + wn * xn
+
+    Attributes:
+        dense_layer (Dense): The dense layer that produces the output.
+    """
+
+    def __init__(self,
+                 output_activation: Optional[str] = None):
+        super().__init__(attn_hidden_units=None, activation=None, output_activation=output_activation)
+        self.dense_layer = None
+
+    def build(self, input_shape: tf.TensorShape) -> None:
+        """
+        Build the layer. This method is called automatically by Keras when the layer is first used.
+
+        Args:
+            input_shape (tf.TensorShape): The shape of the input tensor.
+        """
+        # Create a single dense layer for weights (w0, w1, w2, ...)
+        self.dense_layer = Dense(1, activation=self.output_activation)
+
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        """
+        Perform the forward pass of the BlockT0 layer.
+
+        This method directly applies the dense layer to the inputs.
+
+        Args:
+            inputs (tf.Tensor): The input tensor.
+
+        Returns:
+            tf.Tensor: The output tensor after applying the dense layer.
+        """
+        output = self.dense_layer(inputs)
+        return {'output': output, 'attention_scores': tf.zeros_like(inputs)}
+
+    def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
+        """
+        Retrieve the weights and bias of the output dense layer.
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor]: A tuple containing the weights and bias of the dense layer.
+                                         The first element is the weight tensor, and the second
+                                         is the bias tensor.
+        """
+        return self.dense_layer.get_weights()
+
