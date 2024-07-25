@@ -12,6 +12,7 @@ import wandb
 from tensorflow.keras.layers import Input
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
 from wandb.keras import WandbCallback
 import random
 
@@ -118,7 +119,8 @@ def train_and_print_results(
         y_test: np.ndarray,
         learning_rate: float = 0.003,
         epochs: int = 500,
-        batch_size: int = 32) -> None:
+        batch_size: int = 32,
+        patience: int = 100) -> None:
     """
     Train the model and print the results, including learned weights and attention scores.
 
@@ -132,11 +134,19 @@ def train_and_print_results(
         learning_rate (float): Learning rate for the optimizer.
         epochs (int): Number of epochs to train the model.
         batch_size (int): Batch size for training.
+        patience (int): Patience for early stopping.
     """
     model.compile(
         optimizer=Adam(learning_rate=learning_rate),
         loss={'output': 'mse'},
         metrics={'output': 'mae'}
+    )
+
+    early_stopping = EarlyStopping(
+        monitor='val_loss',
+        patience=patience,
+        restore_best_weights=True,
+        verbose=1
     )
 
     model.fit(
@@ -146,7 +156,7 @@ def train_and_print_results(
         batch_size=batch_size,
         verbose=0,
         validation_data=(x_test, {'output': y_test}),
-        callbacks=[WandbCallback(save_model=False)]
+        callbacks=[early_stopping, WandbCallback(save_model=False)]
     )
 
     # Evaluate the model - focus on the 'output' key
@@ -181,7 +191,8 @@ def train_and_print_results(
     results = []
     for pred, true, inp, attn in zip(output_predictions, initial_y, initial_x, attention_scores):
         results.append(
-            [inp[0], inp[1], true, pred[0]] + attn.tolist() + [dense_layer_bias[0]] + dense_layer_weights[:,0].tolist())
+            [inp[0], inp[1], true, pred[0]] + attn.tolist() + [dense_layer_bias[0]] + dense_layer_weights[:,
+                                                                                      0].tolist())
 
     # Print results in a table
     headers = (['x1', 'x2', 'True y', 'Predicted y'] +
@@ -201,25 +212,27 @@ for i, block_class in enumerate(block_classes, start=1):
     current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
     experiment_name = f'Attention_Type{i}_{current_time}'
     # Initialize wandb
-    LR = 0.001
+    LR = 1e-3
     EPOCHS = 2000
     BS = 32
+    PATIENCE = 100
 
     wandb.init(project="attention-exps", name=experiment_name, config={
         "learning_rate": LR,
         "epochs": EPOCHS,
         "batch_size": BS,
-        "attention_type": i
+        "attention_type": i,
+        "patience": PATIENCE
     })
 
     print(f"\nAttention Type {i}")
     model = create_model(block_class, input_shape)
     model.summary()
     # tf.keras.utils.plot_model(model, to_file=f'./model_{i}.png', show_shapes=True)
-    train_and_print_results(i, model,
-                            x_train, y_train, x_test, y_test,
-                            learning_rate=0.001,
-                            epochs=500, batch_size=32)
+    train_and_print_results(
+        str(i), model, x_train, y_train, x_test, y_test,
+        learning_rate=LR, epochs=EPOCHS, batch_size=BS, patience=PATIENCE
+    )
 
     # Finish the wandb run
     wandb.finish()
