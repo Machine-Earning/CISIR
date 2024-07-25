@@ -177,8 +177,11 @@ def train_and_print_results(
     if block_name != '2':
         # Retrieve the weights and bias of the last dense layer
         dense_layer_weights, dense_layer_bias = model.layers[-1].get_dense_weights()
+        print('weights')
+        print(dense_layer_weights)
+        print(dense_layer_bias)
     else:
-        dense_layer_weights, dense_layer_bias = np.array([1, 1]), 0
+        dense_layer_weights, dense_layer_bias = np.array([[1], [1]]), np.array([0])
     # results = []
     # for pred, true, inp, attn in zip(output_predictions, y_test, x_test, attention_scores):
     #     results.append([inp[0], inp[1], true, pred[0]] + attn.tolist())
@@ -192,9 +195,12 @@ def train_and_print_results(
 
     results = []
     for pred, true, inp, attn in zip(output_predictions, initial_y, initial_x, attention_scores):
-        results.append(
-            [inp[0], inp[1], true, pred[0]] + attn.tolist() + [dense_layer_bias[0]] + dense_layer_weights[:,
-                                                                                      0].tolist())
+        results.append([
+            inp[0], inp[1], true, pred[0]
+            ] + attn.tolist() + [
+                dense_layer_bias[0]
+            ] + dense_layer_weights[:,0].tolist()
+        )
 
     # Print results in a table
     headers = (['x1', 'x2', 'True y', 'Predicted y'] +
@@ -217,7 +223,7 @@ for i, block_class in enumerate(block_classes, start=1):
     LR = 1e-3
     EPOCHS = 2000
     BS = 32
-    PATIENCE = 100
+    PATIENCE = 200
 
     wandb.init(project="attention-exps", name=experiment_name, config={
         "learning_rate": LR,
