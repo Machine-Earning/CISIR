@@ -7,7 +7,6 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 import wandb
 from tensorflow.keras.layers import Input
 from tensorflow.keras.models import Model
@@ -118,11 +117,13 @@ def train_and_print_results(
         y_train: np.ndarray,
         x_test: np.ndarray,
         y_test: np.ndarray,
+        x_debug: np.ndarray = None,
+        y_debug: np.ndarray = None,
         learning_rate: float = 0.003,
         epochs: int = 500,
         batch_size: int = 32,
         patience: int = 100,
-        debug: bool = False) -> None:
+        debug: bool = True) -> None:
     """
     Train the model and print the results, including learned weights and attention scores.
 
@@ -133,6 +134,8 @@ def train_and_print_results(
         y_train (np.ndarray): Training labels.
         x_test (np.ndarray): Test features.
         y_test (np.ndarray): Test labels.
+        x_debug (np.ndarray): Debug features.
+        y_debug (np.ndarray): Debug labels.
         learning_rate (float): Learning rate for the optimizer.
         epochs (int): Number of epochs to train the model.
         batch_size (int): Batch size for training.
@@ -169,14 +172,23 @@ def train_and_print_results(
     mae = results[f'block_t{block_name}_1_mae']
     print(f"Test loss: {loss}")
     print(f"MAE loss: {mae}")
-
     # log the results
     wandb.log({"loss": loss, "mae": mae})
-    
+
+    # Evaluate the model on the debug set
+    results = model.evaluate(x_debug, {'output': y_debug}, verbose=0, return_dict=True)
+    print('results')
+    print(results)
+    loss = results['loss']
+    mae = results[f'block_t{block_name}_1_mae']
+    print(f"Debug loss: {loss}")
+    print(f"Debug MAE loss: {mae}")
+    # log the results
+    wandb.log({"debug_loss": loss, "debug_mae": mae})
 
     if debug:
         # Predict on initial data
-        predictions = model.predict(x_test)
+        predictions = model.predict(x_debug)
         output_predictions = predictions['output']
         attention_scores = predictions['attention_scores']
         print("Predictions on initial data:")
@@ -201,18 +213,16 @@ def train_and_print_results(
         # wandb.log({"results": df_results})  # so coool you can log dataframes
 
         results = []
-        for pred, true, inp, attn in zip(output_predictions, initial_y, initial_x, attention_scores):
-            results.append([
-                inp[0], inp[1], true, pred[0]
-                ] + attn.tolist() + [
-                    dense_layer_bias[0]
-                ] + dense_layer_weights[:,0].tolist()
-            )
+        for pred, true, inp, attn in zip(output_predictions, y_debug, x_debug, attention_scores):
+            results.append([inp[0], inp[1], true, pred[0]]
+                           + attn.tolist()
+                           + [dense_layer_bias[0]]
+                           + dense_layer_weights[:, 0].tolist())
 
         # Print results in a table
         headers = (['x1', 'x2', 'True y', 'Predicted y'] +
-                [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])] +
-                ['Bias'] + [f'Weight_{i + 1}' for i in range(dense_layer_weights.shape[0])])
+                   [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])] +
+                   ['Bias'] + [f'Weight_{i + 1}' for i in range(dense_layer_weights.shape[0])])
         df_results = pd.DataFrame(results, columns=headers)
         print(df_results)
         wandb.log({f"results_{block_name}": df_results})  # so cool you can log dataframes
@@ -245,8 +255,12 @@ for i, block_class in enumerate(block_classes):
     model.summary()
     # tf.keras.utils.plot_model(model, to_file=f'./model_{i}.png', show_shapes=True)
     train_and_print_results(
-        str(i), model, x_train, y_train, x_test, y_test,
-        learning_rate=LR, epochs=EPOCHS, batch_size=BS, patience=PATIENCE
+        str(i), model,
+        x_train, y_train,
+        x_test, y_test,
+        x_debug=initial_x, y_debug=initial_y,
+        learning_rate=LR, epochs=EPOCHS,
+        batch_size=BS, patience=PATIENCE
     )
 
     # Finish the wandb run
