@@ -84,8 +84,8 @@ def create_model(block_class, input_shape: Tuple[int]) -> Model:
     """
     inputs = Input(shape=input_shape)
     block = block_class(attn_hidden_units=[4, 4], activation='tanh', output_activation='linear')
-    outputs = block(inputs)
-    model = Model(inputs, outputs)
+    outputs = block(inputs)  # dict of outputs and attention scores
+    model = Model(inputs, outputs=outputs)
     return model
 
 
@@ -117,29 +117,36 @@ def train_and_print_results(
         epochs (int): Number of epochs to train the model.
         batch_size (int): Batch size for training.
     """
-    model.compile(optimizer=Adam(learning_rate=learning_rate), loss='mse', metrics=['mae'])
+    model.compile(
+        optimizer=Adam(learning_rate=learning_rate), 
+        loss={'output': 'mse'}, 
+        metrics={'output': 'mae'}
+    )
+                  
     
     model.fit(
         x_train,
-        y_train,
+        {'output': y_train},
         epochs=epochs,
         batch_size=batch_size,
         verbose=0,
-        validation_data=(x_test, y_test),
+        validation_data=(x_test,{'output': y_test}),
         callbacks=[WandbCallback(save_model=False)]
     )
 
-    # Evaluate the model
-    loss, mae = model.evaluate(x_test, y_test, verbose=0)
+     # Evaluate the model - focus on the 'output' key
+    loss, mae = model.evaluate(x_test, {'output': y_test}, verbose=0)
     print(f"Test loss: {loss}")
     print(f"MAE loss: {mae}")
 
     # Predict on initial data
-    predictions, attention_scores = model.predict(initial_x)
+    predictions = model.predict(initial_x)
+    output_predictions = predictions['output']
+    attention_scores = predictions['attention_scores']
     print("Predictions on initial data:")
 
     results = []
-    for pred, true, inp, attn in zip(predictions, initial_y, initial_x, attention_scores):
+    for pred, true, inp, attn in zip(output_predictions, initial_y, initial_x, attention_scores):
         results.append([inp[0], inp[1], true, pred[0]] + attn.tolist())
 
     # Print results in a table

@@ -187,7 +187,7 @@ class BlockT1(BlockBase):
         # Pass the weighted inputs through the final dense layer
         output = self.dense_layer(weighted_inputs)
 
-        return output, self.attention_scores
+        return {'output': output, 'attention_scores': self.attention_scores}
 
     def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
         """
@@ -260,7 +260,7 @@ class BlockT2(BlockBase):
         if self.output_activation:
             output = tf.keras.activations.get(self.output_activation)(output)
 
-        return output, self.attention_scores
+        return {'output': output, 'attention_scores': self.attention_scores}
 
 
 class BlockT3(BlockBase):
@@ -340,7 +340,7 @@ class BlockT3(BlockBase):
         if self.output_activation:
             output = tf.keras.activations.get(self.output_activation)(output)
 
-        return output, self.attention_scores
+        return {'output': output, 'attention_scores': self.attention_scores}
 
     def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
         """
@@ -434,7 +434,7 @@ class BlockT4(BlockBase):
         # Pass the weighted inputs through the final dense layer
         output = self.dense_layer(weighted_inputs)
 
-        return output, self.attention_scores
+        return {'output': output, 'attention_scores': self.attention_scores}
 
     def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
         """
@@ -528,7 +528,7 @@ class BlockT5(BlockBase):
         # Pass the weighted inputs through the final dense layer
         output = self.dense_layer(weighted_inputs)
 
-        return output, self.attention_scores
+        return {'output': output, 'attention_scores': self.attention_scores}
 
     def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
         """
@@ -628,7 +628,7 @@ class BlockT6(BlockBase):
         # Pass the weighted inputs through the final dense layer
         output = self.dense_layer(weighted_inputs)
 
-        return output, self.attention_scores
+        return {'output': output, 'attention_scores': self.attention_scores}
 
     def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
         """
