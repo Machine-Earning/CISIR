@@ -38,59 +38,6 @@ def set_seed(seed: int) -> None:
 set_seed(0)  # Set seed for reproducibility
 
 
-# def generate_dataset(n_points: int) -> Tuple[np.ndarray, np.ndarray]:
-#     """
-#     Generate a synthetic dataset based on the given rules.
-#     If x2 is negative, y = 2 * x1.
-#     If x2 is positive or zero, y = x1 + x2.
-
-#     Args:
-#         n_points (int): Number of data points to generate.
-
-#     Returns:
-#         Tuple[np.ndarray, np.ndarray]: Generated features and labels.
-#     """
-#     np.random.seed(0)
-
-#     # Generate x1: mix of integers and floats, positive and negative
-#     x1_int = np.random.randint(-5, 6, size=n_points // 2)
-#     x1_float = np.random.uniform(-5, 5, size=n_points - n_points // 2)
-#     x1 = np.concatenate([x1_int, x1_float])
-
-#     # Generate x2: mix of integers and floats, positive and negative
-#     x2_int = np.random.randint(-5, 6, size=n_points // 2)
-#     x2_float = np.random.uniform(-5, 5, size=n_points - n_points // 2)
-#     x2 = np.concatenate([x2_int, x2_float])
-
-#     # Shuffle the arrays to mix integers and floats
-#     np.random.shuffle(x1)
-#     np.random.shuffle(x2)
-
-#     # Generate y based on the rule
-#     y = np.where(x2 < 0, x1, x1 + x2)
-
-#     return np.stack((x1, x2), axis=1), y
-
-
-# # Test set
-# initial_x = np.array([
-#     [1, -1], [2, 1], [3, -3],
-#     [4, 5], [-1, -1], [-3, 2],
-#     [-5, 5], [-4, -5], [0, 0],
-#     [0, 4]
-# ])
-# initial_y = np.array([
-#     1, 3, 3,
-#     9, -1, -1,
-#     0, -4, 0,
-#     4
-# ])
-
-# # Generate additional data points for training
-# x_train, y_train = generate_dataset(5000)
-# # x_test, y_test = initial_x, initial_y
-# x_test, y_test = generate_dataset(1000)
-
 def generate_unique_dataset(n_points: int, exclude_set: set) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generate a synthetic dataset ensuring no overlap with the exclude set.
@@ -132,6 +79,7 @@ def generate_unique_dataset(n_points: int, exclude_set: set) -> Tuple[np.ndarray
                 y_list.append(y)
 
     return np.stack((x1_list, x2_list), axis=1), np.array(y_list)
+
 
 # Initial test set
 initial_x = np.array([
@@ -276,28 +224,25 @@ def train_and_print_results(
             print(dense_layer_bias)
         else:
             dense_layer_weights, dense_layer_bias = np.array([[1], [1]]), np.array([0])
-        # results = []
-        # for pred, true, inp, attn in zip(output_predictions, y_test, x_test, attention_scores):
-        #     results.append([inp[0], inp[1], true, pred[0]] + attn.tolist())
-        #
-        # # Print results in a table
-        # headers = (['x1', 'x2', 'True y', 'Predicted y'] +
-        #            [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])])
-        # df_results = pd.DataFrame(results, columns=headers)
-        # print(df_results)
-        # wandb.log({"results": df_results})  # so coool you can log dataframes
 
         results = []
         for pred, true, inp, attn in zip(output_predictions, y_debug, x_debug, attention_scores):
-            results.append([inp[0], inp[1], true, pred[0]]
-                           + attn.tolist()
-                           + [dense_layer_bias[0]]
-                           + dense_layer_weights[:, 0].tolist())
+            attention_weighted_values = [a * w for a, w in zip(attn, dense_layer_weights[:, 0])]
+            results.append(
+                [inp[0], inp[1], true, pred[0]]
+                + attn.tolist()
+                + attention_weighted_values
+                + [dense_layer_bias[0]]
+                + dense_layer_weights[:, 0].tolist()
+            )
 
         # Print results in a table
-        headers = (['x1', 'x2', 'True y', 'Predicted y'] +
-                   [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])] +
-                   ['Bias'] + [f'Weight_{i + 1}' for i in range(dense_layer_weights.shape[0])])
+        headers = (
+                ['x1', 'x2', 'True y', 'Predicted y']
+                + [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])]
+                + [f'Attention_Weight_{i + 1}' for i in range(attention_scores.shape[1])]
+                + ['Bias'] + [f'Weight_{i + 1}' for i in range(dense_layer_weights.shape[0])]
+        )
         df_results = pd.DataFrame(results, columns=headers)
         print(df_results)
         wandb.log({f"results_{block_name}": df_results})  # so cool you can log dataframes
@@ -309,7 +254,7 @@ block_classes = [BlockT0, BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6]
 
 for i, block_class in enumerate(block_classes):
     if i not in [3]:
-        continue # skip the first 4
+        continue  # skip the first 4
     # Create a unique experiment name with a timestamp
     current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
     experiment_name = f'Attention_Type{i}_{current_time}'
