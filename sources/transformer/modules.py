@@ -654,6 +654,8 @@ class BlockT0(BlockBase):
     """
 
     def __init__(self,
+                 attn_hidden_units: Optional[List[int]] = None,
+                 activation: str = 'tanh',
                  output_activation: Optional[str] = None):
         super().__init__(attn_hidden_units=None, activation=None, output_activation=output_activation)
         self.dense_layer = None

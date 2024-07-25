@@ -88,8 +88,9 @@ initial_y = np.array([
 ])
 
 # Generate additional data points for training
-x_train, y_train = generate_dataset(10)
-x_test, y_test = initial_x, initial_y
+x_train, y_train = generate_dataset(5000)
+# x_test, y_test = initial_x, initial_y
+x_test, y_test = generate_dataset(1000)
 
 
 def create_model(block_class, input_shape: Tuple[int]) -> Model:
@@ -120,7 +121,8 @@ def train_and_print_results(
         learning_rate: float = 0.003,
         epochs: int = 500,
         batch_size: int = 32,
-        patience: int = 100) -> None:
+        patience: int = 100,
+        debug: bool = False) -> None:
     """
     Train the model and print the results, including learned weights and attention scores.
 
@@ -172,47 +174,48 @@ def train_and_print_results(
     wandb.log({"loss": loss, "mae": mae})
     
 
-    # Predict on initial data
-    predictions = model.predict(x_test)
-    output_predictions = predictions['output']
-    attention_scores = predictions['attention_scores']
-    print("Predictions on initial data:")
+    if debug:
+        # Predict on initial data
+        predictions = model.predict(x_test)
+        output_predictions = predictions['output']
+        attention_scores = predictions['attention_scores']
+        print("Predictions on initial data:")
 
-    if block_name != '2':
-        # Retrieve the weights and bias of the last dense layer
-        dense_layer_weights, dense_layer_bias = model.layers[-1].get_dense_weights()
-        print('weights')
-        print(dense_layer_weights)
-        print(dense_layer_bias)
-    else:
-        dense_layer_weights, dense_layer_bias = np.array([[1], [1]]), np.array([0])
-    # results = []
-    # for pred, true, inp, attn in zip(output_predictions, y_test, x_test, attention_scores):
-    #     results.append([inp[0], inp[1], true, pred[0]] + attn.tolist())
-    #
-    # # Print results in a table
-    # headers = (['x1', 'x2', 'True y', 'Predicted y'] +
-    #            [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])])
-    # df_results = pd.DataFrame(results, columns=headers)
-    # print(df_results)
-    # wandb.log({"results": df_results})  # so coool you can log dataframes
+        if block_name != '2':
+            # Retrieve the weights and bias of the last dense layer
+            dense_layer_weights, dense_layer_bias = model.layers[-1].get_dense_weights()
+            print('weights')
+            print(dense_layer_weights)
+            print(dense_layer_bias)
+        else:
+            dense_layer_weights, dense_layer_bias = np.array([[1], [1]]), np.array([0])
+        # results = []
+        # for pred, true, inp, attn in zip(output_predictions, y_test, x_test, attention_scores):
+        #     results.append([inp[0], inp[1], true, pred[0]] + attn.tolist())
+        #
+        # # Print results in a table
+        # headers = (['x1', 'x2', 'True y', 'Predicted y'] +
+        #            [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])])
+        # df_results = pd.DataFrame(results, columns=headers)
+        # print(df_results)
+        # wandb.log({"results": df_results})  # so coool you can log dataframes
 
-    results = []
-    for pred, true, inp, attn in zip(output_predictions, initial_y, initial_x, attention_scores):
-        results.append([
-            inp[0], inp[1], true, pred[0]
-            ] + attn.tolist() + [
-                dense_layer_bias[0]
-            ] + dense_layer_weights[:,0].tolist()
-        )
+        results = []
+        for pred, true, inp, attn in zip(output_predictions, initial_y, initial_x, attention_scores):
+            results.append([
+                inp[0], inp[1], true, pred[0]
+                ] + attn.tolist() + [
+                    dense_layer_bias[0]
+                ] + dense_layer_weights[:,0].tolist()
+            )
 
-    # Print results in a table
-    headers = (['x1', 'x2', 'True y', 'Predicted y'] +
-               [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])] +
-               ['Bias'] + [f'Weight_{i + 1}' for i in range(dense_layer_weights.shape[0])])
-    df_results = pd.DataFrame(results, columns=headers)
-    print(df_results)
-    wandb.log({"results": df_results})  # so cool you can log dataframes
+        # Print results in a table
+        headers = (['x1', 'x2', 'True y', 'Predicted y'] +
+                [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])] +
+                ['Bias'] + [f'Weight_{i + 1}' for i in range(dense_layer_weights.shape[0])])
+        df_results = pd.DataFrame(results, columns=headers)
+        print(df_results)
+        wandb.log({f"results_{block_name}": df_results})  # so cool you can log dataframes
 
 
 # Training and printing results for each attention type
