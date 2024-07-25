@@ -1,5 +1,9 @@
 import os
 from typing import Tuple
+from datetime import datetime
+
+# Set the environment variable for CUDA (in case it is necessary)
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import numpy as np
 import pandas as pd
@@ -12,9 +16,6 @@ from wandb.keras import WandbCallback
 
 # Importing the Blocks
 from sources.transformer.modules import BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6
-
-# Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 
 def generate_dataset(n_points: int) -> Tuple[np.ndarray, np.ndarray]:
@@ -97,7 +98,7 @@ def train_and_print_results(
         y_test: np.ndarray,
         initial_x: np.ndarray,
         initial_y: np.ndarray,
-        learning_rate: float = 0.001,
+        learning_rate: float = 0.003,
         epochs: int = 500,
         batch_size: int = 32) -> None:
     """
@@ -116,8 +117,8 @@ def train_and_print_results(
         epochs (int): Number of epochs to train the model.
         batch_size (int): Batch size for training.
     """
-    model.compile(optimizer=Adam(learning_rate=learning_rate), loss='mse')
-    wandb.init(project="attention_models", entity=block_name)
+    model.compile(optimizer=Adam(learning_rate=learning_rate), loss='mse', metrics=['mae'])
+    
     model.fit(
         x_train,
         y_train,
@@ -125,12 +126,13 @@ def train_and_print_results(
         batch_size=batch_size,
         verbose=0,
         validation_data=(x_test, y_test),
-        callbacks=[WandbCallback()]
+        callbacks=[WandbCallback(save_model=False)]
     )
 
     # Evaluate the model
-    loss = model.evaluate(x_test, y_test, verbose=0)
+    loss, mae = model.evaluate(x_test, y_test, verbose=0)
     print(f"Test loss: {loss}")
+    print(f"MAE loss: {mae}")
 
     # Predict on initial data
     predictions = model.predict(initial_x)
@@ -140,8 +142,9 @@ def train_and_print_results(
     for pred, true, inp in zip(predictions, initial_y, initial_x):
         results.append([inp[0], inp[1], true, pred[0]])
 
+    tf.enable_eager_execution(config=None, device_policy=None, execution_mode=None)
     # Get attention scores from the model's attention block
-    attention_scores = model.layers[1].get_attention_scores().numpy()
+    attention_scores = tf.keras.backend.get_value(model.layers[1].get_attention_scores())
     for i in range(len(results)):
         results[i].extend(attention_scores[i])
 
@@ -158,6 +161,11 @@ input_shape = (2,)
 block_classes = [BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6]
 
 for i, block_class in enumerate(block_classes, start=1):
+    # Create a unique experiment name with a timestamp
+    current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+    experiment_name = f'Attention_Type{i}_{current_time}'
+    # Initialize wandb
+    wandb.init(project="attention-exps", name=experiment_name)
     print(f"\nAttention Type {i}")
     model = create_model(block_class, input_shape)
     model.summary()
@@ -167,4 +175,4 @@ for i, block_class in enumerate(block_classes, start=1):
         model, x_train, y_train, x_test, y_test,
         initial_x, initial_y,
         learning_rate=0.001,
-        epochs=500, batch_size=32)
+        epochs=2000, batch_size=32)
