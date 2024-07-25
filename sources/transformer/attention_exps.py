@@ -36,7 +36,7 @@ def set_seed(seed: int) -> None:
     os.environ['TF_DETERMINISTIC_OPS'] = '1'
 
 
-set_seed(42)  # Set seed for reproducibility
+set_seed(0)  # Set seed for reproducibility
 
 
 def generate_dataset(n_points: int) -> Tuple[np.ndarray, np.ndarray]:
@@ -51,7 +51,7 @@ def generate_dataset(n_points: int) -> Tuple[np.ndarray, np.ndarray]:
     Returns:
         Tuple[np.ndarray, np.ndarray]: Generated features and labels.
     """
-    np.random.seed(42)
+    np.random.seed(0)
 
     # Generate x1: mix of integers and floats, positive and negative
     x1_int = np.random.randint(-5, 6, size=n_points // 2)
@@ -174,9 +174,11 @@ def train_and_print_results(
     attention_scores = predictions['attention_scores']
     print("Predictions on initial data:")
 
-    # Retrieve the weights and bias of the last dense layer
-    dense_layer_weights, dense_layer_bias = model.layers[-1].get_dense_weights()
-
+    if block_name != '2':
+        # Retrieve the weights and bias of the last dense layer
+        dense_layer_weights, dense_layer_bias = model.layers[-1].get_dense_weights()
+    else:
+        dense_layer_weights, dense_layer_bias = np.array([1, 1]), 0
     # results = []
     # for pred, true, inp, attn in zip(output_predictions, y_test, x_test, attention_scores):
     #     results.append([inp[0], inp[1], true, pred[0]] + attn.tolist())
