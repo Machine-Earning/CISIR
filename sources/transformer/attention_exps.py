@@ -135,18 +135,12 @@ def train_and_print_results(
     print(f"MAE loss: {mae}")
 
     # Predict on initial data
-    predictions = model.predict(initial_x)
+    predictions, attention_scores = model.predict(initial_x)
     print("Predictions on initial data:")
 
     results = []
-    for pred, true, inp in zip(predictions, initial_y, initial_x):
-        results.append([inp[0], inp[1], true, pred[0]])
-
-    tf.enable_eager_execution(config=None, device_policy=None, execution_mode=None)
-    # Get attention scores from the model's attention block
-    attention_scores = tf.keras.backend.get_value(model.layers[1].get_attention_scores())
-    for i in range(len(results)):
-        results[i].extend(attention_scores[i])
+    for pred, true, inp, attn in zip(predictions, initial_y, initial_x, attention_scores):
+        results.append([inp[0], inp[1], true, pred[0]] + attn.tolist())
 
     # Print results in a table
     headers = (['x1', 'x2', 'True y', 'Predicted y'] +
@@ -169,7 +163,7 @@ for i, block_class in enumerate(block_classes, start=1):
     print(f"\nAttention Type {i}")
     model = create_model(block_class, input_shape)
     model.summary()
-    tf.keras.utils.plot_model(model, to_file=f'./model_{i}.png', show_shapes=True)
+    # tf.keras.utils.plot_model(model, to_file=f'./model_{i}.png', show_shapes=True)
     train_and_print_results(
         f'Attention Typ {i}',
         model, x_train, y_train, x_test, y_test,

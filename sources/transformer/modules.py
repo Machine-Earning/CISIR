@@ -94,15 +94,16 @@ class BlockBase(Layer):
         self.attention_scores = None
         self.attention_block = None
 
-    def get_attention_scores(self) -> tf.Tensor:
-        """
-        Retrieve the most recently computed attention scores.
+    # NOTE: doesn't work!!Best to return them with the predictions 
+    # def get_attention_scores(self) -> tf.Tensor:
+    #     """
+    #     Retrieve the most recently computed attention scores.
 
-        Returns:
-            tf.Tensor: The attention scores from the last forward pass.
-                       Returns None if the layer hasn't been called yet.
-        """
-        return self.attention_scores
+    #     Returns:
+    #         tf.Tensor: The attention scores from the last forward pass.
+    #                    Returns None if the layer hasn't been called yet.
+    #     """
+    #     return self.attention_scores
 
     def get_config(self) -> dict:
         """
@@ -186,7 +187,7 @@ class BlockT1(BlockBase):
         # Pass the weighted inputs through the final dense layer
         output = self.dense_layer(weighted_inputs)
 
-        return output
+        return output, self.attention_scores
 
     def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
         """
@@ -259,7 +260,7 @@ class BlockT2(BlockBase):
         if self.output_activation:
             output = tf.keras.activations.get(self.output_activation)(output)
 
-        return output
+        return output, self.attention_scores
 
 
 class BlockT3(BlockBase):
@@ -339,7 +340,7 @@ class BlockT3(BlockBase):
         if self.output_activation:
             output = tf.keras.activations.get(self.output_activation)(output)
 
-        return output
+        return output, self.attention_scores
 
     def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
         """
@@ -433,7 +434,7 @@ class BlockT4(BlockBase):
         # Pass the weighted inputs through the final dense layer
         output = self.dense_layer(weighted_inputs)
 
-        return output
+        return output, self.attention_scores
 
     def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
         """
@@ -527,7 +528,7 @@ class BlockT5(BlockBase):
         # Pass the weighted inputs through the final dense layer
         output = self.dense_layer(weighted_inputs)
 
-        return output
+        return output, self.attention_scores
 
     def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
         """
@@ -595,7 +596,7 @@ class BlockT6(BlockBase):
         # Create the final dense layer
         self.dense_layer = Dense(1, activation=self.output_activation)
 
-    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+    def call(self, inputs: tf.Tensor, training=None) -> tf.Tensor:
         """
         Perform the forward pass of the BlockT6 layer.
 
@@ -627,7 +628,7 @@ class BlockT6(BlockBase):
         # Pass the weighted inputs through the final dense layer
         output = self.dense_layer(weighted_inputs)
 
-        return output
+        return output, self.attention_scores
 
     def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
         """
