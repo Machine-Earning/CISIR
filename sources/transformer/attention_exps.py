@@ -13,10 +13,27 @@ from tensorflow.keras.layers import Input
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from wandb.keras import WandbCallback
+import random
 
 # Importing the Blocks
 from sources.transformer.modules import BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6
 
+def set_seed(seed: int) -> None:
+    """
+    Set the seed for reproducibility.
+
+    Args:
+        seed (int): The seed value to use.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+
+    # Set TensorFlow to use deterministic operations
+    os.environ['TF_DETERMINISTIC_OPS'] = '1'
+
+set_seed(42)  # Set seed for reproducibility
 
 def generate_dataset(n_points: int) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -134,8 +151,12 @@ def train_and_print_results(
         callbacks=[WandbCallback(save_model=False)]
     )
 
-     # Evaluate the model - focus on the 'output' key
-    loss, mae = model.evaluate(x_test, {'output': y_test}, verbose=0)
+    # Evaluate the model - focus on the 'output' key
+    results = model.evaluate(x_test, {'output': y_test}, verbose=0, return_dict=True)
+    print('results')
+    print(results)
+    loss = results['loss']
+    mae = results['block_t1_1_mae']
     print(f"Test loss: {loss}")
     print(f"MAE loss: {mae}")
 
@@ -176,4 +197,4 @@ for i, block_class in enumerate(block_classes, start=1):
         model, x_train, y_train, x_test, y_test,
         initial_x, initial_y,
         learning_rate=0.001,
-        epochs=2000, batch_size=32)
+        epochs=500, batch_size=32)
