@@ -38,41 +38,102 @@ def set_seed(seed: int) -> None:
 set_seed(0)  # Set seed for reproducibility
 
 
-def generate_dataset(n_points: int) -> Tuple[np.ndarray, np.ndarray]:
+# def generate_dataset(n_points: int) -> Tuple[np.ndarray, np.ndarray]:
+#     """
+#     Generate a synthetic dataset based on the given rules.
+#     If x2 is negative, y = 2 * x1.
+#     If x2 is positive or zero, y = x1 + x2.
+
+#     Args:
+#         n_points (int): Number of data points to generate.
+
+#     Returns:
+#         Tuple[np.ndarray, np.ndarray]: Generated features and labels.
+#     """
+#     np.random.seed(0)
+
+#     # Generate x1: mix of integers and floats, positive and negative
+#     x1_int = np.random.randint(-5, 6, size=n_points // 2)
+#     x1_float = np.random.uniform(-5, 5, size=n_points - n_points // 2)
+#     x1 = np.concatenate([x1_int, x1_float])
+
+#     # Generate x2: mix of integers and floats, positive and negative
+#     x2_int = np.random.randint(-5, 6, size=n_points // 2)
+#     x2_float = np.random.uniform(-5, 5, size=n_points - n_points // 2)
+#     x2 = np.concatenate([x2_int, x2_float])
+
+#     # Shuffle the arrays to mix integers and floats
+#     np.random.shuffle(x1)
+#     np.random.shuffle(x2)
+
+#     # Generate y based on the rule
+#     y = np.where(x2 < 0, x1, x1 + x2)
+
+#     return np.stack((x1, x2), axis=1), y
+
+
+# # Test set
+# initial_x = np.array([
+#     [1, -1], [2, 1], [3, -3],
+#     [4, 5], [-1, -1], [-3, 2],
+#     [-5, 5], [-4, -5], [0, 0],
+#     [0, 4]
+# ])
+# initial_y = np.array([
+#     1, 3, 3,
+#     9, -1, -1,
+#     0, -4, 0,
+#     4
+# ])
+
+# # Generate additional data points for training
+# x_train, y_train = generate_dataset(5000)
+# # x_test, y_test = initial_x, initial_y
+# x_test, y_test = generate_dataset(1000)
+
+def generate_unique_dataset(n_points: int, exclude_set: set) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Generate a synthetic dataset based on the given rules.
-    If x2 is negative, y = 2 * x1.
-    If x2 is positive or zero, y = x1 + x2.
+    Generate a synthetic dataset ensuring no overlap with the exclude set.
 
     Args:
         n_points (int): Number of data points to generate.
+        exclude_set (set): Set of tuples representing points to exclude.
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: Generated features and labels.
     """
     np.random.seed(0)
+    unique_points = set()
+    x1_list, x2_list, y_list = [], [], []
 
-    # Generate x1: mix of integers and floats, positive and negative
-    x1_int = np.random.randint(-5, 6, size=n_points // 2)
-    x1_float = np.random.uniform(-5, 5, size=n_points - n_points // 2)
-    x1 = np.concatenate([x1_int, x1_float])
+    while len(unique_points) < n_points:
+        # Generate x1 and x2
+        x1_int = np.random.randint(-5, 6, size=n_points // 2)
+        x1_float = np.random.uniform(-5, 5, size=n_points - n_points // 2)
+        x1 = np.concatenate([x1_int, x1_float])
 
-    # Generate x2: mix of integers and floats, positive and negative
-    x2_int = np.random.randint(-5, 6, size=n_points // 2)
-    x2_float = np.random.uniform(-5, 5, size=n_points - n_points // 2)
-    x2 = np.concatenate([x2_int, x2_float])
+        x2_int = np.random.randint(-5, 6, size=n_points // 2)
+        x2_float = np.random.uniform(-5, 5, size=n_points - n_points // 2)
+        x2 = np.concatenate([x2_int, x2_float])
 
-    # Shuffle the arrays to mix integers and floats
-    np.random.shuffle(x1)
-    np.random.shuffle(x2)
+        # Shuffle the arrays to mix integers and floats
+        np.random.shuffle(x1)
+        np.random.shuffle(x2)
 
-    # Generate y based on the rule
-    y = np.where(x2 < 0, 2 * x1, x1 + x2)
+        for xi, xj in zip(x1, x2):
+            if len(unique_points) >= n_points:
+                break
+            point = (round(xi, 2), round(xj, 2))
+            if point not in exclude_set:
+                unique_points.add(point)
+                x1_list.append(xi)
+                x2_list.append(xj)
+                y = xi if xj < 0 else xi + xj
+                y_list.append(y)
 
-    return np.stack((x1, x2), axis=1), y
+    return np.stack((x1_list, x2_list), axis=1), np.array(y_list)
 
-
-# Test set
+# Initial test set
 initial_x = np.array([
     [1, -1], [2, 1], [3, -3],
     [4, 5], [-1, -1], [-3, 2],
@@ -80,16 +141,30 @@ initial_x = np.array([
     [0, 4]
 ])
 initial_y = np.array([
-    2, 3, 6,
-    9, -2, -1,
-    0, -9, 0,
+    1, 3, 3,
+    9, -1, -1,
+    0, -4, 0,
     4
 ])
 
-# Generate additional data points for training
-x_train, y_train = generate_dataset(5000)
-# x_test, y_test = initial_x, initial_y
-x_test, y_test = generate_dataset(1000)
+# Convert initial_x to a set of tuples for exclusion
+initial_set = set((round(xi[0], 2), round(xi[1], 2)) for xi in initial_x)
+
+# Generate training set ensuring no overlap with initial set
+x_train, y_train = generate_unique_dataset(5000, initial_set)
+
+# Combine initial set into the exclusion set for generating the final test set
+train_set = set((round(xi[0], 2), round(xi[1], 2)) for xi in x_train)
+total_exclude_set = initial_set.union(train_set)
+
+# Generate test set ensuring no overlap with training set and initial set
+x_test, y_test = generate_unique_dataset(1000, total_exclude_set)
+
+# Verify no overlap
+assert not set(map(tuple, x_test)).intersection(set(map(tuple, x_train)))
+assert not set(map(tuple, x_test)).intersection(initial_set)
+
+print("Training and test sets generated without overlap.")
 
 
 def create_model(block_class, input_shape: Tuple[int]) -> Model:
@@ -233,14 +308,16 @@ input_shape = (2,)
 block_classes = [BlockT0, BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6]
 
 for i, block_class in enumerate(block_classes):
+    if i not in [3]:
+        continue # skip the first 4
     # Create a unique experiment name with a timestamp
     current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
     experiment_name = f'Attention_Type{i}_{current_time}'
     # Initialize wandb
     LR = 1e-3
-    EPOCHS = 2000
-    BS = 32
-    PATIENCE = 200
+    EPOCHS = int(5e3)
+    BS = 256
+    PATIENCE = 250
 
     wandb.init(project="attention-exps", name=experiment_name, config={
         "learning_rate": LR,
