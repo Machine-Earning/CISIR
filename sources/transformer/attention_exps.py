@@ -264,7 +264,7 @@ for i, block_class in enumerate(block_classes):
     BS = 256
     PATIENCE = 250
 
-    wandb.init(project="attention-exps", name=experiment_name, config={
+    wandb.init(project="attention-exps-2", name=experiment_name, config={
         "learning_rate": LR,
         "epochs": EPOCHS,
         "batch_size": BS,

@@ -1,8 +1,28 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Union, Any
 
 import tensorflow as tf
+from tensorflow import Tensor
 from tensorflow.keras import backend as K
+from tensorflow.keras import regularizers
 from tensorflow.keras.layers import Layer, Dense, Multiply, Softmax, Activation
+
+
+class AwayFrom1Regularizer(regularizers.Regularizer):
+    """
+    Custom regularizer that encourages weights to be away from the value 1.
+
+    Attributes:
+        strength (float): The regularization strength.
+    """
+
+    def __init__(self, strength: float = 0.01):
+        self.strength = strength
+
+    def __call__(self, x):
+        return self.strength * K.sum(K.square(x - 1.0))
+
+    def get_config(self):
+        return {'strength': self.strength}
 
 
 class AttentionBlock(Layer):
@@ -162,10 +182,14 @@ class BlockT1(BlockBase):
             output_dim=input_shape[-1],
             activation=self.activation
         )
-        # Create the final dense layer
-        self.dense_layer = Dense(1, activation=self.output_activation)
+        # Create the final dense layer with custom regularization
+        self.dense_layer = Dense(
+            1,
+            activation=self.output_activation,
+            kernel_regularizer=AwayFrom1Regularizer(strength=1)  # Custom regularization
+        )
 
-    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+    def call(self, inputs: tf.Tensor) -> Dict[str, Any]:
         """
         Perform the forward pass of the BlockT1 layer.
 
@@ -235,7 +259,7 @@ class BlockT2(BlockBase):
             activation=self.activation
         )
 
-    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+    def call(self, inputs: tf.Tensor) -> Dict[str, Union[Tensor, Any]]:
         """
         Perform the forward pass of the BlockT2 layer.
 
@@ -303,7 +327,7 @@ class BlockT3(BlockBase):
         # Create a single dense layer for weights (w0, w1, w2, ...)
         self.dense_layer = Dense(input_shape[-1] + 1)
 
-    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+    def call(self, inputs: tf.Tensor) -> Dict[str, Union[Tensor, Any]]:
         """
         Perform the forward pass of the BlockT3 layer.
 
@@ -407,7 +431,7 @@ class BlockT4(BlockBase):
         # Create the final dense layer
         self.dense_layer = Dense(1, activation=self.output_activation)
 
-    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+    def call(self, inputs: tf.Tensor) -> Dict[str, Any]:
         """
         Perform the forward pass of the BlockT4 layer.
 
@@ -501,7 +525,7 @@ class BlockT5(BlockBase):
         # Create the final dense layer
         self.dense_layer = Dense(1, activation=self.output_activation)
 
-    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+    def call(self, inputs: tf.Tensor) -> Dict[str, Any]:
         """
         Perform the forward pass of the BlockT5 layer.
 
@@ -596,7 +620,7 @@ class BlockT6(BlockBase):
         # Create the final dense layer
         self.dense_layer = Dense(1, activation=self.output_activation)
 
-    def call(self, inputs: tf.Tensor, training=None) -> tf.Tensor:
+    def call(self, inputs: tf.Tensor, training=None) -> Dict[str, Any]:
         """
         Perform the forward pass of the BlockT6 layer.
 
@@ -641,6 +665,7 @@ class BlockT6(BlockBase):
         """
         return self.dense_layer.get_weights()
 
+
 class BlockT0(BlockBase):
     """
     A simple dense layer block with no attention mechanism.
@@ -670,7 +695,7 @@ class BlockT0(BlockBase):
         # Create a single dense layer for weights (w0, w1, w2, ...)
         self.dense_layer = Dense(1, activation=self.output_activation)
 
-    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+    def call(self, inputs: tf.Tensor) -> Dict[str, Any]:
         """
         Perform the forward pass of the BlockT0 layer.
 
@@ -695,4 +720,3 @@ class BlockT0(BlockBase):
                                          is the bias tensor.
         """
         return self.dense_layer.get_weights()
-
