@@ -156,7 +156,7 @@ def train_and_print_results(
     print('results')
     print(results)
     loss = results['loss']
-    mae = results['block_t1_1_mae']
+    mae = results[f'block_t{block_name}_1_mae']
     print(f"Test loss: {loss}")
     print(f"MAE loss: {mae}")
 
@@ -175,7 +175,7 @@ def train_and_print_results(
                [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])])
     df_results = pd.DataFrame(results, columns=headers)
     print(df_results)
-    wandb.log({"results": df_results})
+    wandb.log({"results": df_results}) # so coool you can log dataframes
 
 
 # Training and printing results for each attention type
@@ -187,14 +187,21 @@ for i, block_class in enumerate(block_classes, start=1):
     current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
     experiment_name = f'Attention_Type{i}_{current_time}'
     # Initialize wandb
+    LR = 0.001
+    EPOCHS = 2000
+    BS = 32
+    
     wandb.init(project="attention-exps", name=experiment_name)
     print(f"\nAttention Type {i}")
     model = create_model(block_class, input_shape)
     model.summary()
     # tf.keras.utils.plot_model(model, to_file=f'./model_{i}.png', show_shapes=True)
     train_and_print_results(
-        f'Attention Typ {i}',
+        i,
         model, x_train, y_train, x_test, y_test,
         initial_x, initial_y,
         learning_rate=0.001,
         epochs=500, batch_size=32)
+
+    # Finish the wandb run
+    wandb.finish()
