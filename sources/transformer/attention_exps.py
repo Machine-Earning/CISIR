@@ -227,7 +227,7 @@ def train_and_print_results(
 
         results = []
         for pred, true, inp, attn in zip(output_predictions, y_debug, x_debug, attention_scores):
-            attention_weighted_values = [a * w for a, w in zip(attn, dense_layer_weights[:, 0])]
+            attention_weighted_values = [a + w for a, w in zip(attn, dense_layer_weights[:, 0])]
             results.append(
                 [inp[0], inp[1], true, pred[0]]
                 + attn.tolist()

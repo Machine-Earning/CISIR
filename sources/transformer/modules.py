@@ -370,7 +370,7 @@ class BlockT3(BlockBase):
 
         return {'output': output, 'attention_scores': self.attention_scores}
 
-    def get_fixed_weights(self) -> tf.Tensor:
+    def get_dense_weights(self) -> tf.Tensor:
         """
         Retrieve the fixed weights (w0, w1, w2, ...).
 
@@ -378,7 +378,6 @@ class BlockT3(BlockBase):
             tf.Tensor: The fixed weights tensor.
         """
         return self.w
-
 
 
 class BlockT4(BlockBase):
