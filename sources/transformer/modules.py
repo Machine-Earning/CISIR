@@ -186,7 +186,7 @@ class BlockT1(BlockBase):
         self.dense_layer = Dense(
             1,
             activation=self.output_activation,
-            kernel_regularizer=AwayFrom1Regularizer(strength=0.01)  # Custom regularization
+            kernel_regularizer=AwayFrom1Regularizer(strength=0.001)  # Custom regularization
         )
 
     def call(self, inputs: tf.Tensor) -> Dict[str, Any]:
