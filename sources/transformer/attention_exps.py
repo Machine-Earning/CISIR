@@ -12,7 +12,7 @@ from tensorflow.keras.layers import Input
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
-from wandb.keras import WandbCallback
+from wandb.integration.keras import WandbCallback
 import random
 
 # Importing the Blocks
