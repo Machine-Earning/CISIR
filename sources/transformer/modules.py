@@ -299,7 +299,7 @@ class BlockT3(BlockBase):
         activation (str): The activation function to use in the attention block.
         output_activation (Optional[str]): The activation function to use in the final output.
         attention_block (AttentionBlock): The block used to compute attention scores.
-        dense_layer (Dense): The dense layer used to compute weights.
+        w (tf.Variable): Fixed weights to be added to attention scores.
     """
 
     def __init__(self,
@@ -307,7 +307,7 @@ class BlockT3(BlockBase):
                  activation: str = 'tanh',
                  output_activation: Optional[str] = None):
         super().__init__(attn_hidden_units, activation, output_activation)
-        self.dense_layer = None
+        self.w = None
 
     def build(self, input_shape: tf.TensorShape) -> None:
         """
@@ -324,10 +324,15 @@ class BlockT3(BlockBase):
             activation=self.activation
         )
 
-        # Create a single dense layer for weights (w0, w1, w2, ...)
-        self.dense_layer = Dense(input_shape[-1] + 1)
+        # Create fixed weights w (including w0)
+        self.w = self.add_weight(
+            name='fixed_weights',
+            shape=(input_shape[-1] + 1,),
+            initializer='random_normal',
+            trainable=True
+        )
 
-    def call(self, inputs: tf.Tensor) -> Dict[str, Union[Tensor, Any]]:
+    def call(self, inputs: tf.Tensor) -> Dict[str, Union[tf.Tensor, Any]]:
         """
         Perform the forward pass of the BlockT3 layer.
 
@@ -345,12 +350,9 @@ class BlockT3(BlockBase):
 
         self.attention_scores = attention_scores
 
-        # Compute weights (w0, w1, w2, ...)
-        weights = self.dense_layer(inputs)
-
         # Separate w0 from the rest of the weights
-        w0 = weights[:, 0:1]
-        w_rest = weights[:, 1:]
+        w0 = self.w[0]
+        w_rest = self.w[1:]
 
         # Add attention scores to the rest of the weights
         combined_weights = w_rest + attention_scores
@@ -359,23 +361,24 @@ class BlockT3(BlockBase):
         weighted_inputs = combined_weights * inputs
 
         # Sum up all components
-        output = w0 + tf.reduce_sum(weighted_inputs, axis=-1, keepdims=True)
+        intermediate_output = w0 + tf.reduce_sum(weighted_inputs, axis=-1, keepdims=True)
+
+        output = intermediate_output
 
         if self.output_activation:
             output = tf.keras.activations.get(self.output_activation)(output)
 
         return {'output': output, 'attention_scores': self.attention_scores}
 
-    def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
+    def get_fixed_weights(self) -> tf.Tensor:
         """
-        Retrieve the weights and bias of the output dense layer.
+        Retrieve the fixed weights (w0, w1, w2, ...).
 
         Returns:
-            Tuple[tf.Tensor, tf.Tensor]: A tuple containing the weights and bias of the dense layer.
-                                         The first element is the weight tensor, and the second
-                                         is the bias tensor.
+            tf.Tensor: The fixed weights tensor.
         """
-        return self.dense_layer.get_weights()
+        return self.w
+
 
 
 class BlockT4(BlockBase):
