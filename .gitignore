@@ -191,3 +191,5 @@ modules/training/code_snippet.py
 wandb/
 
 *.csv
+.idea/inspectionProfiles/profiles_settings.xml
+/.idea

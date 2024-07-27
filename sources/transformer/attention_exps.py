@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Tuple
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import numpy as np
 import pandas as pd
@@ -182,9 +182,9 @@ def train_and_print_results(
         {'output': y_train},
         epochs=epochs,
         batch_size=batch_size,
-        verbose=0,
+        verbose=1,
         validation_data=(x_test, {'output': y_test}),
-        callbacks=[early_stopping, WandbCallback(save_model=False)]
+        callbacks=[early_stopping, WandbCallback(save_model=False)],
     )
 
     # Evaluate the model - focus on the 'output' key
