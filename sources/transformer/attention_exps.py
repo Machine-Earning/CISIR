@@ -182,7 +182,7 @@ def train_and_print_results(
         {'output': y_train},
         epochs=epochs,
         batch_size=batch_size,
-        verbose=0,
+        verbose=1,
         validation_data=(x_test, {'output': y_test}),
         callbacks=[early_stopping, WandbCallback(save_model=False)]
     )
