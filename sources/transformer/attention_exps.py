@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Tuple
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import numpy as np
 import pandas as pd
@@ -17,6 +17,9 @@ import random
 
 # Importing the Blocks
 from sources.transformer.modules import *
+
+devices = tf.config.list_physical_devices('GPU')
+print(f'devices: {devices}')
 
 
 def set_seed(seed: int) -> None:

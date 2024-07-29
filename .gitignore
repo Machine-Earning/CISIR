@@ -193,3 +193,5 @@ wandb/
 *.csv
 .idea/inspectionProfiles/profiles_settings.xml
 /.idea
+.idea/keras-functional-api.iml
+.idea/misc.xml
