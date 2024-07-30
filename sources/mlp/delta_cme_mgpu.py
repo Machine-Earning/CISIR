@@ -9,8 +9,8 @@ from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-from tensorflow_addons.optimizers import AdamW
-from wandb.keras import WandbCallback
+from tensorflow.keras.optimizers import AdamW
+from wandb.integration.keras import WandbCallback
 import numpy as np
 
 from modules.training.DenseReweights import exDenseReweights
@@ -27,6 +27,7 @@ from modules.training.ts_modeling import (
 def main():
     """
     Main function to run the E-MLP model
+    TODO: debugg
     :return:
     """
 

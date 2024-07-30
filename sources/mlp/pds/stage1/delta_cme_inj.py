@@ -7,13 +7,13 @@ from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_re
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import numpy as np
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
-from wandb.keras import WandbCallback
+from wandb.integration.keras import WandbCallback
 
 from modules.training import cme_modeling
 from modules.training.cme_modeling import pds_space_norm
@@ -43,7 +43,8 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for add_slope in ADD_SLOPE:
-                    for alpha in [2, 5]:
+                    # for alpha in [0.2, 0, 0.1, 0.3, 0.4]:
+                    for alpha in [1, 0.5, 0.6, 0.7, 0.8, 0.9]:
                         # Set NumPy seed
                         np.random.seed(SEED)
 
@@ -107,7 +108,7 @@ def main():
                         n_inj = 2
 
                         # Initialize wandb
-                        wandb.init(project="nasa-ts-delta-v6-pds", name=experiment_name, config={
+                        wandb.init(project="nasa-ts-delta-v7-pds", name=experiment_name, config={
                             "inputs_to_use": inputs_to_use,
                             "add_slope": add_slope,
                             "target_change": target_change,
@@ -261,6 +262,17 @@ def main():
                             ]
                         )
 
+                                                # Evaluate PCC
+                        pcc = evaluate_pcc(model_sep, X_test_filtered, y_test_filtered)
+                        print(f"PCC: {pcc}")
+
+                        # Evaluate conditional PCC (i >= 0.5)
+                        pcc_cond = evaluate_pcc(model_sep, X_test_filtered, y_test_filtered, i_above_threshold=0.5)
+                        print(f"Conditional PCC (i >= 0.5): {pcc_cond}")
+
+                        # Log to wandb
+                        wandb.log({f"pcc_error_test": pcc, f"pcc_error_cond_test": pcc_cond})
+
                         # Evaluate the model correlation with colored
                         file_path = plot_repr_corr_dist(
                             model_sep,
@@ -333,16 +345,7 @@ def main():
                         wandb.log({'representation_correlation_density_plot_test': wandb.Image(file_path)})
                         print('file_path: ' + file_path)
 
-                        # Evaluate PCC
-                        pcc = evaluate_pcc(model_sep, X_test_filtered, y_test_filtered)
-                        print(f"PCC: {pcc}")
 
-                        # Evaluate conditional PCC (i >= 0.5)
-                        pcc_cond = evaluate_pcc(model_sep, X_test_filtered, y_test_filtered, i_above_threshold=0.5)
-                        print(f"Conditional PCC (i >= 0.5): {pcc_cond}")
-
-                        # Log to wandb
-                        wandb.log({f"pcc": pcc, f"pcc_plus": pcc_cond})
 
                         # Finish the wandb run
                         wandb.finish()

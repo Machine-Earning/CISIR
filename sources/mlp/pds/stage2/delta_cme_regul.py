@@ -4,13 +4,13 @@ from datetime import datetime
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-from tensorflow_addons.optimizers import AdamW
-from wandb.keras import WandbCallback
+from tensorflow.keras.optimizers import Adam
+from wandb.integration.keras import WandbCallback
 import numpy as np
 
 from modules.evaluate.utils import plot_tsne_delta, plot_repr_corr_dist
@@ -20,7 +20,6 @@ from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
     evaluate_mae,
-    evaluate_model_cond,
     process_sep_events,
     get_loss,
     filter_ds,
@@ -40,7 +39,8 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha in [0.3, 0.4, 0.5, 0.6]:
+                for alpha in [0.2, 0, 0.1, 0.3, 0.4]:
+                # for alpha in [1, 0.5, 0.6, 0.7, 0.8, 0.9]:
                     for add_slope in ADD_SLOPE:
                         # PARAMS
                         outputs_to_use = OUTPUTS_TO_USE
@@ -96,7 +96,7 @@ def main():
                         mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                         # Initialize wandb
-                        wandb.init(project="nasa-ts-delta-v6", name=experiment_name, config={
+                        wandb.init(project="nasa-ts-delta-v7", name=experiment_name, config={
                             "inputs_to_use": inputs_to_use,
                             "add_slope": add_slope,
                             "patience": patience,
@@ -258,7 +258,7 @@ def main():
 
                         # Compile the model with the specified learning rate
                         model_sep.compile(
-                            optimizer=AdamW(
+                            optimizer=Adam(
                                 learning_rate=learning_rate,
                                 weight_decay=weight_decay,
                                 beta_1=momentum_beta1
@@ -312,7 +312,7 @@ def main():
 
                         # Compile the model with the specified learning rate
                         final_model_sep.compile(
-                            optimizer=AdamW(
+                            optimizer=Adam(
                                 learning_rate=learning_rate,
                                 weight_decay=weight_decay,
                                 beta_1=momentum_beta1
@@ -402,7 +402,7 @@ def main():
 
                         # evaluate the model on test cme_files
                         above_threshold = mae_plus_threshold
-                        error_mae_cond = evaluate_model_cond(
+                        error_mae_cond = evaluate_mae(
                             final_model_sep, X_test, y_test, above_threshold=above_threshold)
 
                         print(f'mae error delta >= 0.1 test: {error_mae_cond}')
@@ -410,7 +410,7 @@ def main():
                         wandb.log({"mae_error_cond_test": error_mae_cond})
 
                         # evaluate the model on training cme_files
-                        error_mae_cond_train = evaluate_model_cond(
+                        error_mae_cond_train = evaluate_mae(
                             final_model_sep, X_train, y_train, above_threshold=above_threshold)
 
                         print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
