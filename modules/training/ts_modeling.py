@@ -888,7 +888,7 @@ def load_file_data(
     """
     # Initialization and file reading
     if inputs_to_use is None:
-        inputs_to_use = ['e0.5', 'e1.8', 'p']
+        inputs_to_use = ['e0.5', 'e4.4', 'p6.1', 'p']
     if outputs_to_use is None:
         outputs_to_use = ['delta_p']
 
@@ -1356,7 +1356,10 @@ def preprocess_cme_features(df: pd.DataFrame, inputs_to_use: List[str]) -> pd.Da
     intensity_mapping = {
         'e0.5': 'e0.5_max_intensity',
         'e1.8': 'e1.8_max_intensity',
-        'p': 'p_max_intensity'
+        'p': 'p_max_intensity',
+        'e4.4': 'e4.4_max_intensity',
+        'p6.1': 'p6.1_max_intensity',
+        'p33.0': 'p33.0_max_intensity'
     }
 
     # Natural Log Transformations for selected intensity columns
