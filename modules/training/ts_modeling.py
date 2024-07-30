@@ -1647,7 +1647,7 @@ def plot_and_evaluate_sep_event(
     Returns:
     - Tuple[float, str]: A tuple containing the MAE loss and the plot title.
     """
-    global actual_changes, predicted_changes, delta_count, selected_changes, mask
+    global actual_changes, predicted_changes, delta_count, selected_changes, mask, e44_intensity_log, p61_intensity_log, p330_intensity_log
     e18_intensity_log = None
 
     if add_slope:
@@ -1664,6 +1664,15 @@ def plot_and_evaluate_sep_event(
 
     if 'e1.8' in inputs_to_use:
         e18_intensity_log = np.log1p(df['e1.8_t'])  # Using log1p for numerical stability
+
+    if 'e4.4' in inputs_to_use:
+        e44_intensity_log = np.log1p(df['e4.4_t'])
+
+    if 'p6.1' in inputs_to_use:
+        p61_intensity_log = np.log1p(df['p6.1_t'])
+
+    if 'p33.0' in inputs_to_use:
+        p330_intensity_log = np.log1p(df['p33.0_t'])
 
     # Normalize the flux intensities
     df_norm = normalize_flux(df, input_columns, apply_log=True)
@@ -1745,6 +1754,12 @@ def plot_and_evaluate_sep_event(
     plt.plot(t_timestamps, e05_intensity_log, label='E 0.5 ln(Intensity)', color='orange', linewidth=lw)
     if 'e1.8' in inputs_to_use:
         plt.plot(t_timestamps, e18_intensity_log, label='E 1.8 ln(Intensity)', color='yellow', linewidth=lw)
+    if 'e4.4' in inputs_to_use:
+        plt.plot(t_timestamps, e44_intensity_log, label='E 4.4 ln(Intensity)', color='teal', linewidth=lw)
+    if 'p6.1' in inputs_to_use:
+        plt.plot(t_timestamps, p61_intensity_log, label='P 6.1 ln(Intensity)', color='purple', linewidth=lw)
+    if 'p33.0' in inputs_to_use:
+        plt.plot(t_timestamps, p330_intensity_log, label='P 33.0 ln(Intensity)', color='brown', linewidth=lw)
     if 'p' in inputs_to_use and 'delta_p' in outputs_to_use and show_persistent:
         plt.plot(timestamps, p_t_log, label='Persistent Model', color='black', linestyle=':', linewidth=tlw)
     if 'p' in inputs_to_use and 'delta_p' in outputs_to_use and show_changes:
@@ -1942,7 +1957,7 @@ def process_sep_events(
     """
 
     if inputs_to_use is None:
-        inputs_to_use = ['e0.5', 'e1.8', 'p']
+        inputs_to_use = ['e0.5', 'e4.4', 'p6.1', 'p']
 
     if outputs_to_use is None:
         outputs_to_use = ['delta_p', 'p']
