@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import tensorflow as tf
 import wandb
@@ -39,8 +39,8 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha in [0.2, 0, 0.1, 0.3, 0.4]:
-                # for alpha in [1, 0.5, 0.6, 0.7, 0.8, 0.9]:
+                # for alpha in [0.2, 0, 0.1, 0.3, 0.4]:
+                for alpha in [1, 0.5, 0.6, 0.7, 0.8, 0.9]:
                     for add_slope in ADD_SLOPE:
                         # PARAMS
                         outputs_to_use = OUTPUTS_TO_USE
@@ -314,7 +314,7 @@ def main():
                         final_model_sep.compile(
                             optimizer=Adam(
                                 learning_rate=learning_rate,
-                                weight_decay=weight_decay,
+                                # weight_decay=weight_decay,
                                 beta_1=momentum_beta1
                             ),
                             loss={
