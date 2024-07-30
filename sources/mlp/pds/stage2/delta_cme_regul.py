@@ -117,7 +117,7 @@ def main():
                             "dropout": dropout,
                             "activation": 'LeakyReLU',
                             "norm": norm,
-                            'optimizer': 'adamw',
+                            'optimizer': 'adam',
                             'output_dim': output_dim,
                             'architecture': 'mlp',
                             "pds": pds,
@@ -260,7 +260,7 @@ def main():
                         model_sep.compile(
                             optimizer=Adam(
                                 learning_rate=learning_rate,
-                                weight_decay=weight_decay,
+                                # weight_decay=weight_decay,
                                 beta_1=momentum_beta1
                             ),
                             loss={
