@@ -36,7 +36,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for add_slope in ADD_SLOPE:
-                    for alpha in [0.3, 0.4, 0.5, 0.6]:
+                    for alpha in [0.2, 0.1, 0, 0.3, 0.4]:
                         # PARAMS
                         # Set NumPy seed
                         np.random.seed(SEED)
