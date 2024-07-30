@@ -233,7 +233,7 @@ def main():
                         model_sep.compile(
                             optimizer=Adam(
                                 learning_rate=learning_rate,
-                                weight_decay=weight_decay,
+                                # weight_decay=weight_decay,
                                 beta_1=momentum_beta1
                             ),
                             loss={'forecast_head': get_loss(loss_key)}
@@ -276,7 +276,7 @@ def main():
                         final_model_sep.compile(
                             optimizer=Adam(
                                 learning_rate=learning_rate,
-                                weight_decay=weight_decay,
+                                # weight_decay=weight_decay,
                                 beta_1=momentum_beta1
                             ),
                             loss={'forecast_head': get_loss(loss_key)}
