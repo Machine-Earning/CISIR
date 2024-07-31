@@ -76,7 +76,7 @@ def main():
                             'batch_size': bs,  # Assuming batch_size is defined elsewhere
                             'epochs': EPOCHS,  # 35k epochs
                             'patience': PATIENCE,
-                            'learning_rate': START_LR_PDS,  # initial learning rate
+                            'learning_rate': START_LR,  # initial learning rate
                             'weight_decay': WEIGHT_DECAY_PDS,  # Added weight decay
                             'momentum_beta1': MOMENTUM_BETA1,  # Added momentum beta1
                         }

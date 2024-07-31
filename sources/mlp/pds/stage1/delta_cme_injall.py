@@ -6,7 +6,7 @@ from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_re
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import numpy as np
 import tensorflow as tf
@@ -45,8 +45,8 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for add_slope in ADD_SLOPE:
-                    # for alpha in [0.2, 0, 0.1, 0.3, 0.4]:
-                    for alpha in [1, 0.5, 0.6, 0.7, 0.8, 0.9]:
+                    for alpha in [0.2, 0, 0.1, 0.3, 0.4]:
+                    # for alpha in [1, 0.5, 0.6, 0.7, 0.8, 0.9]:
                         # Set NumPy seed
                         np.random.seed(SEED)
 
@@ -87,7 +87,7 @@ def main():
                         hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                         pds = True
                         target_change = ('delta_p' in outputs_to_use)
-                        repr_dim = OUTPUT_DIM
+                        repr_dim = REPR_DIM
                         dropout_rate = DROPOUT
                         activation = ACTIVATION
                         norm = NORM
