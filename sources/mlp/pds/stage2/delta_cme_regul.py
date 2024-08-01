@@ -39,8 +39,8 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha in [0.3, 0.4]:
-                # for alpha in [0.6, 0.7, 0.8, 0.9]:
+                # for alpha in [0.4]:
+                for alpha in [0.8, 0.9]:
                     for add_slope in ADD_SLOPE:
                         # PARAMS
                         outputs_to_use = OUTPUTS_TO_USE
