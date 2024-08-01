@@ -95,32 +95,36 @@ def sam_train_step(
             y, y_pred, sample_weight=sample_weight, regularization_losses=self.losses
         )
 
-    # Compute gradients
+    # Compute gradients without perturbation
     trainable_vars = self.trainable_variables
     gradients = tape.gradient(loss, trainable_vars)
 
-    # First step of SAM: perturb weights
+    # perturb weights
     e_ws = []
     grad_norm = tf.linalg.global_norm(gradients)
     ew_multiplier = rho / (grad_norm + eps)
     for grad, var in zip(gradients, trainable_vars):
         e_w = tf.math.multiply(grad, ew_multiplier)
-        var.assign_add(e_w)
+        var.assign_add(e_w)  # w + e_hat(w)
         e_ws.append(e_w)
 
-    # Second forward pass and gradient computation
+    # Second forward pass and gradient computation with perturbed weights
     with tf.GradientTape() as tape:
         y_pred = self(x, training=True)
         loss = self.compiled_loss(
             y, y_pred, sample_weight=sample_weight, regularization_losses=self.losses
         )
 
-    gradients = tape.gradient(loss, trainable_vars)
+    # Compute gradients with perturbed weights
+    perturbed_gradients = tape.gradient(loss, trainable_vars)
 
-    # Second step of SAM: revert perturbation and apply update
+    # revert perturbation to get the original parameters
     for var, e_w in zip(trainable_vars, e_ws):
         var.assign_sub(e_w)
-    self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+
+    # Apply the actual "sharpness-aware" update
+    # using the based parameters and perturbed gradients
+    self.optimizer.apply_gradients(zip(perturbed_gradients, trainable_vars))
 
     # Update and return metrics
     self.compiled_metrics.update_state(y, y_pred, sample_weight=sample_weight)
@@ -133,6 +137,10 @@ class SAMModel(tf.keras.Model):
     Custom Keras Model class that integrates Sharpness-Aware Minimization (SAM) into the training step.
     """
 
+    def __init__(self, *args, rho=0.05, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.rho = rho
+
     def train_step(self, data: any) -> dict:
         """
         Overrides the default train_step method to use SAM.
@@ -143,4 +151,4 @@ class SAMModel(tf.keras.Model):
         Returns:
             dict: A dictionary containing the training loss and metrics.
         """
-        return sam_train_step(self, data)
+        return sam_train_step(self, data, rho=self.rho)

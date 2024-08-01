@@ -37,6 +37,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
 
 from modules.training.cme_modeling import NormalizeLayer
+from modules.training.sam_keras import SAMModel
 
 # Seeds for reproducibility
 seed_value = 42
@@ -407,6 +408,7 @@ def create_mlp(
         activation=None,
         norm: str = None,
         residual: bool = False,
+        sam_rho: float = 0.9,
         name: str = 'mlp'
 ) -> Model:
     """
@@ -425,6 +427,7 @@ def create_mlp(
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None (no normalization).
     - skipped_layers (int): Number of layers between residual connections.
     - residual (bool): If True, add residual connections for every 'skipped_layers' hidden layers.
+    - sam_rho (float): Size of the neighborhood for perturbation in SAM. Default is 0.9. if 0.0, SAM is not used.
 
     Returns:
     - Model: A Keras model instance.
@@ -485,7 +488,10 @@ def create_mlp(
     else:
         model_output = final_repr_output
 
-    model = Model(inputs=input_layer, outputs=model_output, name=name)
+    if sam_rho > 0.0:
+        model = SAMModel(inputs=input_layer, outputs=model_output, rho=sam_rho, name=name)
+    else:
+        model = Model(inputs=input_layer, outputs=model_output, name=name)
     return model
 
 
