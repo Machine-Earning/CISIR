@@ -288,7 +288,7 @@ class ModelBuilder:
                       residual: bool = False,
                       skipped_layers: int = 2,
                       name: str = 'mlp',
-                      sam: bool = True) -> Model:
+                      sam_rho: float = 0.05) -> Model:
         """
         Add a regression head with one output unit and a projection layer to an existing model,
         replacing the existing prediction layer and optionally the decoder layer.
@@ -305,7 +305,7 @@ class ModelBuilder:
         :param residual: Whether to add residual connections for every 'skipped_layers' hidden layers.
         :param skipped_layers: Number of layers between residual connections.
         :param name: Name of the model.
-        :param sam: Whether to use the Sharpness-Aware Minimization (SAM) optimizer.
+        :param sam_rho: Rho value for sharpness-aware minimization (SAM). Default is 0.05. if 0.0, SAM is not used.
         :return: The modified model with a projection layer and a regression head.
         """
 
@@ -372,9 +372,10 @@ class ModelBuilder:
         # Add a Dense layer with one output unit for regression
         output_layer = Dense(output_dim, activation='linear', name=f"forecast_head")(x_proj)
 
-        if sam:
+        if sam_rho > 0.0:
             # create the new extended SAM model
-            extended_model = SAMModel(inputs=new_base_model.input, outputs=[repr_output, output_layer], name=name)
+            extended_model = SAMModel(inputs=new_base_model.input, outputs=[repr_output, output_layer], rho=sam_rho,
+                                      name=name)
         else:
             # Create the new extended model
             extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer], name=name)

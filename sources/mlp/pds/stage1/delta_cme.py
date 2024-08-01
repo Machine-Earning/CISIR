@@ -131,7 +131,7 @@ def main():
                                 "upper_t": upper_threshold,
                                 'mae_plus_th': mae_plus_threshold,
                                 "cme_speed_threshold": cme_speed_threshold,
-                                "rho": rho
+                                "sam_rho": rho
                             })
 
                             # set the root directory
