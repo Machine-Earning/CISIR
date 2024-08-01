@@ -408,7 +408,7 @@ def create_mlp(
         activation=None,
         norm: str = None,
         residual: bool = False,
-        sam_rho: float = 0.9,
+        sam_rho: float = 0.05,
         name: str = 'mlp'
 ) -> Model:
     """

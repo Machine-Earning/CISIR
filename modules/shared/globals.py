@@ -1,4 +1,4 @@
-   # Global configurations
+# Global configurations
 SEEDS = [456789]  # Seeds for reproducibility
 INPUTS_TO_USE = [['e0.5', 'e4.4', 'p6.1', 'p']]  # Inputs to use
 OUTPUTS_TO_USE = ['delta_p']  # Output to use
@@ -50,3 +50,4 @@ ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
 ES_CB_RESTORE_WEIGHTS = False  # Restore weights
 WANDB_SAVE_MODEL = False  # Save model to wandb
 RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
+SAM_RHOS = [0.05, 0.1, 0.3, 0.6, 0.9]  # Rho values for SAM
