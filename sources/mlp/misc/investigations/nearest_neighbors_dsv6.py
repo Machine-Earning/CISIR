@@ -22,7 +22,7 @@ def main() -> None:
     Main function to run the E-MLP model.
     """
     for seed in SEEDS:
-        for inputs_to_use in INPUTS_TO_USE:
+        for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha in [0.5]:
                     for add_slope in ADD_SLOPE:
@@ -86,8 +86,8 @@ def main() -> None:
                         n_features = X_test.shape[1]
                         print(f'n_features: {n_features}')
 
-                        weight_path = (f"/home1/jmoukpe2016/keras-functional-api/final_model_weights_MLP_e0_5_e4_4_p6_1_p_slopeFalse_alpha0.50_CME0_20240731-075648_reg.h5")
-                        # weight_path = (f"/home1/jmoukpe2016/keras-functional-api/final_model_weights_MLP_e0_5_e1_8_p_slopeFalse_alpha0.50_CME0_20240731-115408_reg.h5")
+                        # weight_path = (f"/home1/jmoukpe2016/keras-functional-api/final_model_weights_MLP_e0_5_e4_4_p6_1_p_slopeFalse_alpha0.50_CME0_20240731-075648_reg.h5")
+                        weight_path = (f"/home1/jmoukpe2016/keras-functional-api/final_model_weights_MLP_e0_5_e1_8_p_slopeFalse_alpha0.50_CME0_20240731-115408_reg.h5")
                         final_model_sep = create_mlp(
                             input_dim=n_features,
                             hiddens=hiddens,

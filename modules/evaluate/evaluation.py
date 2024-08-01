@@ -19,211 +19,58 @@ from sklearn.neighbors import NearestNeighbors
 from tensorflow.keras import Model
 
 from modules.training.cme_modeling import error
-
-
-# def find_k_nearest_neighbors(
-#         X_test: np.ndarray,
-#         y_test: np.ndarray,
-#         predictions: np.ndarray,
-#         k_neighbors: int = 3,
-#         threshold: float = 0.5,
-#         max_samples: Optional[int] = None,
-#         log_results: bool = True,
-#         logger: Optional[logging.Logger] = None
-# ) -> List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]:
-#     """
-#     Find the k nearest neighbors for each point in the test set with target labels greater than the threshold.
-#     Results are sorted in ascending order of the test points' actual target labels before logging.
-#
-#     Args:
-#         X_test (np.ndarray): Test data features.
-#         y_test (np.ndarray): Test data target labels (1D array).
-#         predictions (np.ndarray): Model predictions for the test data (1D array).
-#         k_neighbors (int): Number of nearest neighbors to find.
-#         threshold (float): Threshold for selecting positive samples.
-#         max_samples (Optional[int]): Maximum number of samples to process.
-#         log_results (bool): Whether to log the results.
-#         logger (Optional[logging.Logger]): Logger object to use. If None, a new logger will be created.
-#
-#     Returns:
-#         List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]: Sorted list of tuples containing:
-#             - Test point index
-#             - Actual target label
-#             - Predicted label
-#             - List of tuples for each neighbor:
-#                 - Distance
-#                 - Neighbor index
-#                 - Neighbor's target label
-#                 - Neighbor's predicted label
-#     """
-#     if k_neighbors >= len(X_test):
-#         raise ValueError(f"k ({k_neighbors}) must be less than the number of test samples ({len(X_test)})")
-#
-#     if len(X_test) != len(y_test) or len(X_test) != len(predictions):
-#         raise ValueError("Inconsistent lengths of input arrays")
-#
-#     if log_results and logger is None:
-#         logger = logging.getLogger(__name__)
-#         logger.setLevel(logging.INFO)
-#         if not logger.handlers:
-#             handler = logging.StreamHandler()
-#             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-#             handler.setFormatter(formatter)
-#             logger.addHandler(handler)
-#
-#     # k+1 because the point itself is included
-#     nbrs = NearestNeighbors(n_neighbors=k_neighbors + 1, algorithm='auto').fit(X_test)
-#
-#     y_test = y_test.flatten()
-#     predictions = predictions.flatten()
-#
-#     large_positives_indices = np.where(y_test > threshold)[0]
-#     if max_samples:
-#         large_positives_indices = large_positives_indices[:max_samples]
-#
-#     if log_results:
-#         logger.info(f"Processing {len(large_positives_indices)} samples with target labels > {threshold}")
-#
-#     results = []
-#     for idx in large_positives_indices:
-#         distances, indices = nbrs.kneighbors([X_test[idx]])
-#         # Remove the first neighbor (which is the point itself)
-#         neighbors = [
-#             (float(dist), int(neighbor_idx), float(y_test[neighbor_idx]), float(predictions[neighbor_idx]))
-#             for dist, neighbor_idx in zip(distances[0][1:], indices[0][1:])
-#         ]
-#         result = (int(idx), float(y_test[idx]), float(predictions[idx]), neighbors)
-#         results.append(result)
-#
-#     # Sort results based on the actual target labels of test points
-#     sorted_results = sorted(results, key=lambda x: x[1])
-#
-#     if log_results:
-#         logger.info(f"Processed and sorted {len(sorted_results)} samples")
-#         logger.info("Results sorted in ascending order of test points' actual target labels")
-#         for idx, true_label, pred_label, neighbors in sorted_results:
-#             logger.info(f"Test point {idx}: true={true_label:.2f}, pred={pred_label:.2f}")
-#             for i, (dist, neighbor_idx, neighbor_true, neighbor_pred) in enumerate(neighbors):
-#                 logger.info(
-#                     f"  Neighbor {i + 1}: idx={neighbor_idx}, dist={dist:.4f}, true={neighbor_true:.2f}, pred={neighbor_pred:.2f}")
-#
-#     return sorted_results
-
-# def find_k_nearest_neighbors(
-#         X_test: np.ndarray,
-#         y_test: np.ndarray,
-#         predictions: np.ndarray,
-#         third_e_features: np.ndarray,
-#         k_neighbors: int = 3,
-#         threshold: float = 0.5,
-#         max_samples: Optional[int] = None,
-#         log_results: bool = True,
-#         max_features_to_log: int = 5,
-#         logger: Optional[logging.Logger] = None
-# ) -> List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]:
-#     """
-#     Find the k nearest neighbors for each point in the test set with target labels greater than the threshold.
-#     Results are sorted in ascending order of the test points' actual target labels before logging.
-#
-#     Args:
-#         X_test (np.ndarray): Test data features.
-#         y_test (np.ndarray): Test data target labels (1D array).
-#         predictions (np.ndarray): Model predictions for the test data (1D array).
-#         third_e_features (np.ndarray): Additional features to be printed alongside the input features.
-#         k_neighbors (int): Number of nearest neighbors to find.
-#         threshold (float): Threshold for selecting positive samples.
-#         max_samples (Optional[int]): Maximum number of samples to process.
-#         log_results (bool): Whether to log the results.
-#         max_features_to_log (int): Maximum number of features to log.
-#         logger (Optional[logging.Logger]): Logger object to use. If None, a new logger will be created.
-#
-#     Returns:
-#         List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]: Sorted list of tuples containing:
-#             - Test point index
-#             - Actual target label
-#             - Predicted label
-#             - List of tuples for each neighbor:
-#                 - Distance
-#                 - Neighbor index
-#                 - Neighbor's target label
-#                 - Neighbor's predicted label
-#     """
-#     if k_neighbors >= len(X_test):
-#         raise ValueError(f"k ({k_neighbors}) must be less than the number of test samples ({len(X_test)})")
-#
-#     if len(X_test) != len(y_test) or len(X_test) != len(predictions) or len(X_test) != len(third_e_features):
-#         raise ValueError("Inconsistent lengths of input arrays")
-#
-#     if log_results and logger is None:
-#         logger = logging.getLogger(__name__)
-#         logger.setLevel(logging.INFO)
-#         if not logger.handlers:
-#             handler = logging.StreamHandler()
-#             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-#             handler.setFormatter(formatter)
-#             logger.addHandler(handler)
-#
-#     # k+1 because the point itself is included
-#     nbrs = NearestNeighbors(n_neighbors=k_neighbors + 1, algorithm='auto').fit(X_test)
-#
-#     y_test = y_test.flatten()
-#     predictions = predictions.flatten()
-#
-#     large_positives_indices = np.where((y_test > threshold) & (predictions < threshold))[0]
-#     if max_samples:
-#         large_positives_indices = large_positives_indices[:max_samples]
-#
-#     if log_results:
-#         logger.info(
-#             f"Processing {len(large_positives_indices)} samples with target labels > {threshold} and predictions < {threshold}")
-#
-#     results = []
-#     for idx in large_positives_indices:
-#         distances, indices = nbrs.kneighbors([X_test[idx]])
-#         # Remove the first neighbor (which is the point itself)
-#         neighbors = [
-#             (float(dist), int(neighbor_idx), float(y_test[neighbor_idx]), float(predictions[neighbor_idx]))
-#             for dist, neighbor_idx in zip(distances[0][1:], indices[0][1:])
-#         ]
-#         result = (int(idx), float(y_test[idx]), float(predictions[idx]), neighbors, X_test[idx], third_e_features[idx])
-#         results.append(result)
-#
-#     # Sort results based on the actual target labels of test points
-#     sorted_results = sorted(results, key=lambda x: x[1])
-#
-#     if log_results:
-#         logger.info(f"Processed and sorted {len(sorted_results)} samples")
-#         logger.info("Results sorted in ascending order of test points' actual target labels")
-#         for idx, true_label, pred_label, neighbors, features, third_e_features in sorted_results:
-#             main_features = ", ".join(f"{f:.2f}" for f in features[:max_features_to_log])
-#             additional_features = ", ".join(f"{f:.2f}" for f in third_e_features[:max_features_to_log])
-#             log_message = f"Test point {idx}: true={true_label:.2f}, pred={pred_label:.2f}"
-#             log_message += f", features=[{main_features}]"
-#             log_message += f", third_e_features=[{additional_features}]"
-#             if len(features) > max_features_to_log or len(third_e_features) > max_features_to_log:
-#                 log_message += " ..."
-#             logger.info(log_message)
-#             for i, (dist, neighbor_idx, neighbor_true, neighbor_pred) in enumerate(neighbors):
-#                 logger.info(
-#                     f"  Neighbor {i + 1}: idx={neighbor_idx}, dist={dist:.4f}, true={neighbor_true:.2f}, pred={neighbor_pred:.2f}")
-#
-#     return sorted_results
+import logging
 
 
 def find_k_nearest_neighbors(
         X_test: np.ndarray,
         y_test: np.ndarray,
         predictions: np.ndarray,
-        third_e_features: np.ndarray,
         k_neighbors: int = 3,
         threshold: float = 0.5,
-        max_samples: Optional[int] = None
+        max_samples: Optional[int] = None,
+        log_results: bool = True,
+        logger: Optional[logging.Logger] = None
 ) -> List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]:
+    """
+    Find the k nearest neighbors for each point in the test set with target labels greater than the threshold.
+    Results are sorted in ascending order of the test points' actual target labels before logging.
+
+    Args:
+        X_test (np.ndarray): Test data features.
+        y_test (np.ndarray): Test data target labels (1D array).
+        predictions (np.ndarray): Model predictions for the test data (1D array).
+        k_neighbors (int): Number of nearest neighbors to find.
+        threshold (float): Threshold for selecting positive samples.
+        max_samples (Optional[int]): Maximum number of samples to process.
+        log_results (bool): Whether to log the results.
+        logger (Optional[logging.Logger]): Logger object to use. If None, a new logger will be created.
+
+    Returns:
+        List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]: Sorted list of tuples containing:
+            - Test point index
+            - Actual target label
+            - Predicted label
+            - List of tuples for each neighbor:
+                - Distance
+                - Neighbor index
+                - Neighbor's target label
+                - Neighbor's predicted label
+    """
     if k_neighbors >= len(X_test):
         raise ValueError(f"k ({k_neighbors}) must be less than the number of test samples ({len(X_test)})")
 
-    if len(X_test) != len(y_test) or len(X_test) != len(predictions) or len(X_test) != len(third_e_features):
+    if len(X_test) != len(y_test) or len(X_test) != len(predictions):
         raise ValueError("Inconsistent lengths of input arrays")
+
+    if log_results and logger is None:
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
 
     # k+1 because the point itself is included
     nbrs = NearestNeighbors(n_neighbors=k_neighbors + 1, algorithm='auto').fit(X_test)
@@ -231,9 +78,12 @@ def find_k_nearest_neighbors(
     y_test = y_test.flatten()
     predictions = predictions.flatten()
 
-    large_positives_indices = np.where((y_test > threshold) & (predictions < threshold))[0]
+    large_positives_indices = np.where(y_test > threshold)[0]
     if max_samples:
         large_positives_indices = large_positives_indices[:max_samples]
+
+    if log_results:
+        logger.info(f"Processing {len(large_positives_indices)} samples with target labels > {threshold}")
 
     results = []
     for idx in large_positives_indices:
@@ -246,13 +96,153 @@ def find_k_nearest_neighbors(
         result = (int(idx), float(y_test[idx]), float(predictions[idx]), neighbors)
         results.append(result)
 
-        # Plot and save the features for this test point
-        plot_feature_channels(X_test[idx], third_e_features[idx], idx, y_test[idx], predictions[idx])
-
     # Sort results based on the actual target labels of test points
     sorted_results = sorted(results, key=lambda x: x[1])
 
+    if log_results:
+        logger.info(f"Processed and sorted {len(sorted_results)} samples")
+        logger.info("Results sorted in ascending order of test points' actual target labels")
+        for idx, true_label, pred_label, neighbors in sorted_results:
+            logger.info(f"Test point {idx}: true={true_label:.2f}, pred={pred_label:.2f}")
+            for i, (dist, neighbor_idx, neighbor_true, neighbor_pred) in enumerate(neighbors):
+                logger.info(
+                    f"  Neighbor {i + 1}: idx={neighbor_idx}, dist={dist:.4f}, true={neighbor_true:.2f}, pred={neighbor_pred:.2f}")
+
     return sorted_results
+
+# def find_k_nearest_neighbors(
+#         X_test: np.ndarray,
+#         y_test: np.ndarray,
+#         predictions: np.ndarray,
+#         k_neighbors: int = 3,
+#         threshold: float = 0.5,
+#         max_samples: Optional[int] = None,
+#         log_results: bool = True,
+#         logger: Optional[logging.Logger] = None
+# ) -> List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]:
+#     """
+#     Find the k nearest neighbors for each point in the test set with target labels greater than the threshold.
+#     Results are sorted in ascending order of the test points' actual target labels before logging.
+
+#     Args:
+#         X_test (np.ndarray): Test data features.
+#         y_test (np.ndarray): Test data target labels (1D array).
+#         predictions (np.ndarray): Model predictions for the test data (1D array).
+#         k_neighbors (int): Number of nearest neighbors to find.
+#         threshold (float): Threshold for selecting positive samples.
+#         max_samples (Optional[int]): Maximum number of samples to process.
+#         log_results (bool): Whether to log the results.
+#         logger (Optional[logging.Logger]): Logger object to use. If None, a new logger will be created.
+
+#     Returns:
+#         List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]: Sorted list of tuples containing:
+#             - Test point index
+#             - Actual target label
+#             - Predicted label
+#             - List of tuples for each neighbor:
+#                 - Distance
+#                 - Neighbor index
+#                 - Neighbor's target label
+#                 - Neighbor's predicted label
+#     """
+#     if k_neighbors >= len(X_test):
+#         raise ValueError(f"k ({k_neighbors}) must be less than the number of test samples ({len(X_test)})")
+
+#     if len(X_test) != len(y_test) or len(X_test) != len(predictions):
+#         raise ValueError("Inconsistent lengths of input arrays")
+
+#     if log_results and logger is None:
+#         logger = logging.getLogger(__name__)
+#         logger.setLevel(logging.INFO)
+#         if not logger.handlers:
+#             handler = logging.StreamHandler()
+#             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+#             handler.setFormatter(formatter)
+#             logger.addHandler(handler)
+
+#     # k+1 because the point itself is included
+#     nbrs = NearestNeighbors(n_neighbors=k_neighbors + 1, algorithm='auto').fit(X_test)
+
+#     y_test = y_test.flatten()
+#     predictions = predictions.flatten()
+
+#     large_positives_indices = np.where((y_test > threshold) & (predictions < threshold))[0]
+#     if max_samples:
+#         large_positives_indices = large_positives_indices[:max_samples]
+
+#     if log_results:
+#         logger.info(
+#             f"Processing {len(large_positives_indices)} samples with target labels > {threshold} and predictions < {threshold}")
+
+#     results = []
+#     for idx in large_positives_indices:
+#         distances, indices = nbrs.kneighbors([X_test[idx]])
+#         # Remove the first neighbor (which is the point itself)
+#         neighbors = [
+#             (float(dist), int(neighbor_idx), float(y_test[neighbor_idx]), float(predictions[neighbor_idx]))
+#             for dist, neighbor_idx in zip(distances[0][1:], indices[0][1:])
+#         ]
+#         result = (int(idx), float(y_test[idx]), float(predictions[idx]), neighbors)
+#         results.append(result)
+
+#     # Sort results based on the actual target labels of test points
+#     sorted_results = sorted(results, key=lambda x: x[1])
+
+#     if log_results:
+#         logger.info(f"Processed and sorted {len(sorted_results)} samples")
+#         logger.info("Results sorted in ascending order of test points' actual target labels")
+#         for idx, true_label, pred_label, neighbors in sorted_results:
+#             logger.info(f"Test point {idx}: true={true_label:.2f}, pred={pred_label:.2f}")
+#             for i, (dist, neighbor_idx, neighbor_true, neighbor_pred) in enumerate(neighbors):
+#                 logger.info(
+#                     f"  Neighbor {i + 1}: idx={neighbor_idx}, dist={dist:.4f}, true={neighbor_true:.2f}, pred={neighbor_pred:.2f}")
+
+#     return sorted_results
+
+
+# def find_k_nearest_neighbors(
+#         X_test: np.ndarray,
+#         y_test: np.ndarray,
+#         predictions: np.ndarray,
+#         third_e_features: np.ndarray,
+#         k_neighbors: int = 3,
+#         threshold: float = 0.5,
+#         max_samples: Optional[int] = None
+# ) -> List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]:
+#     if k_neighbors >= len(X_test):
+#         raise ValueError(f"k ({k_neighbors}) must be less than the number of test samples ({len(X_test)})")
+
+#     if len(X_test) != len(y_test) or len(X_test) != len(predictions) or len(X_test) != len(third_e_features):
+#         raise ValueError("Inconsistent lengths of input arrays")
+
+#     # k+1 because the point itself is included
+#     nbrs = NearestNeighbors(n_neighbors=k_neighbors + 1, algorithm='auto').fit(X_test)
+
+#     y_test = y_test.flatten()
+#     predictions = predictions.flatten()
+
+#     large_positives_indices = np.where((y_test > threshold) & (predictions < threshold))[0]
+#     if max_samples:
+#         large_positives_indices = large_positives_indices[:max_samples]
+
+#     results = []
+#     for idx in large_positives_indices:
+#         distances, indices = nbrs.kneighbors([X_test[idx]])
+#         # Remove the first neighbor (which is the point itself)
+#         neighbors = [
+#             (float(dist), int(neighbor_idx), float(y_test[neighbor_idx]), float(predictions[neighbor_idx]))
+#             for dist, neighbor_idx in zip(distances[0][1:], indices[0][1:])
+#         ]
+#         result = (int(idx), float(y_test[idx]), float(predictions[idx]), neighbors)
+#         results.append(result)
+
+#         # Plot and save the features for this test point
+#         plot_feature_channels(X_test[idx], third_e_features[idx], idx, y_test[idx], predictions[idx])
+
+#     # Sort results based on the actual target labels of test points
+#     sorted_results = sorted(results, key=lambda x: x[1])
+
+#     return sorted_results
 
 
 def plot_feature_channels(features, third_e_features, idx, true_label, pred_label):
