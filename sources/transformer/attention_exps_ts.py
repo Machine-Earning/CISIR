@@ -1,22 +1,22 @@
 import os
+import random
 from datetime import datetime
 from typing import Tuple
-
-# Set the environment variable for CUDA (in case it is necessary)
-# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import numpy as np
 import pandas as pd
 import wandb
+from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import Input
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping
 from wandb.integration.keras import WandbCallback
-import random
 
 # Importing the Blocks
 from sources.transformer.modules import *
+
+# Set the environment variable for CUDA (in case it is necessary)
+# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
@@ -41,81 +41,109 @@ def set_seed(seed: int) -> None:
 set_seed(0)  # Set seed for reproducibility
 
 
-def generate_unique_dataset(n_points: int, exclude_set: set) -> Tuple[np.ndarray, np.ndarray]:
+def create_event_series(event_type: str) -> np.ndarray:
     """
-    Generate a synthetic dataset ensuring no overlap with the exclude set.
+    Create a time series for a specific event type.
 
     Args:
-        n_points (int): Number of data points to generate.
-        exclude_set (set): Set of tuples representing points to exclude.
+        event_type (str): Type of the event ('fast' or 'slow').
+
+    Returns:
+        np.ndarray: Time series data.
+    """
+    series = np.ones(30)
+    if event_type == 'fast':
+        series[10:20] = np.linspace(1, 10, 10)  # Increase by 1 for 10 timestamps
+    elif event_type == 'slow':
+        series[10:20] = np.linspace(1, 3, 10)  # Increase by 0.2 for 10 timestamps
+    series[20:] = series[19]  # Plateau after rise
+    return series
+
+
+def generate_time_series_data(n_samples: int, shuffle: bool = True) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Generate synthetic time series data for fast rising and slow rising events.
+
+    Args:
+        n_samples (int): Number of samples to generate for each type.
+        shuffle (bool): Whether to shuffle the generated data.
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: Generated features and labels.
     """
-    np.random.seed(0)
-    unique_points = set()
-    x1_list, x2_list, y_list = [], [], []
+    x_list, y_list = [], []
 
-    while len(unique_points) < n_points:
-        # Generate x1 and x2
-        x1_int = np.random.randint(-5, 6, size=n_points // 2)
-        x1_float = np.random.uniform(-5, 5, size=n_points - n_points // 2)
-        x1 = np.concatenate([x1_int, x1_float])
+    for _ in range(n_samples):
+        for event_type in ['fast', 'slow']:
+            series = create_event_series(event_type)
+            for t in range(4, 30):
+                x_list.append(series[t - 4:t + 1])
+                y_list.append(series[min(t + 6, 29)])  # Ensure we don't go out of bounds
 
-        x2_int = np.random.randint(-5, 6, size=n_points // 2)
-        x2_float = np.random.uniform(-5, 5, size=n_points - n_points // 2)
-        x2 = np.concatenate([x2_int, x2_float])
+    x_array = np.array(x_list)
+    y_array = np.array(y_list)
 
-        # Shuffle the arrays to mix integers and floats
-        np.random.shuffle(x1)
-        np.random.shuffle(x2)
+    if shuffle:
+        indices = np.arange(x_array.shape[0])
+        np.random.shuffle(indices)
+        x_array = x_array[indices]
+        y_array = y_array[indices]
 
-        for xi, xj in zip(x1, x2):
-            if len(unique_points) >= n_points:
-                break
-            point = (round(xi, 2), round(xj, 2))
-            if point not in exclude_set:
-                unique_points.add(point)
-                x1_list.append(xi)
-                x2_list.append(xj)
-                y = xi if xj < 0 else xi + xj
-                y_list.append(y)
-
-    return np.stack((x1_list, x2_list), axis=1), np.array(y_list)
+    return x_array, y_array
 
 
-# Initial test set
-initial_x = np.array([
-    [1, -1], [2, 1], [3, -3],
-    [4, 5], [-1, -1], [-3, 2],
-    [-5, 5], [-4, -5], [0, 0],
-    [0, 4]
-])
-initial_y = np.array([
-    1, 3, 3,
-    9, -1, -1,
-    0, -4, 0,
-    4
-])
+def select_debug_samples(x_test: np.ndarray, y_test: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Select debug samples from background, rising edge, and plateau.
 
-# Convert initial_x to a set of tuples for exclusion
-initial_set = set((round(xi[0], 2), round(xi[1], 2)) for xi in initial_x)
+    Args:
+        x_test (np.ndarray): Test features.
+        y_test (np.ndarray): Test labels.
 
-# Generate training set ensuring no overlap with initial set
-x_train, y_train = generate_unique_dataset(5000, initial_set)
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: Selected debug features and labels.
+    """
+    background_samples = []
+    rising_edge_samples = []
+    plateau_samples = []
 
-# Combine initial set into the exclusion set for generating the final test set
-train_set = set((round(xi[0], 2), round(xi[1], 2)) for xi in x_train)
-total_exclude_set = initial_set.union(train_set)
+    for x, y in zip(x_test, y_test):
+        if x[-1] == 1:
+            background_samples.append((x, y))
+        elif 1 < x[-1] < 10:
+            rising_edge_samples.append((x, y))
+        elif x[-1] == 10 or x[-1] == 3:
+            plateau_samples.append((x, y))
 
-# Generate test set ensuring no overlap with training set and initial set
-x_test, y_test = generate_unique_dataset(1000, total_exclude_set)
+    debug_samples = (
+            background_samples[:2] +
+            rising_edge_samples[:2] +
+            plateau_samples[:2]
+    )
 
-# Verify no overlap
-assert not set(map(tuple, x_test)).intersection(set(map(tuple, x_train)))
-assert not set(map(tuple, x_test)).intersection(initial_set)
+    x_debug = np.array([x for x, y in debug_samples])
+    y_debug = np.array([y for x, y in debug_samples])
 
-print("Training and test sets generated without overlap.")
+    return x_debug, y_debug
+
+
+# Generate training and test data
+n_samples_train = 500
+n_samples_test = 100
+
+x_train, y_train = generate_time_series_data(n_samples_train)
+x_test, y_test = generate_time_series_data(n_samples_test)
+
+# Select 6 instances for debugging
+x_debug, y_debug = select_debug_samples(x_test, y_test)
+
+# Verify data shapes
+print(f"Shape of x_train: {x_train.shape}")
+print(f"Shape of y_train: {y_train.shape}")
+print(f"Shape of x_test: {x_test.shape}")
+print(f"Shape of y_test: {y_test.shape}")
+print(f"Shape of x_debug: {x_debug.shape}")
+print(f"Shape of y_debug: {y_debug.shape}")
 
 
 def create_model(block_class, input_shape: Tuple[int]) -> Model:
@@ -232,7 +260,7 @@ def train_and_print_results(
         for pred, true, inp, attn in zip(output_predictions, y_debug, x_debug, attention_scores):
             attention_weighted_values = [a * w for a, w in zip(attn, dense_layer_weights[:, 0])]
             results.append(
-                [inp[0], inp[1], true, pred[0]]
+                list(inp) + [true, pred[0]]
                 + attn.tolist()
                 + attention_weighted_values
                 + [dense_layer_bias[0]]
@@ -241,18 +269,20 @@ def train_and_print_results(
 
         # Print results in a table
         headers = (
-                ['x1', 'x2', 'True y', 'Predicted y']
+                [f'x{i + 1}' for i in range(len(inp))]
+                + ['True y', 'Predicted y']
                 + [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])]
                 + [f'Attention_Weight_{i + 1}' for i in range(attention_scores.shape[1])]
                 + ['Bias'] + [f'Weight_{i + 1}' for i in range(dense_layer_weights.shape[0])]
         )
+
         df_results = pd.DataFrame(results, columns=headers)
         print(df_results)
         wandb.log({f"results_{block_name}": df_results})  # so cool you can log dataframes
 
 
 # Training and printing results for each attention type
-input_shape = (2,)
+input_shape = (5,)
 block_classes = [BlockT0, BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6, BlockT7]
 
 for i, block_class in enumerate(block_classes):
@@ -262,7 +292,7 @@ for i, block_class in enumerate(block_classes):
     current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
     experiment_name = f'Attention_Type{i}_{current_time}'
     # Initialize wandb
-    LR = 1e-3
+    LR = 1e-2
     EPOCHS = int(5e3)
     BS = 256
     PATIENCE = 250
@@ -283,7 +313,7 @@ for i, block_class in enumerate(block_classes):
         str(i), model,
         x_train, y_train,
         x_test, y_test,
-        x_debug=initial_x, y_debug=initial_y,
+        x_debug=x_debug, y_debug=y_debug,
         learning_rate=LR, epochs=EPOCHS,
         batch_size=BS, patience=PATIENCE
     )

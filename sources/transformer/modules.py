@@ -637,7 +637,7 @@ class BlockT7(BlockBase):
         # Compute attention scores
         self.attention_scores = self.attention_block(inputs)
 
-        # Apply sigmoid to obtain attention weights between 0 and 1
+        # Apply tanh to obtain attention weights between -1 and 1
         attention_weights = self.tanh(self.attention_scores)
 
         self.attention_scores = attention_weights
