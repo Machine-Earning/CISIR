@@ -31,20 +31,22 @@ def create_dataset(
         X: np.ndarray,
         y: np.ndarray,
         batch_size: int,
-        options: tf.data.Options
+        options: tf.data.Options,
+        sample_weights: Optional[np.ndarray] = None
 ) -> tf.data.Dataset:
     """
-    Create a TensorFlow dataset for a multi-output model.
+    Create a TensorFlow dataset for a multi-output model, optionally including sample weights.
 
-    This function takes input features and labels, and creates a TensorFlow dataset
-    structured for use with a model that has a 'forecast_head' output. The resulting
-    dataset is batched and configured with the provided options.
+    This function takes input features, labels, and optional sample weights, and creates
+    a TensorFlow dataset structured for use with a model that has a 'forecast_head' output.
+    The resulting dataset is batched and configured with the provided options.
 
     Args:
         X (np.ndarray): Input features array.
         y (np.ndarray): Labels array.
         batch_size (int): Number of samples per batch.
         options (tf.data.Options): Options for the dataset, e.g., sharding policy.
+        sample_weights (Optional[np.ndarray]): Sample weights array. If None, no sample weights are used.
 
     Returns:
         tf.data.Dataset: A TensorFlow dataset ready for use in model training or evaluation.
@@ -52,23 +54,27 @@ def create_dataset(
     Example:
         >>> X_train = np.random.rand(1000, 10)
         >>> y_train = np.random.rand(1000, 1)
+        >>> sample_weights = np.random.rand(1000)
         >>> options = tf.data.Options()
         >>> options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.DATA
-        >>> train_dataset = create_dataset(X_train, y_train, batch_size=32, options=options)
+        >>> train_dataset = create_dataset(X_train, y_train, batch_size=32, options=options, sample_weights=sample_weights)
     """
     # Create a dictionary with 'forecast_head' as the key for the labels
-    # This structure tells the model which output the labels correspond to
     label_dict = {'forecast_head': y}
 
-    # Create a dataset from the input features and the label dictionary
-    dataset = tf.data.Dataset.from_tensor_slices((X, label_dict))
+    if sample_weights is not None:
+        # If sample weights are provided, include them in the dataset
+        dataset = tf.data.Dataset.from_tensor_slices((X, label_dict, sample_weights))
+        # Use a lambda function to structure the dataset elements correctly
+        dataset = dataset.map(lambda x, y, w: (x, y, w))
+    else:
+        # If no sample weights, create the dataset without them
+        dataset = tf.data.Dataset.from_tensor_slices((X, label_dict))
 
     # Apply batching to the dataset
-    # This groups the data into batches, which is more efficient for training
     dataset = dataset.batch(batch_size)
 
     # Apply the provided options to the dataset
-    # This could include settings like sharding policy for distributed training
     dataset = dataset.with_options(options)
 
     return dataset
@@ -266,9 +272,12 @@ def main():
 
                             # Shard the dataset for distribution
                             # Convert numpy arrays to TensorFlow datasets
-                            train_dataset = create_dataset(X_train, y_train, batch_size, options)
-                            subtrain_dataset = create_dataset(X_subtrain, y_subtrain, batch_size, options)
-                            val_dataset = create_dataset(X_val, y_val, batch_size, options)
+                            train_dataset = create_dataset(X_train, y_train, batch_size, options,
+                                                           sample_weights=y_train_weights)
+                            subtrain_dataset = create_dataset(X_subtrain, y_subtrain, batch_size, options,
+                                                              sample_weights=y_subtrain_weights)
+                            val_dataset = create_dataset(X_val, y_val, batch_size, options,
+                                                         sample_weights=y_val_weights)
                             test_dataset = create_dataset(X_test, y_test, batch_size, options)
 
                             with strategy.scope():
@@ -306,9 +315,8 @@ def main():
                                 # Train the model with the callback
                                 history = model_sep.fit(
                                     subtrain_dataset,
-                                    sample_weight={'forecast_head': y_subtrain_weights},
                                     epochs=epochs,
-                                    validation_data=(val_dataset, {'forecast_head': y_val_weights}),
+                                    validation_data=val_dataset,
                                     callbacks=[
                                         early_stopping,
                                         reduce_lr_on_plateau,
@@ -347,7 +355,6 @@ def main():
                                 # Train on the full dataset
                                 final_model_sep.fit(
                                     train_dataset,
-                                    sample_weight={'forecast_head': y_train_weights},
                                     epochs=optimal_epochs,
                                     callbacks=[
                                         reduce_lr_on_plateau,
