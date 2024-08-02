@@ -14,6 +14,8 @@ from wandb.integration.keras import WandbCallback
 
 # Importing the Blocks
 from sources.transformer.modules import *
+from modules.training.ts_modeling import set_seed
+from modules.shared.globals import SEEDS
 
 # Set the environment variable for CUDA (in case it is necessary)
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
@@ -24,23 +26,10 @@ devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
 
 
-def set_seed(seed: int) -> None:
-    """
-    Set the seed for reproducibility.
-
-    Args:
-        seed (int): The seed value to use.
-    """
-    random.seed(seed)
-    np.random.seed(seed)
-    tf.random.set_seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-
-    # Set TensorFlow to use deterministic operations
-    os.environ['TF_DETERMINISTIC_OPS'] = '1'
 
 
-set_seed(0)  # Set seed for reproducibility
+
+set_seed(SEEDS[0])  # Set seed for reproducibility
 
 
 def create_event_series(event_type: str) -> np.ndarray:

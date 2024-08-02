@@ -2996,3 +2996,19 @@ def build_dataset_from_numpy(x, y, batch_size, options=None):
         dataset = dataset.with_options(options)
 
     return dataset
+
+
+def set_seed(seed: int) -> None:
+    """
+    Set the seed for reproducibility.
+
+    Args:
+        seed (int): The seed value to use.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+
+    # Set TensorFlow to use deterministic operations
+    os.environ['TF_DETERMINISTIC_OPS'] = '1'
