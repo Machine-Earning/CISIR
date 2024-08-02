@@ -90,8 +90,8 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha in ALPHAS:
-                    for rho in SAM_RHOS:  # SAM_RHOS:
+                for alpha in [0.5]:
+                    for rho in [0.5]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
