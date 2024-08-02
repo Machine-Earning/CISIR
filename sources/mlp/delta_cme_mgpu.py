@@ -357,9 +357,9 @@ def main():
                                 )
 
                             # Save the final model
-                            final_model_sep.save_weights(f"final_model_weights_{experiment_name}_reg.h5")
+                            final_model_sep.save_weights(f"final_model_weight_mgpu_{experiment_name}_reg.h5")
                             # print where the model weights are saved
-                            print(f"Model weights are saved in final_model_weights_{experiment_name}_reg.h5")
+                            print(f"Model weights are saved in final_model_weights_mgpu_{experiment_name}_reg.h5")
 
                             # evaluate the model on test cme_files
                             error_mae = evaluate_mae(final_model_sep, X_test, y_test)
