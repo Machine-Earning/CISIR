@@ -55,7 +55,7 @@ def main():
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'MLP_{inputs_str}_slope{str(add_slope)}_PDSnorm_bs{bs}_CME{cme_speed_threshold}'
+                title = f'MLP_{inputs_str}_PDSnorm_bs{bs}'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')

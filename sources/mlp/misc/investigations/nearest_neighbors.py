@@ -30,7 +30,7 @@ def main() -> None:
                         outputs_to_use = OUTPUTS_TO_USE
 
                         inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
-                        title = f'kNN_MLP__{inputs_str}_slope{str(add_slope)}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                        title = f'kNN_MLP__{inputs_str}_alpha{alpha:.2f}'
                         title = title.replace(' ', '_').replace(':', '_')
                         current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
 

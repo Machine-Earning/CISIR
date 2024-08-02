@@ -6,7 +6,6 @@ from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 # Set the environment variable for CUDA (in case it is necessary)
 os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
-import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
@@ -37,7 +36,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha in [0.5]:
-                    for rho in [0.4, 0.6]: #SAM_RHOS:
+                    for rho in [0.4, 0.6]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -46,7 +45,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'MLP_{inputs_str}_slope{str(add_slope)}_alpha{alpha:.2f}_CME{cme_speed_threshold}_rho{rho}'
+                            title = f'MLP_{inputs_str}_alpha{alpha:.2f}_rho{rho}'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -114,7 +113,7 @@ def main():
                                 "dropout": dropout,
                                 "activation": 'LeakyReLU',
                                 "norm": norm,
-                                'optimizer': 'adamw',
+                                'optimizer': 'adam',
                                 'output_dim': output_dim,
                                 'architecture': 'mlp',
                                 'cme_speed_threshold': cme_speed_threshold,

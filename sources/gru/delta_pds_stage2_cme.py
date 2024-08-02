@@ -60,7 +60,7 @@ def main():
                         inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                         # Construct the title
-                        title = f'GRU_PDS_Stage2_{inputs_str}_slope{str(add_slope)}_frozen{freeze}_alpha{alpha:.2f}_CME{cme_speed_threshold}'
+                        title = f'GRU_PDS_Stage2_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}'
 
                         # Replace any other characters that are not suitable for filenames (if any)
                         title = title.replace(' ', '_').replace(':', '_')
