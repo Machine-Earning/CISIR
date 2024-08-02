@@ -19,9 +19,9 @@ from modules.training.cme_modeling import pds_space_norm
 from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
-    reshape_X,
     filter_ds,
-    stratified_split)
+    stratified_split,
+    set_seed)
 
 
 from modules.shared.globals import *
@@ -45,17 +45,11 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for add_slope in ADD_SLOPE:
-                    for rho in [0.5]:
+                    for rho in [1.1, 1.3]:
                         # for alpha in [2]:
                         for alpha in [0.5]:
                             # Set NumPy seed
-                            np.random.seed(SEED)
-
-                            # Set TensorFlow seed
-                            tf.random.set_seed(SEED)
-
-                            # Set random seed
-                            random.seed(SEED)
+                            set_seed(SEED)
                             # add_slope = True
                             outputs_to_use = OUTPUTS_TO_USE
 

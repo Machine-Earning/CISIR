@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import tensorflow as tf
 import wandb
@@ -22,7 +22,8 @@ from modules.training.ts_modeling import (
     get_loss,
     filter_ds,
     stratified_split,
-    plot_error_hist)
+    plot_error_hist,
+    set_seed)
 from modules.training.utils import get_weight_path
 
 from modules.shared.globals import *
@@ -55,7 +56,7 @@ def main():
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
                     for alpha in [0.5]:
                         for freeze in [False, True]:
-                            for rho in [0.05]:
+                            for rho in [0.7,  0.9]:
                                 # PARAMS
                                 outputs_to_use = OUTPUTS_TO_USE
                                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -71,8 +72,7 @@ def main():
                                 current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
                                 experiment_name = f'{title}_{current_time}'
 
-                                tf.random.set_seed(seed)
-                                np.random.seed(seed)
+                                set_seed(seed)
                                 patience = PATIENCE  # higher patience
                                 learning_rate = START_LR_FT  # lower due to finetuning
                                 reduce_lr_on_plateau = ReduceLROnPlateau(

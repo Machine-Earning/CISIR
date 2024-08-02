@@ -18,7 +18,7 @@ from modules.training.ts_modeling import set_seed
 from modules.shared.globals import SEEDS
 
 # Set the environment variable for CUDA (in case it is necessary)
-# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 # TODO: double check and update like he asked so everything looks good
 
@@ -83,43 +83,8 @@ def generate_time_series_data(n_samples: int, shuffle: bool = True) -> Tuple[np.
     return x_array, y_array
 
 
-def select_debug_samples(x_test: np.ndarray, y_test: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Select debug samples from background, rising edge, and plateau.
-
-    Args:
-        x_test (np.ndarray): Test features.
-        y_test (np.ndarray): Test labels.
-
-    Returns:
-        Tuple[np.ndarray, np.ndarray]: Selected debug features and labels.
-    """
-    background_samples = []
-    rising_edge_samples = []
-    plateau_samples = []
-
-    for x, y in zip(x_test, y_test):
-        if x[-1] == 1:
-            background_samples.append((x, y))
-        elif 1 < x[-1] < 10:
-            rising_edge_samples.append((x, y))
-        elif x[-1] == 10 or x[-1] == 3:
-            plateau_samples.append((x, y))
-
-    debug_samples = (
-            background_samples[:2] +
-            rising_edge_samples[:2] +
-            plateau_samples[:2]
-    )
-
-    x_debug = np.array([x for x, y in debug_samples])
-    y_debug = np.array([y for x, y in debug_samples])
-
-    return x_debug, y_debug
-
-
 # Generate training and test data
-n_samples_train = 500
+n_samples_train = 250
 n_samples_test = 100
 
 x_train, y_train = generate_time_series_data(n_samples_train)
@@ -278,14 +243,14 @@ input_shape = (5,)
 block_classes = [BlockT0, BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6, BlockT7]
 
 for i, block_class in enumerate(block_classes):
-    if i not in [0, 7]:
+    if i not in [0]:
         continue  # skip the first 4
     # Create a unique experiment name with a timestamp
     current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
     experiment_name = f'Attention_Type{i}_{current_time}'
     # Initialize wandb
     LR = 3e-3
-    EPOCHS = int(5e3)
+    EPOCHS = int(15e3)
     BS = 256
     PATIENCE = 500
 

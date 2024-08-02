@@ -20,7 +20,10 @@ from modules.training.ts_modeling import (
     evaluate_mae,
     process_sep_events,
     get_loss,
-    filter_ds, stratified_split, plot_error_hist)
+    filter_ds, 
+    stratified_split, 
+    plot_error_hist,
+    set_seed)
 
 from modules.shared.globals import *
 
@@ -52,8 +55,7 @@ def main():
                         experiment_name = f'{title}_{current_time}'
 
                         # Set the early stopping patience and learning rate as variables
-                        tf.random.set_seed(seed)
-                        np.random.seed(seed)
+                        set_seed(seed)
                         patience = PATIENCE  # higher patience
                         learning_rate = START_LR  # og learning rate
 
