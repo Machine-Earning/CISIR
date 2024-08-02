@@ -18,6 +18,8 @@ from sources.transformer.modules import *
 # Set the environment variable for CUDA (in case it is necessary)
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
+# TODO: double check and update like he asked so everything looks good
+
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
 
@@ -78,7 +80,7 @@ def generate_time_series_data(n_samples: int, shuffle: bool = True) -> Tuple[np.
             series = create_event_series(event_type)
             for t in range(4, 30):
                 x_list.append(series[t - 4:t + 1])
-                y_list.append(series[min(t + 6, 29)])  # Ensure we don't go out of bounds
+                y_list.append(series[min(t + 3, 29)])  # Ensure we don't go out of bounds
 
     x_array = np.array(x_list)
     y_array = np.array(y_list)
@@ -135,7 +137,8 @@ x_train, y_train = generate_time_series_data(n_samples_train)
 x_test, y_test = generate_time_series_data(n_samples_test)
 
 # Select 6 instances for debugging
-x_debug, y_debug = select_debug_samples(x_test, y_test)
+x_debug, y_debug = generate_time_series_data(1, shuffle=False) 
+#select_debug_samples(x_test, y_test)
 
 # Verify data shapes
 print(f"Shape of x_train: {x_train.shape}")
@@ -286,16 +289,16 @@ input_shape = (5,)
 block_classes = [BlockT0, BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6, BlockT7]
 
 for i, block_class in enumerate(block_classes):
-    if i not in [7]:
+    if i not in [0, 7]:
         continue  # skip the first 4
     # Create a unique experiment name with a timestamp
     current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
     experiment_name = f'Attention_Type{i}_{current_time}'
     # Initialize wandb
-    LR = 1e-2
+    LR = 3e-3
     EPOCHS = int(5e3)
     BS = 256
-    PATIENCE = 250
+    PATIENCE = 500
 
     wandb.init(project="attention-exps-2", name=experiment_name, config={
         "learning_rate": LR,

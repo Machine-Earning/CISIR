@@ -78,7 +78,7 @@ def generate_unique_dataset(n_points: int, exclude_set: set) -> Tuple[np.ndarray
                 unique_points.add(point)
                 x1_list.append(xi)
                 x2_list.append(xj)
-                y = xi if xj < 0 else xi + xj
+                y = xi - xj if xj < 0 else xi + xj
                 y_list.append(y)
 
     return np.stack((x1_list, x2_list), axis=1), np.array(y_list)
@@ -92,9 +92,9 @@ initial_x = np.array([
     [0, 4]
 ])
 initial_y = np.array([
-    1, 3, 3,
-    9, -1, -1,
-    0, -4, 0,
+    2, 3, 6,
+    9, 0, -1,
+    0, 1, 0,
     4
 ])
 
