@@ -5,7 +5,7 @@ from datetime import datetime
 from modules.training.cme_modeling import pds_space_norm
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'  # left is 1
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'  # left is 1
 
 import numpy as np
 import tensorflow as tf
@@ -15,7 +15,7 @@ from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import plot_tsne_delta, plot_repr_correlation, plot_repr_corr_dist, plot_repr_corr_density, evaluate_pcc
 from modules.training import cme_modeling
-from modules.training.ts_modeling import build_dataset, create_mlp, filter_ds, stratified_split
+from modules.training.ts_modeling import build_dataset, create_mlp, filter_ds, stratified_split, set_seed
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 from modules.shared.globals import *
@@ -36,16 +36,12 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for add_slope in ADD_SLOPE:
-                    for rho in SAM_RHOS:
-                        # for alpha in [2]:
-                        for alpha in [0.7]:
+                    for rho in [0]:
+                        for alpha in [5, 10]:
+                        # for alpha in [2.5, 3]:
                             # PARAMS
                             # Set NumPy seed
-                            np.random.seed(SEED)
-                            # Set TensorFlow seed
-                            tf.random.set_seed(SEED)
-                            # Set random seed
-                            random.seed(SEED)
+                            set_seed(SEED)
                             # add_slope = True
                             outputs_to_use = OUTPUTS_TO_USE
 
@@ -55,7 +51,7 @@ def main():
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'MLP_{inputs_str}_PDS_bs{bs}_alpha{alpha:.2f}_rho{rho}'
+                            title = f'MLP_{inputs_str}_PDS_bs{bs}_alpha{alpha:.2f}_rho{rho:.2f}'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
 

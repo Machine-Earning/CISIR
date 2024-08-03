@@ -18,7 +18,7 @@ from modules.training.ts_modeling import set_seed
 from modules.shared.globals import SEEDS
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 # TODO: double check and update like he asked so everything looks good
 
@@ -84,7 +84,7 @@ def generate_time_series_data(n_samples: int, shuffle: bool = True) -> Tuple[np.
 
 
 # Generate training and test data
-n_samples_train = 250
+n_samples_train = 400
 n_samples_test = 100
 
 x_train, y_train = generate_time_series_data(n_samples_train)
@@ -243,16 +243,16 @@ input_shape = (5,)
 block_classes = [BlockT0, BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6, BlockT7]
 
 for i, block_class in enumerate(block_classes):
-    if i not in [0]:
+    if i not in [7]:
         continue  # skip the first 4
     # Create a unique experiment name with a timestamp
     current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
     experiment_name = f'Attention_Type{i}_{current_time}'
     # Initialize wandb
-    LR = 3e-3
-    EPOCHS = int(15e3)
-    BS = 256
-    PATIENCE = 500
+    LR = 1e-3
+    EPOCHS = int(50e3)
+    BS = 128
+    PATIENCE = 1000
 
     wandb.init(project="attention-exps-2", name=experiment_name, config={
         "learning_rate": LR,
@@ -277,3 +277,4 @@ for i, block_class in enumerate(block_classes):
 
     # Finish the wandb run
     wandb.finish()
+

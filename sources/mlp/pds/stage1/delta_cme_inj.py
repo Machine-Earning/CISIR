@@ -64,7 +64,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'MLP_strat_{inputs_str}_PDSinj_bs{bs}_alpha{alpha:.2f}_rho{rho}'
+                            title = f'MLP_strat_{inputs_str}_PDSinj_bs{bs}_alpha{alpha:.2f}_rho{rho:.2f}'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
