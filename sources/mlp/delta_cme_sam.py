@@ -36,7 +36,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha in [0.5]:
-                    for rho in np.arange(0.36, 0.4, 0.01):  # SAM_RHOS:
+                    for rho in np.arange(0.38, 0.4, 0.01):  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
