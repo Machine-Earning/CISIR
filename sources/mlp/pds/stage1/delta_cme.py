@@ -5,7 +5,7 @@ from datetime import datetime
 from modules.training.cme_modeling import pds_space_norm
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'  # left is 1
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # left is 1
 
 import numpy as np
 import tensorflow as tf
