@@ -10,7 +10,7 @@ import pandas as pd
 import wandb
 from tensorflow.keras.layers import Input
 from tensorflow.keras.models import Model
-from tensorflow.keras.optimizers import Adam
+from tensorflow_addons.optimizers import AdamW
 from tensorflow.keras.callbacks import EarlyStopping
 from wandb.integration.keras import WandbCallback
 import random
@@ -168,7 +168,7 @@ def train_and_print_results(
         patience (int): Patience for early stopping.
     """
     model.compile(
-        optimizer=Adam(learning_rate=learning_rate),
+        optimizer=AdamW(learning_rate=learning_rate),
         loss={'output': 'mse'},
         metrics={'output': 'mae'}
     )

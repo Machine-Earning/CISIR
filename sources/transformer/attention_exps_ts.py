@@ -9,7 +9,7 @@ import wandb
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import Input
 from tensorflow.keras.models import Model
-from tensorflow.keras.optimizers import Adam
+from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
 # Importing the Blocks
@@ -153,7 +153,7 @@ def train_and_print_results(
         patience (int): Patience for early stopping.
     """
     model.compile(
-        optimizer=Adam(learning_rate=learning_rate),
+        optimizer=AdamW(learning_rate=learning_rate),
         loss={'output': 'mse'},
         metrics={'output': 'mae'}
     )

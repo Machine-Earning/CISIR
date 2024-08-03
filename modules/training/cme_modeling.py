@@ -416,11 +416,11 @@ class ModelBuilder:
 
         # Compile the model
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            optimizer=tf.keras.optimizers.AdamW(learning_rate=learning_rate),
             loss=self.pds_loss_vec
         )
 
-        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=self.pds_loss_vec)
+        # model.compile(optimizer=tf.keras.optimizers.AdamW(learning_rate=learning_rate), loss=self.pds_loss_vec)
         model.fit(X_train, y_train,
                   epochs=epochs,
                   batch_size=batch_size if batch_size > 0 else len(y_train),
@@ -515,7 +515,7 @@ class ModelBuilder:
                 return total_loss / 4  # Average over the quadrants
 
             model.compile(
-                optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+                optimizer=tf.keras.optimizers.AdamW(learning_rate=learning_rate),
                 loss=wrapped_loss
             )
 
@@ -736,6 +736,8 @@ class ModelBuilder:
                   epochs: int = 100,
                   batch_size: int = 32,
                   patience: int = 9,
+                  weight_decay: float = 0.0,
+                  momentum_beta1: float = 0.9,
                   save_tag: Optional[str] = None,
                   callbacks_list=None,
                   verbose: int = 1) -> dict:
@@ -754,6 +756,8 @@ class ModelBuilder:
         :param epochs: The maximum number of epochs for training.
         :param batch_size: The batch size for training.
         :param patience: The number of epochs with no improvement to wait before early stopping.
+        :param weight_decay: The L2 regularization factor.
+        :param momentum_beta1: The beta1 parameter for the Adam optimizer.
         :param save_tag: Tag to use for saving experiments.
         :param callbacks_list: List of callback instances to apply during training.
         :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
@@ -786,7 +790,11 @@ class ModelBuilder:
 
         # Optimizer and history initialization
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            optimizer=tf.keras.optimizers.AdamW(
+                learning_rate=learning_rate,
+                weight_decay=weight_decay,
+                beta_1=momentum_beta1
+            ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
                 y_true, y_pred, sample_weights=train_label_weights_dict
             )
@@ -812,7 +820,11 @@ class ModelBuilder:
         model.set_weights(initial_weights)
 
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            optimizer=tf.keras.optimizers.AdamW(
+                learning_rate=learning_rate,
+                weight_decay=weight_decay,
+                beta_1=momentum_beta1
+            ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
                 y_true, y_pred, sample_weights=train_label_weights_dict
             )
@@ -883,7 +895,7 @@ class ModelBuilder:
             cb.on_train_begin(logs=logs)
 
         # Optimizer and history initialization
-        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        optimizer = tf.keras.optimizers.AdamW(learning_rate=learning_rate)
         model.compile(optimizer=optimizer)  # Set the optimizer for the model
 
         # Retraining on the combined dataset
@@ -1029,7 +1041,7 @@ class ModelBuilder:
                     yield X[batch_indices], y[batch_indices]
 
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            optimizer=tf.keras.optimizers.AdamW(learning_rate=learning_rate),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
                 y_true, y_pred, sample_weights=train_label_weights_dict
             )
@@ -1064,6 +1076,8 @@ class ModelBuilder:
                       lower_bound: float = -0.5,
                       upper_bound: float = 0.5,
                       patience: int = 9,
+                      weight_decay: float = 0.0,
+                      momentum_beta1: float = 0.9,
                       save_tag: Optional[str] = None,
                       callbacks_list=None,
                       verbose: int = 1) -> tf.keras.callbacks.History:
@@ -1085,6 +1099,8 @@ class ModelBuilder:
         :param lower_bound: The lower bound for selecting rare samples.
         :param upper_bound: The upper bound for selecting rare samples.
         :param patience: The number of epochs with no improvement to wait before early stopping.
+        :param weight_decay: The L2 regularization factor.
+        :param momentum_beta1: The beta1 parameter for the Adam optimizer.
         :param save_tag: Tag to use for saving experiments.
         :param callbacks_list: List of callback instances to apply during training.
         :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
@@ -1257,7 +1273,11 @@ class ModelBuilder:
             return dataset.prefetch(tf.data.AUTOTUNE)
 
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            optimizer=tf.keras.optimizers.AdamW(
+                learning_rate=learning_rate,
+                weight_decay=weight_decay,
+                beta_1=momentum_beta1
+            ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
                 y_true, y_pred, sample_weights=train_label_weights_dict
             )
@@ -1288,7 +1308,11 @@ class ModelBuilder:
         model.set_weights(initial_weights)
 
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            optimizer=tf.keras.optimizers.AdamW(
+                learning_rate=learning_rate,
+                weight_decay=weight_decay,
+                beta_1=momentum_beta1
+            ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
                 y_true, y_pred, sample_weights=train_label_weights_dict
             )
@@ -1333,6 +1357,8 @@ class ModelBuilder:
                             lower_bound: float = -0.5,
                             upper_bound: float = 0.5,
                             patience: int = 9,
+                            weight_decay: float = 0.0,
+                            momentum_beta1: float = 0.9,
                             save_tag: Optional[str] = None,
                             callbacks_list=None,
                             verbose: int = 1) -> tf.keras.callbacks.History:
@@ -1356,6 +1382,8 @@ class ModelBuilder:
         :param lower_bound: The lower bound for selecting rare samples.
         :param upper_bound: The upper bound for selecting rare samples.
         :param patience: The number of epochs with no improvement to wait before early stopping.
+        :param weight_decay: The L2 regularization factor.
+        :param momentum_beta1: The beta1 parameter for the Adam optimizer.
         :param save_tag: Tag to use for saving experiments.
         :param callbacks_list: List of callback instances to apply during training.
         :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
@@ -1521,7 +1549,11 @@ class ModelBuilder:
             return dataset.prefetch(tf.data.AUTOTUNE)
 
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            optimizer=tf.keras.optimizers.AdamW(
+                learning_rate=learning_rate,
+                weight_decay=weight_decay,
+                beta_1=momentum_beta1
+            ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
                 y_true, y_pred, sample_weights=train_label_weights_dict
             )
@@ -1549,7 +1581,11 @@ class ModelBuilder:
         model.set_weights(initial_weights)
 
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            optimizer=tf.keras.optimizers.AdamW(
+                learning_rate=learning_rate,
+                weight_decay=weight_decay,
+                beta_1=momentum_beta1
+            ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
                 y_true, y_pred, sample_weights=train_label_weights_dict
             )
@@ -1650,7 +1686,7 @@ class ModelBuilder:
         # print("Run the command line:\n tensorboard --logdir logs/fit")
 
         # Optimizer and history initialization
-        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        optimizer = tf.keras.optimizers.AdamW(learning_rate=learning_rate)
         history = {'loss': [], 'val_loss': []}
 
         for epoch in range(epochs):
@@ -1768,7 +1804,7 @@ class ModelBuilder:
         # Setup model checkpointing
         checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_{str(save_tag)}.h5", save_weights_only=True)
         # Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss={'regression_head': 'mse'})
+        model.compile(optimizer=tf.keras.optimizers.AdamW(learning_rate=learning_rate), loss={'regression_head': 'mse'})
 
         # Train the model with a validation set
         history = model.fit(X_subtrain, {'regression_head': y_subtrain},
@@ -1837,7 +1873,7 @@ class ModelBuilder:
 
         # Initialize lists to store validation losses for each head
         primary_losses = []
-        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        optimizer = tf.keras.optimizers.AdamW(learning_rate=learning_rate)
         # Train the primary head using custom training loop
         for epoch in range(n_epochs):
             train_loss = self.train_for_one_epoch_mh(
@@ -1856,7 +1892,7 @@ class ModelBuilder:
 
         # Train regression branch only if with_reg is True
         if with_reg:
-            model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            model.compile(optimizer=tf.keras.optimizers.AdamW(learning_rate=learning_rate),
                           loss={'regression_head': 'mse'})
             history_reg = model.fit(X_subtrain, {'regression_head': y_subtrain},
                                     sample_weight=sample_weights,
@@ -1866,7 +1902,7 @@ class ModelBuilder:
 
         # Train decoder branch only if with_ae is True
         if with_ae:
-            model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            model.compile(optimizer=tf.keras.optimizers.AdamW(learning_rate=learning_rate),
                           loss={'decoder_head': 'mse'})
             history_dec = model.fit(X_subtrain, {'decoder_head': X_subtrain},
                                     sample_weight=sample_weights,
@@ -1928,7 +1964,7 @@ class ModelBuilder:
         """
 
         # Train regression branch only
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+        model.compile(optimizer=tf.keras.optimizers.AdamW(learning_rate=learning_rate),
                       loss={'regression_head': 'mse'})
         history_reg = model.fit(X_subtrain, {'regression_head': y_subtrain},
                                 sample_weight=sample_weights,
@@ -1938,7 +1974,7 @@ class ModelBuilder:
         reg_losses = history_reg.history['loss']
 
         # Train decoder branch only
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+        model.compile(optimizer=tf.keras.optimizers.AdamW(learning_rate=learning_rate),
                       loss={'decoder_head': 'mse'})
         history_dec = model.fit(X_subtrain, {'decoder_head': X_subtrain},
                                 sample_weight=sample_weights,
@@ -2016,7 +2052,7 @@ class ModelBuilder:
         checkpoint_cb = callbacks.ModelCheckpoint(f"model_weights_ae_{str(save_tag)}.h5", save_weights_only=True)
 
         # Compile the model
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+        model.compile(optimizer=tf.keras.optimizers.AdamW(learning_rate=learning_rate),
                       loss={'regression_head': 'mse', 'decoder_head': 'mse'},
                       loss_weights={'regression_head': 1.0, 'decoder_head': lambda_coef})
 

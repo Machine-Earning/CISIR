@@ -21,7 +21,8 @@ from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
     filter_ds,
-    stratified_split)
+    stratified_split,
+    set_seed)
 
 from modules.shared.globals import *
 
@@ -47,13 +48,7 @@ def main():
                         # for alpha in [2]:
                         for alpha in [0.7]:
                             # Set NumPy seed
-                            np.random.seed(SEED)
-
-                            # Set TensorFlow seed
-                            tf.random.set_seed(SEED)
-
-                            # Set random seed
-                            random.seed(SEED)
+                            set_seed(SEED)
                             # add_slope = True
                             outputs_to_use = OUTPUTS_TO_USE
 
@@ -257,6 +252,8 @@ def main():
                                 batch_size=Options['batch_size'],
                                 rare_injection_count=n_inj,
                                 patience=Options['patience'],
+                                weight_decay=Options['weight_decay'],
+                                momentum_beta1=Options['momentum_beta1'],
                                 save_tag=current_time + title + "_features_inj",
                                 lower_bound=norm_lower_t,
                                 upper_bound=norm_upper_t,

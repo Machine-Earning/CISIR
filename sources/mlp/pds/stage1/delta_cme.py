@@ -237,6 +237,8 @@ def main():
                                 epochs=Options['epochs'],
                                 batch_size=Options['batch_size'],
                                 patience=Options['patience'],
+                                weight_decay=Options['weight_decay'],
+                                momentum_beta1=Options['momentum_beta1'],
                                 save_tag=current_time + title + "_features_noinj",
                                 callbacks_list=[
                                     WandbCallback(save_model=False),

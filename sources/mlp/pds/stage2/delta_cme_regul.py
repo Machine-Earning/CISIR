@@ -9,7 +9,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-from tensorflow.keras.optimizers import Adam
+from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 import numpy as np
 
@@ -261,9 +261,9 @@ def main():
 
                             # Compile the model with the specified learning rate
                             model_sep.compile(
-                                optimizer=Adam(
+                                optimizer=AdamW(
                                     learning_rate=learning_rate,
-                                    # weight_decay=weight_decay,
+                                    weight_decay=weight_decay,
                                     beta_1=momentum_beta1
                                 ),
                                 loss={
@@ -316,9 +316,9 @@ def main():
 
                             # Compile the model with the specified learning rate
                             final_model_sep.compile(
-                                optimizer=Adam(
+                                optimizer=AdamW(
                                     learning_rate=learning_rate,
-                                    # weight_decay=weight_decay,
+                                    weight_decay=weight_decay,
                                     beta_1=momentum_beta1
                                 ),
                                 loss={
