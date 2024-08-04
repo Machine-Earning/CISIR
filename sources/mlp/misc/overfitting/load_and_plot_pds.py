@@ -128,7 +128,7 @@ def main():
                         "dropout": dropout,
                         "activation": 'LeakyReLU',
                         "norm": norm,
-                        'optimizer': 'adam',
+                        'optimizer': 'adamw',
                         'architecture': 'mlp',
                         "pds": pds,
                         "stage": 2,

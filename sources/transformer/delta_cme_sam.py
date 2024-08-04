@@ -1,20 +1,20 @@
 import os
 from datetime import datetime
-from typing import Optional
 
-import numpy as np
-import tensorflow as tf
+from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
+
+# Set the environment variable for CUDA (in case it is necessary)
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
+import numpy as np
 
-from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
-from modules.shared.globals import *
 from modules.training.DenseReweights import exDenseReweights
 from modules.training.ts_modeling import (
     build_dataset,
-    create_mlp,
     evaluate_mae,
     process_sep_events,
     get_loss,
@@ -23,82 +23,20 @@ from modules.training.ts_modeling import (
     plot_error_hist,
     set_seed)
 
-
-# Set the environment variable for CUDA (in case it is necessary)
-# os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1, 2, 3'
-# whatever number of GPUs are available
-
-def create_dataset(
-        X: np.ndarray,
-        y: np.ndarray,
-        batch_size: int,
-        options: tf.data.Options,
-        sample_weights: Optional[np.ndarray] = None
-) -> tf.data.Dataset:
-    """
-    Create a TensorFlow dataset for a multi-output model, optionally including sample weights.
-
-    This function takes input features, labels, and optional sample weights, and creates
-    a TensorFlow dataset structured for use with a model that has a 'forecast_head' output.
-    The resulting dataset is batched and configured with the provided options.
-
-    Args:
-        X (np.ndarray): Input features array.
-        y (np.ndarray): Labels array.
-        batch_size (int): Number of samples per batch.
-        options (tf.data.Options): Options for the dataset, e.g., sharding policy.
-        sample_weights (Optional[np.ndarray]): Sample weights array. If None, no sample weights are used.
-
-    Returns:
-        tf.data.Dataset: A TensorFlow dataset ready for use in model training or evaluation.
-
-    Example:
-        >>> X_train = np.random.rand(1000, 10)
-        >>> y_train = np.random.rand(1000, 1)
-        >>> sample_weights = np.random.rand(1000)
-        >>> options = tf.data.Options()
-        >>> options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.DATA
-        >>> train_dataset = create_dataset(X_train, y_train, batch_size=32, options=options, sample_weights=sample_weights)
-    """
-    # Create a dictionary with 'forecast_head' as the key for the labels
-    label_dict = {'forecast_head': y}
-
-    if sample_weights is not None:
-        # If sample weights are provided, include them in the dataset
-        dataset = tf.data.Dataset.from_tensor_slices((X, label_dict, sample_weights))
-        # Use a lambda function to structure the dataset elements correctly
-        dataset = dataset.map(lambda x, y, w: (x, y, w))
-    else:
-        # If no sample weights, create the dataset without them
-        dataset = tf.data.Dataset.from_tensor_slices((X, label_dict))
-
-    # Apply batching to the dataset
-    dataset = dataset.batch(batch_size)
-
-    # Apply the provided options to the dataset
-    dataset = dataset.with_options(options)
-
-    return dataset
+from modules.shared.globals import *
+from sources.transformer.modules import create_attentive_model
 
 
 def main():
     """
     Main function to run the E-MLP model
-    TODO: debugg
     :return:
     """
-
-    strategy = tf.distribute.MultiWorkerMirroredStrategy()
-    options = tf.data.Options()
-    options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.DATA
-
-    print(f"Number of devices: {strategy.num_replicas_in_sync}")
-
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha in [0.5]:
-                    for rho in [0.5]:  # SAM_RHOS:
+                    for rho in [0, 0.3]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -107,7 +45,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'MLP_mgpu_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}'
+                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -119,7 +57,7 @@ def main():
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
                             patience = PATIENCE  # higher patience
-                            learning_rate = START_LR_FT  # og learning rate
+                            learning_rate = START_LR  # og learning rate
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
@@ -134,6 +72,7 @@ def main():
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
                             hiddens = MLP_HIDDENS  # hidden layers
+
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             loss_key = LOSS_KEY
                             target_change = ('delta_p' in outputs_to_use)
@@ -176,7 +115,7 @@ def main():
                                 "norm": norm,
                                 'optimizer': 'adamw',
                                 'output_dim': output_dim,
-                                'architecture': 'mlp',
+                                'architecture': 'attm',
                                 'cme_speed_threshold': cme_speed_threshold,
                                 'residual': residual,
                                 'skipped_layers': skipped_layers,
@@ -195,6 +134,7 @@ def main():
                                 outputs_to_use=outputs_to_use,
                                 cme_speed_threshold=cme_speed_threshold,
                                 shuffle_data=True)
+
                             X_test, y_test = build_dataset(
                                 root_dir + '/testing',
                                 inputs_to_use=inputs_to_use,
@@ -271,103 +211,113 @@ def main():
                             n_features = X_train.shape[1]
                             print(f'n_features: {n_features}')
 
-                            # Shard the dataset for distribution
-                            # Convert numpy arrays to TensorFlow datasets
-                            train_dataset = create_dataset(X_train, y_train, batch_size, options,
-                                                           sample_weights=y_train_weights)
-                            subtrain_dataset = create_dataset(X_subtrain, y_subtrain, batch_size, options,
-                                                              sample_weights=y_subtrain_weights)
-                            val_dataset = create_dataset(X_val, y_val, batch_size, options,
-                                                         sample_weights=y_val_weights)
-                            test_dataset = create_dataset(X_test, y_test, batch_size, options)
+                            # create the model
+                            model_sep = create_attentive_model(
+                                input_dim=n_features,
+                                output_dim=output_dim,
+                                hidden_blocks=[1024, 512, 256, 128],
+                                attn_hidden_units=[256, 128, 128],
+                                attn_hidden_activation='tanh',
+                                attn_skipped_layers=skipped_layers,
+                                attn_residual=False,
+                                attn_dropout_rate=dropout,
+                                attn_norm=norm,
+                                skipped_blocks=1,
+                                repr_dim=repr_dim,
+                                dropout_rate=dropout,
+                                activation='leaky_relu',
+                                norm=norm,
+                                residual=residual,
+                                sam_rho=rho
+                            )
+                            model_sep.summary()
 
-                            with strategy.scope():
-                                # create the model
-                                model_sep = create_mlp(
-                                    input_dim=n_features,
-                                    hiddens=hiddens,
-                                    repr_dim=repr_dim,
-                                    output_dim=output_dim,
-                                    dropout_rate=dropout,
-                                    activation=activation,
-                                    norm=norm,
-                                    residual=residual,
-                                    skipped_layers=skipped_layers,
-                                    sam_rho=rho
-                                )
-                                # Compile the model with the specified learning rate
-                                model_sep.compile(
-                                    optimizer=AdamW(
-                                        learning_rate=learning_rate,
-                                        weight_decay=weight_decay,
-                                        beta_1=momentum_beta1
-                                    ),
-                                    loss={'forecast_head': get_loss(loss_key)}
-                                )
-                                model_sep.summary()
+                            # Define the EarlyStopping callback
+                            early_stopping = EarlyStopping(
+                                monitor=ES_CB_MONITOR,
+                                patience=patience,
+                                verbose=VERBOSE,
+                                restore_best_weights=ES_CB_RESTORE_WEIGHTS)
 
-                                # Define the EarlyStopping callback
-                                early_stopping = EarlyStopping(
-                                    monitor=ES_CB_MONITOR,
-                                    patience=patience,
-                                    verbose=VERBOSE,
-                                    restore_best_weights=ES_CB_RESTORE_WEIGHTS)
+                            # Compile the model with the specified learning rate
+                            model_sep.compile(
+                                optimizer=AdamW(
+                                    learning_rate=learning_rate,
+                                    weight_decay=weight_decay,
+                                    beta_1=momentum_beta1
+                                ),
+                                loss={'forecast_head': get_loss(loss_key)}
+                            )
 
-                                # Train the model with the callback
-                                history = model_sep.fit(
-                                    subtrain_dataset,
-                                    epochs=epochs,
-                                    validation_data=val_dataset,
-                                    callbacks=[
-                                        early_stopping,
-                                        reduce_lr_on_plateau,
-                                        WandbCallback(save_model=WANDB_SAVE_MODEL)
-                                    ],
-                                    verbose=VERBOSE
-                                )
+                            # Train the model with the callback
+                            history = model_sep.fit(
+                                X_subtrain,
+                                {'forecast_head': y_subtrain},
+                                sample_weight=y_subtrain_weights,
+                                epochs=epochs, batch_size=batch_size,
+                                validation_data=(X_val, {'forecast_head': y_val}, y_val_weights),
+                                callbacks=[
+                                    early_stopping,
+                                    reduce_lr_on_plateau,
+                                    WandbCallback(save_model=WANDB_SAVE_MODEL)
+                                ],
+                                verbose=VERBOSE
+                            )
 
-                                # Determine the optimal number of epochs from the fit history
-                                optimal_epochs = np.argmin(
-                                    history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
+                            # Determine the optimal number of epochs from early stopping
+                            # optimal_epochs = early_stopping.best_epoch + 1  # Adjust for the offset
 
-                                final_model_sep = create_mlp(
-                                    input_dim=n_features,
-                                    hiddens=hiddens,
-                                    repr_dim=repr_dim,
-                                    output_dim=output_dim,
-                                    dropout_rate=dropout,
-                                    activation=activation,
-                                    norm=norm,
-                                    residual=residual,
-                                    skipped_layers=skipped_layers,
-                                    sam_rho=rho
-                                )
+                            # Determine the optimal number of epochs from the fit history
+                            optimal_epochs = np.argmin(
+                                history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
 
-                                # Recreate the model architecture
-                                final_model_sep.compile(
-                                    optimizer=AdamW(
-                                        learning_rate=learning_rate,
-                                        weight_decay=weight_decay,
-                                        beta_1=momentum_beta1
-                                    ),
-                                    loss={'forecast_head': get_loss(loss_key)}
-                                )
+                            final_model_sep = create_attentive_model(
+                                input_dim=n_features,
+                                output_dim=output_dim,
+                                hidden_blocks=[1024, 512, 256, 128],
+                                attn_hidden_units=[256, 128, 128],
+                                attn_hidden_activation='tanh',
+                                attn_skipped_layers=skipped_layers,
+                                attn_residual=False,
+                                attn_dropout_rate=dropout,
+                                attn_norm=norm,
+                                skipped_blocks=1,
+                                repr_dim=repr_dim,
+                                dropout_rate=dropout,
+                                activation='leaky_relu',
+                                norm=norm,
+                                residual=residual,
+                                sam_rho=rho
+                            )
 
-                                # Train on the full dataset
-                                final_model_sep.fit(
-                                    train_dataset,
-                                    epochs=optimal_epochs,
-                                    callbacks=[
-                                        reduce_lr_on_plateau,
-                                        WandbCallback(save_model=WANDB_SAVE_MODEL)
-                                    ],
-                                    verbose=VERBOSE
-                                )
+                            # Recreate the model architecture
+                            final_model_sep.compile(
+                                optimizer=AdamW(
+                                    learning_rate=learning_rate,
+                                    weight_decay=weight_decay,
+                                    beta_1=momentum_beta1
+                                ),
+                                loss={'forecast_head': get_loss(loss_key)}
+                            )
+
+                            # Train on the full dataset
+                            final_model_sep.fit(
+                                X_train,
+                                {'forecast_head': y_train},
+                                sample_weight=y_train_weights,
+                                epochs=optimal_epochs,
+                                batch_size=batch_size,
+                                callbacks=[
+                                    reduce_lr_on_plateau,
+                                    WandbCallback(save_model=WANDB_SAVE_MODEL)
+                                ],
+                                verbose=VERBOSE
+                            )
 
                             # Save the final model
-                            final_model_sep.save_weights(f"final_model_weight_mgpu_{experiment_name}_reg.h5")
+                            final_model_sep.save_weights(f"final_model_weights_{experiment_name}_reg.h5")
                             # print where the model weights are saved
-                            print(f"Model weights are saved in final_model_weights_mgpu_{experiment_name}_reg.h5")
+                            print(f"Model weights are saved in final_model_weights_{experiment_name}_reg.h5")
 
                             # evaluate the model on test cme_files
                             error_mae = evaluate_mae(final_model_sep, X_test, y_test)

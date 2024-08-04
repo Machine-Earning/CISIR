@@ -131,7 +131,7 @@ def main():
                                     "dropout": dropout,
                                     "activation": 'LeakyReLU',
                                     "norm": norm,
-                                    'optimizer': 'adam',
+                                    'optimizer': 'adamw',
                                     'output_dim': output_dim,
                                     'architecture': 'mlp',
                                     "freeze": freeze,
