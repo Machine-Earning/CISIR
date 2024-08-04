@@ -13,7 +13,8 @@ from tensorflow.keras.layers import (
     Softmax,
     Multiply,
     Layer,
-    Activation
+    Activation,
+    LeakyReLU
 )
 
 
@@ -135,7 +136,7 @@ class AttentionBlock(Layer):
             input_dim: int,
             hidden_units: List[int],
             output_dim: int,
-            activation: str = 'tanh',
+            hidden_activation: str = 'tanh',
             dropout_rate: float = 0.0,
             norm: str = None,
             residual: bool = False,
@@ -149,7 +150,7 @@ class AttentionBlock(Layer):
             hidden_units (List[int]): A list of integers, where each integer is the number of units
                                       in the corresponding dense layer.
             output_dim (int): The dimensionality of the output.
-            activation (str, optional): The activation function to use in the hidden layers.
+            hidden_activation (str, optional): The activation function to use in the hidden layers.
                                         Defaults to 'tanh'.
             dropout_rate (float, optional): The dropout rate to use in the hidden layers. Defaults to 0.0.
             norm (str, optional): The type of normalization to use ('batch_norm' or 'layer_norm'). Defaults to None.
@@ -160,7 +161,7 @@ class AttentionBlock(Layer):
         self.input_dim = input_dim
         self.hidden_units = hidden_units
         self.output_dim = output_dim
-        self.activation = activation
+        self.hidden_activation = hidden_activation
         self.dropout_rate = dropout_rate
         self.norm = norm
         self.residual = residual
@@ -178,7 +179,7 @@ class AttentionBlock(Layer):
                 self.norm_layers.append(BatchNormalization())
             elif self.norm == 'layer_norm':
                 self.norm_layers.append(LayerNormalization())
-        self.output_layer = Dense(output_dim)
+        self.output_layer = Dense(output_dim)  # activation='linear'
 
     def build(self, input_shape: tf.TensorShape) -> None:
         """
@@ -224,7 +225,7 @@ class AttentionBlock(Layer):
             if self.norm is not None:
                 x = self.norm_layers[i](x)
 
-            x = Activation(self.activation)(x)
+            x = Activation(self.hidden_activation)(x)
 
             if self.dropout_rate > 0.0:
                 x = self.dropout_layers[i](x)
@@ -240,7 +241,7 @@ class BlockBase(Layer):
 
     def __init__(self,
                  attn_hidden_units: Optional[List[int]] = None,
-                 activation: str = 'tanh',
+                 activation: Optional[str] = 'tanh',
                  output_activation: Optional[str] = None):
         super(BlockBase, self).__init__()
         self.attn_hidden_units = attn_hidden_units or [3]
@@ -304,7 +305,7 @@ class BlockT1(BlockBase):
             input_dim=input_shape[-1],
             hidden_units=self.attn_hidden_units,
             output_dim=input_shape[-1],
-            activation=self.activation
+            hidden_activation=self.activation
         )
         # Create the final dense layer with custom regularization
         self.dense_layer = Dense(
@@ -380,7 +381,7 @@ class BlockT2(BlockBase):
             input_dim=input_shape[-1],
             hidden_units=self.attn_hidden_units,
             output_dim=input_shape[-1],
-            activation=self.activation
+            hidden_activation=self.activation
         )
 
     def call(self, inputs: tf.Tensor) -> Dict[str, Union[Tensor, Any]]:
@@ -445,7 +446,7 @@ class BlockT3(BlockBase):
             input_dim=input_shape[-1],
             hidden_units=self.attn_hidden_units,
             output_dim=input_shape[-1],
-            activation=self.activation
+            hidden_activation=self.activation
         )
 
         # Create fixed weights w (including w0)
@@ -552,7 +553,7 @@ class BlockT4(BlockBase):
             input_dim=input_shape[-1],
             hidden_units=self.attn_hidden_units,
             output_dim=input_shape[-1],
-            activation=self.activation
+            hidden_activation=self.activation
         )
         # Create the final dense layer
         self.dense_layer = Dense(1, activation=self.output_activation)
@@ -646,7 +647,7 @@ class BlockT5(BlockBase):
             input_dim=input_shape[-1],
             hidden_units=self.attn_hidden_units,
             output_dim=input_shape[-1],
-            activation=self.activation
+            hidden_activation=self.activation
         )
         # Create the final dense layer
         self.dense_layer = Dense(1, activation=self.output_activation)
@@ -740,7 +741,7 @@ class BlockT7(BlockBase):
             input_dim=input_shape[-1],
             hidden_units=self.attn_hidden_units,
             output_dim=input_shape[-1],
-            activation=self.activation
+            hidden_activation=self.activation
         )
         # Create the final dense layer
         self.dense_layer = Dense(1, activation=self.output_activation)
@@ -835,7 +836,7 @@ class BlockT6(BlockBase):
             input_dim=input_shape[-1],
             hidden_units=self.attn_hidden_units,
             output_dim=input_shape[-1],
-            activation=self.activation
+            hidden_activation=self.activation
         )
         # Create the final dense layer
         self.dense_layer = Dense(1, activation=self.output_activation)
@@ -929,6 +930,159 @@ class BlockT0(BlockBase):
         """
         output = self.dense_layer(inputs)
         return {'output': output, 'attention_scores': tf.zeros_like(inputs)}
+
+    def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
+        """
+        Retrieve the weights and bias of the output dense layer.
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor]: A tuple containing the weights and bias of the dense layer.
+                                         The first element is the weight tensor, and the second
+                                         is the bias tensor.
+        """
+        return self.dense_layer.get_weights()
+
+
+class TanhAttentiveBlock(Layer):
+    """
+    A custom layer that applies an attention mechanism followed by a dense layer.
+
+    This block consists of an attention layer that computes attention scores,
+    applies these scores to the input via element-wise multiplication,
+    and then passes the result through a dense layer.
+
+    y = w0 + w1 * a1 * x1 + w2 * a2 * x2 + ... + wn * an * xn where tanh is applied to attention scores.
+
+    Attributes:
+        attn_hidden_units (List[int]): A list of integers representing the number of units
+                                       in each hidden layer of the attention mechanism.
+        attn_hidden_activation (str): The activation function to use in the hidden layers of the attention block.
+        attn_dropout_rate (float): The dropout rate to use in the attention layer.
+        attn_norm (str): The type of normalization to use in the attention layer ('batch_norm' or 'layer_norm').
+        attn_residual (bool): Whether to use residual connections in the attention layer.
+        attn_skipped_layers (int): The number of layers between residual connections in the attention layer.
+        output_dim (int): The dimensionality of the output.
+        output_activation (str): The activation function to use in the final dense layer.
+        dropout_rate (float): The dropout rate to use in the TanhAttentiveBlock.
+        norm (str): The type of normalization to use in the TanhAttentiveBlock ('batch_norm' or 'layer_norm').
+        attention_block (AttentionBlock): The layer used to compute attention scores.
+        dense_layer (Dense): The final dense layer that produces the output.
+        attention_scores (tf.Tensor): The most recently computed attention scores.
+    """
+
+    def __init__(self,
+                 attn_hidden_units: Optional[List[int]] = None,
+                 attn_hidden_activation: str = 'tanh',
+                 attn_dropout_rate: float = 0.0,
+                 attn_norm: Optional[str] = None,
+                 attn_residual: bool = False,
+                 attn_skipped_layers: int = 2,
+                 output_dim: int = 1,
+                 output_activation: Optional[str] = 'leaky_relu',
+                 dropout_rate: float = 0.0,
+                 norm: Optional[str] = None):
+        """
+        Initialize the TanhAttentiveBlock.
+
+        Args:
+            attn_hidden_units (Optional[List[int]]): List of integers for hidden layer units in attention mechanism.
+            attn_hidden_activation (str): Activation function to use in hidden layers of the attention block.
+            attn_dropout_rate (float, optional): The dropout rate to use in the attention layers. Defaults to 0.0.
+            attn_norm (Optional[str], optional): The type of normalization to use ('batch_norm' or 'layer_norm'). Defaults to None.
+            attn_residual (bool, optional): Whether to use residual connections in the attention layer. Defaults to False.
+            attn_skipped_layers (int, optional): The number of layers between residual connections. Defaults to 2.
+            output_dim (int, optional): The dimensionality of the output. Defaults to 1.
+            output_activation (Optional[str], optional): Activation function to use in the final dense layer. Defaults to 'leaky_relu'.
+            dropout_rate (float, optional): The dropout rate to use in the TanhAttentiveBlock. Defaults to 0.0.
+            norm (Optional[str], optional): The type of normalization to use ('batch_norm' or 'layer_norm'). Defaults to None.
+        """
+        super(TanhAttentiveBlock, self).__init__()
+        self.attn_hidden_units = attn_hidden_units or [3]
+        self.attn_hidden_activation = attn_hidden_activation
+        self.attn_dropout_rate = attn_dropout_rate
+        self.attn_norm = attn_norm
+        self.attn_residual = attn_residual
+        self.attn_skipped_layers = attn_skipped_layers
+        self.output_dim = output_dim
+        self.output_activation = output_activation
+        self.dropout_rate = dropout_rate
+        self.norm = norm
+        self.attention_scores = None
+        self.attention_block = None
+        self.dense_layer = None
+        self.tanh = Activation('tanh')
+        self.dropout_layer = Dropout(self.dropout_rate) if self.dropout_rate > 0 else None
+        self.norm_layer = None
+
+    def build(self, input_shape: tf.TensorShape) -> None:
+        """
+        Build the layer. This method is called automatically by Keras when the layer is first used.
+
+        Args:
+            input_shape (tf.TensorShape): The shape of the input tensor.
+        """
+        # Create the attention block
+        self.attention_block = AttentionBlock(
+            input_dim=input_shape[-1],
+            output_dim=input_shape[-1],
+            hidden_units=self.attn_hidden_units,
+            hidden_activation=self.attn_hidden_activation,
+            dropout_rate=self.attn_dropout_rate,
+            norm=self.attn_norm,
+            residual=self.attn_residual,
+            skipped_layers=self.attn_skipped_layers
+        )
+        # Create the final dense layer
+        self.dense_layer = Dense(self.output_dim)
+
+        # Set the normalization layer if specified
+        if self.norm == 'batch_norm':
+            self.norm_layer = BatchNormalization()
+        elif self.norm == 'layer_norm':
+            self.norm_layer = LayerNormalization()
+
+    def call(self, inputs: tf.Tensor) -> Dict[str, Any]:
+        """
+        Perform the forward pass of the TanhAttentiveBlock layer.
+
+        This method applies the attention mechanism to the inputs,
+        applies tanh to the attention scores, then passes the weighted inputs through a dense layer.
+
+        Args:
+            inputs (tf.Tensor): The input tensor.
+
+        Returns:
+            tf.Tensor: The output tensor after applying attention, tanh, and the dense layer.
+        """
+        # Compute attention scores
+        self.attention_scores = self.attention_block(inputs)
+
+        # Apply tanh to obtain attention weights between -1 and 1
+        attention_weights = self.tanh(self.attention_scores)
+
+        self.attention_scores = attention_weights
+
+        # Apply attention weights to inputs via element-wise multiplication
+        weighted_inputs = Multiply()([inputs, attention_weights])
+
+        # Optionally apply dropout
+        if self.dropout_layer is not None:
+            weighted_inputs = self.dropout_layer(weighted_inputs)
+
+        # Optionally apply normalization
+        if self.norm_layer is not None:
+            weighted_inputs = self.norm_layer(weighted_inputs)
+
+        # Pass the weighted inputs through the final dense layer
+        output = self.dense_layer(weighted_inputs)
+
+        # Apply the output activation function
+        if self.output_activation == 'leaky_relu':
+            output = LeakyReLU()(output)
+        elif self.output_activation:
+            output = Activation(self.output_activation)(output)
+
+        return {'output': output, 'attention_scores': self.attention_scores}
 
     def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
         """
