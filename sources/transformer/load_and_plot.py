@@ -36,7 +36,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha in [0.5]:
-                    for rho in [0]:  # SAM_RHOS:
+                    for rho in [0, 0.3]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -215,14 +215,14 @@ def main():
                             model_sep = create_attentive_model(
                                 input_dim=n_features,
                                 output_dim=output_dim,
-                                hidden_blocks=MLP_HIDDENS,
-                                attn_hidden_units=[256, 128, 256],
+                                hidden_blocks=[2048, 1024, 1024, 512, 512, 256, 256, 128, 128, 128, 128],
+                                attn_hidden_units=[256, 256, 256],
                                 attn_hidden_activation='tanh',
                                 attn_skipped_layers=skipped_layers,
                                 attn_residual=False,
                                 attn_dropout_rate=dropout,
                                 attn_norm=norm,
-                                skipped_blocks=skipped_layers,
+                                skipped_blocks=1,
                                 repr_dim=repr_dim,
                                 dropout_rate=dropout,
                                 activation='leaky_relu',
@@ -274,14 +274,14 @@ def main():
                             final_model_sep = create_attentive_model(
                                 input_dim=n_features,
                                 output_dim=output_dim,
-                                hidden_blocks=MLP_HIDDENS,
-                                attn_hidden_units=[256, 128, 256],
+                                hidden_blocks=[2048, 1024, 1024, 512, 512, 256, 256, 128, 128, 128, 128],
+                                attn_hidden_units=[256, 256, 256],
                                 attn_hidden_activation='tanh',
                                 attn_skipped_layers=skipped_layers,
                                 attn_residual=False,
                                 attn_dropout_rate=dropout,
                                 attn_norm=norm,
-                                skipped_blocks=skipped_layers,
+                                skipped_blocks=1,
                                 repr_dim=repr_dim,
                                 dropout_rate=dropout,
                                 activation='leaky_relu',
