@@ -4,7 +4,17 @@ import tensorflow as tf
 from tensorflow import Tensor
 from tensorflow.keras import backend as K
 from tensorflow.keras import regularizers
-from tensorflow.keras.layers import Layer, Dense, Multiply, Softmax, Activation
+from tensorflow.keras.layers import (
+    Dense,
+    Dropout,
+    BatchNormalization,
+    LayerNormalization,
+    Add,
+    Softmax,
+    Multiply,
+    Layer,
+    Activation
+)
 
 
 class AwayFrom1Regularizer(regularizers.Regularizer):
@@ -25,6 +35,78 @@ class AwayFrom1Regularizer(regularizers.Regularizer):
         return {'strength': self.strength}
 
 
+# class AttentionBlock(Layer):
+#     """
+#     A custom attention layer that applies a series of dense layers followed by an output layer.
+#
+#     This layer can be used to compute attention scores or feature transformations
+#     in attention-based neural network architectures.
+#
+#     Attributes:
+#         input_dim (int): The dimensionality of the input.
+#         hidden_units (List[int]): A list of integers, where each integer is the number of units
+#                                   in the corresponding dense layer.
+#         output_dim (int): The dimensionality of the output.
+#         activation (str): The activation function to use in the hidden layers.
+#         dense_layers (List[Dense]): A list of Dense layers used in the attention mechanism.
+#         output_layer (Dense): The final Dense layer that produces the output.
+#     """
+#
+#     def __init__(self, input_dim: int, hidden_units: List[int], output_dim: int, activation: str = 'tanh'):
+#         """
+#         Initialize the AttentionBlock.
+#
+#         Args:
+#             input_dim (int): The dimensionality of the input.
+#             hidden_units (List[int]): A list of integers, where each integer is the number of units
+#                                       in the corresponding dense layer.
+#             output_dim (int): The dimensionality of the output.
+#             activation (str, optional): The activation function to use in the hidden layers.
+#                                         Defaults to 'tanh'.
+#         """
+#         super(AttentionBlock, self).__init__()
+#         self.input_dim = input_dim
+#         self.hidden_units = hidden_units
+#         self.output_dim = output_dim
+#         self.activation = activation
+#         self.dense_layers: List[Dense] = []
+#
+#         # Create dense layers based on hidden_units list
+#         for units in hidden_units:
+#             self.dense_layers.append(Dense(units, activation=self.activation))
+#         self.output_layer = Dense(output_dim)
+#
+#     def build(self, input_shape: tf.TensorShape) -> None:
+#         """
+#         Build the layer. This method is called automatically by Keras when the layer is first used.
+#
+#         In this implementation, the layers are created in __init__, so this method is empty.
+#
+#         Args:
+#             input_shape (tf.TensorShape): The shape of the input tensor.
+#         """
+#         # The layers are created in __init__, so no need to create them here.
+#         pass
+#
+#     def call(self, inputs: tf.Tensor) -> tf.Tensor:
+#         """
+#         Perform the forward pass of the attention layer.
+#
+#         This method applies a series of dense layers to the input, followed by a final output layer.
+#
+#         Args:
+#             inputs (tf.Tensor): The input tensor.
+#
+#         Returns:
+#             tf.Tensor: The output tensor after applying the attention mechanism.
+#         """
+#         x = inputs
+#         # Apply each dense layer in sequence
+#         for dense in self.dense_layers:
+#             x = dense(x)
+#         # Apply the final output layer
+#         return self.output_layer(x)
+
 class AttentionBlock(Layer):
     """
     A custom attention layer that applies a series of dense layers followed by an output layer.
@@ -38,11 +120,27 @@ class AttentionBlock(Layer):
                                   in the corresponding dense layer.
         output_dim (int): The dimensionality of the output.
         activation (str): The activation function to use in the hidden layers.
+        dropout_rate (float): The dropout rate to use in the hidden layers.
+        norm (str): The type of normalization to use ('batch_norm' or 'layer_norm').
+        residual (bool): Whether to use residual connections.
+        skipped_layers (int): The number of layers between residual connections.
         dense_layers (List[Dense]): A list of Dense layers used in the attention mechanism.
+        dropout_layers (List[Dropout]): A list of Dropout layers used in the attention mechanism.
+        norm_layers (List[Layer]): A list of normalization layers used in the attention mechanism.
         output_layer (Dense): The final Dense layer that produces the output.
     """
 
-    def __init__(self, input_dim: int, hidden_units: List[int], output_dim: int, activation: str = 'tanh'):
+    def __init__(
+            self,
+            input_dim: int,
+            hidden_units: List[int],
+            output_dim: int,
+            activation: str = 'tanh',
+            dropout_rate: float = 0.0,
+            norm: str = None,
+            residual: bool = False,
+            skipped_layers: int = 2
+    ):
         """
         Initialize the AttentionBlock.
 
@@ -53,17 +151,33 @@ class AttentionBlock(Layer):
             output_dim (int): The dimensionality of the output.
             activation (str, optional): The activation function to use in the hidden layers.
                                         Defaults to 'tanh'.
+            dropout_rate (float, optional): The dropout rate to use in the hidden layers. Defaults to 0.0.
+            norm (str, optional): The type of normalization to use ('batch_norm' or 'layer_norm'). Defaults to None.
+            residual (bool, optional): Whether to use residual connections. Defaults to False.
+            skipped_layers (int, optional): The number of layers between residual connections. Defaults to 2.
         """
         super(AttentionBlock, self).__init__()
         self.input_dim = input_dim
         self.hidden_units = hidden_units
         self.output_dim = output_dim
         self.activation = activation
+        self.dropout_rate = dropout_rate
+        self.norm = norm
+        self.residual = residual
+        self.skipped_layers = skipped_layers
         self.dense_layers: List[Dense] = []
+        self.dropout_layers: List[Dropout] = []
+        self.norm_layers: List[Layer] = []
 
-        # Create dense layers based on hidden_units list
-        for units in hidden_units:
-            self.dense_layers.append(Dense(units, activation=self.activation))
+        # Create dense, dropout, and normalization layers based on hidden_units list
+        for i, units in enumerate(hidden_units):
+            self.dense_layers.append(Dense(units, activation=None))
+            if self.dropout_rate > 0.0:
+                self.dropout_layers.append(Dropout(self.dropout_rate))
+            if self.norm == 'batch_norm':
+                self.norm_layers.append(BatchNormalization())
+            elif self.norm == 'layer_norm':
+                self.norm_layers.append(LayerNormalization())
         self.output_layer = Dense(output_dim)
 
     def build(self, input_shape: tf.TensorShape) -> None:
@@ -91,9 +205,30 @@ class AttentionBlock(Layer):
             tf.Tensor: The output tensor after applying the attention mechanism.
         """
         x = inputs
-        # Apply each dense layer in sequence
-        for dense in self.dense_layers:
+        residual_layer = None
+
+        for i, dense in enumerate(self.dense_layers):
+            if i % self.skipped_layers == 0 and i > 0 and self.residual:
+                if residual_layer is not None:
+                    # Check if projection is needed
+                    if x.shape[-1] != residual_layer.shape[-1]:
+                        residual_layer = Dense(x.shape[-1], use_bias=False)(residual_layer)
+                    x = Add()([x, residual_layer])
+                residual_layer = x  # Update the starting point for the next residual connection
+            else:
+                if i % self.skipped_layers == 0 or residual_layer is None:
+                    residual_layer = x
+
             x = dense(x)
+
+            if self.norm is not None:
+                x = self.norm_layers[i](x)
+
+            x = Activation(self.activation)(x)
+
+            if self.dropout_rate > 0.0:
+                x = self.dropout_layers[i](x)
+
         # Apply the final output layer
         return self.output_layer(x)
 
@@ -113,17 +248,6 @@ class BlockBase(Layer):
         self.output_activation = output_activation
         self.attention_scores = None
         self.attention_block = None
-
-    # NOTE: doesn't work!!Best to return them with the predictions 
-    # def get_attention_scores(self) -> tf.Tensor:
-    #     """
-    #     Retrieve the most recently computed attention scores.
-
-    #     Returns:
-    #         tf.Tensor: The attention scores from the last forward pass.
-    #                    Returns None if the layer hasn't been called yet.
-    #     """
-    #     return self.attention_scores
 
     def get_config(self) -> dict:
         """
