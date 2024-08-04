@@ -2533,12 +2533,13 @@ def reshape_X(
     elif model_type == '1dcnn' or model_type == 'gru' or model_type == 'seq':
         return prepare_seq_inputs(X, n_features_list, add_slope)
     elif model_type == "hybrid":
-        return prepare_hybrid_inputs(X,
-                                     tsf_input_dims=n_features_list,
-                                     with_slope=add_slope,
-                                     mlp_input_dim=20 + len(inputs_to_use))
+        return prepare_hybrid_inputs(
+            X,
+            tsf_input_dims=n_features_list,
+            with_slope=add_slope,
+            mlp_input_dim=20 + len(inputs_to_use))
     else:
-        raise ValueError("Invalid model_type. Must be 'mlp', 'cnn' or 'rnn'.")
+        return X
 
 
 def prepare_hybrid_inputs(
