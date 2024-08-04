@@ -5,7 +5,7 @@ from datetime import datetime
 from modules.training.cme_modeling import pds_space_norm
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'  # left is 1
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'  # left is 1
 
 import numpy as np
 import tensorflow as tf
@@ -36,7 +36,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for add_slope in ADD_SLOPE:
-                    for rho in [0]:
+                    for rho in [0.7]:
                         # for alpha in [5, 10]:
                         for alpha in [2.5, 5]:
                             # PARAMS
