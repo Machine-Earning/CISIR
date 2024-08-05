@@ -30,67 +30,84 @@ print(f'devices: {devices}')
 set_seed(SEEDS[0])  # Set seed for reproducibility
 
 
-def create_event_series(event_type: str) -> np.ndarray:
-    """
-    Create a time series for a specific event type.
-
-    Args:
-        event_type (str): Type of the event ('fast' or 'slow').
-
-    Returns:
-        np.ndarray: Time series data.
-    """
+def create_event_series(event_type: str, start_point: int, end_value: float) -> np.ndarray:
     series = np.ones(30)
     if event_type == 'fast':
-        series[10:20] = np.linspace(1, 10, 10)  # Increase by 1 for 10 timestamps
+        series[start_point:start_point+10] = np.linspace(1, end_value, 10)
     elif event_type == 'slow':
-        series[10:20] = np.linspace(1, 3, 10)  # Increase by 0.2 for 10 timestamps
-    series[20:] = series[19]  # Plateau after rise
+        series[start_point:start_point+10] = np.linspace(1, end_value, 10)
+    series[start_point+10:] = series[start_point+9]
     return series
 
-
-def generate_time_series_data(n_samples: int, shuffle: bool = True) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Generate synthetic time series data for fast rising and slow rising events.
-
-    Args:
-        n_samples (int): Number of samples to generate for each type.
-        shuffle (bool): Whether to shuffle the generated data.
-
-    Returns:
-        Tuple[np.ndarray, np.ndarray]: Generated features and labels.
-    """
+def generate_large_pool(n_samples: int) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     x_list, y_list = [], []
-
+    
     for _ in range(n_samples):
         for event_type in ['fast', 'slow']:
-            series = create_event_series(event_type)
+            start_point = np.random.randint(5, 15)
+            end_value = np.random.uniform(2, 10) if event_type == 'fast' else np.random.uniform(2, 4)
+            series = create_event_series(event_type, start_point, end_value)
             for t in range(4, 30):
                 x_list.append(series[t - 4:t + 1])
-                y_list.append(series[min(t + 3, 29)])  # Ensure we don't go out of bounds
+                y_list.append(series[min(t + 3, 29)])
+                
+    return x_list, y_list
 
-    x_array = np.array(x_list)
-    y_array = np.array(y_list)
+def filter_overlapping_samples(x_list: List[np.ndarray], y_list: List[np.ndarray], debug_data: Tuple[np.ndarray, np.ndarray], exclude_set: set = None) -> Tuple[np.ndarray, np.ndarray]:
+    debug_samples = {tuple(sample) for sample in debug_data[0]}
+    if exclude_set:
+        debug_samples.update(exclude_set)
+        
+    filtered_x_list, filtered_y_list = [], []
+    
+    for x, y in zip(x_list, y_list):
+        if tuple(x) not in debug_samples:
+            filtered_x_list.append(x)
+            filtered_y_list.append(y)
+            
+    return np.array(filtered_x_list), np.array(filtered_y_list)
 
-    if shuffle:
-        indices = np.arange(x_array.shape[0])
-        np.random.shuffle(indices)
-        x_array = x_array[indices]
-        y_array = y_array[indices]
+# Fixed debug dataset
+def generate_debug_data() -> Tuple[np.ndarray, np.ndarray]:
+    x_list, y_list = [], []
+    for event_type in ['fast', 'slow']:
+        series = create_event_series(event_type, 10, 10 if event_type == 'fast' else 3)
+        for t in range(4, 30):
+            x_list.append(series[t - 4:t + 1])
+            y_list.append(series[min(t + 3, 29)])
+    return np.array(x_list), np.array(y_list)
 
-    return x_array, y_array
+# Generate debug data first
+x_debug, y_debug = generate_debug_data()
 
+# Generate a large pool of samples
+pool_size = 20000
+x_pool, y_pool = generate_large_pool(pool_size)
 
-# Generate training and test data
+# Filter out overlapping samples
+x_filtered, y_filtered = filter_overlapping_samples(x_pool, y_pool, (x_debug, y_debug))
+
+# Generate training data
 n_samples_train = 400
 n_samples_test = 100
 
-x_train, y_train = generate_time_series_data(n_samples_train)
-x_test, y_test = generate_time_series_data(n_samples_test)
+x_train, y_train = x_filtered[:n_samples_train * 52], y_filtered[:n_samples_train * 52]
+train_samples_set = set(map(tuple, x_train))
 
-# Select 6 instances for debugging
-x_debug, y_debug = generate_time_series_data(1, shuffle=False) 
-#select_debug_samples(x_test, y_test)
+# Filter again to ensure no overlap between training and testing
+x_filtered_test, y_filtered_test = filter_overlapping_samples(x_filtered[n_samples_train * 52:], y_filtered[n_samples_train * 52:], (x_debug, y_debug), train_samples_set)
+x_test, y_test = x_filtered_test[:n_samples_test * 52], y_filtered_test[:n_samples_test * 52]
+
+# # Verify the uniqueness of the datasets
+# debug_samples_set = set(map(tuple, x_debug))
+# test_samples_set = set(map(tuple, x_test))
+
+# debug_train_overlap = debug_samples_set.intersection(train_samples_set)
+# debug_test_overlap = debug_samples_set.intersection(test_samples_set)
+# train_test_overlap = train_samples_set.intersection(test_samples_set)
+
+# (x_train.shape, y_train.shape), (x_test.shape, y_test.shape), (x_debug.shape, y_debug.shape), debug_train_overlap, debug_test_overlap, train_test_overlap
+# #select_debug_samples(x_test, y_test)
 
 # Verify data shapes
 print(f"Shape of x_train: {x_train.shape}")
