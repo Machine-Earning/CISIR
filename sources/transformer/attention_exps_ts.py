@@ -20,8 +20,6 @@ from modules.shared.globals import SEEDS
 # Set the environment variable for CUDA (in case it is necessary)
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
-# TODO: double check and update like he asked so everything looks good
-
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
 
@@ -115,7 +113,7 @@ def create_model(block_class, input_shape: Tuple[int]) -> Model:
         Model: The Keras model.
     """
     inputs = Input(shape=input_shape)
-    block = block_class(attn_hidden_units=[4, 4], activation='tanh', output_activation='linear')
+    block = block_class(attn_hidden_units=[20, 10, 5], activation='leaky_relu', output_activation='linear')
     outputs = block(inputs)  # dict of outputs and attention scores
     model = Model(inputs, outputs=outputs)
     return model
@@ -131,6 +129,7 @@ def train_and_print_results(
         x_debug: np.ndarray = None,
         y_debug: np.ndarray = None,
         learning_rate: float = 0.003,
+        weight_decay: float = 1e-5,
         epochs: int = 500,
         batch_size: int = 32,
         patience: int = 100,
@@ -153,7 +152,7 @@ def train_and_print_results(
         patience (int): Patience for early stopping.
     """
     model.compile(
-        optimizer=AdamW(learning_rate=learning_rate),
+        optimizer=AdamW(learning_rate=learning_rate, weight_decay=weight_decay),
         loss={'output': 'mse'},
         metrics={'output': 'mae'}
     )
@@ -243,15 +242,15 @@ input_shape = (5,)
 block_classes = [BlockT0, BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6, BlockT7]
 
 for i, block_class in enumerate(block_classes):
-    if i not in [7]:
+    if i not in [0]:
         continue  # skip the first 4
     # Create a unique experiment name with a timestamp
     current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
     experiment_name = f'Attention_Type{i}_{current_time}'
     # Initialize wandb
-    LR = 1e-3
+    LR = 3e-3
     EPOCHS = int(50e3)
-    BS = 128
+    BS = 512
     PATIENCE = 1000
 
     wandb.init(project="attention-exps-2", name=experiment_name, config={

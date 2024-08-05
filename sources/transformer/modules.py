@@ -230,7 +230,10 @@ class AttentionBlock(Layer):
             if self.norm is not None:
                 x = self.norm_layers[i](x)
 
-            x = Activation(self.hidden_activation)(x)
+            if self.hidden_activation == 'leaky_relu':
+                x = LeakyReLU()(x)
+            else:
+                x = Activation(self.hidden_activation)(x)
 
             if self.dropout_rate > 0.0:
                 x = self.dropout_layers[i](x)
@@ -720,7 +723,7 @@ class BlockT7(BlockBase):
 
     def __init__(self,
                  attn_hidden_units: Optional[List[int]] = None,
-                 activation: str = 'tanh',
+                 activation: str = 'leaky_relu',
                  output_activation: Optional[str] = None):
         """
         Initialize the BlockT5.
