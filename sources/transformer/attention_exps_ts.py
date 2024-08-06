@@ -16,7 +16,7 @@ from modules.training.ts_modeling import set_seed
 from sources.transformer.modules import *
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
@@ -95,9 +95,11 @@ x_train, y_train = x_filtered[:n_samples_train * 52], y_filtered[:n_samples_trai
 train_samples_set = set(map(tuple, x_train))
 
 # Filter again to ensure no overlap between training and testing
-x_filtered_test, y_filtered_test = filter_overlapping_samples(x_filtered[n_samples_train * 52:],
-                                                              y_filtered[n_samples_train * 52:], (x_debug, y_debug),
-                                                              train_samples_set)
+x_filtered_test, y_filtered_test = filter_overlapping_samples(
+    x_filtered[n_samples_train * 52:],
+    y_filtered[n_samples_train * 52:], 
+    (x_debug, y_debug),
+    train_samples_set)
 x_test, y_test = x_filtered_test[:n_samples_test * 52], y_filtered_test[:n_samples_test * 52]
 
 # # Verify the uniqueness of the datasets
@@ -136,7 +138,7 @@ def create_model(block_class, input_shape: Tuple[int]) -> Model:
         attn_hidden_units=[20, 10, 5],
         activation='leaky_relu',
         output_activation='linear',
-        offset=1e-1)
+        offset=1e-2)
     outputs = block(inputs)  # dict of outputs and attention scores
     model = Model(inputs, outputs=outputs)
     return model
@@ -282,7 +284,7 @@ for i, block_class in enumerate(block_classes):
         "batch_size": BS,
         "attention_type": i,
         "patience": PATIENCE,
-        "offset": 1e-1
+        "offset": 1e-2
     })
 
     print(f"\nAttention Type {i}")
