@@ -724,18 +724,21 @@ class BlockT7(BlockBase):
     def __init__(self,
                  attn_hidden_units: Optional[List[int]] = None,
                  activation: str = 'leaky_relu',
-                 output_activation: Optional[str] = None):
+                 output_activation: Optional[str] = None,
+                 offset: Optional[float] = 0.0):
         """
-        Initialize the BlockT5.
+        Initialize the BlockT7.
 
         Args:
             attn_hidden_units (Optional[List[int]]): List of integers for hidden layer units in attention mechanism.
             activation (str): Activation function to use in attention layers.
             output_activation (Optional[str]): Activation function to use in the final dense layer.
+            offset (Optional[float]): An optional offset value to modify the input.
         """
         super().__init__(attn_hidden_units, activation, output_activation)
         self.dense_layer = None
         self.tanh = Activation('tanh')
+        self.offset = offset
 
     def build(self, input_shape: tf.TensorShape) -> None:
         """
@@ -756,7 +759,7 @@ class BlockT7(BlockBase):
 
     def call(self, inputs: tf.Tensor) -> Dict[str, Any]:
         """
-        Perform the forward pass of the BlockT5 layer.
+        Perform the forward pass of the BlockT7 layer.
 
         This method applies the attention mechanism to the inputs,
         applies sigmoid to the attention scores, then passes the weighted inputs through a dense layer.
@@ -767,6 +770,10 @@ class BlockT7(BlockBase):
         Returns:
             tf.Tensor: The output tensor after applying attention, sigmoid, and the dense layer.
         """
+        # Apply the offset to inputs
+        offset_tensor = tf.range(1, inputs.shape[-1] + 1, dtype=inputs.dtype) * self.offset
+        inputs = inputs + offset_tensor
+
         # Compute attention scores
         self.attention_scores = self.attention_block(inputs)
 

@@ -1,5 +1,4 @@
 import os
-import random
 from datetime import datetime
 from typing import Tuple
 
@@ -7,15 +6,14 @@ import numpy as np
 import pandas as pd
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.layers import Input
 from tensorflow.keras.models import Model
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
+from modules.shared.globals import SEEDS
+from modules.training.ts_modeling import set_seed
 # Importing the Blocks
 from sources.transformer.modules import *
-from modules.training.ts_modeling import set_seed
-from modules.shared.globals import SEEDS
 
 # Set the environment variable for CUDA (in case it is necessary)
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
@@ -23,25 +21,22 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
 
-
-
-
-
 set_seed(SEEDS[0])  # Set seed for reproducibility
 
 
 def create_event_series(event_type: str, start_point: int, end_value: float) -> np.ndarray:
     series = np.ones(30)
     if event_type == 'fast':
-        series[start_point:start_point+10] = np.linspace(1, end_value, 10)
+        series[start_point:start_point + 10] = np.linspace(1, end_value, 10)
     elif event_type == 'slow':
-        series[start_point:start_point+10] = np.linspace(1, end_value, 10)
-    series[start_point+10:] = series[start_point+9]
+        series[start_point:start_point + 10] = np.linspace(1, end_value, 10)
+    series[start_point + 10:] = series[start_point + 9]
     return series
+
 
 def generate_large_pool(n_samples: int) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     x_list, y_list = [], []
-    
+
     for _ in range(n_samples):
         for event_type in ['fast', 'slow']:
             start_point = np.random.randint(5, 15)
@@ -50,22 +45,26 @@ def generate_large_pool(n_samples: int) -> Tuple[List[np.ndarray], List[np.ndarr
             for t in range(4, 30):
                 x_list.append(series[t - 4:t + 1])
                 y_list.append(series[min(t + 3, 29)])
-                
+
     return x_list, y_list
 
-def filter_overlapping_samples(x_list: List[np.ndarray], y_list: List[np.ndarray], debug_data: Tuple[np.ndarray, np.ndarray], exclude_set: set = None) -> Tuple[np.ndarray, np.ndarray]:
+
+def filter_overlapping_samples(x_list: List[np.ndarray], y_list: List[np.ndarray],
+                               debug_data: Tuple[np.ndarray, np.ndarray], exclude_set: set = None) -> Tuple[
+    np.ndarray, np.ndarray]:
     debug_samples = {tuple(sample) for sample in debug_data[0]}
     if exclude_set:
         debug_samples.update(exclude_set)
-        
+
     filtered_x_list, filtered_y_list = [], []
-    
+
     for x, y in zip(x_list, y_list):
         if tuple(x) not in debug_samples:
             filtered_x_list.append(x)
             filtered_y_list.append(y)
-            
+
     return np.array(filtered_x_list), np.array(filtered_y_list)
+
 
 # Fixed debug dataset
 def generate_debug_data() -> Tuple[np.ndarray, np.ndarray]:
@@ -76,6 +75,7 @@ def generate_debug_data() -> Tuple[np.ndarray, np.ndarray]:
             x_list.append(series[t - 4:t + 1])
             y_list.append(series[min(t + 3, 29)])
     return np.array(x_list), np.array(y_list)
+
 
 # Generate debug data first
 x_debug, y_debug = generate_debug_data()
@@ -95,7 +95,9 @@ x_train, y_train = x_filtered[:n_samples_train * 52], y_filtered[:n_samples_trai
 train_samples_set = set(map(tuple, x_train))
 
 # Filter again to ensure no overlap between training and testing
-x_filtered_test, y_filtered_test = filter_overlapping_samples(x_filtered[n_samples_train * 52:], y_filtered[n_samples_train * 52:], (x_debug, y_debug), train_samples_set)
+x_filtered_test, y_filtered_test = filter_overlapping_samples(x_filtered[n_samples_train * 52:],
+                                                              y_filtered[n_samples_train * 52:], (x_debug, y_debug),
+                                                              train_samples_set)
 x_test, y_test = x_filtered_test[:n_samples_test * 52], y_filtered_test[:n_samples_test * 52]
 
 # # Verify the uniqueness of the datasets
@@ -130,7 +132,11 @@ def create_model(block_class, input_shape: Tuple[int]) -> Model:
         Model: The Keras model.
     """
     inputs = Input(shape=input_shape)
-    block = block_class(attn_hidden_units=[20, 10, 5], activation='leaky_relu', output_activation='linear')
+    block = block_class(
+        attn_hidden_units=[20, 10, 5],
+        activation='leaky_relu',
+        output_activation='linear',
+        offset=1e-1)
     outputs = block(inputs)  # dict of outputs and attention scores
     model = Model(inputs, outputs=outputs)
     return model
@@ -275,7 +281,8 @@ for i, block_class in enumerate(block_classes):
         "epochs": EPOCHS,
         "batch_size": BS,
         "attention_type": i,
-        "patience": PATIENCE
+        "patience": PATIENCE,
+        "offset": 1e-1
     })
 
     print(f"\nAttention Type {i}")
@@ -293,4 +300,3 @@ for i, block_class in enumerate(block_classes):
 
     # Finish the wandb run
     wandb.finish()
-
