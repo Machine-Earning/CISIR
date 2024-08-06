@@ -146,7 +146,7 @@ def train_and_print_results(
         x_debug: np.ndarray = None,
         y_debug: np.ndarray = None,
         learning_rate: float = 0.003,
-        weight_decay: float = 1e-5,
+        weight_decay: float = 1e-8,
         epochs: int = 500,
         batch_size: int = 32,
         patience: int = 100,
@@ -259,7 +259,7 @@ input_shape = (5,)
 block_classes = [BlockT0, BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6, BlockT7]
 
 for i, block_class in enumerate(block_classes):
-    if i not in [0]:
+    if i not in [7]:
         continue  # skip the first 4
     # Create a unique experiment name with a timestamp
     current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
