@@ -724,8 +724,7 @@ class BlockT7(BlockBase):
     def __init__(self,
                  attn_hidden_units: Optional[List[int]] = None,
                  activation: str = 'leaky_relu',
-                 output_activation: Optional[str] = None,
-                 offset: Optional[float] = 0.0):
+                 output_activation: Optional[str] = None):
         """
         Initialize the BlockT7.
 
@@ -738,7 +737,6 @@ class BlockT7(BlockBase):
         super().__init__(attn_hidden_units, activation, output_activation)
         self.dense_layer = None
         self.tanh = Activation('tanh')
-        self.offset = offset
 
     def build(self, input_shape: tf.TensorShape) -> None:
         """
@@ -771,8 +769,8 @@ class BlockT7(BlockBase):
             tf.Tensor: The output tensor after applying attention, sigmoid, and the dense layer.
         """
         # Apply the offset to inputs
-        offset_tensor = tf.range(1, inputs.shape[-1] + 1, dtype=inputs.dtype) * self.offset
-        inputs = inputs + offset_tensor
+        # offset_tensor = tf.range(1, inputs.shape[-1] + 1, dtype=inputs.dtype) * self.offset
+        # inputs = inputs + offset_tensor
 
         # Compute attention scores
         self.attention_scores = self.attention_block(inputs)
