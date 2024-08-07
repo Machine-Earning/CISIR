@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
@@ -215,14 +215,14 @@ def main():
                             model_sep = create_attentive_model(
                                 input_dim=n_features,
                                 output_dim=output_dim,
-                                hidden_blocks=MLP_HIDDENS,
-                                attn_hidden_units=[128, 128, 128],
+                                hidden_blocks=ATTM_HIDDENS,
+                                attn_hidden_units=ATTN_HIDDENS,
                                 attn_hidden_activation='leaky_relu',
                                 attn_skipped_layers=skipped_layers,
                                 attn_residual=False,
                                 attn_dropout_rate=0,
                                 attn_norm=None,
-                                skipped_blocks=skipped_layers,
+                                skipped_blocks=1,
                                 repr_dim=repr_dim,
                                 dropout_rate=dropout,
                                 activation='leaky_relu',
@@ -274,14 +274,14 @@ def main():
                             final_model_sep = create_attentive_model(
                                 input_dim=n_features,
                                 output_dim=output_dim,
-                                hidden_blocks=MLP_HIDDENS,
-                                attn_hidden_units=[128, 128, 128],
+                                hidden_blocks=ATTM_HIDDENS,
+                                attn_hidden_units=ATTN_HIDDENS,
                                 attn_hidden_activation='leaky_relu',
                                 attn_skipped_layers=skipped_layers,
                                 attn_residual=False,
                                 attn_dropout_rate=0,
                                 attn_norm=None,
-                                skipped_blocks=skipped_layers,
+                                skipped_blocks=1,
                                 repr_dim=repr_dim,
                                 dropout_rate=dropout,
                                 activation='leaky_relu',

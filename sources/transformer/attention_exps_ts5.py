@@ -82,7 +82,7 @@ def create_model(block_class, input_shape: Tuple[int]) -> Model:
         attn_hidden_activation='leaky_relu',
         output_activation='linear',
         attn_skipped_layers=1,
-        attn_residual=True,
+        attn_residual=False,
         attn_norm=None)
     outputs = block(inputs)  # dict of outputs and attention scores
     model = Model(inputs, outputs=outputs)
