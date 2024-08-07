@@ -12,7 +12,7 @@ from wandb.integration.keras import WandbCallback
 
 from modules.shared.globals import *
 from modules.training.ts_modeling import (
-    build_dataset)
+    build_dataset, evaluate_mae, process_sep_events)
 from modules.training.ts_modeling import set_seed
 # Importing the Blocks
 from sources.transformer.modules import *
@@ -85,6 +85,8 @@ def create_model(block_class, input_shape: Tuple[int]) -> Model:
         attn_residual=False,
         attn_norm=None)
     outputs = block(inputs)  # dict of outputs and attention scores
+    # get the outputs and attention scores a list from the block
+    # outputs = [outputs['output'], outputs['attention_scores']]
     model = Model(inputs, outputs=outputs)
     return model
 
@@ -210,6 +212,74 @@ def train_and_print_results(
         # Save the results DataFrame to a CSV file
         df_results.to_csv(f"results_{block_name}_{time}.csv", index=False)
         print(f"Results saved to results_{block_name}_{time}.csv")
+
+        # evaluate the model on test cme_files
+        error_mae = evaluate_mae(model, x_test, y_test, use_dict=True)
+        print(f'mae error: {error_mae}')
+        # Log the MAE error to wandb
+        wandb.log({"mae_error": error_mae})
+
+        # evaluate the model on training cme_files
+        error_mae_train = evaluate_mae(model, x_train, y_train, use_dict=True)
+        print(f'mae error train: {error_mae_train}')
+        # Log the MAE error to wandb
+        wandb.log({"train_mae_error": error_mae_train})
+
+        # Process SEP event files in the specified directory
+        test_directory = root_dir + '/testing'
+        filenames = process_sep_events(
+            test_directory,
+            model,
+            title=block_name,
+            inputs_to_use=inputs_to_use,
+            add_slope=add_slope,
+            outputs_to_use=outputs_to_use,
+            show_avsp=True,
+            using_cme=True,
+            cme_speed_threshold=cme_speed_threshold,
+            use_dict=True)
+
+        # Log the plot to wandb
+        for filename in filenames:
+            log_title = os.path.basename(filename)
+            wandb.log({f'testing_{log_title}': wandb.Image(filename)})
+
+        # Process SEP event files in the specified directory
+        test_directory = root_dir + '/training'
+        filenames = process_sep_events(
+            test_directory,
+            model,
+            title=block_name,
+            inputs_to_use=inputs_to_use,
+            add_slope=add_slope,
+            outputs_to_use=outputs_to_use,
+            show_avsp=True,
+            prefix='training',
+            using_cme=True,
+            cme_speed_threshold=cme_speed_threshold,
+            use_dict=True)
+
+        # Log the plot to wandb
+        for filename in filenames:
+            log_title = os.path.basename(filename)
+            wandb.log({f'training_{log_title}': wandb.Image(filename)})
+
+        # evaluate the model on test cme_files
+        above_threshold = 0.5
+        error_mae_cond = evaluate_mae(
+            model, x_test, y_test, above_threshold=above_threshold, use_dict=True)
+
+        print(f'mae error delta >= 0.1 test: {error_mae_cond}')
+        # Log the MAE error to wandb
+        wandb.log({"mae_error_cond_test": error_mae_cond})
+
+        # evaluate the model on training cme_files
+        error_mae_cond_train = evaluate_mae(
+            model, x_train, y_train, above_threshold=above_threshold, use_dict=True)
+
+        print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
+        # Log the MAE error to wandb
+        wandb.log({"mae_error_cond_train": error_mae_cond_train})
 
 
 # Training and printing results for each attention type

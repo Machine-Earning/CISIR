@@ -1498,7 +1498,8 @@ def plot_and_evaluate_sep_event(
         outputs_to_use: List[str] = None,
         show_persistent: bool = True,
         show_changes: bool = True,
-        prefix: str = 'testing') -> [float, str]:
+        prefix: str = 'testing',
+        use_dict: bool = False) -> [float, str]:
     """
     Plots the SEP event cme_files with actual and predicted proton intensities, electron intensity,
     and evaluates the model's performance using MAE.
@@ -1520,6 +1521,7 @@ def plot_and_evaluate_sep_event(
     - show_persistent (bool): Whether to show the persistent model where the delta = 0. Default is True.
     - show_changes (bool): Whether to show the scatter plot of target changes vs predicted changes. Default is True.
     - prefix (bool): Whether to add the prefix 'SEP Event' to the title. Default is True.
+    - use_dict (bool): Whether to use the dictionary for the model. Default is False.
 
     Returns:
     - Tuple[float, str]: A tuple containing the MAE loss and the plot title.
@@ -1596,7 +1598,11 @@ def plot_and_evaluate_sep_event(
     X_reshaped = reshape_X(X_reshaped, n_features_list, inputs_to_use, add_slope, model.name)
 
     # Evaluate the model
-    _, predictions = model.predict(X_reshaped)
+    if use_dict:
+        res = model.predict(X_reshaped)
+        predictions = res['output']
+    else:
+        _, predictions = model.predict(X_reshaped)
     predictions = process_predictions(predictions)
 
     # if target change then we need to convert prediction into actual value
@@ -1707,6 +1713,7 @@ def plot_avsp_delta(
         inputs_to_use: List[str] = None,
         add_slope: bool = True,
         outputs_to_use: List[str] = None,
+        use_dict: bool = False
 ) -> [float, str]:
     """
     Plots theactual delta (x) vs predicted delta (y) with a diagonal dotted line indicating perfect prediction.
@@ -1724,6 +1731,7 @@ def plot_avsp_delta(
     - inputs_to_use (List[str]): The list of input types to use. Default is None.
     - add_slope (bool): Whether to add slope features. Default is True.
     - outputs_to_use (List[str]): The list of output types to use. Default is None.
+    - use_dict (bool): Whether to use the dictionary for the model. Default is False.
 
     Returns:
     - Tuple[float, str]: A tuple containing the MAE loss and the plot title.
@@ -1778,7 +1786,12 @@ def plot_avsp_delta(
     X_reshaped = reshape_X(X_reshaped, n_features_list, inputs_to_use, add_slope, model.name)
 
     # Evaluate the model
-    _, predictions = model.predict(X_reshaped)
+    if use_dict:
+        res = model.predict(X_reshaped)
+        predictions = res['output']
+    else:
+        _, predictions = model.predict(X_reshaped)
+
     predictions = process_predictions(predictions)
 
     print("Using target change approach")
@@ -1806,7 +1819,8 @@ def process_sep_events(
         show_avsp: bool = False,
         show_error_hist: bool = True,
         show_error_concentration: bool = True,
-        prefix: str = 'testing') -> List[str]:
+        prefix: str = 'testing',
+        use_dict: bool = False) -> List[str]:
     """
     Processes SEP event files in the specified directory, normalizes flux intensities, predicts proton intensities,
     plots the results, and calculates the MAE for each file.
@@ -1823,6 +1837,7 @@ def process_sep_events(
     - show_avsp (bool): Whether to show the Actual vs Predicted delta plot. Default is False.
     - show_error_hist (bool): Whether to show the error histogram. Default is True.
     - prefix (str): The prefix to use for the plot file names. Default is 'testing'.
+    - use_dict (bool): Whether to use the dictionary for the model. Default is False.
 
     Returns:
     - str: The name of the plot file.
@@ -1891,7 +1906,7 @@ def process_sep_events(
                     input_columns, using_cme=using_cme,
                     title=title, inputs_to_use=inputs_to_use,
                     add_slope=add_slope, outputs_to_use=outputs_to_use,
-                    prefix=prefix)
+                    prefix=prefix, use_dict=use_dict)
 
                 print(f"Processed file: {file_name} with MAE: {mae_loss}")
                 plot_names.append(plotname)
@@ -1900,7 +1915,7 @@ def process_sep_events(
                     actual_ch, predicted_ch = plot_avsp_delta(
                         df, model, input_columns, using_cme=using_cme,
                         inputs_to_use=inputs_to_use, add_slope=add_slope,
-                        outputs_to_use=outputs_to_use)
+                        outputs_to_use=outputs_to_use, use_dict=use_dict)
 
                     avsp_data.append((event_id, actual_ch, predicted_ch))
             except Exception as e:
@@ -2234,7 +2249,8 @@ def evaluate_mae(
         X_test: np.ndarray or List[np.ndarray],
         y_test: np.ndarray,
         below_threshold: float = None,
-        above_threshold: float = None) -> float:
+        above_threshold: float = None,
+        use_dict: bool = False) -> float:
     """
     Evaluates a given model using Mean Absolute Error (MAE) on the provided test data,
     with an option to conditionally calculate MAE based on specified thresholds.
@@ -2245,12 +2261,16 @@ def evaluate_mae(
     - y_test (np.ndarray): True target values for the test set.
     - below_threshold (float, optional): The lower bound threshold for y_test to be included in MAE calculation.
     - above_threshold (float, optional): The upper bound threshold for y_test to be included in MAE calculation.
-
+    - use_dict (bool, optional): Whether the model returns a dictionary with output names. Default is False.
     Returns:
     - float: The MAE loss of the model on the filtered test data.
     """
     # Make predictions
-    _, predictions = model.predict(X_test)
+    if use_dict:
+        res = model.predict(X_test)
+        predictions = res['output']
+    else:
+        _, predictions = model.predict(X_test)
 
     # Process predictions
     predictions = process_predictions(predictions)
