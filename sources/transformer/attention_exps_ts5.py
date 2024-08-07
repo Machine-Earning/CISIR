@@ -30,7 +30,7 @@ root_dir = DS_PATH
 inputs_to_use = INPUTS_TO_USE[0]
 outputs_to_use = OUTPUTS_TO_USE
 cme_speed_threshold = CME_SPEED_THRESHOLD[0]
-add_slope = ADD_SLOPE[0]
+add_slope = False
 # build the dataset
 x_train, y_train = build_dataset(
     root_dir + '/training',
@@ -54,7 +54,7 @@ x_debug, y_debug = build_dataset(
     outputs_to_use=outputs_to_use,
     cme_speed_threshold=cme_speed_threshold)
 
-hiddens = [128]
+hiddens = [128, 64, 128, 64, 128, 64, 128]
 
 # Verify data shapes
 print(f"Shape of x_train: {x_train.shape}")
@@ -76,11 +76,12 @@ def create_model(block_class, input_shape: Tuple[int]) -> Model:
     Returns:
         Model: The Keras model.
     """
-    inputs = Input(shape=input_shape)
-    block = block_class(
+    inputs = Input(shape=(input_shape,))
+    block = TanhAttentiveBlock(
         attn_hidden_units=hiddens,
-        activation='leaky_relu',
-        output_activation='linear')
+        attn_hidden_activation='leaky_relu',
+        output_activation='linear',
+        attn_residual=True)
     outputs = block(inputs)  # dict of outputs and attention scores
     model = Model(inputs, outputs=outputs)
     return model
@@ -148,7 +149,7 @@ def train_and_print_results(
     print('results')
     print(results)
     loss = results['loss']
-    mae = results[f'block_t{block_name}_1_mae']
+    mae = results[f'tanh_attentive_block_1_mae']
     print(f"Test loss: {loss}")
     print(f"MAE loss: {mae}")
     # log the results
@@ -159,7 +160,7 @@ def train_and_print_results(
     print('results')
     print(results)
     loss = results['loss']
-    mae = results[f'block_t{block_name}_1_mae']
+    mae = results[f'tanh_attentive_block_1_mae']
     print(f"Debug loss: {loss}")
     print(f"Debug MAE loss: {mae}")
     # log the results
@@ -203,12 +204,15 @@ def train_and_print_results(
 
         df_results = pd.DataFrame(results, columns=headers)
         print(df_results)
-        wandb.log({f"results_{block_name}_{time}": df_results})  # so cool you can log dataframes
+        # wandb.log({f"results_{block_name}_{time}": df_results})  # so cool you can log dataframes
+        # Save the results DataFrame to a CSV file
+        df_results.to_csv(f"results_{block_name}_{time}.csv", index=False)
+        print(f"Results saved to results_{block_name}_{time}.csv")
 
 
 # Training and printing results for each attention type
 input_shape = x_train.shape[1]
-block_classes = [BlockT0, BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6, BlockT7]
+block_classes = [BlockT0, BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6, TanhAttentiveBlock]
 
 for i, block_class in enumerate(block_classes):
     if i not in [7]:
@@ -220,7 +224,7 @@ for i, block_class in enumerate(block_classes):
     LR = 3e-3
     EPOCHS = int(50e3)
     BS = 4096
-    PATIENCE = 1000
+    PATIENCE = 2000
 
     wandb.init(project="attention-exps-5", name=experiment_name, config={
         "learning_rate": LR,
@@ -228,7 +232,8 @@ for i, block_class in enumerate(block_classes):
         "batch_size": BS,
         "attention_type": i,
         "patience": PATIENCE,
-        'attn_hiddens': (", ".join(map(str, hiddens))).replace(', ', '_')
+        'attn_hiddens': (", ".join(map(str, hiddens))).replace(', ', '_'),
+        'slope': add_slope
     })
 
     print(f"\nAttention Type {i}")
