@@ -18,7 +18,7 @@ from modules.training.ts_modeling import set_seed
 from sources.transformer.modules import *
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
@@ -54,7 +54,7 @@ x_debug, y_debug = build_dataset(
     outputs_to_use=outputs_to_use,
     cme_speed_threshold=cme_speed_threshold)
 
-hiddens = [128, 64, 128, 64, 128, 64, 128]
+hiddens = [128, 128, 128, 128, 128, 128, 128]
 
 # Verify data shapes
 print(f"Shape of x_train: {x_train.shape}")
@@ -81,7 +81,9 @@ def create_model(block_class, input_shape: Tuple[int]) -> Model:
         attn_hidden_units=hiddens,
         attn_hidden_activation='leaky_relu',
         output_activation='linear',
-        attn_residual=True)
+        attn_skipped_layers=1,
+        attn_residual=True,
+        attn_norm=None)
     outputs = block(inputs)  # dict of outputs and attention scores
     model = Model(inputs, outputs=outputs)
     return model

@@ -23,95 +23,7 @@ from modules.training.cme_modeling import NormalizeLayer
 from modules.training.sam_keras import SAMModel
 
 
-class AwayFrom1Regularizer(regularizers.Regularizer):
-    """
-    Custom regularizer that encourages weights to be away from the value 1.
 
-    Attributes:
-        strength (float): The regularization strength.
-    """
-
-    def __init__(self, strength: float = 0.01):
-        self.strength = strength
-
-    def __call__(self, x):
-        return self.strength * K.sum(K.square(x - 1.0))
-
-    def get_config(self):
-        return {'strength': self.strength}
-
-
-# class AttentionBlock(Layer):
-#     """
-#     A custom attention layer that applies a series of dense layers followed by an output layer.
-#
-#     This layer can be used to compute attention scores or feature transformations
-#     in attention-based neural network architectures.
-#
-#     Attributes:
-#         input_dim (int): The dimensionality of the input.
-#         hidden_units (List[int]): A list of integers, where each integer is the number of units
-#                                   in the corresponding dense layer.
-#         output_dim (int): The dimensionality of the output.
-#         activation (str): The activation function to use in the hidden layers.
-#         dense_layers (List[Dense]): A list of Dense layers used in the attention mechanism.
-#         output_layer (Dense): The final Dense layer that produces the output.
-#     """
-#
-#     def __init__(self, input_dim: int, hidden_units: List[int], output_dim: int, activation: str = 'tanh'):
-#         """
-#         Initialize the AttentionBlock.
-#
-#         Args:
-#             input_dim (int): The dimensionality of the input.
-#             hidden_units (List[int]): A list of integers, where each integer is the number of units
-#                                       in the corresponding dense layer.
-#             output_dim (int): The dimensionality of the output.
-#             activation (str, optional): The activation function to use in the hidden layers.
-#                                         Defaults to 'tanh'.
-#         """
-#         super(AttentionBlock, self).__init__()
-#         self.input_dim = input_dim
-#         self.hidden_units = hidden_units
-#         self.output_dim = output_dim
-#         self.activation = activation
-#         self.dense_layers: List[Dense] = []
-#
-#         # Create dense layers based on hidden_units list
-#         for units in hidden_units:
-#             self.dense_layers.append(Dense(units, activation=self.activation))
-#         self.output_layer = Dense(output_dim)
-#
-#     def build(self, input_shape: tf.TensorShape) -> None:
-#         """
-#         Build the layer. This method is called automatically by Keras when the layer is first used.
-#
-#         In this implementation, the layers are created in __init__, so this method is empty.
-#
-#         Args:
-#             input_shape (tf.TensorShape): The shape of the input tensor.
-#         """
-#         # The layers are created in __init__, so no need to create them here.
-#         pass
-#
-#     def call(self, inputs: tf.Tensor) -> tf.Tensor:
-#         """
-#         Perform the forward pass of the attention layer.
-#
-#         This method applies a series of dense layers to the input, followed by a final output layer.
-#
-#         Args:
-#             inputs (tf.Tensor): The input tensor.
-#
-#         Returns:
-#             tf.Tensor: The output tensor after applying the attention mechanism.
-#         """
-#         x = inputs
-#         # Apply each dense layer in sequence
-#         for dense in self.dense_layers:
-#             x = dense(x)
-#         # Apply the final output layer
-#         return self.output_layer(x)
 
 class AttentionBlock(Layer):
     def __init__(
@@ -932,7 +844,7 @@ class TanhAttentiveBlock(Layer):
                  attn_hidden_units: Optional[List[int]] = None,
                  attn_hidden_activation: str = 'leaky_relu',
                  attn_dropout_rate: float = 0,
-                 attn_norm: Optional[str] = 'batch_norm',
+                 attn_norm: Optional[str] = None,
                  attn_residual: bool = True,
                  attn_skipped_layers: int = 2,
                  output_dim: int = 1,
