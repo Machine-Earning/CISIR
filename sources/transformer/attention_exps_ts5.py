@@ -54,6 +54,8 @@ x_debug, y_debug = build_dataset(
     outputs_to_use=outputs_to_use,
     cme_speed_threshold=cme_speed_threshold)
 
+hiddens = [128]
+
 # Verify data shapes
 print(f"Shape of x_train: {x_train.shape}")
 print(f"Shape of y_train: {y_train.shape}")
@@ -76,7 +78,7 @@ def create_model(block_class, input_shape: Tuple[int]) -> Model:
     """
     inputs = Input(shape=input_shape)
     block = block_class(
-        attn_hidden_units=[128],
+        attn_hidden_units=hiddens,
         activation='leaky_relu',
         output_activation='linear')
     outputs = block(inputs)  # dict of outputs and attention scores
@@ -205,7 +207,7 @@ def train_and_print_results(
 
 
 # Training and printing results for each attention type
-input_shape = (5,)
+input_shape = x_train.shape[1]
 block_classes = [BlockT0, BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6, BlockT7]
 
 for i, block_class in enumerate(block_classes):
@@ -226,6 +228,7 @@ for i, block_class in enumerate(block_classes):
         "batch_size": BS,
         "attention_type": i,
         "patience": PATIENCE,
+        'attn_hiddens': (", ".join(map(str, hiddens))).replace(', ', '_')
     })
 
     print(f"\nAttention Type {i}")
