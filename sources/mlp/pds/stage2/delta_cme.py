@@ -33,7 +33,7 @@ mb = ModelBuilder()
 weight_paths = {
     # No inj
     (False,
-     0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-012209MLP_e0_5_e1_8_p_slopeFalse_PDS_bs4096_alpha0.20_CME0_features_noinj.h5',
+     0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240803-222916MLP_e0_5_e4_4_p6_1_p_PDS_bs4096_alpha5.00_rho0.70_features_noinj.h5',
     # inj all
     # (False,
     #  0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-030006MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_alpha0.20_CME0_features_all.h5',
@@ -53,9 +53,9 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha in [0.3, 0.4, 0.5]:
-                        for freeze in [False, True]:
-                            for rho in SAM_RHOS:
+                    for alpha in [0.5]:
+                        for freeze in [False]:
+                            for rho in [0.3, 0.7]:
                                 # PARAMS
                                 outputs_to_use = OUTPUTS_TO_USE
                                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'

@@ -18,10 +18,11 @@ from modules.training.ts_modeling import set_seed
 from sources.transformer.modules import *
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
+a = 5
 
 set_seed(SEEDS[0])  # Set seed for reproducibility
 
@@ -83,7 +84,8 @@ def create_model(block_class, input_shape: Tuple[int]) -> Model:
         output_activation='linear',
         attn_skipped_layers=1,
         attn_residual=False,
-        attn_norm=None)
+        attn_norm=None,
+        a=a)
     outputs = block(inputs)  # dict of outputs and attention scores
     # get the outputs and attention scores a list from the block
     # outputs = [outputs['output'], outputs['attention_scores']]
@@ -101,7 +103,7 @@ def train_and_print_results(
         x_debug: np.ndarray = None,
         y_debug: np.ndarray = None,
         learning_rate: float = 0.003,
-        weight_decay: float = 1e-8,
+        weight_decay: float = 1e-6,
         epochs: int = 500,
         batch_size: int = 32,
         patience: int = 100,
@@ -305,7 +307,8 @@ for i, block_class in enumerate(block_classes):
         "attention_type": i,
         "patience": PATIENCE,
         'attn_hiddens': (", ".join(map(str, hiddens))).replace(', ', '_'),
-        'slope': add_slope
+        'slope': add_slope,
+        'a': a
     })
 
     print(f"\nAttention Type {i}")

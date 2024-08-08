@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
@@ -121,7 +121,9 @@ def main():
                                 'skipped_layers': skipped_layers,
                                 'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
-                                'sam_rho': rho
+                                'sam_rho': rho,
+                                'attm_hiddens': ATTM_HIDDENS,
+                                'attn_hiddens': ATTN_HIDDENS
                             })
 
                             # set the root directory
@@ -222,7 +224,7 @@ def main():
                                 attn_residual=False,
                                 attn_dropout_rate=0,
                                 attn_norm=None,
-                                skipped_blocks=1,
+                                skipped_blocks=skipped_layers,
                                 repr_dim=repr_dim,
                                 dropout_rate=dropout,
                                 activation='leaky_relu',
@@ -281,7 +283,7 @@ def main():
                                 attn_residual=False,
                                 attn_dropout_rate=0,
                                 attn_norm=None,
-                                skipped_blocks=1,
+                                skipped_blocks=skipped_layers,
                                 repr_dim=repr_dim,
                                 dropout_rate=dropout,
                                 activation='leaky_relu',

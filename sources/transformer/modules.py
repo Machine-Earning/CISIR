@@ -850,7 +850,8 @@ class TanhAttentiveBlock(Layer):
                  output_dim: int = 1,
                  output_activation: Optional[str] = 'leaky_relu',
                  dropout_rate: float = 0.0,
-                 norm: Optional[str] = None):
+                 norm: Optional[str] = None,
+                 a: float = 1.5):
         """
         Initialize the TanhAttentiveBlock.
 
@@ -865,6 +866,7 @@ class TanhAttentiveBlock(Layer):
             output_activation (Optional[str], optional): Activation function to use in the final dense layer. Defaults to 'leaky_relu'.
             dropout_rate (float, optional): The dropout rate to use in the TanhAttentiveBlock. Defaults to 0.0.
             norm (Optional[str], optional): The type of normalization to use ('batch_norm' or 'layer_norm'). Defaults to None.
+            a (float, optional): The parameter to scale the attention scores before applying tanh. Defaults to 0.5.
         """
         super(TanhAttentiveBlock, self).__init__()
         self.attn_hidden_units = attn_hidden_units or [3]
@@ -877,6 +879,7 @@ class TanhAttentiveBlock(Layer):
         self.output_activation = output_activation
         self.dropout_rate = dropout_rate
         self.norm = norm
+        self.a = tf.Variable(a, trainable=True, dtype=tf.float32, name='attention_scale')
         self.attention_scores = None
         self.attention_block = None
         self.dense_layer = None
@@ -927,8 +930,8 @@ class TanhAttentiveBlock(Layer):
         # Compute attention scores
         self.attention_scores = self.attention_block(inputs)
 
-        # Apply tanh to obtain attention weights between -1 and 1
-        attention_weights = self.tanh(self.attention_scores)
+        # Apply scaling factor a and tanh to obtain attention weights between -1 and 1
+        attention_weights = self.tanh(self.a * self.attention_scores)
 
         self.attention_scores = attention_weights
 
@@ -964,6 +967,7 @@ class TanhAttentiveBlock(Layer):
                                          is the bias tensor.
         """
         return self.dense_layer.get_weights()
+
 
 
 # def create_attentive_model(

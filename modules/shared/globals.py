@@ -13,8 +13,8 @@ MLP_HIDDENS = [
     512, 256, 512, 256, 256, 128, 256, 128,
     256, 128, 128, 128, 128, 128, 128, 128
 ]  # Hidden layers
-ATTM_HIDDENS = [128]
-ATTN_HIDDENS = [128, 128, 128]
+ATTM_HIDDENS = [128 for _ in range(7)]
+ATTN_HIDDENS = [128 for _ in range(7)]
 PROJ_HIDDENS = [64]  # Projection hidden layers
 LOSS_KEY = 'mse'  # Mean squared error regression loss
 REPR_DIM = 128  # Representation dimension

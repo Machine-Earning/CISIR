@@ -47,7 +47,7 @@ def main():
                 for add_slope in ADD_SLOPE:
                     for rho in [0, 0.7]:
                         # for alpha in [2]:
-                        for alpha in [4]:
+                        for alpha in [2.5]:
                             # Set NumPy seed
                             set_seed(SEED)
                             # add_slope = True
