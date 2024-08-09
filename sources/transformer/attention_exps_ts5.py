@@ -11,6 +11,7 @@ from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
 from modules.shared.globals import *
+from modules.training.DenseReweights import exDenseReweights
 from modules.training.ts_modeling import (
     build_dataset, evaluate_mae, process_sep_events)
 from modules.training.ts_modeling import set_seed
@@ -22,56 +23,28 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
-a = 5
-
 set_seed(SEEDS[0])  # Set seed for reproducibility
 
-# set the root directory
+# Hyperparameters
 root_dir = DS_PATH
 inputs_to_use = INPUTS_TO_USE[0]
 outputs_to_use = OUTPUTS_TO_USE
 cme_speed_threshold = CME_SPEED_THRESHOLD[0]
 add_slope = False
-# build the dataset
-x_train, y_train = build_dataset(
-    root_dir + '/training',
-    inputs_to_use=inputs_to_use,
-    add_slope=add_slope,
-    outputs_to_use=outputs_to_use,
-    cme_speed_threshold=cme_speed_threshold,
-    shuffle_data=True)
-
-x_test, y_test = build_dataset(
-    root_dir + '/testing',
-    inputs_to_use=inputs_to_use,
-    add_slope=add_slope,
-    outputs_to_use=outputs_to_use,
-    cme_speed_threshold=cme_speed_threshold)
-
-x_debug, y_debug = build_dataset(
-    root_dir + '/debug',
-    inputs_to_use=inputs_to_use,
-    add_slope=add_slope,
-    outputs_to_use=outputs_to_use,
-    cme_speed_threshold=cme_speed_threshold)
-
 hiddens = [128, 128, 128, 128, 128, 128, 128]
-
-# Verify data shapes
-print(f"Shape of x_train: {x_train.shape}")
-print(f"Shape of y_train: {y_train.shape}")
-print(f"Shape of x_test: {x_test.shape}")
-print(f"Shape of y_test: {y_test.shape}")
-print(f"Shape of x_debug: {x_debug.shape}")
-print(f"Shape of y_debug: {y_debug.shape}")
+a = 1
+LR = 3e-3
+EPOCHS = int(50e3)
+BS = 4096
+PATIENCE = 2000
+bandwidth = BANDWIDTH
 
 
-def create_model(block_class, input_shape: Tuple[int]) -> Model:
+def create_model(input_shape: int) -> Model:
     """
     Create a model using the specified block class.
 
     Args:
-        block_class: The block class to use.
         input_shape (Tuple[int]): The shape of the input tensor.
 
     Returns:
@@ -98,8 +71,10 @@ def train_and_print_results(
         model: Model,
         x_train: np.ndarray,
         y_train: np.ndarray,
+        y_train_weights: np.ndarray,
         x_test: np.ndarray,
         y_test: np.ndarray,
+        y_test_weights: np.ndarray,
         x_debug: np.ndarray = None,
         y_debug: np.ndarray = None,
         learning_rate: float = 0.003,
@@ -117,8 +92,10 @@ def train_and_print_results(
         model (Model): The Keras model to train.
         x_train (np.ndarray): Training features.
         y_train (np.ndarray): Training labels.
+        y_train_weights (np.ndarray): Training sample weights
         x_test (np.ndarray): Test features.
         y_test (np.ndarray): Test labels.
+        y_test_weights (np.ndarray): Test sample weights
         x_debug (np.ndarray): Debug features.
         y_debug (np.ndarray): Debug labels.
         learning_rate (float): Learning rate for the optimizer.
@@ -137,16 +114,17 @@ def train_and_print_results(
         monitor='val_loss',
         patience=patience,
         restore_best_weights=True,
-        verbose=1
+        verbose=VERBOSE
     )
 
     model.fit(
         x_train,
         {'output': y_train},
+        sample_weight={'output': y_train_weights},
         epochs=epochs,
         batch_size=batch_size,
-        verbose=1,
-        validation_data=(x_test, {'output': y_test}),
+        verbose=VERBOSE,
+        validation_data=(x_test, {'output': y_test}, y_test_weights),
         callbacks=[early_stopping, WandbCallback(save_model=False)],
     )
 
@@ -284,41 +262,94 @@ def train_and_print_results(
         wandb.log({"mae_error_cond_train": error_mae_cond_train})
 
 
-# Training and printing results for each attention type
-input_shape = x_train.shape[1]
-block_classes = [BlockT0, BlockT1, BlockT2, BlockT3, BlockT4, BlockT5, BlockT6, TanhAttentiveBlock]
-
-for i, block_class in enumerate(block_classes):
-    if i not in [7]:
-        continue  # skip the first 4
+for alpha in np.arange(0, 1.1, 0.1):
     # Create a unique experiment name with a timestamp
     current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-    experiment_name = f'Attention_Type{i}_{current_time}'
-    # Initialize wandb
-    LR = 3e-3
-    EPOCHS = int(50e3)
-    BS = 4096
-    PATIENCE = 2000
+    experiment_name = f'Attention_Type7_{current_time}_alpha{alpha}'
 
+    # dataset
+    # build the dataset
+    x_train, y_train = build_dataset(
+        root_dir + '/training',
+        inputs_to_use=inputs_to_use,
+        add_slope=add_slope,
+        outputs_to_use=outputs_to_use,
+        cme_speed_threshold=cme_speed_threshold,
+        shuffle_data=True)
+
+    x_test, y_test = build_dataset(
+        root_dir + '/testing',
+        inputs_to_use=inputs_to_use,
+        add_slope=add_slope,
+        outputs_to_use=outputs_to_use,
+        cme_speed_threshold=cme_speed_threshold)
+
+    x_debug, y_debug = build_dataset(
+        root_dir + '/debug',
+        inputs_to_use=inputs_to_use,
+        add_slope=add_slope,
+        outputs_to_use=outputs_to_use,
+        cme_speed_threshold=cme_speed_threshold)
+
+    # Verify data shapes
+    print(f"Shape of x_train: {x_train.shape}")
+    print(f"Shape of y_train: {y_train.shape}")
+    print(f"Shape of x_test: {x_test.shape}")
+    print(f"Shape of y_test: {y_test.shape}")
+    print(f"Shape of x_debug: {x_debug.shape}")
+    print(f"Shape of y_debug: {y_debug.shape}")
+
+    # Dense Loss
+    # Compute the sample weights
+    delta_train = y_train[:, 0]
+    delta_test = y_test[:, 0]
+    print(f'delta_train.shape: {delta_train.shape}')
+    print(f'delta_test.shape: {delta_test.shape}')
+
+    print(f'rebalancing the training set...')
+    min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
+    y_train_weights = exDenseReweights(
+        x_train, delta_train,
+        alpha=alpha, bw=bandwidth,
+        min_norm_weight=min_norm_weight,
+        debug=False).reweights
+    print(f'training set rebalanced.')
+
+    print(f'rebalancing the test set...')
+    min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_test)
+    y_test_weights = exDenseReweights(
+        x_test, delta_test,
+        alpha=COMMON_VAL_ALPHA, bw=bandwidth,
+        min_norm_weight=min_norm_weight,
+        debug=False).reweights
+    print(f'test set rebalanced.')
+
+    # Training and printing results for each attention type
+    input_dim = x_train.shape[1]
+    block_classes = TanhAttentiveBlock
+
+    # Initialize wandb
     wandb.init(project="attention-exps-5", name=experiment_name, config={
         "learning_rate": LR,
         "epochs": EPOCHS,
         "batch_size": BS,
-        "attention_type": i,
+        "attention_type": 7,
         "patience": PATIENCE,
         'attn_hiddens': (", ".join(map(str, hiddens))).replace(', ', '_'),
         'slope': add_slope,
-        'a': a
+        'a': a,
+        'alpha': alpha,
+        'bandwidth': bandwidth
     })
 
-    print(f"\nAttention Type {i}")
-    model = create_model(block_class, input_shape)
+    print(f"\nAttention Type 7")
+    model = create_model(input_dim)
     model.summary()
     # tf.keras.utils.plot_model(model, to_file=f'./model_{i}.png', show_shapes=True)
     train_and_print_results(
-        str(i), model,
-        x_train, y_train,
-        x_test, y_test,
+        "7", model,
+        x_train, y_train, y_train_weights,
+        x_test, y_test, y_test_weights,
         x_debug=x_debug, y_debug=y_debug,
         learning_rate=LR, epochs=EPOCHS,
         batch_size=BS, patience=PATIENCE,
