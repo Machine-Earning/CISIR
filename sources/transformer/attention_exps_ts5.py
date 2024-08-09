@@ -19,7 +19,7 @@ from modules.training.ts_modeling import set_seed
 from sources.transformer.modules import *
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
@@ -29,14 +29,14 @@ set_seed(SEEDS[0])  # Set seed for reproducibility
 root_dir = DS_PATH
 inputs_to_use = INPUTS_TO_USE[0]
 outputs_to_use = OUTPUTS_TO_USE
-cme_speed_threshold = CME_SPEED_THRESHOLD[0]
+cme_speed_threshold = -1 # removing CME because it is making the groups obvious here CME_SPEED_THRESHOLD[0]
 add_slope = False
-hiddens = [128, 128, 128, 128, 128, 128, 128]
+hiddens = [128 for _ in range(7)]
 a = 1
 LR = 3e-3
-EPOCHS = int(50e3)
+EPOCHS = int(1e4)
 BS = 4096
-PATIENCE = 2000
+PATIENCE = int(3e3)
 bandwidth = BANDWIDTH
 
 
@@ -78,7 +78,7 @@ def train_and_print_results(
         x_debug: np.ndarray = None,
         y_debug: np.ndarray = None,
         learning_rate: float = 0.003,
-        weight_decay: float = 1e-6,
+        weight_decay: float = 1e-8,
         epochs: int = 500,
         batch_size: int = 32,
         patience: int = 100,
@@ -106,8 +106,7 @@ def train_and_print_results(
     """
     model.compile(
         optimizer=AdamW(learning_rate=learning_rate, weight_decay=weight_decay),
-        loss={'output': 'mse'},
-        metrics={'output': 'mae'}
+        loss={'output': 'mse'}
     )
 
     early_stopping = EarlyStopping(
@@ -128,27 +127,11 @@ def train_and_print_results(
         callbacks=[early_stopping, WandbCallback(save_model=False)],
     )
 
-    # Evaluate the model - focus on the 'output' key
-    results = model.evaluate(x_test, {'output': y_test}, verbose=0, return_dict=True)
-    print('results')
-    print(results)
-    loss = results['loss']
-    mae = results[f'tanh_attentive_block_1_mae']
-    print(f"Test loss: {loss}")
-    print(f"MAE loss: {mae}")
-    # log the results
-    wandb.log({"loss": loss, "mae": mae})
-
     # Evaluate the model on the debug set
-    results = model.evaluate(x_debug, {'output': y_debug}, verbose=0, return_dict=True)
-    print('results')
-    print(results)
-    loss = results['loss']
-    mae = results[f'tanh_attentive_block_1_mae']
-    print(f"Debug loss: {loss}")
-    print(f"Debug MAE loss: {mae}")
+    debug_mae = evaluate_mae(model, x_debug, y_debug, use_dict=True)
+    print(f"MAE debug: {debug_mae}")
     # log the results
-    wandb.log({"debug_loss": loss, "debug_mae": mae})
+    wandb.log({"debug_mae": debug_mae})
 
     if debug:
         # Predict on initial data
@@ -170,7 +153,7 @@ def train_and_print_results(
         for pred, true, inp, attn in zip(output_predictions, y_debug, x_debug, attention_scores):
             attention_weighted_values = [a * w for a, w in zip(attn, dense_layer_weights[:, 0])]
             results.append(
-                list(inp) + [true, pred[0]]
+                list(inp) + [true[0], pred[0]]
                 + attn.tolist()
                 + attention_weighted_values
                 + [dense_layer_bias[0]]
@@ -197,13 +180,13 @@ def train_and_print_results(
         error_mae = evaluate_mae(model, x_test, y_test, use_dict=True)
         print(f'mae error: {error_mae}')
         # Log the MAE error to wandb
-        wandb.log({"mae_error": error_mae})
+        wandb.log({"mae": error_mae})
 
         # evaluate the model on training cme_files
         error_mae_train = evaluate_mae(model, x_train, y_train, use_dict=True)
         print(f'mae error train: {error_mae_train}')
         # Log the MAE error to wandb
-        wandb.log({"train_mae_error": error_mae_train})
+        wandb.log({"train_mae": error_mae_train})
 
         # Process SEP event files in the specified directory
         test_directory = root_dir + '/testing'
@@ -251,7 +234,16 @@ def train_and_print_results(
 
         print(f'mae error delta >= 0.1 test: {error_mae_cond}')
         # Log the MAE error to wandb
-        wandb.log({"mae_error_cond_test": error_mae_cond})
+        wandb.log({"mae+": error_mae_cond})
+
+
+        #debug 
+        error_mae_cond_debug = evaluate_mae(
+            model, x_debug, y_debug, above_threshold=above_threshold, use_dict=True)
+
+        print(f'mae error delta >= 0.1 test: {error_mae_cond_debug}')
+        # Log the MAE error to wandb
+        wandb.log({"debug_mae+": error_mae_cond_debug})
 
         # evaluate the model on training cme_files
         error_mae_cond_train = evaluate_mae(
@@ -259,102 +251,106 @@ def train_and_print_results(
 
         print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
         # Log the MAE error to wandb
-        wandb.log({"mae_error_cond_train": error_mae_cond_train})
+        wandb.log({"train_mae+": error_mae_cond_train})
 
 
-for alpha in np.arange(0, 1.1, 0.1):
-    # Create a unique experiment name with a timestamp
-    current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-    experiment_name = f'Attention_Type7_{current_time}_alpha{alpha}'
+for alpha in np.arange(1, 1.5, 0.25):
+    for alpha_val in np.arange(1, 1.5, 0.25):
+    # for alpha in np.arange(1.1, 1.5, 0.1):
+    # for alpha in np.arange(0, 1.1, 0.1):
+        # Create a unique experiment name with a timestamp
+        current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+        experiment_name = f'Attention_Type7_{current_time}_alpha{alpha}'
 
-    # dataset
-    # build the dataset
-    x_train, y_train = build_dataset(
-        root_dir + '/training',
-        inputs_to_use=inputs_to_use,
-        add_slope=add_slope,
-        outputs_to_use=outputs_to_use,
-        cme_speed_threshold=cme_speed_threshold,
-        shuffle_data=True)
+        # dataset
+        # build the dataset
+        x_train, y_train = build_dataset(
+            root_dir + '/training',
+            inputs_to_use=inputs_to_use,
+            add_slope=add_slope,
+            outputs_to_use=outputs_to_use,
+            cme_speed_threshold=cme_speed_threshold,
+            shuffle_data=True)
 
-    x_test, y_test = build_dataset(
-        root_dir + '/testing',
-        inputs_to_use=inputs_to_use,
-        add_slope=add_slope,
-        outputs_to_use=outputs_to_use,
-        cme_speed_threshold=cme_speed_threshold)
+        x_test, y_test = build_dataset(
+            root_dir + '/testing',
+            inputs_to_use=inputs_to_use,
+            add_slope=add_slope,
+            outputs_to_use=outputs_to_use,
+            cme_speed_threshold=cme_speed_threshold)
 
-    x_debug, y_debug = build_dataset(
-        root_dir + '/debug',
-        inputs_to_use=inputs_to_use,
-        add_slope=add_slope,
-        outputs_to_use=outputs_to_use,
-        cme_speed_threshold=cme_speed_threshold)
+        x_debug, y_debug = build_dataset(
+            root_dir + '/debug',
+            inputs_to_use=inputs_to_use,
+            add_slope=add_slope,
+            outputs_to_use=outputs_to_use,
+            cme_speed_threshold=cme_speed_threshold)
 
-    # Verify data shapes
-    print(f"Shape of x_train: {x_train.shape}")
-    print(f"Shape of y_train: {y_train.shape}")
-    print(f"Shape of x_test: {x_test.shape}")
-    print(f"Shape of y_test: {y_test.shape}")
-    print(f"Shape of x_debug: {x_debug.shape}")
-    print(f"Shape of y_debug: {y_debug.shape}")
+        # Verify data shapes
+        print(f"Shape of x_train: {x_train.shape}")
+        print(f"Shape of y_train: {y_train.shape}")
+        print(f"Shape of x_test: {x_test.shape}")
+        print(f"Shape of y_test: {y_test.shape}")
+        print(f"Shape of x_debug: {x_debug.shape}")
+        print(f"Shape of y_debug: {y_debug.shape}")
 
-    # Dense Loss
-    # Compute the sample weights
-    delta_train = y_train[:, 0]
-    delta_test = y_test[:, 0]
-    print(f'delta_train.shape: {delta_train.shape}')
-    print(f'delta_test.shape: {delta_test.shape}')
+        # Dense Loss
+        # Compute the sample weights
+        delta_train = y_train[:, 0]
+        delta_test = y_test[:, 0]
+        print(f'delta_train.shape: {delta_train.shape}')
+        print(f'delta_test.shape: {delta_test.shape}')
 
-    print(f'rebalancing the training set...')
-    min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
-    y_train_weights = exDenseReweights(
-        x_train, delta_train,
-        alpha=alpha, bw=bandwidth,
-        min_norm_weight=min_norm_weight,
-        debug=False).reweights
-    print(f'training set rebalanced.')
+        print(f'rebalancing the training set...')
+        min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
+        y_train_weights = exDenseReweights(
+            x_train, delta_train,
+            alpha=alpha, bw=bandwidth,
+            min_norm_weight=min_norm_weight,
+            debug=False).reweights
+        print(f'training set rebalanced.')
 
-    print(f'rebalancing the test set...')
-    min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_test)
-    y_test_weights = exDenseReweights(
-        x_test, delta_test,
-        alpha=COMMON_VAL_ALPHA, bw=bandwidth,
-        min_norm_weight=min_norm_weight,
-        debug=False).reweights
-    print(f'test set rebalanced.')
+        print(f'rebalancing the test set...')
+        min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_test)
+        y_test_weights = exDenseReweights(
+            x_test, delta_test,
+            alpha=alpha_val, bw=bandwidth,
+            min_norm_weight=min_norm_weight,
+            debug=False).reweights
+        print(f'test set rebalanced.')
 
-    # Training and printing results for each attention type
-    input_dim = x_train.shape[1]
-    block_classes = TanhAttentiveBlock
+        # Training and printing results for each attention type
+        input_dim = x_train.shape[1]
+        block_classes = TanhAttentiveBlock
 
-    # Initialize wandb
-    wandb.init(project="attention-exps-5", name=experiment_name, config={
-        "learning_rate": LR,
-        "epochs": EPOCHS,
-        "batch_size": BS,
-        "attention_type": 7,
-        "patience": PATIENCE,
-        'attn_hiddens': (", ".join(map(str, hiddens))).replace(', ', '_'),
-        'slope': add_slope,
-        'a': a,
-        'alpha': alpha,
-        'bandwidth': bandwidth
-    })
+        # Initialize wandb
+        wandb.init(project="attention-exps-5.1", name=experiment_name, config={
+            "learning_rate": LR,
+            "epochs": EPOCHS,
+            "batch_size": BS,
+            "attention_type": 7,
+            "patience": PATIENCE,
+            'attn_hiddens': (", ".join(map(str, hiddens))).replace(', ', '_'),
+            'slope': add_slope,
+            'a': a,
+            'alpha': alpha,
+            'alpha_val': alpha_val,
+            'bandwidth': bandwidth
+        })
 
-    print(f"\nAttention Type 7")
-    model = create_model(input_dim)
-    model.summary()
-    # tf.keras.utils.plot_model(model, to_file=f'./model_{i}.png', show_shapes=True)
-    train_and_print_results(
-        "7", model,
-        x_train, y_train, y_train_weights,
-        x_test, y_test, y_test_weights,
-        x_debug=x_debug, y_debug=y_debug,
-        learning_rate=LR, epochs=EPOCHS,
-        batch_size=BS, patience=PATIENCE,
-        time=current_time
-    )
+        print(f"\nAttention Type 7")
+        model = create_model(input_dim)
+        model.summary()
+        # tf.keras.utils.plot_model(model, to_file=f'./model_{i}.png', show_shapes=True)
+        train_and_print_results(
+            "7", model,
+            x_train, y_train, y_train_weights,
+            x_test, y_test, y_test_weights,
+            x_debug=x_debug, y_debug=y_debug,
+            learning_rate=LR, epochs=EPOCHS,
+            batch_size=BS, patience=PATIENCE,
+            time=current_time
+        )
 
-    # Finish the wandb run
-    wandb.finish()
+        # Finish the wandb run
+        wandb.finish()
