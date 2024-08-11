@@ -35,7 +35,7 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha in [0.5]:
+                for alpha, alpha_val in zip([0.25, 0.5], [0.75, 0.71]):
                     for rho in [0]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
@@ -84,7 +84,7 @@ def main():
                             activation = ACTIVATION
                             norm = NORM
                             cme_speed_threshold = cme_speed_threshold
-                            residual = RESIDUAL
+                            residual = False #RESIDUAL
                             skipped_layers = SKIPPED_LAYERS
                             N = N_FILTERED  # number of samples to keep outside the threshold
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
@@ -107,6 +107,7 @@ def main():
                                 "target_change": target_change,
                                 "seed": seed,
                                 "alpha_rw": alpha_rw,
+                                "alpha_val": alpha_val,
                                 "bandwidth": bandwidth,
                                 "reciprocal_reweight": RECIPROCAL_WEIGHTS,
                                 "repr_dim": repr_dim,
@@ -204,7 +205,7 @@ def main():
                             min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
                             y_val_weights = exDenseReweights(
                                 X_val, delta_val,
-                                alpha=COMMON_VAL_ALPHA, bw=bandwidth,
+                                alpha=alpha_val, bw=bandwidth,
                                 min_norm_weight=min_norm_weight,
                                 debug=False).reweights
                             print(f'validation set rebalanced.')
@@ -273,7 +274,7 @@ def main():
                             optimal_epochs = np.argmin(
                                 history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
 
-                            final_model_sep = create_attentive_model(
+                            final_model_sep =  create_attentive_model(
                                 input_dim=n_features,
                                 output_dim=output_dim,
                                 hidden_blocks=ATTM_HIDDENS,
@@ -291,7 +292,6 @@ def main():
                                 residual=residual,
                                 sam_rho=rho
                             )
-
                             # Recreate the model architecture
                             final_model_sep.compile(
                                 optimizer=AdamW(

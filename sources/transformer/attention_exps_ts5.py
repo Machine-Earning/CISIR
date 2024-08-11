@@ -1,6 +1,5 @@
 import os
 from datetime import datetime
-from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -19,7 +18,7 @@ from modules.training.ts_modeling import set_seed
 from sources.transformer.modules import *
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
@@ -29,7 +28,7 @@ set_seed(SEEDS[0])  # Set seed for reproducibility
 root_dir = DS_PATH
 inputs_to_use = INPUTS_TO_USE[0]
 outputs_to_use = OUTPUTS_TO_USE
-cme_speed_threshold = -1 # removing CME because it is making the groups obvious here CME_SPEED_THRESHOLD[0]
+cme_speed_threshold = CME_SPEED_THRESHOLD[0]
 add_slope = False
 hiddens = [128 for _ in range(7)]
 a = 1
@@ -254,13 +253,13 @@ def train_and_print_results(
         wandb.log({"train_mae+": error_mae_cond_train})
 
 
-for alpha in np.arange(1, 1.5, 0.25):
-    for alpha_val in np.arange(1, 1.5, 0.25):
+for alpha in [.25]:
+    for alpha_val in [.75]:
     # for alpha in np.arange(1.1, 1.5, 0.1):
     # for alpha in np.arange(0, 1.1, 0.1):
         # Create a unique experiment name with a timestamp
         current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-        experiment_name = f'Attention_Type7_{current_time}_alpha{alpha}'
+        experiment_name = f'Attention_Type7_{current_time}_alphaVal{alpha_val}_alpha{alpha}'
 
         # dataset
         # build the dataset
@@ -324,7 +323,7 @@ for alpha in np.arange(1, 1.5, 0.25):
         block_classes = TanhAttentiveBlock
 
         # Initialize wandb
-        wandb.init(project="attention-exps-5.1", name=experiment_name, config={
+        wandb.init(project="attention-exps-5.3", name=experiment_name, config={
             "learning_rate": LR,
             "epochs": EPOCHS,
             "batch_size": BS,
