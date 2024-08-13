@@ -19,7 +19,7 @@ from modules.training.sam_keras import SAMModel
 from sources.transformer.modules import *
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
@@ -264,7 +264,7 @@ def train_and_print_results(
 
 
 for alpha_val in np.arange(0.75, 0.8, 0.01):
-    for alpha in np.arange(0.2, 0.6, 0.1):
+    for alpha in np.arange(0.2, 0.55, 0.05):
         for rho in np.arange(0.05, 0.15, 0.05):
         # for alpha in np.arange(1.1, 1.5, 0.1):
         # for alpha in np.arange(0, 1.1, 0.1):
@@ -334,7 +334,7 @@ for alpha_val in np.arange(0.75, 0.8, 0.01):
             block_classes = TanhAttentiveBlock
 
             # Initialize wandb
-            wandb.init(project="attention-exps-5.3", name=experiment_name, config={
+            wandb.init(project="attention-exps-5.4", name=experiment_name, config={
                 "learning_rate": LR,
                 "epochs": EPOCHS,
                 "batch_size": BS,
