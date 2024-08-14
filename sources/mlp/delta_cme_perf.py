@@ -157,17 +157,12 @@ def main():
                         # print all cme_files shapes
                         print(f'X_train.shape: {X_train.shape}')
                         print(f'y_train.shape: {y_train.shape}')
-                        print(f'X_subtrain.shape: {X_subtrain.shape}')
-                        print(f'y_subtrain.shape: {y_subtrain.shape}')
                         print(f'X_test.shape: {X_test.shape}')
                         print(f'y_test.shape: {y_test.shape}')
-                        print(f'X_val.shape: {X_val.shape}')
-                        print(f'y_val.shape: {y_val.shape}')
 
                         # Compute the sample weights
                         delta_train = y_train[:, 0]
-                        delta_subtrain = y_subtrain[:, 0]
-                        delta_val = y_val[:, 0]
+                        delta_test = y_test[:, 0]
                         print(f'delta_train.shape: {delta_train.shape}')
                         print(f'delta_subtrain.shape: {delta_subtrain.shape}')
                         print(f'delta_val.shape: {delta_val.shape}')
