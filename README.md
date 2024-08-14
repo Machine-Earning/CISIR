@@ -1,10 +1,7 @@
-# keras-functional-api
-repo for projects with keras-functional-api
+# SEP Forecasting Research
+repo for SEP forecasting research for NASA
 
-### Install dependencies
-```bash
-pip install -r setup/setup.txt
-```
 
-### Running on AI-Panther
+
+### Running on AI-Panther Supercomputing Cluster
 https://help.fit.edu/TDClient/39/Portal/KB/ArticleDet?ID=3282&SIDs=418
