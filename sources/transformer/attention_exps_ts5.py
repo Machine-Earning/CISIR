@@ -19,7 +19,7 @@ from modules.training.sam_keras import SAMModel
 from sources.transformer.modules import *
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
@@ -33,7 +33,7 @@ cme_speed_threshold = -1 #CME_SPEED_THRESHOLD[0]
 using_cme =  True if cme_speed_threshold >= 0 else False
 add_slope = False
 hiddens = [128 for _ in range(7)]
-a = 0.2
+a = 1
 LR = 3e-3
 EPOCHS = int(1e4)
 BS = 4096
@@ -41,7 +41,7 @@ PATIENCE = int(3e3)
 bandwidth = BANDWIDTH
 residual = False
 skipped_layers = 2
-weight_decay = 1e-9
+weight_decay = 1e-8
 
 
 def create_model(input_shape: int, rho: float) -> Model:
@@ -263,9 +263,9 @@ def train_and_print_results(
 
 
 
-for alpha_val in np.arange(0.75, 0.8, 0.01):
-    for alpha in np.arange(0.2, 0.55, 0.05):
-        for rho in np.arange(0.05, 0.15, 0.05):
+for alpha_val in [0.75]:
+    for alpha in [0.25]:
+        for rho in [0.5, 1, 2, 4]:
         # for alpha in np.arange(1.1, 1.5, 0.1):
         # for alpha in np.arange(0, 1.1, 0.1):
             # Create a unique experiment name with a timestamp
@@ -334,7 +334,7 @@ for alpha_val in np.arange(0.75, 0.8, 0.01):
             block_classes = TanhAttentiveBlock
 
             # Initialize wandb
-            wandb.init(project="attention-exps-5.4", name=experiment_name, config={
+            wandb.init(project="attention-exps-5.5", name=experiment_name, config={
                 "learning_rate": LR,
                 "epochs": EPOCHS,
                 "batch_size": BS,
