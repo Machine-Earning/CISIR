@@ -6,12 +6,10 @@ from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 # Set the environment variable for CUDA (in case it is necessary)
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-import tensorflow as tf
 import wandb
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
-import numpy as np
 
 from modules.training.DenseReweights import exDenseReweights
 from modules.training.ts_modeling import (
@@ -20,8 +18,7 @@ from modules.training.ts_modeling import (
     evaluate_mae,
     process_sep_events,
     get_loss,
-    filter_ds, 
-    stratified_split, 
+    filter_ds,
     plot_error_hist,
     set_seed)
 
@@ -164,8 +161,7 @@ def main():
                         delta_train = y_train[:, 0]
                         delta_test = y_test[:, 0]
                         print(f'delta_train.shape: {delta_train.shape}')
-                        print(f'delta_subtrain.shape: {delta_subtrain.shape}')
-                        print(f'delta_val.shape: {delta_val.shape}')
+                        print(f'delta_test.shape: {delta_test.shape}')
 
                         print(f'rebalancing the training set...')
                         min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
@@ -176,29 +172,18 @@ def main():
                             debug=False).reweights
                         print(f'training set rebalanced.')
 
-                        print(f'rebalancing the subtraining set...')
-                        min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
-                        y_subtrain_weights = exDenseReweights(
-                            X_subtrain, delta_subtrain,
-                            alpha=alpha_rw, bw=bandwidth,
-                            min_norm_weight=min_norm_weight,
-                            debug=False).reweights
-                        print(f'subtraining set rebalanced.')
-
-                        print(f'rebalancing the validation set...')
-                        min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
-                        y_val_weights = exDenseReweights(
-                            X_val, delta_val,
+                        print(f'rebalancing the test set...')
+                        min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_test)
+                        y_test_weights = exDenseReweights(
+                            X_test, delta_test,
                             alpha=alpha_val, bw=bandwidth,
                             min_norm_weight=min_norm_weight,
                             debug=False).reweights
-                        print(f'validation set rebalanced.')
+                        print(f'test set rebalanced.')
 
                         # get the number of features
                         n_features = X_train.shape[1]
                         print(f'n_features: {n_features}')
-
-                        
 
                         final_model_sep = create_mlp(
                             input_dim=n_features,
@@ -211,6 +196,13 @@ def main():
                             residual=residual,
                             skipped_layers=skipped_layers
                         )
+
+                        # Define the EarlyStopping callback
+                        early_stopping = EarlyStopping(
+                            monitor=ES_CB_MONITOR,
+                            patience=patience,
+                            verbose=VERBOSE,
+                            restore_best_weights=True)
 
                         # Recreate the model architecture
                         final_model_sep.compile(
@@ -227,9 +219,11 @@ def main():
                             X_train,
                             {'forecast_head': y_train},
                             sample_weight=y_train_weights,
-                            epochs=optimal_epochs,
+                            epochs=epochs,
                             batch_size=batch_size,
+                            validation_data=(X_test, {'forecast_head': y_test}, y_test_weights),
                             callbacks=[
+                                early_stopping,
                                 reduce_lr_on_plateau,
                                 WandbCallback(save_model=WANDB_SAVE_MODEL)
                             ],
@@ -252,6 +246,24 @@ def main():
                         print(f'mae error train: {error_mae_train}')
                         # Log the MAE error to wandb
                         wandb.log({"train_mae_error": error_mae_train})
+
+                        # evaluate the model on test cme_files
+                        above_threshold = mae_plus_threshold
+                        error_mae_cond = evaluate_mae(
+                            final_model_sep, X_test, y_test, above_threshold=above_threshold)
+
+                        print(f'mae error delta >= 0.1 test: {error_mae_cond}')
+                        # Log the MAE error to wandb
+                        wandb.log({"mae_error_cond_test": error_mae_cond})
+
+                        # evaluate the model on training cme_files
+                        error_mae_cond_train = evaluate_mae(
+                            final_model_sep, X_train, y_train, above_threshold=above_threshold)
+
+                        print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
+                        # Log the MAE error to wandb
+                        wandb.log({"mae_error_cond_train": error_mae_cond_train})
+                        # Log the MAE error to wandb
 
                         # Process SEP event files in the specified directory
                         test_directory = root_dir + '/testing'
@@ -289,24 +301,6 @@ def main():
                         for filename in filenames:
                             log_title = os.path.basename(filename)
                             wandb.log({f'training_{log_title}': wandb.Image(filename)})
-
-                        # evaluate the model on test cme_files
-                        above_threshold = mae_plus_threshold
-                        error_mae_cond = evaluate_mae(
-                            final_model_sep, X_test, y_test, above_threshold=above_threshold)
-
-                        print(f'mae error delta >= 0.1 test: {error_mae_cond}')
-                        # Log the MAE error to wandb
-                        wandb.log({"mae_error_cond_test": error_mae_cond})
-
-                        # evaluate the model on training cme_files
-                        error_mae_cond_train = evaluate_mae(
-                            final_model_sep, X_train, y_train, above_threshold=above_threshold)
-
-                        print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
-                        # Log the MAE error to wandb
-                        wandb.log({"mae_error_cond_train": error_mae_cond_train})
-                        # Log the MAE error to wandb
 
                         # Evaluate the model correlation with colored
                         file_path = plot_repr_corr_dist(
