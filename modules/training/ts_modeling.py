@@ -3115,6 +3115,9 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 0.5) -> Callable[[tf.
 
             # Combine MSE and PCC with lambda factor per sample
             combined_loss_per_sample = mse_loss_per_sample + lambda_factor * pcc_loss_per_sample  # Shape: [batch_size]
+
+            tf.print("Shape of combined_loss_per_sample:", tf.shape(combined_loss_per_sample))
+
             return combined_loss_per_sample
 
         return mse_pcc
