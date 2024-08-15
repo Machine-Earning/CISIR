@@ -12,9 +12,8 @@ from wandb.integration.keras import WandbCallback
 from modules.shared.globals import *
 from modules.training.DenseReweights import exDenseReweights
 from modules.training.ts_modeling import (
-    build_dataset, evaluate_mae, process_sep_events)
+    build_dataset, evaluate_mae, process_sep_events, get_loss, evaluate_pcc)
 from modules.training.ts_modeling import set_seed
-from modules.training.sam_keras import SAMModel
 # Importing the Blocks
 from sources.transformer.modules import *
 
@@ -29,8 +28,8 @@ set_seed(SEEDS[0])  # Set seed for reproducibility
 root_dir = DS_PATH
 inputs_to_use = INPUTS_TO_USE[0]
 outputs_to_use = OUTPUTS_TO_USE
-cme_speed_threshold = -1 #CME_SPEED_THRESHOLD[0]
-using_cme =  True if cme_speed_threshold >= 0 else False
+cme_speed_threshold = -1  # CME_SPEED_THRESHOLD[0]
+using_cme = True if cme_speed_threshold >= 0 else False
 add_slope = False
 hiddens = [128 for _ in range(7)]
 a = 1
@@ -42,6 +41,8 @@ bandwidth = BANDWIDTH
 residual = False
 skipped_layers = 2
 weight_decay = 1e-8
+loss_key = 'mse_pcc'
+lambda_ = 0.5
 
 
 def create_model(input_shape: int, rho: float) -> Model:
@@ -113,7 +114,7 @@ def train_and_print_results(
     """
     model.compile(
         optimizer=AdamW(learning_rate=learning_rate, weight_decay=weight_decay),
-        loss={'output': 'mse'}
+        loss={'output': get_loss(loss_key, lambda_factor=lambda_)}
     )
 
     early_stopping = EarlyStopping(
@@ -186,41 +187,62 @@ def train_and_print_results(
         # evaluate the model on test cme_files
         error_mae = evaluate_mae(model, x_test, y_test, use_dict=True)
         print(f'mae error: {error_mae}')
-        # Log the MAE error to wandb
         wandb.log({"mae": error_mae})
 
         # evaluate the model on training cme_files
         error_mae_train = evaluate_mae(model, x_train, y_train, use_dict=True)
         print(f'mae error train: {error_mae_train}')
-        # Log the MAE error to wandb
         wandb.log({"train_mae": error_mae_train})
 
-        
+        # evaluate the model correlation on test set
+        error_pcc = evaluate_pcc(model, x_test, y_test, use_dict=True)
+        print(f'pcc error: {error_pcc}')
+        wandb.log({"pcc": error_pcc})
+
+        # evaluate the model correlation on training set
+        error_pcc_train = evaluate_pcc(model, x_train, y_train, use_dict=True)
+        print(f'pcc error train: {error_pcc_train}')
+        wandb.log({"train_pcc": error_pcc_train})
+
+        error_pcc_debug = evaluate_pcc(model, x_debug, y_debug, use_dict=True)
+        print(f'pcc error debug: {error_pcc_debug}')
+        wandb.log({"debug_pcc": error_pcc_debug})
+
         # evaluate the model on test cme_files
         above_threshold = 0.5
         error_mae_cond = evaluate_mae(
             model, x_test, y_test, above_threshold=above_threshold, use_dict=True)
-
-        print(f'mae error delta >= 0.1 test: {error_mae_cond}')
-        # Log the MAE error to wandb
+        print(f'mae error delta >= {above_threshold} test: {error_mae_cond}')
         wandb.log({"mae+": error_mae_cond})
 
+        error_mae_train_cond = evaluate_mae(
+            model, x_train, y_train, above_threshold=above_threshold, use_dict=True)
+        print(f'mae error delta >= {above_threshold} train: {error_mae_train_cond}')
+        wandb.log({"train_mae+": error_mae_train_cond})
 
-        #debug 
+        # evaluate the model correlation for rare samples on test set
+        error_pcc_cond = evaluate_pcc(
+            model, x_test, y_test, above_threshold=above_threshold, use_dict=True)
+        print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
+        wandb.log({"pcc+": error_pcc_cond})
+
+        # evaluate the model correlation for rare samples on training set
+        error_pcc_cond_train = evaluate_pcc(
+            model, x_train, y_train, above_threshold=above_threshold, use_dict=True)
+        print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
+        wandb.log({"train_pcc+": error_pcc_cond_train})
+
+        # debug
         error_mae_cond_debug = evaluate_mae(
             model, x_debug, y_debug, above_threshold=above_threshold, use_dict=True)
-
-        print(f'mae error delta >= 0.1 test: {error_mae_cond_debug}')
-        # Log the MAE error to wandb
+        print(f'mae error delta >= {above_threshold} test: {error_mae_cond_debug}')
         wandb.log({"debug_mae+": error_mae_cond_debug})
 
-        # evaluate the model on training cme_files
-        error_mae_cond_train = evaluate_mae(
-            model, x_train, y_train, above_threshold=above_threshold, use_dict=True)
-
-        print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
-        # Log the MAE error to wandb
-        wandb.log({"train_mae+": error_mae_cond_train})
+        # evaluate the model correlation for rare samples on debug set
+        error_pcc_cond_debug = evaluate_pcc(
+            model, x_debug, y_debug, above_threshold=above_threshold, use_dict=True)
+        print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond_debug}')
+        wandb.log({"debug_pcc+": error_pcc_cond_debug})
 
         # Process SEP event files in the specified directory
         test_directory = root_dir + '/testing'
@@ -262,15 +284,14 @@ def train_and_print_results(
             wandb.log({f'training_{log_title}': wandb.Image(filename)})
 
 
-
 for alpha_val in [0.75]:
     for alpha in [0.25]:
-        for rho in [0.01]:
-        # for alpha in np.arange(1.1, 1.5, 0.1):
-        # for alpha in np.arange(0, 1.1, 0.1):
+        for rho in [0]:
+            # for alpha in np.arange(1.1, 1.5, 0.1):
+            # for alpha in np.arange(0, 1.1, 0.1):
             # Create a unique experiment name with a timestamp
             current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-            experiment_name = f'Attention_Type7_{current_time}_alphaVal{alpha_val}_alpha{alpha}'
+            experiment_name = f'Attention_Type7_{current_time}_alphaVal{alpha_val}_alpha{alpha}_lambda{lambda_}'
 
             # dataset
             # build the dataset
@@ -349,7 +370,8 @@ for alpha_val in [0.75]:
                 'weight_dacay': weight_decay,
                 'residual': residual,
                 "skipped_layers": skipped_layers,
-                'sam_rho': rho
+                'sam_rho': rho,
+                'loss_key': loss_key,
             })
 
             print(f"\nAttention Type 7")
