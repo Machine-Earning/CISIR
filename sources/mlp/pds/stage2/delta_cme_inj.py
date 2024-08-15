@@ -64,7 +64,7 @@ def main():
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                                 # Construct the title
-                                title = f'MLP_S2min_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_rho{rho:.2f}_lambda{LAMBDA}'
+                                title = f'MLP_S2min_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_rho{rho:.2f}_lambda{LAMBDA:.2f}'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -389,7 +389,6 @@ def main():
                                 final_model_sep.save_weights(f"final_model_weights_{experiment_name}_s2min_reg.h5")
                                 # print where the model weights are saved
                                 print(f"Model weights are saved in final_model_weights_{experiment_name}_s2min_reg.h5")
-
 
                                 # TODO: put the battery of evaluation in a function since they always repeat
                                 # evaluate the model error on test set
