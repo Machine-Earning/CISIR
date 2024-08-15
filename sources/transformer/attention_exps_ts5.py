@@ -19,7 +19,7 @@ from modules.training.sam_keras import SAMModel
 from sources.transformer.modules import *
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
@@ -265,7 +265,7 @@ def train_and_print_results(
 
 for alpha_val in [0.75]:
     for alpha in [0.25]:
-        for rho in [0.5, 1, 2, 4]:
+        for rho in [0.01]:
         # for alpha in np.arange(1.1, 1.5, 0.1):
         # for alpha in np.arange(0, 1.1, 0.1):
             # Create a unique experiment name with a timestamp
