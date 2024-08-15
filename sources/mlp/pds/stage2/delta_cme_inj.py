@@ -4,7 +4,6 @@ from datetime import datetime
 # Set the environment variable for CUDA (in case it is necessary)
 os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
-import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
@@ -18,6 +17,7 @@ from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
     evaluate_mae,
+    evaluate_pcc,
     process_sep_events,
     get_loss,
     filter_ds,
@@ -41,7 +41,7 @@ weight_paths = {
     # # inj min 
     (False,
      0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240731-084027MLP_strat_e0_5_e4_4_p6_1_p_slopeFalse_PDSinj_bs4096_alpha0.50_CME0_features_inj.h5',
-   
+
 }
 
 
@@ -57,14 +57,14 @@ def main():
                     for alpha in [0.5]:
                         for freeze in [False]:
                             # for rho in [0.3, 0.21]:
-                            for rho in [7]:
+                            for rho in [0]:
                                 # PARAMS
                                 outputs_to_use = OUTPUTS_TO_USE
                                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                                 # Construct the title
-                                title = f'MLP_S2min_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_rho{rho:.2f}'
+                                title = f'MLP_S2min_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_rho{rho:.2f}_lambda{LAMBDA}'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -92,6 +92,7 @@ def main():
                                 proj_hiddens = PROJ_HIDDENS
                                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                                 loss_key = LOSS_KEY
+                                lambda_ = LAMBDA
                                 target_change = ('delta_p' in outputs_to_use)
                                 alpha_rw = alpha
                                 bandwidth = BANDWIDTH
@@ -111,7 +112,7 @@ def main():
                                 mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                                 # Initialize wandb
-                                wandb.init(project="nasa-ts-delta-v7", name=experiment_name, config={
+                                wandb.init(project="nasa-ts-delta-v7-nl", name=experiment_name, config={
                                     "inputs_to_use": inputs_to_use,
                                     "add_slope": add_slope,
                                     "patience": patience,
@@ -123,6 +124,7 @@ def main():
                                     # hidden in a more readable format  (wandb does not support lists)
                                     "hiddens": hiddens_str,
                                     "loss": loss_key,
+                                    "lambda": lambda_,
                                     "target_change": target_change,
                                     "seed": seed,
                                     "alpha_rw": alpha_rw,
@@ -144,7 +146,8 @@ def main():
                                     "skipped_layers": skipped_layers,
                                     'ds_version': DS_VERSION,
                                     'mae_plus_th': mae_plus_threshold,
-                                    'sam_rho': rho
+                                    'sam_rho': rho,
+
                                 })
 
                                 # set the root directory
@@ -308,7 +311,7 @@ def main():
                                         weight_decay=weight_decay,
                                         beta_1=momentum_beta1
                                     ),
-                                    loss={'forecast_head': get_loss(loss_key)}
+                                    loss={'forecast_head': get_loss(loss_key, lambda_factor=lambda_)},
                                 )
 
                                 # Train the model with the callback
@@ -365,7 +368,7 @@ def main():
                                         weight_decay=weight_decay,
                                         beta_1=momentum_beta1
                                     ),
-                                    loss={'forecast_head': get_loss(loss_key)}
+                                    loss={'forecast_head': get_loss(loss_key, lambda_factor=lambda_)},
                                 )  # Compile the model just like before
 
                                 # Train on the full dataset
@@ -387,17 +390,53 @@ def main():
                                 # print where the model weights are saved
                                 print(f"Model weights are saved in final_model_weights_{experiment_name}_s2min_reg.h5")
 
-                                # evaluate the model on test cme_files
+
+                                # TODO: put the battery of evaluation in a function since they always repeat
+                                # evaluate the model error on test set
                                 error_mae = evaluate_mae(final_model_sep, X_test, y_test)
                                 print(f'mae error: {error_mae}')
-                                # Log the MAE error to wandb
-                                wandb.log({"mae_error": error_mae})
+                                wandb.log({"mae": error_mae})
 
-                                # evaluate the model on stage2 cme_files
+                                # evaluate the model error on training set
                                 error_mae_train = evaluate_mae(final_model_sep, X_train, y_train)
                                 print(f'mae error train: {error_mae_train}')
-                                # Log the MAE error to wandb
-                                wandb.log({"train_mae_error": error_mae_train})
+                                wandb.log({"train_mae": error_mae_train})
+
+                                # evaluate the model correlation on test set
+                                error_pcc = evaluate_pcc(final_model_sep, X_test, y_test)
+                                print(f'pcc error: {error_pcc}')
+                                wandb.log({"pcc": error_pcc})
+
+                                # evaluate the model correlation on training set
+                                error_pcc_train = evaluate_pcc(final_model_sep, X_train, y_train)
+                                print(f'pcc error train: {error_pcc_train}')
+                                wandb.log({"train_pcc": error_pcc_train})
+
+                                # evaluate the model on test cme_files
+                                above_threshold = mae_plus_threshold
+                                # evaluate the model error for rare samples on test set
+                                error_mae_cond = evaluate_mae(
+                                    final_model_sep, X_test, y_test, above_threshold=above_threshold)
+                                print(f'mae error delta >= {above_threshold} test: {error_mae_cond}')
+                                wandb.log({"mae+": error_mae_cond})
+
+                                # evaluate the model error for rare samples on training set
+                                error_mae_cond_train = evaluate_mae(
+                                    final_model_sep, X_train, y_train, above_threshold=above_threshold)
+                                print(f'mae error delta >= {above_threshold} train: {error_mae_cond_train}')
+                                wandb.log({"train_mae+": error_mae_cond_train})
+
+                                # evaluate the model correlation for rare samples on test set
+                                error_pcc_cond = evaluate_pcc(
+                                    final_model_sep, X_test, y_test, above_threshold=above_threshold)
+                                print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
+                                wandb.log({"pcc+": error_pcc_cond})
+
+                                # evaluate the model correlation for rare samples on training set
+                                error_pcc_cond_train = evaluate_pcc(
+                                    final_model_sep, X_train, y_train, above_threshold=above_threshold)
+                                print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
+                                wandb.log({"train_pcc+": error_pcc_cond_train})
 
                                 # Process SEP event files in the specified directory
                                 test_directory = root_dir + '/testing'
@@ -435,23 +474,6 @@ def main():
                                 for filename in filenames:
                                     log_title = os.path.basename(filename)
                                     wandb.log({f'training_{log_title}': wandb.Image(filename)})
-
-                                # evaluate the model on test cme_files
-                                above_threshold = mae_plus_threshold
-                                error_mae_cond = evaluate_mae(
-                                    final_model_sep, X_test, y_test, above_threshold=above_threshold)
-
-                                print(f'mae error delta >= 0.1 test: {error_mae_cond}')
-                                # Log the MAE error to wandb
-                                wandb.log({"mae_error_cond_test": error_mae_cond})
-
-                                # evaluate the model on training cme_files
-                                error_mae_cond_train = evaluate_mae(
-                                    final_model_sep, X_train, y_train, above_threshold=above_threshold)
-
-                                print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
-                                # Log the MAE error to wandb
-                                wandb.log({"mae_error_cond_train": error_mae_cond_train})
 
                                 # Evaluate the model correlation with colored
                                 file_path = plot_repr_corr_dist(

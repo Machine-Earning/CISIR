@@ -2,7 +2,7 @@ import os
 import random
 import traceback
 from collections import Counter
-from typing import Tuple, List, Optional, Union
+from typing import Tuple, List, Optional, Union, Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -2983,30 +2983,118 @@ def evaluate_lag_error(
     return threshold_lag, shift_lag, avg_lag
 
 
-def get_loss(loss_key: str = 'mse'):
+def get_loss(loss_key: str = 'mse', lambda_factor: float = 0.5) -> Callable[[tf.Tensor, tf.Tensor], tf.Tensor]:
     """
-    given the key, return the appropiate loss function for the model
+    Given the key, return the appropriate loss function for the model.
 
-    :param loss_key: key for the loss function
-    :return: loss string or function for Tensorflow compile loss
+    :param loss_key: Key for the loss function.
+    :param lambda_factor: Weighting factor for the PCC term when using 'mse_pcc' loss. Default is 0.5.
+    :return: Loss function for TensorFlow model compilation.
     """
 
     if loss_key == 'mse':
-        return 'mse'
+        def mse(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+            """
+            Mean Squared Error (MSE) loss function.
+
+            Calculates the average of the squared differences between the true
+            and predicted values.
+
+            :param y_true: Ground truth values.
+            :param y_pred: Predicted values by the model.
+            :return: MSE loss value.
+            """
+            return tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)
+
+        return mse
+
     elif loss_key == 'exp_mse':
-        def exp_mse(y_true, y_pred):
+        def exp_mse(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+            """
+            Exponential Mean Squared Error (exp_MSE) loss function.
+
+            Calculates the MSE and then applies an exponential function to it,
+            subtracting 1 to scale the loss. This emphasizes larger errors.
+
+            :param y_true: Ground truth values.
+            :param y_pred: Predicted values by the model.
+            :return: Exponentially scaled MSE loss value.
+            """
             mse = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)
             return tf.exp(mse) - 1
 
         return exp_mse
+
     elif loss_key == 'var_mse':
-        def var_mse(y_true, y_pred):
+        def var_mse(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+            """
+            Variance-Aware Mean Squared Error (var_MSE) loss function.
+
+            Combines the MSE with a penalty based on the variance of predictions.
+            This loss can be useful if you want to encourage more diverse predictions.
+
+            :param y_true: Ground truth values.
+            :param y_pred: Predicted values by the model.
+            :return: Combined MSE and variance loss value.
+            """
             mse_loss = tf.reduce_mean(tf.square(y_true - y_pred))
             variance_loss = -tf.reduce_mean(tf.square(y_pred - tf.reduce_mean(y_pred)))
             total_loss = mse_loss + 0.08 * variance_loss  # Adjust the weighting factor as needed
             return total_loss
 
         return var_mse
+
+    elif loss_key == 'pcc':
+        def pcc(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+            """
+            Pearson Correlation Coefficient (PCC) loss function.
+
+            Calculates 1 minus the Pearson Correlation Coefficient between the true
+            and predicted values. This ensures that minimizing the loss maximizes
+            the correlation.
+
+            :param y_true: Ground truth values.
+            :param y_pred: Predicted values by the model.
+            :return: 1 - PCC value as a loss value.
+            """
+            y_true_flat = tf.reshape(y_true, [-1])
+            y_pred_flat = tf.reshape(y_pred, [-1])
+            pcc_value = tf.py_function(func=lambda y, p: pearsonr(y, p)[0], inp=[y_true_flat, y_pred_flat],
+                                       Tout=tf.float32)
+            return 1 - pcc_value  # Return 1 - PCC to treat it as a loss
+
+        return pcc
+
+    elif loss_key == 'mse_pcc':
+        def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+            """
+            Combined Mean Squared Error (MSE) and Pearson Correlation Coefficient (PCC) loss function.
+
+            This loss function calculates the sum of MSE and a weighted PCC loss.
+            The lambda_factor controls the weight of the PCC term.
+
+            :param y_true: Ground truth values.
+            :param y_pred: Predicted values by the model.
+            :return: Combined MSE and PCC loss value.
+            """
+            # Calculate MSE
+            mse_loss = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)
+
+            # Calculate PCC
+            y_true_flat = tf.reshape(y_true, [-1])
+            y_pred_flat = tf.reshape(y_pred, [-1])
+            pcc_value = tf.py_function(func=lambda y, p: pearsonr(y, p)[0], inp=[y_true_flat, y_pred_flat],
+                                       Tout=tf.float32)
+            pcc_loss = 1 - pcc_value  # 1 - PCC to treat it as a loss
+
+            # Combine MSE and PCC with lambda factor
+            combined_loss = mse_loss + lambda_factor * pcc_loss
+            return combined_loss
+
+        return mse_pcc
+
+    else:
+        raise ValueError(f"Unknown loss key: {loss_key}")
 
 
 class PrintBatchMSE(Callback):
