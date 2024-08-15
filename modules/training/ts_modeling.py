@@ -3077,14 +3077,34 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 0.5) -> Callable[[tf.
             :param y_pred: Predicted values by the model.
             :return: Combined MSE and PCC loss value.
             """
+
+            tf.print("Shape of y_true 1:", tf.shape(y_true))
+            tf.print("Shape of y_pred 1:", tf.shape(y_pred))
+
+
             # Calculate MSE
             mse_loss = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)
+
+            tf.print("Shape of y_true 2:", tf.shape(y_true))
+            tf.print("Shape of y_pred 2:", tf.shape(y_pred))
+
 
             # Calculate PCC
             y_true_flat = tf.reshape(y_true, [-1])
             y_pred_flat = tf.reshape(y_pred, [-1])
-            pcc_value = tf.py_function(func=lambda y, p: pearsonr(y, p)[0], inp=[y_true_flat, y_pred_flat],
-                                       Tout=tf.float32)
+
+            tf.print("Shape of y_true 3:", tf.shape(y_true))
+            tf.print("Shape of y_pred 3:", tf.shape(y_pred))
+
+            pcc_value = tf.py_function(
+                func=lambda y, p: pearsonr(y, p)[0], 
+                inp=[y_true_flat, y_pred_flat],
+                Tout=tf.float32
+            )
+            tf.print("Shape of y_true 4:", tf.shape(y_true))
+            tf.print("Shape of y_pred 4:", tf.shape(y_pred))
+
+
             pcc_loss = 1 - pcc_value  # 1 - PCC to treat it as a loss
 
             # Combine MSE and PCC with lambda factor
