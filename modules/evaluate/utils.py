@@ -257,7 +257,7 @@ def plot_repr_corr_density(model, X, y, title, model_type='features'):
     return plot_filename
 
 
-def evaluate_pcc(
+def evaluate_pcc_repr(
         model: tf.keras.Model,
         X_test: Union[np.ndarray, List[np.ndarray]],
         y_test: np.ndarray,
@@ -269,7 +269,6 @@ def evaluate_pcc(
     """
     Evaluates a given model using Pearson Correlation Coefficient (PCC) between
     distances in target values and distances in the representation space.
-    TODO: test this function but it is likely to be correct
 
     Parameters:
     - model (tf.keras.Model): The trained model to evaluate.

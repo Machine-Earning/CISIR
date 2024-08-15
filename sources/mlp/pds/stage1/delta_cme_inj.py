@@ -3,7 +3,7 @@ import random
 from datetime import datetime
 
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density, \
-    evaluate_pcc
+    evaluate_pcc_repr
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
@@ -264,11 +264,11 @@ def main():
                             )
 
                                                     # Evaluate PCC
-                            pcc = evaluate_pcc(model_sep, X_test_filtered, y_test_filtered)
+                            pcc = evaluate_pcc_repr(model_sep, X_test_filtered, y_test_filtered)
                             print(f"PCC: {pcc}")
 
                             # Evaluate conditional PCC (i >= 0.5)
-                            pcc_cond = evaluate_pcc(model_sep, X_test_filtered, y_test_filtered, i_above_threshold=0.5)
+                            pcc_cond = evaluate_pcc_repr(model_sep, X_test_filtered, y_test_filtered, i_above_threshold=0.5)
                             print(f"Conditional PCC (i >= 0.5): {pcc_cond}")
 
                             # Log to wandb

@@ -2,7 +2,7 @@ import os
 import random
 from datetime import datetime
 
-from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density, evaluate_pcc
+from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density, evaluate_pcc_repr
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
@@ -263,14 +263,14 @@ def main():
 
                             # evaluate the model on test cme_files
                             above_threshold = mae_plus_threshold
-                            error_pcc_cond = evaluate_pcc(
+                            error_pcc_cond = evaluate_pcc_repr(
                                 model_sep, X_test, y_test, i_above_threshold=above_threshold)
 
                             print(f'pcc error delta i>= 0.5 test: {error_pcc_cond}')
                             # Log the MAE error to wandb
                             wandb.log({"pcc_error_cond_test": error_pcc_cond})
 
-                            error_pcc = evaluate_pcc(model_sep, X_test, y_test)
+                            error_pcc = evaluate_pcc_repr(model_sep, X_test, y_test)
 
                             print(f'pcc error delta test: {error_pcc}')
                             # Log the MAE error to wandb

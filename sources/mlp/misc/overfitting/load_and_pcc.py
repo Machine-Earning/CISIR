@@ -8,7 +8,7 @@ import wandb
 import numpy as np
 
 from modules.evaluate.utils import (
-    evaluate_pcc,
+    evaluate_pcc_repr,
 )
 from modules.training.cme_modeling import ModelBuilder
 from modules.training.ts_modeling import (
@@ -88,11 +88,11 @@ def main():
         print(f"Weights loaded successfully from: {weight_path}")
 
         # Evaluate PCC
-        pcc = evaluate_pcc(model, X_test_filtered, y_test_filtered)
+        pcc = evaluate_pcc_repr(model, X_test_filtered, y_test_filtered)
         print(f"PCC for {key}: {pcc}")
 
         # Evaluate conditional PCC (i >= 0.5)
-        pcc_cond = evaluate_pcc(model, X_test_filtered, y_test_filtered, i_above_threshold=0.5)
+        pcc_cond = evaluate_pcc_repr(model, X_test_filtered, y_test_filtered, i_above_threshold=0.5)
         print(f"Conditional PCC (i >= 0.5) for {key}: {pcc_cond}")
 
         # Log to wandb
