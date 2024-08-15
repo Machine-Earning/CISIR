@@ -3081,16 +3081,13 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 0.5) -> Callable[[tf.
             tf.print("Shape of y_true 1:", tf.shape(y_true))
             tf.print("Shape of y_pred 1:", tf.shape(y_pred))
 
-
             # Calculate MSE
             mse_loss_per_sample = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)  # Shape: [batch_size]
-            mse_loss = tf.reduce_mean(mse_loss_per_sample)  # Shape: []
 
-            tf.print("Shape of mse_loss:", tf.shape(mse_loss))
+            tf.print("Shape of mse_loss:", tf.shape(mse_loss_per_sample))
 
             tf.print("Shape of y_true 2:", tf.shape(y_true))
             tf.print("Shape of y_pred 2:", tf.shape(y_pred))
-
 
             # Calculate PCC
             y_true_flat = tf.reshape(y_true, [-1])
@@ -3100,7 +3097,7 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 0.5) -> Callable[[tf.
             tf.print("Shape of y_pred 3:", tf.shape(y_pred))
 
             pcc_value = tf.py_function(
-                func=lambda y, p: pearsonr(y, p)[0], 
+                func=lambda y, p: pearsonr(y, p)[0],
                 inp=[y_true_flat, y_pred_flat],
                 Tout=tf.float32
             )
@@ -3110,12 +3107,15 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 0.5) -> Callable[[tf.
             tf.print("Shape of y_true 4:", tf.shape(y_true))
             tf.print("Shape of y_pred 4:", tf.shape(y_pred))
 
+            # Apply PCC to each sample in the batch
+            pcc_loss_per_sample = 1 - pcc_value  # Shape: []
+            pcc_loss_per_sample = tf.fill(tf.shape(mse_loss_per_sample), pcc_loss_per_sample)  # Shape: [batch_size]
 
-            pcc_loss = 1 - pcc_value  # 1 - PCC to treat it as a loss
+            tf.print("Shape of pcc_loss_per_sample:", tf.shape(pcc_loss_per_sample))
 
-            # Combine MSE and PCC with lambda factor
-            combined_loss = mse_loss + lambda_factor * pcc_loss
-            return combined_loss
+            # Combine MSE and PCC with lambda factor per sample
+            combined_loss_per_sample = mse_loss_per_sample + lambda_factor * pcc_loss_per_sample  # Shape: [batch_size]
+            return combined_loss_per_sample
 
         return mse_pcc
 
