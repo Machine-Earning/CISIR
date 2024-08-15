@@ -2912,6 +2912,45 @@ def find_shift_lag_with_correlation(timestamps: np.ndarray, actual_ts: np.ndarra
     shift_lag = -optimal_lag * time_interval
     return shift_lag
 
+def pearson_correlation_coefficient(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+    """
+    Calculate the Pearson Correlation Coefficient (PCC) using native TensorFlow operations.
+
+    This function computes the PCC between two tensors using the formula:
+    PCC = cov(X, Y) / (std(X) * std(Y))
+
+    Where:
+    - cov(X, Y) is the covariance between X and Y
+    - std(X) and std(Y) are the standard deviations of X and Y respectively
+
+    :param y_true: Ground truth values. Shape: [batch_size, ...].
+    :param y_pred: Predicted values. Shape: [batch_size, ...].
+    :return: Pearson Correlation Coefficient. Shape: scalar.
+    """
+    # Flatten input tensors to 1D
+    # Calculate PCC
+    y_true_flat = tf.keras.backend.flatten(y_true)  # Flatten to 1D vector
+    y_pred_flat = tf.keras.backend.flatten(y_pred)  # Flatten to 1D vector
+
+    # Calculate means
+    y_true_mean = tf.reduce_mean(y_true_flat)
+    y_pred_mean = tf.reduce_mean(y_pred_flat)
+
+    # Center the data (subtract mean)
+    y_true_centered = y_true_flat - y_true_mean
+    y_pred_centered = y_pred_flat - y_pred_mean
+
+    # Calculate covariance
+    covariance = tf.reduce_mean(y_true_centered * y_pred_centered)
+
+    # Calculate standard deviations
+    y_true_std = tf.math.reduce_std(y_true_flat)
+    y_pred_std = tf.math.reduce_std(y_pred_flat)
+
+    # Calculate PCC
+    pcc = covariance / (y_true_std * y_pred_std)
+
+    return pcc
 
 def evaluate_lag_error(
         timestamps: np.ndarray,
@@ -3044,27 +3083,6 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 0.5) -> Callable[[tf.
 
         return var_mse
 
-    elif loss_key == 'pcc':
-        def pcc(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-            """
-            Pearson Correlation Coefficient (PCC) loss function.
-
-            Calculates 1 minus the Pearson Correlation Coefficient between the true
-            and predicted values. This ensures that minimizing the loss maximizes
-            the correlation.
-
-            :param y_true: Ground truth values.
-            :param y_pred: Predicted values by the model.
-            :return: 1 - PCC value as a loss value.
-            """
-            y_true_flat = tf.reshape(y_true, [-1])
-            y_pred_flat = tf.reshape(y_pred, [-1])
-            pcc_value = tf.py_function(func=lambda y, p: pearsonr(y, p)[0], inp=[y_true_flat, y_pred_flat],
-                                       Tout=tf.float32)
-            return 1 - pcc_value  # Return 1 - PCC to treat it as a loss
-
-        return pcc
-
     elif loss_key == 'mse_pcc':
         def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
             """
@@ -3078,45 +3096,19 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 0.5) -> Callable[[tf.
             :return: Combined MSE and PCC loss value.
             """
 
-            tf.print("Shape of y_true 1:", tf.shape(y_true))
-            tf.print("Shape of y_pred 1:", tf.shape(y_pred))
-
             # Calculate MSE
             mse_loss_per_sample = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)  # Shape: [batch_size]
 
-            tf.print("Shape of mse_loss:", tf.shape(mse_loss_per_sample))
-
-            tf.print("Shape of y_true 2:", tf.shape(y_true))
-            tf.print("Shape of y_pred 2:", tf.shape(y_pred))
-
             # Calculate PCC
-            y_true_flat = tf.reshape(y_true, [-1])
-            y_pred_flat = tf.reshape(y_pred, [-1])
-
-            tf.print("Shape of y_true 3:", tf.shape(y_true))
-            tf.print("Shape of y_pred 3:", tf.shape(y_pred))
-
-            pcc_value = tf.py_function(
-                func=lambda y, p: pearsonr(y, p)[0],
-                inp=[y_true_flat, y_pred_flat],
-                Tout=tf.float32
-            )
-
-            tf.print("Shape of pcc_value:", tf.shape(pcc_value))
-
-            tf.print("Shape of y_true 4:", tf.shape(y_true))
-            tf.print("Shape of y_pred 4:", tf.shape(y_pred))
+            pcc_value = pearson_correlation_coefficient(y_true, y_pred)
 
             # Apply PCC to each sample in the batch
             pcc_loss_per_sample = 1 - pcc_value  # Shape: []
             pcc_loss_per_sample = tf.fill(tf.shape(mse_loss_per_sample), pcc_loss_per_sample)  # Shape: [batch_size]
 
-            tf.print("Shape of pcc_loss_per_sample:", tf.shape(pcc_loss_per_sample))
-
+            weighted_pcc_loss_per_sample = lambda_factor * pcc_loss_per_sample
             # Combine MSE and PCC with lambda factor per sample
-            combined_loss_per_sample = mse_loss_per_sample + lambda_factor * pcc_loss_per_sample  # Shape: [batch_size]
-
-            tf.print("Shape of combined_loss_per_sample:", tf.shape(combined_loss_per_sample))
+            combined_loss_per_sample = mse_loss_per_sample + weighted_pcc_loss_per_sample
 
             return combined_loss_per_sample
 
