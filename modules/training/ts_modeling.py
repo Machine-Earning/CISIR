@@ -3085,6 +3085,8 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 0.5) -> Callable[[tf.
             # Calculate MSE
             mse_loss = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)
 
+            tf.print("Shape of mse_loss:", tf.shape(mse_loss))
+
             tf.print("Shape of y_true 2:", tf.shape(y_true))
             tf.print("Shape of y_pred 2:", tf.shape(y_pred))
 
@@ -3101,6 +3103,9 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 0.5) -> Callable[[tf.
                 inp=[y_true_flat, y_pred_flat],
                 Tout=tf.float32
             )
+
+            tf.print("Shape of pcc_value:", tf.shape(pcc_value))
+
             tf.print("Shape of y_true 4:", tf.shape(y_true))
             tf.print("Shape of y_pred 4:", tf.shape(y_pred))
 
