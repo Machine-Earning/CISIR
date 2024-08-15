@@ -12,6 +12,7 @@ from matplotlib.lines import Line2D
 from numpy import ndarray
 from scipy import stats
 from scipy.signal import correlate, correlation_lags
+from scipy.stats import pearsonr
 from sklearn.metrics import mean_absolute_error
 from sklearn.utils import shuffle
 from tensorflow.keras.callbacks import Callback
@@ -2294,6 +2295,59 @@ def evaluate_mae(
     # Calculate MAE
     mae_loss = mean_absolute_error(filtered_y_test, filtered_predictions)
     return mae_loss
+
+
+def evaluate_pcc(
+        model: tf.keras.Model,
+        X_test: np.ndarray or List[np.ndarray],
+        y_test: np.ndarray,
+        below_threshold: float = None,
+        above_threshold: float = None,
+        use_dict: bool = False) -> float:
+    """
+    Evaluates a given model using Pearson Correlation Coefficient (PCC) on the provided test data,
+    with an option to conditionally calculate PCC based on specified thresholds.
+
+    Parameters:
+    - model (tf.keras.Model): The trained model to evaluate.
+    - X_test (np.ndarray): Test features.
+    - y_test (np.ndarray): True target values for the test set.
+    - below_threshold (float, optional): The lower bound threshold for y_test to be included in PCC calculation.
+    - above_threshold (float, optional): The upper bound threshold for y_test to be included in PCC calculation.
+    - use_dict (bool, optional): Whether the model returns a dictionary with output names. Default is False.
+
+    Returns:
+    - float: The Pearson Correlation Coefficient between the model predictions and the filtered test data.
+    """
+    # Make predictions
+    if use_dict:
+        res = model.predict(X_test)
+        predictions = res['output']
+    else:
+        _, predictions = model.predict(X_test)
+
+    # Process predictions
+    predictions = process_predictions(predictions)
+    y_test = process_predictions(y_test)
+
+    # Filter y_test and predictions based on thresholds
+    if below_threshold is not None or above_threshold is not None:
+        if below_threshold is not None and above_threshold is not None:
+            mask = (y_test >= above_threshold) | (y_test <= below_threshold)
+        elif below_threshold is not None:
+            mask = y_test <= below_threshold
+        else:  # above_threshold is not None
+            mask = y_test >= above_threshold
+
+        filtered_predictions = predictions[mask]
+        filtered_y_test = y_test[mask]
+    else:
+        filtered_predictions = predictions
+        filtered_y_test = y_test
+
+    # Calculate PCC
+    pcc, _ = pearsonr(filtered_y_test.flatten(), filtered_predictions.flatten())
+    return pcc
 
 
 def filter_ds_deprecated(
