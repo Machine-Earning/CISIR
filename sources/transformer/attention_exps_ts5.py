@@ -42,7 +42,7 @@ residual = False
 skipped_layers = 2
 weight_decay = 1e-8
 loss_key = 'mse_pcc'
-lambda_ = 0.5
+lambda_ = 3.3
 
 
 def create_model(input_shape: int, rho: float) -> Model:
