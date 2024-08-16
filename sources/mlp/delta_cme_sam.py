@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
@@ -36,7 +36,7 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha in [0.5]:
+                for alpha in [0.25]:
                     for rho in [0]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
