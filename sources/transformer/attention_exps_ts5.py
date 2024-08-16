@@ -41,8 +41,9 @@ bandwidth = BANDWIDTH
 residual = False
 skipped_layers = 2
 weight_decay = 1e-8
-loss_key = 'mse_pcc'
+loss_key = 'mse_mae_pcc'
 lambda_ = 3.3
+factors = [0.5, 0.5, 3.3]
 
 
 def create_model(input_shape: int, rho: float) -> Model:
@@ -114,7 +115,7 @@ def train_and_print_results(
     """
     model.compile(
         optimizer=AdamW(learning_rate=learning_rate, weight_decay=weight_decay),
-        loss={'output': get_loss(loss_key, lambda_factor=lambda_)}
+        loss={'output': get_loss(loss_key, factors=factors)}
     )
 
     early_stopping = EarlyStopping(
@@ -291,7 +292,7 @@ for alpha_val in [0.75]:
             # for alpha in np.arange(0, 1.1, 0.1):
             # Create a unique experiment name with a timestamp
             current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-            experiment_name = f'Attention_Type7_{current_time}_alphaVal{alpha_val}_alpha{alpha}_lambda{lambda_}'
+            experiment_name = f'Attention_Type7_{current_time}_alphaVal{alpha_val}_alpha{alpha}_3L'
 
             # dataset
             # build the dataset

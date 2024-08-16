@@ -2912,6 +2912,7 @@ def find_shift_lag_with_correlation(timestamps: np.ndarray, actual_ts: np.ndarra
     shift_lag = -optimal_lag * time_interval
     return shift_lag
 
+
 def pearson_correlation_coefficient(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
     """
     Calculate the Pearson Correlation Coefficient (PCC) using native TensorFlow operations.
@@ -2951,6 +2952,7 @@ def pearson_correlation_coefficient(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.
     pcc = covariance / (y_true_std * y_pred_std)
 
     return pcc
+
 
 def evaluate_lag_error(
         timestamps: np.ndarray,
@@ -3022,12 +3024,15 @@ def evaluate_lag_error(
     return threshold_lag, shift_lag, avg_lag
 
 
-def get_loss(loss_key: str = 'mse', lambda_factor: float = 0.5) -> Callable[[tf.Tensor, tf.Tensor], tf.Tensor]:
+def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3, factors: List[float] = [0.5, 0.5, 3.3]) -> Callable[
+    [tf.Tensor, tf.Tensor], tf.Tensor]:
     """
     Given the key, return the appropriate loss function for the model.
 
     :param loss_key: Key for the loss function.
     :param lambda_factor: Weighting factor for the PCC term when using 'mse_pcc' loss. Default is 0.5.
+    :param factors: List of factors [mse_factor, mae_factor, pcc_factor] for the 'mse_mae_pcc' loss function.
+                    Default is [1.0, 1.0, 0.5].
     :return: Loss function for TensorFlow model compilation.
     """
 
@@ -3114,7 +3119,45 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 0.5) -> Callable[[tf.
 
         return mse_pcc
 
+    elif loss_key == 'mse_mae_pcc':
+        def mse_mae_pcc(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+            """
+            Combined Mean Squared Error (MSE), Mean Absolute Error (MAE), and Pearson Correlation Coefficient (PCC) loss function.
+            This loss function calculates a weighted sum of MSE, MAE, and PCC losses.
+            The factors list controls the weight of each term.
+            :param y_true: Ground truth values
+            :param y_pred: Predicted values by the model.
+            :return: Combined MSE, MAE, and PCC loss value.
+            """
+
+            # Ensure that factors has exactly three elements
+
+            if len(factors) != 3:
+                raise ValueError("factors must be a list of three elements: [mse_factor, mae_factor, pcc_factor]")
+
+            mse_factor, mae_factor, pcc_factor = factors
+            # Calculate MSE per sample
+            mse_loss_per_sample = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)  # Shape: [batch_size]
+            # Calculate MAE per sample
+            mae_loss_per_sample = tf.reduce_mean(tf.abs(y_pred - y_true), axis=-1)  # Shape: [batch_size]
+            # Calculate PCC
+            pcc_value = pearson_correlation_coefficient(y_true, y_pred)
+            # Apply PCC to each sample in the batch
+            pcc_loss_per_sample = 1 - pcc_value  # Shape: []
+            pcc_loss_per_sample = tf.fill(tf.shape(mse_loss_per_sample), pcc_loss_per_sample)  # Shape: [batch_size]
+            # Combine all three losses with respective factors
+            combined_loss_per_sample = (
+                    mse_factor * mse_loss_per_sample +
+                    mae_factor * mae_loss_per_sample +
+                    pcc_factor * pcc_loss_per_sample
+            )  # Shape: [batch_size]
+            return combined_loss_per_sample
+
+        return mse_mae_pcc
+
+
     else:
+
         raise ValueError(f"Unknown loss key: {loss_key}")
 
 
