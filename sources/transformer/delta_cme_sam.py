@@ -35,7 +35,7 @@ def main():
     """
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
-            for cme_speed_threshold in [-1]: #CME_SPEED_THRESHOLD:
+            for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha, alpha_val in zip([0.25, 0.5], [0.75, 1]):
                     for rho in [0]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
@@ -68,7 +68,7 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=LR_CB_MIN_LR)
 
-                            weight_decay = WEIGHT_DECAY  # higher weight decay
+                            weight_decay = 1e-8 #WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
@@ -378,7 +378,7 @@ def main():
                                 add_slope=add_slope,
                                 outputs_to_use=outputs_to_use,
                                 show_avsp=True,
-                                using_cme=False,
+                                using_cme=True,
                                 cme_speed_threshold=cme_speed_threshold)
 
                             # Log the plot to wandb
@@ -397,7 +397,7 @@ def main():
                                 outputs_to_use=outputs_to_use,
                                 show_avsp=True,
                                 prefix='training',
-                                using_cme=False,
+                                using_cme=True,
                                 cme_speed_threshold=cme_speed_threshold)
 
                             # Log the plot to wandb
