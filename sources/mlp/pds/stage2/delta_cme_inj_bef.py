@@ -92,7 +92,7 @@ def main():
                                 proj_hiddens = PROJ_HIDDENS
                                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                                 loss_key = LOSS_KEY
-                                lambda_ = 0.1 # LAMBDA
+                                lambda_ = 0.1  # LAMBDA
                                 target_change = ('delta_p' in outputs_to_use)
                                 alpha_rw = alpha
                                 bandwidth = BANDWIDTH

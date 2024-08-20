@@ -2913,9 +2913,50 @@ def find_shift_lag_with_correlation(timestamps: np.ndarray, actual_ts: np.ndarra
     return shift_lag
 
 
-def pearson_correlation_coefficient(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+# def pearson_correlation_coefficient(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+#     """
+#     Calculate the Pearson Correlation Coefficient (PCC) using native TensorFlow operations.
+#
+#     This function computes the PCC between two tensors using the formula:
+#     PCC = cov(X, Y) / (std(X) * std(Y))
+#
+#     Where:
+#     - cov(X, Y) is the covariance between X and Y
+#     - std(X) and std(Y) are the standard deviations of X and Y respectively
+#
+#     :param y_true: Ground truth values. Shape: [batch_size, ...].
+#     :param y_pred: Predicted values. Shape: [batch_size, ...].
+#     :return: Pearson Correlation Coefficient. Shape: scalar.
+#     """
+#     # Flatten input tensors to 1D
+#     # Calculate PCC
+#     y_true_flat = tf.keras.backend.flatten(y_true)  # Flatten to 1D vector
+#     y_pred_flat = tf.keras.backend.flatten(y_pred)  # Flatten to 1D vector
+#
+#     # Calculate means
+#     y_true_mean = tf.reduce_mean(y_true_flat)
+#     y_pred_mean = tf.reduce_mean(y_pred_flat)
+#
+#     # Center the data (subtract mean)
+#     y_true_centered = y_true_flat - y_true_mean
+#     y_pred_centered = y_pred_flat - y_pred_mean
+#
+#     # Calculate covariance
+#     covariance = tf.reduce_mean(y_true_centered * y_pred_centered)
+#
+#     # Calculate standard deviations
+#     y_true_std = tf.math.reduce_std(y_true_flat)
+#     y_pred_std = tf.math.reduce_std(y_pred_flat)
+#
+#     # Calculate PCC
+#     pcc = covariance / (y_true_std * y_pred_std)
+#
+#     return pcc
+
+def pearson_correlation_coefficient(y_true: tf.Tensor, y_pred: tf.Tensor, sample_weight: tf.Tensor = None) -> tf.Tensor:
     """
-    Calculate the Pearson Correlation Coefficient (PCC) using native TensorFlow operations.
+    Calculate the Pearson Correlation Coefficient (PCC) using native TensorFlow operations,
+    with support for sample weights.
 
     This function computes the PCC between two tensors using the formula:
     PCC = cov(X, Y) / (std(X) * std(Y))
@@ -2926,27 +2967,45 @@ def pearson_correlation_coefficient(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.
 
     :param y_true: Ground truth values. Shape: [batch_size, ...].
     :param y_pred: Predicted values. Shape: [batch_size, ...].
+    :param sample_weight: Optional tensor of sample weights. Shape: [batch_size, ...].
     :return: Pearson Correlation Coefficient. Shape: scalar.
     """
     # Flatten input tensors to 1D
-    # Calculate PCC
-    y_true_flat = tf.keras.backend.flatten(y_true)  # Flatten to 1D vector
-    y_pred_flat = tf.keras.backend.flatten(y_pred)  # Flatten to 1D vector
+    y_true_flat = tf.keras.backend.flatten(y_true)
+    y_pred_flat = tf.keras.backend.flatten(y_pred)
 
-    # Calculate means
-    y_true_mean = tf.reduce_mean(y_true_flat)
-    y_pred_mean = tf.reduce_mean(y_pred_flat)
+    if sample_weight is not None:
+        sample_weight = tf.keras.backend.flatten(sample_weight)
+        # sample_weight /= tf.reduce_sum(sample_weight)  # Normalize the weights
+
+    # Calculate weighted means
+    if sample_weight is not None:
+        y_true_mean = tf.reduce_sum(y_true_flat * sample_weight)
+        y_pred_mean = tf.reduce_sum(y_pred_flat * sample_weight)
+    else:
+        y_true_mean = tf.reduce_mean(y_true_flat)
+        y_pred_mean = tf.reduce_mean(y_pred_flat)
 
     # Center the data (subtract mean)
     y_true_centered = y_true_flat - y_true_mean
     y_pred_centered = y_pred_flat - y_pred_mean
 
-    # Calculate covariance
-    covariance = tf.reduce_mean(y_true_centered * y_pred_centered)
+    # Calculate weighted covariance
+    if sample_weight is not None:
+        covariance = tf.reduce_sum(y_true_centered * y_pred_centered * sample_weight)
+    else:
+        covariance = tf.reduce_mean(y_true_centered * y_pred_centered)
 
-    # Calculate standard deviations
-    y_true_std = tf.math.reduce_std(y_true_flat)
-    y_pred_std = tf.math.reduce_std(y_pred_flat)
+    # Calculate weighted standard deviations
+    if sample_weight is not None:
+        y_true_var = tf.reduce_sum(tf.square(y_true_centered) * sample_weight)
+        y_pred_var = tf.reduce_sum(tf.square(y_pred_centered) * sample_weight)
+    else:
+        y_true_var = tf.reduce_mean(tf.square(y_true_centered))
+        y_pred_var = tf.reduce_mean(tf.square(y_pred_centered))
+
+    y_true_std = tf.sqrt(y_true_var)
+    y_pred_std = tf.sqrt(y_pred_var)
 
     # Calculate PCC
     pcc = covariance / (y_true_std * y_pred_std)
@@ -3024,15 +3083,12 @@ def evaluate_lag_error(
     return threshold_lag, shift_lag, avg_lag
 
 
-def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3, factors: List[float] = [0.5, 0.5, 3.3]) -> Callable[
-    [tf.Tensor, tf.Tensor], tf.Tensor]:
+def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3) -> Callable[[tf.Tensor, tf.Tensor], tf.Tensor]:
     """
     Given the key, return the appropriate loss function for the model.
 
     :param loss_key: Key for the loss function.
     :param lambda_factor: Weighting factor for the PCC term when using 'mse_pcc' loss. Default is 0.5.
-    :param factors: List of factors [mse_factor, mae_factor, pcc_factor] for the 'mse_mae_pcc' loss function.
-                    Default is [1.0, 1.0, 0.5].
     :return: Loss function for TensorFlow model compilation.
     """
 
@@ -3052,44 +3108,8 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3, factors: List[fl
 
         return mse
 
-    elif loss_key == 'exp_mse':
-        def exp_mse(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-            """
-            Exponential Mean Squared Error (exp_MSE) loss function.
-
-            Calculates the MSE and then applies an exponential function to it,
-            subtracting 1 to scale the loss. This emphasizes larger errors.
-
-            :param y_true: Ground truth values.
-            :param y_pred: Predicted values by the model.
-            :return: Exponentially scaled MSE loss value.
-            """
-            mse = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)
-            return tf.exp(mse) - 1
-
-        return exp_mse
-
-    elif loss_key == 'var_mse':
-        def var_mse(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-            """
-            Variance-Aware Mean Squared Error (var_MSE) loss function.
-
-            Combines the MSE with a penalty based on the variance of predictions.
-            This loss can be useful if you want to encourage more diverse predictions.
-
-            :param y_true: Ground truth values.
-            :param y_pred: Predicted values by the model.
-            :return: Combined MSE and variance loss value.
-            """
-            mse_loss = tf.reduce_mean(tf.square(y_true - y_pred))
-            variance_loss = -tf.reduce_mean(tf.square(y_pred - tf.reduce_mean(y_pred)))
-            total_loss = mse_loss + 0.08 * variance_loss  # Adjust the weighting factor as needed
-            return total_loss
-
-        return var_mse
-
     elif loss_key == 'mse_pcc':
-        def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+        def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor, sample_weights: Optional[tf.Tensor] = None) -> tf.Tensor:
             """
             Combined Mean Squared Error (MSE) and Pearson Correlation Coefficient (PCC) loss function.
 
@@ -3098,14 +3118,18 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3, factors: List[fl
 
             :param y_true: Ground truth values.
             :param y_pred: Predicted values by the model.
+            :param sample_weights: Optional sample weights for the loss calculation.
             :return: Combined MSE and PCC loss value.
             """
 
             # Calculate MSE
             mse_loss_per_sample = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)  # Shape: [batch_size]
 
+            if sample_weights is not None:
+                mse_loss_per_sample *= sample_weights  # Apply sample weights to MSE only
+
             # Calculate PCC
-            pcc_value = pearson_correlation_coefficient(y_true, y_pred)
+            pcc_value = pearson_correlation_coefficient(y_true, y_pred, sample_weights)
 
             # Apply PCC to each sample in the batch
             pcc_loss_per_sample = 1 - pcc_value  # Shape: []
@@ -3118,44 +3142,6 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3, factors: List[fl
             return combined_loss_per_sample
 
         return mse_pcc
-
-    elif loss_key == 'mse_mae_pcc':
-        def mse_mae_pcc(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-            """
-            Combined Mean Squared Error (MSE), Mean Absolute Error (MAE), and Pearson Correlation Coefficient (PCC) loss function.
-            This loss function calculates a weighted sum of MSE, MAE, and PCC losses.
-            The factors list controls the weight of each term.
-            :param y_true: Ground truth values
-            :param y_pred: Predicted values by the model.
-            :return: Combined MSE, MAE, and PCC loss value.
-            """
-
-            # Ensure that factors has exactly three elements
-
-            if len(factors) != 3:
-                raise ValueError("factors must be a list of three elements: [mse_factor, mae_factor, pcc_factor]")
-
-            mse_factor, mae_factor, pcc_factor = factors
-            # Calculate MSE per sample
-            mse_loss_per_sample = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)  # Shape: [batch_size]
-            # Calculate MAE per sample
-            mae_loss_per_sample = tf.reduce_mean(tf.abs(y_pred - y_true), axis=-1)  # Shape: [batch_size]
-            # Calculate PCC
-            pcc_value = pearson_correlation_coefficient(y_true, y_pred)
-            # Apply PCC to each sample in the batch
-            pcc_loss_per_sample = 1 - pcc_value  # Shape: []
-            pcc_loss_per_sample = tf.fill(tf.shape(mse_loss_per_sample), pcc_loss_per_sample)  # Shape: [batch_size]
-            # Combine all three losses with respective factors
-            combined_loss_per_sample = (
-                    mse_factor * mse_loss_per_sample +
-                    mae_factor * mae_loss_per_sample +
-                    pcc_factor * pcc_loss_per_sample
-            )  # Shape: [batch_size]
-            return combined_loss_per_sample
-
-        return mse_mae_pcc
-
-
     else:
 
         raise ValueError(f"Unknown loss key: {loss_key}")
