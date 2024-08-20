@@ -23,7 +23,8 @@ from modules.training.ts_modeling import (
     filter_ds,
     stratified_split,
     plot_error_hist,
-    set_seed)
+    set_seed,
+    custom_train_loop)
 from modules.training.utils import get_weight_path
 
 from modules.shared.globals import *
@@ -304,33 +305,61 @@ def main():
                                     verbose=VERBOSE,
                                     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
 
-                                # Compile the model with the specified learning rate
-                                model_sep.compile(
-                                    optimizer=AdamW(
-                                        learning_rate=learning_rate,
-                                        weight_decay=weight_decay,
-                                        beta_1=momentum_beta1
-                                    ),
-                                    loss={'forecast_head': get_loss(loss_key, lambda_factor=lambda_)},
+                                loss_fn = get_loss(loss_key, lambda_factor=lambda_)
+                                optimizer = AdamW(
+                                    learning_rate=learning_rate,
+                                    weight_decay=weight_decay,
+                                    beta_1=momentum_beta1
                                 )
+                                # Compile the model with the specified learning rate
+                                # model_sep.compile(
+                                #     optimizer=AdamW(
+                                #         learning_rate=learning_rate,
+                                #         weight_decay=weight_decay,
+                                #         beta_1=momentum_beta1
+                                #     ),
+                                #     loss={'forecast_head': get_loss(loss_key, lambda_factor=lambda_)},
+                                # )
 
                                 # Train the model with the callback
-                                history = model_sep.fit(
-                                    X_subtrain,
-                                    {'forecast_head': y_subtrain},
-                                    sample_weight=y_subtrain_weights,
-                                    epochs=epochs, batch_size=batch_size,
-                                    validation_data=(X_val, {'forecast_head': y_val}, y_val_weights),
+                                # history = model_sep.fit(
+                                #     X_subtrain,
+                                #     {'forecast_head': y_subtrain},
+                                #     sample_weight=y_subtrain_weights,
+                                #     epochs=epochs, batch_size=batch_size,
+                                #     validation_data=(X_val, {'forecast_head': y_val}, y_val_weights),
+                                #     callbacks=[
+                                #         early_stopping,
+                                #         reduce_lr_on_plateau,  # Reduce learning rate on plateau
+                                #         WandbCallback(save_model=WANDB_SAVE_MODEL),
+                                #     ],
+                                #     verbose=VERBOSE
+                                # )
+
+                                history = custom_train_loop(
+                                    model=model_sep,
+                                    X_train=X_subtrain,
+                                    y_train=y_subtrain,
+                                    train_weights=y_subtrain_weights,
+                                    X_val=X_val,
+                                    y_val=y_val,
+                                    val_weights=y_val_weights,
+                                    loss_fn=loss_fn,
+                                    optimizer=optimizer,
+                                    epochs=epochs,
+                                    batch_size=batch_size,
+                                    output_key='forecast_head',  # Specify the output you want to train on
                                     callbacks=[
                                         early_stopping,
-                                        reduce_lr_on_plateau,  # Reduce learning rate on plateau
-                                        WandbCallback(save_model=WANDB_SAVE_MODEL),
+                                        reduce_lr_on_plateau,
+                                        WandbCallback(save_model=WANDB_SAVE_MODEL)
                                     ],
-                                    verbose=VERBOSE
+                                    verbose=1
                                 )
 
                                 # Determine the optimal number of epochs from the fit history
-                                optimal_epochs = np.argmin(history.history[ES_CB_MONITOR]) + 1
+                                # optimal_epochs = np.argmin(history.history[ES_CB_MONITOR]) + 1
+                                optimal_epochs = np.argmin(history[ES_CB_MONITOR]) + 1
 
                                 final_model_sep_stage1 = create_mlp(
                                     input_dim=n_features,
@@ -362,27 +391,47 @@ def main():
                                     sam_rho=rho
                                 )
 
-                                final_model_sep.compile(
-                                    optimizer=AdamW(
-                                        learning_rate=learning_rate,
-                                        weight_decay=weight_decay,
-                                        beta_1=momentum_beta1
-                                    ),
-                                    loss={'forecast_head': get_loss(loss_key, lambda_factor=lambda_)},
-                                )  # Compile the model just like before
+                                # final_model_sep.compile(
+                                #     optimizer=AdamW(
+                                #         learning_rate=learning_rate,
+                                #         weight_decay=weight_decay,
+                                #         beta_1=momentum_beta1
+                                #     ),
+                                #     loss={'forecast_head': get_loss(loss_key, lambda_factor=lambda_)},
+                                # )  # Compile the model just like before
 
                                 # Train on the full dataset
-                                final_model_sep.fit(
-                                    X_train,
-                                    {'forecast_head': y_train},
-                                    sample_weight=y_train_weights,
+                                # final_model_sep.fit(
+                                #     X_train,
+                                #     {'forecast_head': y_train},
+                                #     sample_weight=y_train_weights,
+                                #     epochs=optimal_epochs,
+                                #     batch_size=batch_size,
+                                #     callbacks=[
+                                #         reduce_lr_on_plateau,
+                                #         WandbCallback(save_model=WANDB_SAVE_MODEL)
+                                #     ],
+                                #     verbose=VERBOSE
+                                # )
+
+                                custom_train_loop(
+                                    model=final_model_sep,
+                                    X_train=X_train,
+                                    y_train=y_train,
+                                    train_weights=y_train_weights,
+                                    X_val=None,  # No validation data
+                                    y_val=None,  # No validation labels
+                                    val_weights=None,  # No validation sample weights
+                                    loss_fn=loss_fn,
+                                    optimizer=optimizer,
                                     epochs=optimal_epochs,
                                     batch_size=batch_size,
+                                    output_key='forecast_head',  # Specify the output you want to train on
                                     callbacks=[
                                         reduce_lr_on_plateau,
                                         WandbCallback(save_model=WANDB_SAVE_MODEL)
                                     ],
-                                    verbose=VERBOSE
+                                    verbose=1
                                 )
 
                                 # Save the final model

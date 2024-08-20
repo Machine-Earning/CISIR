@@ -2,7 +2,7 @@ import os
 import random
 import traceback
 from collections import Counter
-from typing import Tuple, List, Optional, Union, Callable
+from typing import Tuple, List, Optional, Union, Callable, Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -35,6 +35,7 @@ from tensorflow.keras.layers import (
     Lambda
 )
 from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Optimizer
 from tensorflow.keras.regularizers import l2
 
 from modules.training.cme_modeling import NormalizeLayer
@@ -3145,6 +3146,153 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3) -> Callable[[tf.
     else:
 
         raise ValueError(f"Unknown loss key: {loss_key}")
+
+
+def train_step(
+        model: tf.keras.Model,
+        X: tf.Tensor,
+        y: tf.Tensor,
+        sample_weights: Optional[tf.Tensor],
+        loss_fn: Callable[[tf.Tensor, tf.Tensor, Optional[tf.Tensor]], tf.Tensor],
+        optimizer: Optimizer,
+        output_key: str
+) -> tf.Tensor:
+    """
+    Executes a single training step for the specified model output.
+
+    :param model: The model to train.
+    :param X: Input data.
+    :param y: True labels for the specified output.
+    :param sample_weights: Optional sample weights for loss computation.
+    :param loss_fn: Loss function that takes true labels, predictions, and sample weights.
+    :param optimizer: Optimizer to use for the training step.
+    :param output_key: The key for the specific model output to train on.
+    :return: The computed loss for the current training step.
+    """
+    with tf.GradientTape() as tape:
+        # Forward pass: Compute predictions for the specified output.
+        y_pred = model(X, training=True)[output_key]
+        # Compute the loss using the loss function.
+        loss = loss_fn(y, y_pred, sample_weights)
+
+    # Compute gradients of the loss with respect to model parameters.
+    gradients = tape.gradient(loss, model.trainable_variables)
+    # Apply the gradients to update the model's parameters.
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+    return loss
+
+
+def custom_train_loop(
+        model: tf.keras.Model,
+        X_train: tf.Tensor,
+        y_train: tf.Tensor,
+        train_weights: Optional[tf.Tensor],
+        X_val: Optional[tf.Tensor],
+        y_val: Optional[tf.Tensor],
+        val_weights: Optional[tf.Tensor],
+        loss_fn: Callable[[tf.Tensor, tf.Tensor, Optional[tf.Tensor]], tf.Tensor],
+        optimizer: Optimizer,
+        epochs: int,
+        batch_size: int,
+        output_key: str,
+        callbacks: Optional[List[Callback]] = None,
+        verbose: int = 1
+) -> Dict[str, List[float]]:
+    """
+    Custom training loop for a specific model output that mimics the behavior of TensorFlow's `fit` method,
+    with support for callbacks, sample weights, and optional validation. Returns history of training.
+
+    :param model: The model to train.
+    :param X_train: Training input data.
+    :param y_train: Training labels for the specified output.
+    :param train_weights: Optional sample weights for training data.
+    :param X_val: Optional validation input data.
+    :param y_val: Optional validation labels for the specified output.
+    :param val_weights: Optional sample weights for validation data.
+    :param loss_fn: Custom loss function that accepts sample weights.
+    :param optimizer: Optimizer to use for training.
+    :param epochs: Number of epochs to train.
+    :param batch_size: Size of the batches for training.
+    :param output_key: The key for the specific model output to train on.
+    :param callbacks: List of callbacks to apply during training.
+    :param verbose: Verbosity mode (0 = silent, 1 = progress bar).
+    :return: Dictionary containing lists of loss and validation loss per epoch.
+    """
+    # Initialize callback list and set model stop_training attribute
+    if callbacks is None:
+        callbacks = []
+    for callback in callbacks:
+        callback.set_model(model)
+        callback.on_train_begin()
+
+    num_samples = X_train.shape[0]
+    steps_per_epoch = num_samples // batch_size
+
+    # History dictionary to store loss and validation loss
+    history = {'loss': [], 'val_loss': []} if X_val is not None else {'loss': []}
+
+    for epoch in range(epochs):
+        print(f"Epoch {epoch + 1}/{epochs}")
+        epoch_loss = 0.0
+
+        # Training loop
+        for step in range(steps_per_epoch):
+            # Generate mini-batch indices
+            batch_start = step * batch_size
+            batch_end = (step + 1) * batch_size
+
+            # Extract mini-batch data
+            X_batch = X_train[batch_start:batch_end]
+            y_batch = y_train[batch_start:batch_end]
+            batch_weights = train_weights[batch_start:batch_end] if train_weights is not None else None
+
+            # Perform a training step
+            batch_loss = train_step(model, X_batch, y_batch, batch_weights, loss_fn, optimizer, output_key)
+            epoch_loss += batch_loss.numpy()
+
+            # Callbacks at the end of each batch
+            for callback in callbacks:
+                callback.on_batch_end(step, {'loss': batch_loss.numpy()})
+
+        # Average loss over the epoch
+        epoch_loss /= steps_per_epoch
+
+        # Store the epoch loss in the history
+        history['loss'].append(epoch_loss)
+
+        # Validation at the end of the epoch if validation data is provided
+        if X_val is not None and y_val is not None:
+            val_pred = model(X_val, training=False)[output_key]
+            val_loss = loss_fn(y_val, val_pred, val_weights).numpy()
+            history['val_loss'].append(val_loss)
+
+            # Print progress if verbose
+            if verbose:
+                print(f"loss: {epoch_loss:.4f} - val_loss: {val_loss:.4f}")
+
+            # Callbacks at the end of each epoch
+            for callback in callbacks:
+                callback.on_epoch_end(epoch, {'loss': epoch_loss, 'val_loss': val_loss})
+        else:
+            # Print progress if verbose and no validation
+            if verbose:
+                print(f"loss: {epoch_loss:.4f}")
+
+            # Callbacks at the end of each epoch when no validation data is provided
+            for callback in callbacks:
+                callback.on_epoch_end(epoch, {'loss': epoch_loss})
+
+        # Early stopping check
+        if model.stop_training:
+            print("Early stopping...")
+            break
+
+    # Callbacks at the end of training
+    for callback in callbacks:
+        callback.on_train_end()
+
+    return history
 
 
 class PrintBatchMSE(Callback):
