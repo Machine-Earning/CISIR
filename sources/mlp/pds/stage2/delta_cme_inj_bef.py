@@ -348,7 +348,6 @@ def main():
                                     optimizer=optimizer,
                                     epochs=epochs,
                                     batch_size=batch_size,
-                                    output_key='forecast_head',  # Specify the output you want to train on
                                     callbacks=[
                                         early_stopping,
                                         reduce_lr_on_plateau,
@@ -426,7 +425,7 @@ def main():
                                     optimizer=optimizer,
                                     epochs=optimal_epochs,
                                     batch_size=batch_size,
-                                    output_key='forecast_head',  # Specify the output you want to train on
+                                    output_key=1,  # Specify the output you want to train on
                                     callbacks=[
                                         reduce_lr_on_plateau,
                                         WandbCallback(save_model=WANDB_SAVE_MODEL)

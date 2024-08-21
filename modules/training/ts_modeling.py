@@ -2977,7 +2977,7 @@ def pearson_correlation_coefficient(y_true: tf.Tensor, y_pred: tf.Tensor, sample
 
     if sample_weight is not None:
         sample_weight = tf.keras.backend.flatten(sample_weight)
-        # sample_weight /= tf.reduce_sum(sample_weight)  # Normalize the weights
+        sample_weight /= tf.reduce_sum(sample_weight)  # Normalize the weights
 
     # Calculate weighted means
     if sample_weight is not None:
@@ -3120,29 +3120,28 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3) -> Callable[[tf.
             :param y_true: Ground truth values.
             :param y_pred: Predicted values by the model.
             :param sample_weights: Optional sample weights for the loss calculation.
-            :return: Combined MSE and PCC loss value.
+            :return: Combined MSE and PCC loss value as a single scalar.
             """
 
-            # Calculate MSE
+            # Calculate MSE per sample
             mse_loss_per_sample = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)  # Shape: [batch_size]
 
             if sample_weights is not None:
                 mse_loss_per_sample *= sample_weights  # Apply sample weights to MSE only
 
-            # Calculate PCC
-            pcc_value = pearson_correlation_coefficient(y_true, y_pred, sample_weights)
+            # Calculate the mean of MSE loss across the batch
+            mse_loss = tf.reduce_mean(mse_loss_per_sample)  # Scalar value
 
-            # Apply PCC to each sample in the batch
-            pcc_loss_per_sample = 1 - pcc_value  # Shape: []
-            pcc_loss_per_sample = tf.fill(tf.shape(mse_loss_per_sample), pcc_loss_per_sample)  # Shape: [batch_size]
+            # Calculate PCC (which is already a single scalar value)
+            pcc_value = pearson_correlation_coefficient(y_true, y_pred, sample_weights)  # Scalar value
 
-            weighted_pcc_loss_per_sample = lambda_factor * pcc_loss_per_sample
-            # Combine MSE and PCC with lambda factor per sample
-            combined_loss_per_sample = mse_loss_per_sample + weighted_pcc_loss_per_sample
+            # PCC loss is 1 - PCC value
+            pcc_loss = 1 - pcc_value  # Scalar value
 
-            return combined_loss_per_sample
+            # Combine MSE and PCC loss
+            combined_loss = mse_loss + lambda_factor * pcc_loss
 
-        return mse_pcc
+            return combined_loss
     else:
 
         raise ValueError(f"Unknown loss key: {loss_key}")
@@ -3155,7 +3154,7 @@ def train_step(
         sample_weights: Optional[tf.Tensor],
         loss_fn: Callable[[tf.Tensor, tf.Tensor, Optional[tf.Tensor]], tf.Tensor],
         optimizer: Optimizer,
-        output_key: str
+        output_key: int
 ) -> tf.Tensor:
     """
     Executes a single training step for the specified model output.
@@ -3185,17 +3184,17 @@ def train_step(
 
 def custom_train_loop(
         model: tf.keras.Model,
-        X_train: tf.Tensor,
-        y_train: tf.Tensor,
+        X_train: Union[tf.Tensor, np.array],
+        y_train: Union[tf.Tensor, np.array],
         train_weights: Optional[tf.Tensor],
-        X_val: Optional[tf.Tensor],
-        y_val: Optional[tf.Tensor],
+        X_val: Optional[Union[tf.Tensor, np.array]],
+        y_val: Optional[Union[tf.Tensor, np.array]],
         val_weights: Optional[tf.Tensor],
-        loss_fn: Callable[[tf.Tensor, tf.Tensor, Optional[tf.Tensor]], tf.Tensor],
+        loss_fn: Callable,
         optimizer: Optimizer,
         epochs: int,
         batch_size: int,
-        output_key: str,
+        output_key: int = 1,
         callbacks: Optional[List[Callback]] = None,
         verbose: int = 1
 ) -> Dict[str, List[float]]:
