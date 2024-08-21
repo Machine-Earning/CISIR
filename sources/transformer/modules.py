@@ -317,6 +317,8 @@ class TanhAttentiveBlockV2(Layer):
         self.attention_scores = None
         self.attention_block = None
         self.dense_layer = None
+        self.dense_weights = None  # Placeholder for dense weights
+        self.dense_bias = None  # Placeholder for dense bias
         self.tanh = Activation('tanh')
         self.dropout_layer = Dropout(self.dropout_rate) if self.dropout_rate > 0 else None
         self.norm_layer = None
@@ -341,6 +343,10 @@ class TanhAttentiveBlockV2(Layer):
         )
         # Create the final dense layer
         self.dense_layer = Dense(self.output_dim)
+        # Retrieve and store the weights of the dense layer during the build phase
+        self.dense_layer.build(input_shape)
+        self.dense_weights = self.dense_layer.kernel
+        self.dense_bias = self.dense_layer.bias
 
         # Set the normalization layer if specified
         if self.norm == 'batch_norm':
@@ -370,17 +376,11 @@ class TanhAttentiveBlockV2(Layer):
         # Reshape attention weights to match the weights of the dense layer
         attention_weights = tf.reshape(attention_weights, (-1, self.output_dim, inputs.shape[-1]))
 
-        # Get the original weights of the dense layer
-        dense_weights, dense_bias = self.dense_layer.get_weights()
+        # Apply the attention weights to the stored dense weights
+        modulated_weights = self.dense_weights * attention_weights
 
-        # Reshape the dense weights to match the attention weights
-        dense_weights = tf.reshape(dense_weights, (self.output_dim, -1))
-
-        # Apply the attention weights to the dense weights
-        modulated_weights = dense_weights * attention_weights
-
-        # Calculate the final output by using the modulated weights
-        modulated_output = tf.matmul(inputs, modulated_weights, transpose_b=True) + dense_bias
+        # Calculate the final output using the modulated weights
+        modulated_output = tf.matmul(inputs, modulated_weights, transpose_b=True) + self.dense_bias
 
         # Optionally apply dropout
         if self.dropout_layer is not None:
