@@ -2971,6 +2971,13 @@ def pearson_correlation_coefficient(y_true: tf.Tensor, y_pred: tf.Tensor, sample
     :param sample_weight: Optional tensor of sample weights. Shape: [batch_size, ...].
     :return: Pearson Correlation Coefficient. Shape: scalar.
     """
+
+    # Ensure consistent data type (float32)
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
+    if sample_weight is not None:
+        sample_weight = tf.cast(sample_weight, tf.float32)
+
     # Flatten input tensors to 1D
     y_true_flat = tf.keras.backend.flatten(y_true)
     y_pred_flat = tf.keras.backend.flatten(y_pred)
