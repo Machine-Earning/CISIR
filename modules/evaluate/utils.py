@@ -42,7 +42,7 @@ def evaluate_plot(
         cme_speed_threshold: float = 0,
         show_avsp: bool = True,
         current_time: str = None,
-        wandb_cls: Optional[wandb] = None,
+        wandb_cls: Optional = None,
 
 ):
     """
