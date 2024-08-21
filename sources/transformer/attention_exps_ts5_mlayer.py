@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -10,9 +9,8 @@ from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
 from modules.shared.globals import *
-from modules.training.DenseReweights import exDenseReweights
 from modules.training.ts_modeling import (
-    build_dataset, evaluate_mae, process_sep_events, get_loss, evaluate_pcc)
+    evaluate_mae, process_sep_events, get_loss, evaluate_pcc)
 from modules.training.ts_modeling import set_seed
 # Importing the Blocks
 from sources.transformer.modules import *
@@ -32,6 +30,7 @@ cme_speed_threshold = -1  # CME_SPEED_THRESHOLD[0]
 using_cme = True if cme_speed_threshold >= 0 else False
 add_slope = False
 hiddens = [128 for _ in range(7)]
+blocks = [128 for _ in range(1)]
 
 a = 1
 LR = 3e-3
@@ -44,35 +43,56 @@ skipped_layers = 2
 weight_decay = 1e-8
 loss_key = 'mse_pcc'
 lambda_ = 3.3
-factors = [0.5, 0.5, 3.3]
 
 
-def create_model(input_shape: int, rho: float) -> Model:
+def create_model(input_shape: int, rho: float, hiddens: list, blocks: list) -> Model:
     """
     Create a model using the specified block class.
 
     Args:
-        input_shape (Tuple[int]): The shape of the input tensor.
+        input_shape (int): The shape of the input tensor.
+        rho (float): SAM regularization parameter. If rho > 0, a SAM model is created.
+        hiddens (list): List of hidden units for each block.
+        blocks (list): List specifying the number of blocks and their configurations.
 
     Returns:
         Model: The Keras model.
     """
     inputs = Input(shape=(input_shape,))
-    block = TanhAttentiveBlock(
+    x = inputs
+
+    # Iterate through the number of blocks
+    for i in range(len(blocks)):
+        block = TanhAttentiveBlock(
+            attn_hidden_units=hiddens,
+            attn_hidden_activation='leaky_relu',
+            output_activation='linear',
+            attn_skipped_layers=skipped_layers,
+            attn_residual=residual,
+            attn_norm=None,
+            output_dim=blocks[i],
+            a=a)
+        x = block(x)  # Apply the block to the input
+
+    # The final output is the output of the last block
+    output_block = TanhAttentiveBlock(
         attn_hidden_units=hiddens,
         attn_hidden_activation='leaky_relu',
         output_activation='linear',
         attn_skipped_layers=skipped_layers,
         attn_residual=residual,
         attn_norm=None,
+        output_dim=1,
         a=a)
-    outputs = block(inputs)  # dict of outputs and attention scores
-    # get the outputs and attention scores a list from the block
-    # outputs = [outputs['output'], outputs['attention_scores']]
+    # final output
+    outputs = output_block(x)  # dict of outputs and attention scores
+
+    # If rho is greater than 0, wrap the model in SAMModel
     if rho > 0:
         model = SAMModel(inputs=inputs, outputs=outputs, rho=rho)
     else:
         model = Model(inputs=inputs, outputs=outputs)
+
     return model
 
 
@@ -93,7 +113,8 @@ def train_and_print_results(
         batch_size: int = 32,
         patience: int = 100,
         debug: bool = True,
-        time: str = "") -> None:
+        time: str = "",
+        norm_factor: int = None) -> None:
     """
     Train the model and print the results, including learned weights and attention scores.
 
@@ -113,10 +134,11 @@ def train_and_print_results(
         batch_size (int): Batch size for training.
         patience (int): Patience for early stopping.
         time (str): The current time for the experiment.
+        norm_factor (int): The normalization factor for the attention scores.
     """
     model.compile(
         optimizer=AdamW(learning_rate=learning_rate, weight_decay=weight_decay),
-        loss={'output': get_loss(loss_key, factors=factors)},
+        loss={'output': get_loss(loss_key, lambda_factor=lambda_, norm_factor=norm_factor)},
     )
 
     early_stopping = EarlyStopping(
@@ -342,6 +364,7 @@ for alpha_val in [0.75]:
                 min_norm_weight=min_norm_weight,
                 debug=False).reweights
             print(f'training set rebalanced.')
+            sum_train_weights = np.sum(y_train_weights)
 
             print(f'rebalancing the test set...')
             min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_test)
@@ -357,7 +380,7 @@ for alpha_val in [0.75]:
             block_classes = TanhAttentiveBlock
 
             # Initialize wandb
-            wandb.init(project="attention-exps-5.5", name=experiment_name, config={
+            wandb.init(project="attention-exps-5.6", name=experiment_name, config={
                 "learning_rate": LR,
                 "epochs": EPOCHS,
                 "batch_size": BS,
@@ -377,7 +400,7 @@ for alpha_val in [0.75]:
             })
 
             print(f"\nAttention Type 7")
-            model = create_model(input_dim, rho=rho)
+            model = create_model(input_dim, rho=rho, hiddens=hiddens, blocks=blocks)
             model.summary()
             # tf.keras.utils.plot_model(model, to_file=f'./model_{i}.png', show_shapes=True)
             train_and_print_results(
@@ -388,7 +411,8 @@ for alpha_val in [0.75]:
                 learning_rate=LR, epochs=EPOCHS,
                 batch_size=BS, patience=PATIENCE,
                 weight_decay=weight_decay,
-                time=current_time
+                time=current_time,
+                norm_factor=sum_train_weights,
             )
 
             # Finish the wandb run
