@@ -18,7 +18,7 @@ from modules.training.ts_modeling import set_seed
 from sources.transformer.modules import *
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
@@ -44,7 +44,7 @@ residual = False
 skipped_layers = 2
 weight_decay = 1e-8
 loss_key = 'mse_pcc'
-lambda_ = 3.3
+lambda_ = 2.1
 
 
 def create_model(input_shape: int, rho: float, hiddens: list, blocks: list) -> Model:
@@ -389,6 +389,7 @@ for alpha_val in [0.75]:
                 "attention_type": 7,
                 "patience": PATIENCE,
                 'attn_hiddens': (", ".join(map(str, hiddens))).replace(', ', '_'),
+                'block_hiddens': (", ".join(map(str, blocks))).replace(', ', '_'),
                 'slope': add_slope,
                 'a': a,
                 'alpha': alpha,
