@@ -132,7 +132,7 @@ def evaluate_mae_pcc(
         above_threshold: float = None,
         below_threshold: float = None,
         use_dict: bool = False,
-        wandb_cls: Optional[wandb] = None,
+        wandb_cls: Optional = None,
 ):
     """
     Evaluates a given model using Mean Absolute Error (MAE) and Pearson Correlation Coefficient (PCC) metrics.
