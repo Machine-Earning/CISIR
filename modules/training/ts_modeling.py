@@ -3142,6 +3142,8 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3) -> Callable[[tf.
             combined_loss = mse_loss + lambda_factor * pcc_loss
 
             return combined_loss
+
+        return mse_pcc
     else:
 
         raise ValueError(f"Unknown loss key: {loss_key}")
