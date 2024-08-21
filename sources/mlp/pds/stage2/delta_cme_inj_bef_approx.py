@@ -214,6 +214,7 @@ def main():
                                     min_norm_weight=min_norm_weight,
                                     debug=False).reweights
                                 print(f'training set rebalanced.')
+                                sum_train_weights = np.sum(y_train_weights)
 
                                 print(f'rebalancing the subtraining set...')
                                 min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
@@ -311,7 +312,13 @@ def main():
                                         weight_decay=weight_decay,
                                         beta_1=momentum_beta1
                                     ),
-                                    loss={'forecast_head': get_loss(loss_key, lambda_factor=lambda_)},
+                                    loss={
+                                        'forecast_head': get_loss(
+                                            loss_key,
+                                            lambda_factor=lambda_,
+                                            norm_factor=sum_train_weights
+                                        )
+                                    },
                                 )
 
                                 # Train the model with the callback
@@ -368,7 +375,13 @@ def main():
                                         weight_decay=weight_decay,
                                         beta_1=momentum_beta1
                                     ),
-                                    loss={'forecast_head': get_loss(loss_key, lambda_factor=lambda_)},
+                                    loss={
+                                        'forecast_head': get_loss(
+                                            loss_key,
+                                            lambda_factor=lambda_,
+                                            norm_factor=sum_train_weights
+                                        )
+                                    },
                                 )  # Compile the model just like before
 
                                 # Train on the full dataset
