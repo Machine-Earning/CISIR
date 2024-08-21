@@ -373,14 +373,20 @@ class TanhAttentiveBlockV2(Layer):
         # Apply scaling factor a and tanh to obtain attention weights between -1 and 1
         attention_weights = self.tanh(self.a * self.attention_scores)
 
-        # Reshape attention weights to match the weights of the dense layer
-        attention_weights = tf.reshape(attention_weights, (-1, self.output_dim, inputs.shape[-1]))
+        # Reshape attention weights to match the shape of the dense weights
+        attention_weights = tf.reshape(attention_weights, [-1, inputs.shape[-1], self.output_dim])
 
-        # Apply the attention weights to the stored dense weights
-        modulated_weights = self.dense_weights * attention_weights
+        # Transpose attention_weights to match the shape of dense_weights
+        attention_weights = tf.transpose(attention_weights, perm=[0, 2, 1])
+
+        # Expand the input dimension to match batch size
+        dense_weights_expanded = tf.expand_dims(self.dense_weights, axis=0)
+
+        # Apply the attention weights to the dense weights
+        modulated_weights = dense_weights_expanded * attention_weights
 
         # Calculate the final output using the modulated weights
-        modulated_output = tf.matmul(inputs, modulated_weights, transpose_b=True) + self.dense_bias
+        modulated_output = tf.matmul(inputs, modulated_weights) + self.dense_bias
 
         # Optionally apply dropout
         if self.dropout_layer is not None:
