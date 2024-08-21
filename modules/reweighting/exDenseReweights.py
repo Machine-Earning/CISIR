@@ -4,7 +4,7 @@
 ##############################################################################################################
 
 # types for type hinting
-from typing import Tuple, List, Union, Optional
+from typing import Union, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
