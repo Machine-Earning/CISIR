@@ -65,7 +65,7 @@ def create_model(input_shape: int, rho: float, hiddens: list, blocks: list) -> M
 
     # Iterate through the number of blocks
     for i in range(len(blocks)):
-        block = TanhAttentiveBlockV2(
+        block = TanhAttentiveBlock(
             attn_hidden_units=hiddens,
             attn_hidden_activation='leaky_relu',
             output_activation='linear',
@@ -77,7 +77,7 @@ def create_model(input_shape: int, rho: float, hiddens: list, blocks: list) -> M
         x = block(x)['output']  # Apply the block to the input
 
     # The final output is the output of the last block
-    output_block = TanhAttentiveBlockV2(
+    output_block = TanhAttentiveBlock(
         attn_hidden_units=hiddens,
         attn_hidden_activation='leaky_relu',
         output_activation='linear',
