@@ -74,7 +74,7 @@ def create_model(input_shape: int, rho: float, hiddens: list, blocks: list) -> M
             attn_norm=None,
             output_dim=blocks[i],
             a=a)
-        x = block(x)  # Apply the block to the input
+        x = block(x)['output']  # Apply the block to the input
 
     # The final output is the output of the last block
     output_block = TanhAttentiveBlock(
