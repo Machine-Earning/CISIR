@@ -32,7 +32,7 @@ cme_speed_threshold = -1  # CME_SPEED_THRESHOLD[0]
 using_cme = True if cme_speed_threshold >= 0 else False
 add_slope = False
 hiddens = [128 for _ in range(7)]
-blocks = [128 for _ in range(1)]
+blocks = [128 for _ in range(2)]
 
 a = 1
 LR = 3e-3
@@ -63,7 +63,7 @@ def create_model(input_shape: int, rho: float, hiddens: list, blocks: list) -> M
     inputs = Input(shape=(input_shape,))
     x = inputs
 
-    # Iterate through the number of blocks
+    # Iterate through the number of blockshyper
     for i in range(len(blocks)):
         block = TanhAttentiveBlockV2(
             attn_hidden_units=hiddens,
