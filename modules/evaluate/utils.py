@@ -1,6 +1,5 @@
 # from tsnecuda import TSNE
-import itertools
-from datetime import datetime
+import os
 from typing import List, Union
 from typing import Tuple, Optional
 
@@ -9,91 +8,176 @@ import numpy as np
 import tensorflow as tf
 import wandb
 from matplotlib.patches import Wedge
+from numpy import bool_
 from scipy.spatial.distance import pdist
 from scipy.stats import gaussian_kde
 from scipy.stats import pearsonr
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import MinMaxScaler
 
-from modules.evaluate import evaluation as eval
-from modules.training import seploader as sepl
-from modules.training.ts_modeling import process_predictions
+from modules.training.ts_modeling import (process_predictions,
+                                          evaluate_pcc,
+                                          evaluate_mae,
+                                          filter_ds,
+                                          process_sep_events,
+                                          plot_error_hist)
 
 
-def log_model_evaluations(
-        model, model_type: str,
-        train_data, train_labels,
-        test_data, test_labels,
-        plot_title: str,
-        timestamp: str,
-        random_seed: int,
-        plots: List[str]
-) -> None:
+def evaluate_plot(
+        model: tf.keras.Model,
+        X_test: Union[np.ndarray, List[np.ndarray]],
+        y_test: np.ndarray,
+        lower_threshold: float = None,
+        upper_threshold: float = None,
+        N_samples: int = 1000,
+        seed: int = 42,
+        title: str = "",
+        model_type: str = 'features_reg',
+        test_directory: str = '',
+        split: str = 'test',
+        inputs_to_use: List[str] = None,
+        outputs_to_use: List[str] = None,
+        add_slope: bool = False,
+        use_cme: bool = True,
+        cme_speed_threshold: float = 0,
+        show_avsp: bool = True,
+        current_time: str = None,
+        wandb_cls: Optional[wandb] = None,
+
+):
     """
-    Logs various model evaluation plots to Weights and Biases (wandb).
+    Evaluates a given model using with plots
 
-    Parameters:
-    - model: The model to evaluate.
-    - model_type: The type of model to use (features, features_reg, features_dec, features_reg_dec).
-    - train_data, train_labels: Training data and corresponding labels.
-    - test_data, test_labels: Testing data and corresponding labels.
-    - plot_title: Title for the plots.
-    - timestamp: Current timestamp for saving plots.
-    - random_seed: Random seed for reproducibility.
-    - plots: List of plots to include, options are:
-        'colored_correlation', 'tsne', 'correlation', 'correlation_density'
+    Args:
+        model: The trained model to evaluate.
+        X_test:  Test features.
+        y_test:  True target values for the test set.
+        lower_threshold: The lower bound threshold for y_test to be included in the evaluation.
+        upper_threshold: The upper bound threshold for y_test to be included in the evaluation.
+        N_samples: Number of samples to use for the evaluation.
+        seed: Random seed for the evaluation.
+        title: Title for the plots.
+        model_type: The type of model to use (features, features_reg, features_dec, features_reg_dec).
+        test_directory: The directory containing SEP event files to process.
+        split: The split being evaluated (e.g., 'test', 'validation').
+        inputs_to_use: The input features to use for the evaluation.
+        outputs_to_use: The output features to use for the evaluation.
+        add_slope: Whether to add the slope to the model.
+        use_cme: Whether to use CME data in the evaluation.
+        cme_speed_threshold: The threshold for CME speed.
+        show_avsp: Whether to show the actual vs predicted plot.
+        current_time: The current time to append to the file names.
+        wandb_cls: The wandb class instance to log the evaluation results
 
     Returns:
-    - None
+        None
+
+    """
+    X_test_filtered, y_test_filtered = filter_ds(
+        X_test, y_test,
+        low_threshold=lower_threshold,
+        high_threshold=upper_threshold,
+        N=N_samples, seed=seed)
+
+    # Process SEP event files in the specified directory
+    filenames = process_sep_events(
+        test_directory,
+        model,
+        title=title,
+        inputs_to_use=inputs_to_use,
+        add_slope=add_slope,
+        outputs_to_use=outputs_to_use,
+        show_avsp=show_avsp,
+        using_cme=use_cme,
+        cme_speed_threshold=cme_speed_threshold)
+
+    # Log the plot to wandb
+    for filename in filenames:
+        log_title = os.path.basename(filename)
+        wandb_cls.log({f'{split}ing_{log_title}': wandb_cls.Image(filename)})
+
+    # Process SEP event files in the specified directory
+    file_path = plot_repr_corr_dist(
+        model, X_test_filtered, y_test_filtered,
+        title + f"_{split}",
+        model_type=model_type
+    )
+    wandb_cls.log({f'representation_correlation_colored_plot_{split}': wandb_cls.Image(file_path)})
+    print('file_path: ' + file_path)
+
+    # Log the testing t-SNE plot to wandb
+    stage1_file_path = plot_tsne_delta(
+        model,
+        X_test_filtered, y_test_filtered, title,
+        f'stage2_{split}ing',
+        model_type=model_type,
+        save_tag=current_time, seed=seed)
+    wandb_cls.log({f'stage2_tsne_{split}ing_plot': wandb_cls.Image(stage1_file_path)})
+    print('stage1_file_path: ' + stage1_file_path)
+
+    # Plot the error histograms on the testing set
+    filename = plot_error_hist(
+        model,
+        X_test, y_test,
+        sample_weights=None,
+        title=title,
+        prefix=f'{split}ing')
+    wandb_cls.log({f"{split}ing_error_hist": wandb_cls.Image(filename)})
+
+
+def evaluate_mae_pcc(
+        model: tf.keras.Model,
+        X_test: Union[np.ndarray, List[np.ndarray]],
+        y_test: np.ndarray,
+        above_threshold: float = None,
+        below_threshold: float = None,
+        use_dict: bool = False,
+        wandb_cls: Optional[wandb] = None,
+):
+    """
+    Evaluates a given model using Mean Absolute Error (MAE) and Pearson Correlation Coefficient (PCC) metrics.
+
+    Args:
+        model: The trained model to evaluate.
+        X_test:  Test features.
+        y_test:  True target values for the test set.
+        above_threshold: The upper bound threshold for y_test to be included in the evaluation.
+        below_threshold: The lower bound threshold for y_test to be included in the evaluation.
+        use_dict: Whether to use a dictionary to store the evaluation results.
+        wandb_cls: The wandb class instance to log the evaluation results.
+
+    Returns:
+        None
+
     """
 
-    if 'colored_correlation' in plots:
-        # Evaluate the model correlation with colored
-        file_path = plot_repr_corr_dist(model, train_data, train_labels, plot_title + "_training")
-        wandb.log({'colored_correlation_train': wandb.Image(file_path)})
-        print('Training colored correlation plot saved at:', file_path)
+    # evaluate the model error on test set
+    error_mae = evaluate_mae(model, X_test, y_test, use_dict=use_dict)
+    print(f'mae error: {error_mae}')
+    wandb_cls.log({"mae": error_mae})
 
-        file_path = plot_repr_corr_dist(model, test_data, test_labels, plot_title + "_test")
-        wandb.log({'colored_correlation_test': wandb.Image(file_path)})
-        print('Testing colored correlation plot saved at:', file_path)
+    # evaluate the model correlation on test set
+    error_pcc = evaluate_pcc(model, X_test, y_test, use_dict=use_dict)
+    print(f'pcc error: {error_pcc}')
+    wandb_cls.log({"pcc": error_pcc})
 
-    if 'tsne' in plots:
-        # Log t-SNE plot
-        tsne_train_file_path = plot_tsne_delta(model, train_data, train_labels, plot_title, 'training',
-                                               model_type=model_type, save_tag=timestamp, seed=random_seed)
-        wandb.log({'tsne_train': wandb.Image(tsne_train_file_path)})
-        print('Training t-SNE plot saved at:', tsne_train_file_path)
+    # evaluate the model error for rare samples on test set
+    error_mae_cond = evaluate_mae(
+        model, X_test, y_test,
+        above_threshold=above_threshold,
+        below_threshold=below_threshold,
+        use_dict=use_dict)
+    print(f'mae error delta >= {above_threshold} test: {error_mae_cond}')
+    wandb_cls.log({"mae+": error_mae_cond})
 
-        tsne_test_file_path = plot_tsne_delta(model, test_data, test_labels, plot_title, 'testing',
-                                              model_type=model_type, save_tag=timestamp, seed=random_seed)
-        wandb.log({'tsne_test': wandb.Image(tsne_test_file_path)})
-        print('Testing t-SNE plot saved at:', tsne_test_file_path)
-
-    if 'correlation' in plots:
-        # Evaluate the model correlation
-        corr_train_file_path = plot_repr_correlation(model, train_data, train_labels, plot_title + "_training")
-        wandb.log({'correlation_train': wandb.Image(corr_train_file_path)})
-        print('Training correlation plot saved at:', corr_train_file_path)
-
-        corr_test_file_path = plot_repr_correlation(model, test_data, test_labels, plot_title + "_test")
-        wandb.log({'correlation_test': wandb.Image(corr_test_file_path)})
-        print('Testing correlation plot saved at:', corr_test_file_path)
-
-    if 'correlation_density' in plots:
-        # Evaluate the model correlation density
-        corr_density_train_file_path = plot_repr_corr_density(model, train_data, train_labels, plot_title + "_training")
-        wandb.log({'correlation_density_train': wandb.Image(corr_density_train_file_path)})
-        print('Training correlation density plot saved at:', corr_density_train_file_path)
-
-        corr_density_test_file_path = plot_repr_corr_density(model, test_data, test_labels, plot_title + "_test")
-        wandb.log({'correlation_density_test': wandb.Image(corr_density_test_file_path)})
-        print('Testing correlation density plot saved at:', corr_density_test_file_path)
-
-
-# Example usage:
-# plots_to_include = ['colored_correlation', 'tsne', 'correlation', 'correlation_density']
-# log_model_evaluations(model_sep, X_train_filtered, y_train_filtered, X_test_filtered, y_test_filtered,
-#                       "Model Evaluation", "20230620", 42, plots_to_include)
+    # evaluate the model correlation for rare samples on test set
+    error_pcc_cond = evaluate_pcc(
+        model, X_test, y_test,
+        above_threshold=above_threshold,
+        below_threshold=below_threshold,
+        use_dict=use_dict)
+    print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
+    wandb_cls.log({"pcc+": error_pcc_cond})
 
 
 def print_statistics(statistics: dict) -> None:
@@ -328,6 +412,7 @@ def evaluate_pcc_repr(
 
     return r
 
+
 def plot_repr_corr_dist(model, X, y, title, model_type='features'):
     """
     Plots the correlation between distances in target values and distances in the representation space,
@@ -497,7 +582,6 @@ def plot_repr_correlation(model, X, y, title, model_type='features'):
     plt.close()
 
     return f"representation_correlation_density_{title}.png"
-
 
 
 def plot_shepard(features, tsne_result):
@@ -872,9 +956,6 @@ def investigate_tsne_delta(
     return file_path
 
 
-
-
-
 def plot_2D_pds(model, X, y, title, prefix, save_tag=None):
     """
     If the feature dimension is 2, this function plots the features in a 2D space. If the feature dimension is not 2,
@@ -956,8 +1037,8 @@ def plot_2D_pds(model, X, y, title, prefix, save_tag=None):
     return file_path
 
 
-def count_above_threshold(y_values: List[float], threshold: float = 0.3027, sep_threshold: float = 2.3026) -> Tuple[
-    int, int]:
+def count_above_threshold(y_values: List[float], threshold: float = 0.3027, sep_threshold: float = 2.3026) -> tuple[
+    bool_, bool_]:
     """
     Count the number of y values that are above a given threshold for elevated events and above a sep_threshold for sep events.
 
@@ -975,203 +1056,3 @@ def count_above_threshold(y_values: List[float], threshold: float = 0.3027, sep_
     sep_count = np.sum(y_values_np > sep_threshold)
 
     return elevated_count, sep_count
-
-
-def load_model_with_weights(model_type: str,
-                            weight_path: str,
-                            input_dim: int = 19,
-                            feat_dim: int = 9,
-                            hiddens: Optional[list] = None,
-                            output_dim: int = 1) -> tf.keras.Model:
-    """
-    Load a model of a given type with pre-trained weights.
-
-    :param output_dim:
-    :param model_type: The type of the model to load ('features', 'reg', 'dec', 'features_reg_dec', etc.).
-    :param weight_path: The path to the saved weights.
-    :param input_dim: The input dimension for the model. Default is 19.
-    :param feat_dim: The feature dimension for the model. Default is 9.
-    :param hiddens: A list of integers specifying the number of hidden units for each hidden layer.
-    :return: A loaded model with pre-trained weights.
-    """
-    if hiddens is None:
-        hiddens = [18]
-    mb = modeling.ModelBuilder()
-
-    model = None  # will be determined by model type
-    if model_type == 'features_reg_dec':
-        # Add logic to create this type of model
-        model = mb.create_model_pds(
-            input_dim=input_dim,
-            feat_dim=feat_dim,
-            hiddens=hiddens,
-            output_dim=output_dim,
-            with_ae=True, with_reg=True)
-    elif model_type == 'features_reg':
-        model = mb.create_model_pds(
-            input_dim=input_dim,
-            feat_dim=feat_dim,
-            hiddens=hiddens,
-            output_dim=output_dim,
-            with_ae=False, with_reg=True)
-    elif model_type == 'features_dec':
-        model = mb.create_model_pds(
-            input_dim=input_dim,
-            feat_dim=feat_dim,
-            hiddens=hiddens,
-            output_dim=None,
-            with_ae=True, with_reg=False)
-    else:  # features
-        model = mb.create_model_pds(
-            input_dim=input_dim,
-            feat_dim=feat_dim,
-            hiddens=hiddens,
-            output_dim=None,
-            with_ae=False, with_reg=False)
-    # Load weights into the model
-    model.load_weights(weight_path)
-    print(f"Weights {weight_path} loaded successfully!")
-
-    return model
-
-
-def load_and_plot_tsne(
-        model_path,
-        model_type,
-        title,
-        data_dir='/home1/jmoukpe2016/keras-functional-api/cme_files/fold/fold_1',
-        with_head=False):
-    """
-    Load a trained model and plot its t-SNE visualization.
-
-    :param with_head:
-    :param model_path: Path to the saved model.
-    :param model_type: Type of model to load ('features', 'features_reg', 'features_reg_dec').
-    :param title: Title for the t-SNE plot.
-    :param sep_marker: The shape of the marker to use for SEP events (above threshold).
-    :param data_dir: Directory where the cme_files files are stored.
-    """
-
-    # print the parameters
-    print('Model type:', model_type)
-    print('Model path:', model_path)
-    print('Title:', title)
-    print('Data directory:', data_dir)
-
-    # Generate a timestamp
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    # check for gpus
-    print(tf.config.list_physical_devices('GPU'))
-    # Load the appropriate model
-    mb = modeling.ModelBuilder()
-
-    if with_head:
-        if model_type == 'features':
-            features_model = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
-            loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False, pds=True)
-        elif model_type == 'features_reg':
-            features_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18])
-            loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False)
-        elif model_type == 'features_reg_dec':
-            features_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18], with_ae=True)
-            loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False)
-        else:  # regular reg
-            loaded_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18])
-
-        loaded_model.load_weights(model_path)
-        print(f'Model loaded from {model_path}')
-    else:
-        # load weights to continue training
-        loaded_model = load_model_with_weights(model_type, model_path)
-
-    # Load cme_files
-    loader = sepl.SEPLoader()
-    train_x, train_y, val_x, val_y, test_x, test_y = loader.load_from_dir(data_dir)
-    # Extract counts of events
-    elevateds, seps = count_above_threshold(train_y)
-    print(f'Sub-Training set: elevated events: {elevateds}  and sep events: {seps}')
-    elevateds, seps = count_above_threshold(val_y)
-    print(f'Validation set: elevated events: {elevateds}  and sep events: {seps}')
-    elevateds, seps = count_above_threshold(test_y)
-    print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
-
-    # Combine training and validation sets
-    combined_train_x, combined_train_y = loader.combine(train_x, train_y, val_x, val_y)
-
-    # Plot and save t-SNE
-    test_plot_path = plot_tsne_extended(loaded_model,
-                                        test_x, test_y,
-                                        title,
-                                        model_type + '_testing_',
-                                        model_type=model_type,
-                                        save_tag=timestamp)
-
-    training_plot_path = plot_tsne_extended(loaded_model,
-                                            combined_train_x,
-                                            combined_train_y,
-                                            title,
-                                            model_type + '_training_',
-                                            model_type=model_type,
-                                            save_tag=timestamp)
-
-    return test_plot_path, training_plot_path
-
-
-def load_and_test(model_path, model_type, title, threshold=10,
-                  data_dir='/home1/jmoukpe2016/keras-functional-api/cme_files/fold/fold_1'):
-    """
-    Load a trained model and evaluate its performance.
-
-    :param model_path: Path to the saved model.
-    :param model_type: Type of model to load ('features', 'features_reg', 'features_reg_dec').
-    :param title: Title for the evaluation results.
-    :param threshold: Threshold for evaluation.
-    :param data_dir: Directory where the cme_files files are stored.
-    """
-
-    # print the parameters
-    print('Model type:', model_type)
-    print('Model path:', model_path)
-    print('Title:', title)
-    print('Threshold:', threshold)
-    print('Data directory:', data_dir)
-
-    # Generate a timestamp
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    # check for gpus
-    print(tf.config.list_physical_devices('GPU'))
-    # Load the appropriate model
-    mb = modeling.ModelBuilder()
-
-    if model_type == 'features':
-        features_model = mb.create_model_pds(input_dim=19, feat_dim=9, hiddens=[18])
-        loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False)
-    elif model_type == 'features_reg':
-        features_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18])
-        loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False)
-    else:  # features_reg_dec
-        features_model = mb.create_model(input_dim=19, feat_dim=9, output_dim=1, hiddens=[18], with_ae=True)
-        loaded_model = mb.add_reg_proj_head(features_model, freeze_features=False)
-
-    loaded_model.load_weights(model_path)
-    print(f'Model loaded from {model_path}')
-
-    # Load cme_files
-    loader = sepl.SEPLoader()
-    train_x, train_y, val_x, val_y, test_x, test_y = loader.load_from_dir(data_dir)
-    # Extract counts of events
-    elevateds, seps = count_above_threshold(train_y)
-    print(f'Sub-Training set: elevated events: {elevateds}  and sep events: {seps}')
-    elevateds, seps = count_above_threshold(val_y)
-    print(f'Validation set: elevated events: {elevateds}  and sep events: {seps}')
-    elevateds, seps = count_above_threshold(test_y)
-    print(f'Test set: elevated events: {elevateds}  and sep events: {seps}')
-
-    # Combine training and validation sets
-    combined_train_x, combined_train_y = loader.combine(train_x, train_y, val_x, val_y)
-
-    # Evaluate and save results
-    ev = eval.Evaluator()
-    ev.evaluate(loaded_model, test_x, test_y, title, threshold=threshold, save_tag=model_type + '_test_' + timestamp)
-    ev.evaluate(loaded_model, combined_train_x, combined_train_y, title, threshold=threshold,
-                save_tag=model_type + '_training_' + timestamp)

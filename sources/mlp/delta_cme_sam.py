@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
+from modules.evaluate.utils import evaluate_mae_pcc, evaluate_plot
 
 # Set the environment variable for CUDA (in case it is necessary)
 os.environ['CUDA_VISIBLE_DEVICES'] = '3'
@@ -16,13 +16,8 @@ from modules.training.DenseReweights import exDenseReweights
 from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
-    evaluate_mae,
-    evaluate_pcc,
-    process_sep_events,
     get_loss,
-    filter_ds,
     stratified_split,
-    plot_error_hist,
     set_seed)
 
 from modules.shared.globals import *
@@ -144,18 +139,6 @@ def main():
                                 add_slope=add_slope,
                                 outputs_to_use=outputs_to_use,
                                 cme_speed_threshold=cme_speed_threshold)
-
-                            X_train_filtered, y_train_filtered = filter_ds(
-                                X_train, y_train,
-                                low_threshold=lower_threshold,
-                                high_threshold=upper_threshold,
-                                N=N, seed=seed)
-
-                            X_test_filtered, y_test_filtered = filter_ds(
-                                X_test, y_test,
-                                low_threshold=lower_threshold,
-                                high_threshold=upper_threshold,
-                                N=N, seed=seed)
 
                             X_subtrain, y_subtrain, X_val, y_val = stratified_split(
                                 X_train,
@@ -310,155 +293,65 @@ def main():
                             # print where the model weights are saved
                             print(f"Model weights are saved in final_model_weights_{experiment_name}_reg.h5")
 
-                            # evaluate the model error on test set
-                            error_mae = evaluate_mae(final_model_sep, X_test, y_test)
-                            print(f'mae error: {error_mae}')
-                            wandb.log({"mae": error_mae})
+                            # Evaluate the model on test set
+                            evaluate_mae_pcc(
+                                final_model_sep, X_test, y_test,
+                                above_threshold=mae_plus_threshold,
+                                wandb_cls=wandb
+                            )
 
-                            # evaluate the model error on training set
-                            error_mae_train = evaluate_mae(final_model_sep, X_train, y_train)
-                            print(f'mae error train: {error_mae_train}')
-                            wandb.log({"train_mae": error_mae_train})
-
-                            # evaluate the model correlation on test set
-                            error_pcc = evaluate_pcc(final_model_sep, X_test, y_test)
-                            print(f'pcc error: {error_pcc}')
-                            wandb.log({"pcc": error_pcc})
-
-                            # evaluate the model correlation on training set
-                            error_pcc_train = evaluate_pcc(final_model_sep, X_train, y_train)
-                            print(f'pcc error train: {error_pcc_train}')
-                            wandb.log({"train_pcc": error_pcc_train})
-
-                            # evaluate the model on test cme_files
-                            above_threshold = mae_plus_threshold
-                            # evaluate the model error for rare samples on test set
-                            error_mae_cond = evaluate_mae(
-                                final_model_sep, X_test, y_test, above_threshold=above_threshold)
-                            print(f'mae error delta >= {above_threshold} test: {error_mae_cond}')
-                            wandb.log({"mae+": error_mae_cond})
-
-                            # evaluate the model error for rare samples on training set
-                            error_mae_cond_train = evaluate_mae(
-                                final_model_sep, X_train, y_train, above_threshold=above_threshold)
-                            print(f'mae error delta >= {above_threshold} train: {error_mae_cond_train}')
-                            wandb.log({"train_mae+": error_mae_cond_train})
-
-                            # evaluate the model correlation for rare samples on test set
-                            error_pcc_cond = evaluate_pcc(
-                                final_model_sep, X_test, y_test, above_threshold=above_threshold)
-                            print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
-                            wandb.log({"pcc+": error_pcc_cond})
-
-                            # evaluate the model correlation for rare samples on training set
-                            error_pcc_cond_train = evaluate_pcc(
-                                final_model_sep, X_train, y_train, above_threshold=above_threshold)
-                            print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
-                            wandb.log({"train_pcc+": error_pcc_cond_train})
+                            # evaluate the model error on train set
+                            evaluate_mae_pcc(
+                                final_model_sep, X_train, y_train,
+                                above_threshold=mae_plus_threshold,
+                                wandb_cls=wandb
+                            )
 
                             # Process SEP event files in the specified directory
                             test_directory = root_dir + '/testing'
-                            filenames = process_sep_events(
-                                test_directory,
-                                final_model_sep,
-                                title=title,
-                                inputs_to_use=inputs_to_use,
-                                add_slope=add_slope,
-                                outputs_to_use=outputs_to_use,
-                                show_avsp=True,
-                                using_cme=True,
-                                cme_speed_threshold=cme_speed_threshold)
-
-                            # Log the plot to wandb
-                            for filename in filenames:
-                                log_title = os.path.basename(filename)
-                                wandb.log({f'testing_{log_title}': wandb.Image(filename)})
-
-                            # Process SEP event files in the specified directory
-                            test_directory = root_dir + '/training'
-                            filenames = process_sep_events(
-                                test_directory,
-                                final_model_sep,
-                                title=title,
-                                inputs_to_use=inputs_to_use,
-                                add_slope=add_slope,
-                                outputs_to_use=outputs_to_use,
-                                show_avsp=True,
-                                prefix='training',
-                                using_cme=True,
-                                cme_speed_threshold=cme_speed_threshold)
-
-                            # Log the plot to wandb
-                            for filename in filenames:
-                                log_title = os.path.basename(filename)
-                                wandb.log({f'training_{log_title}': wandb.Image(filename)})
-
-                            # Evaluate the model correlation with colored
-                            file_path = plot_repr_corr_dist(
-                                final_model_sep,
-                                X_train_filtered, y_train_filtered,
-                                title + "_training",
-                                model_type='features_reg'
-                            )
-                            wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
-                            print('file_path: ' + file_path)
-
-                            file_path = plot_repr_corr_dist(
-                                final_model_sep,
-                                X_test_filtered, y_test_filtered,
-                                title + "_test",
-                                model_type='features_reg'
-                            )
-                            wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
-                            print('file_path: ' + file_path)
-
-                            # Log t-SNE plot
-                            # Log the training t-SNE plot to wandb
-                            stage1_file_path = plot_tsne_delta(
-                                final_model_sep,
-                                X_train_filtered, y_train_filtered, title,
-                                'stage2_training',
-                                model_type='features_reg',
-                                save_tag=current_time, seed=seed)
-                            wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
-                            print('stage1_file_path: ' + stage1_file_path)
-
-                            # Log the testing t-SNE plot to wandb
-                            stage1_file_path = plot_tsne_delta(
-                                final_model_sep,
-                                X_test_filtered, y_test_filtered, title,
-                                'stage2_testing',
-                                model_type='features_reg',
-                                save_tag=current_time, seed=seed)
-                            wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
-                            print('stage1_file_path: ' + stage1_file_path)
-
-                            # Plot the error histograms
-                            filename = plot_error_hist(
-                                final_model_sep,
-                                X_train, y_train,
-                                sample_weights=None,
-                                title=title,
-                                prefix='training')
-                            wandb.log({"training_error_hist": wandb.Image(filename)})
-
-                            # Plot the error weighted histograms
-                            filename = plot_error_hist(
-                                final_model_sep,
-                                X_train, y_train,
-                                sample_weights=y_train_weights,
-                                title=title,
-                                prefix='training_weighted')
-                            wandb.log({"training_weighted_error_hist": wandb.Image(filename)})
-
-                            # Plot the error histograms on the testing set
-                            filename = plot_error_hist(
+                            evaluate_plot(
                                 final_model_sep,
                                 X_test, y_test,
-                                sample_weights=None,
+                                lower_threshold=lower_threshold,
+                                upper_threshold=upper_threshold,
+                                N_samples=N,
+                                seed=seed,
                                 title=title,
-                                prefix='testing')
-                            wandb.log({"testing_error_hist": wandb.Image(filename)})
+                                model_type='features_reg',
+                                test_directory=test_directory,
+                                split='test',
+                                inputs_to_use=inputs_to_use,
+                                outputs_to_use=outputs_to_use,
+                                add_slope=add_slope,
+                                use_cme=True,
+                                cme_speed_threshold=cme_speed_threshold,
+                                show_avsp=True,
+                                current_time=current_time,
+                                wandb_cls=wandb
+                            )
+
+                            # training plots
+                            test_directory = root_dir + '/training'
+                            evaluate_plot(
+                                final_model_sep,
+                                X_train, y_train,
+                                lower_threshold=lower_threshold,
+                                upper_threshold=upper_threshold,
+                                N_samples=N,
+                                seed=seed,
+                                title=title,
+                                model_type='features_reg',
+                                test_directory=test_directory,
+                                split='train',
+                                inputs_to_use=inputs_to_use,
+                                outputs_to_use=outputs_to_use,
+                                add_slope=add_slope,
+                                use_cme=True,
+                                cme_speed_threshold=cme_speed_threshold,
+                                show_avsp=True,
+                                current_time=current_time,
+                                wandb_cls=wandb
+                            )
 
                             # Finish the wandb run
                             wandb.finish()
