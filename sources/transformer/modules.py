@@ -248,6 +248,7 @@ class TanhAttentiveBlock(Layer):
         return self.dense_layer.get_weights()
 
 
+
 class TanhAttentiveBlockV2(Layer):
     """
     A custom layer that applies an attention mechanism to modulate the weights of a dense layer.

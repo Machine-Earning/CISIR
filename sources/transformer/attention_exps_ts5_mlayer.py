@@ -32,7 +32,7 @@ cme_speed_threshold = -1  # CME_SPEED_THRESHOLD[0]
 using_cme = True if cme_speed_threshold >= 0 else False
 add_slope = False
 hiddens = [128 for _ in range(7)]
-blocks = [128, 64, 32, 16]
+blocks = [128 for _ in range(3)]
 
 a = 1
 LR = 3e-3
