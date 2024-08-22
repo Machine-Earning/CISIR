@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
@@ -62,9 +62,9 @@ def main():
                                 outputs_to_use = OUTPUTS_TO_USE
                                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
-                                lambda_ = 2.105 # LAMBDA
+                                lambda_ = 2 # LAMBDA
                                 # Construct the title
-                                title = f'MLP_S2min_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_rho{rho:.2f}_lambda{lambda_}'
+                                title = f'MLP_S2min_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_rho{rho:.2f}_lambda{lambda_}_nonorm'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -316,7 +316,7 @@ def main():
                                         'forecast_head': get_loss(
                                             loss_key,
                                             lambda_factor=lambda_,
-                                            norm_factor=sum_train_weights
+                                            norm_factor=1
                                         )
                                     },
                                 )
@@ -379,7 +379,7 @@ def main():
                                         'forecast_head': get_loss(
                                             loss_key,
                                             lambda_factor=lambda_,
-                                            norm_factor=sum_train_weights
+                                            norm_factor=1
                                         )
                                     },
                                 )  # Compile the model just like before

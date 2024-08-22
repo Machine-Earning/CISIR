@@ -3125,7 +3125,7 @@ def evaluate_lag_error(
     return threshold_lag, shift_lag, avg_lag
 
 
-def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3, norm_factor: float = None) -> Callable[[tf.Tensor, tf.Tensor], tf.Tensor]:
+def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3, norm_factor: float = 1) -> Callable[[tf.Tensor, tf.Tensor], tf.Tensor]:
     """
     Given the key, return the appropriate loss function for the model.
 
