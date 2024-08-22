@@ -18,7 +18,7 @@ from modules.training.ts_modeling import set_seed
 from sources.transformer.modules import *
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
@@ -65,7 +65,7 @@ def create_model(input_shape: int, rho: float, hiddens: list, blocks: list) -> M
 
     # Iterate through the number of blocks
     for i in range(len(blocks)):
-        block = TanhAttentiveBlock(
+        block = TanhAttentiveBlockV2(
             attn_hidden_units=hiddens,
             attn_hidden_activation='leaky_relu',
             output_activation='linear',
@@ -77,7 +77,7 @@ def create_model(input_shape: int, rho: float, hiddens: list, blocks: list) -> M
         x = block(x)['output']  # Apply the block to the input
 
     # The final output is the output of the last block
-    output_block = TanhAttentiveBlock(
+    output_block = TanhAttentiveBlockV2(
         attn_hidden_units=hiddens,
         attn_hidden_activation='leaky_relu',
         output_activation='linear',
@@ -317,7 +317,7 @@ for alpha_val in [0.75]:
             # for alpha in np.arange(0, 1.1, 0.1):
             # Create a unique experiment name with a timestamp
             current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-            experiment_name = f'Attention_Type7_{current_time}_alphaVal{alpha_val}_alpha{alpha}_3L'
+            experiment_name = f'Attention_Type7_{current_time}_alphaVal{alpha_val}_alpha{alpha}_v2'
 
             # dataset
             # build the dataset
