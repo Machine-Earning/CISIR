@@ -32,8 +32,8 @@ cme_speed_threshold = -1  # CME_SPEED_THRESHOLD[0]
 using_cme = True if cme_speed_threshold >= 0 else False
 add_slope = False
 hiddens = [128 for _ in range(7)]
-# blocks = [128 for _ in range(4)]
-blocks = [512, 512, 256, 256, 128, 128]
+blocks = [128 for _ in range(3)]
+# blocks = [512, 512, 256, 256, 128, 128]
 
 a = 1
 LR = 3e-3
@@ -41,8 +41,8 @@ EPOCHS = int(1e4)
 BS = 4096
 PATIENCE = int(3e3)
 bandwidth = BANDWIDTH
-residual = False
-skipped_layers = 2
+residual = True
+skipped_layers = 1
 weight_decay = 1e-8
 loss_key = 'mse_pcc'
 lambda_ = 2.1
@@ -404,8 +404,19 @@ for alpha_val in [0.75]:
             })
 
             print(f"\nAttention Type 7")
-            model = create_model(input_dim, rho=rho, hiddens=hiddens, blocks=blocks)
+            # model = create_model(input_dim, rho=rho, hiddens=hiddens, blocks=blocks)
+            model = create_attentive_model(
+                input_dim=input_dim,
+                output_dim=1,
+                attn_hidden_units=hiddens,
+                attn_hidden_activation='leaky_relu',
+                hidden_blocks=blocks,
+                skipped_blocks=skipped_layers,
+                residual=residual,
+                sam_rho=rho,
+            )
             model.summary()
+
             # tf.keras.utils.plot_model(model, to_file=f'./model_{i}.png', show_shapes=True)
             train_and_print_results(
                 "7", model,
