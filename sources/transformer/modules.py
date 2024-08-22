@@ -248,7 +248,6 @@ class TanhAttentiveBlock(Layer):
         return self.dense_layer.get_weights()
 
 
-
 class TanhAttentiveBlockV2(Layer):
     """
     A custom layer that applies an attention mechanism to modulate the weights of a dense layer.
@@ -530,18 +529,32 @@ def create_attentive_model(
         output_activation=activation
     )
 
-    final_repr = final_block(x)['output']
+    final = final_block(x)
+    final_repr = final['output']
+    last_attention_scores = final['attention_scores']
 
     if pds:
         final_repr_output = NormalizeLayer(name='normalize_layer')(final_repr)
     else:
         final_repr_output = final_repr
 
+    # if output_dim > 0:
+    #     output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+    #     model_output = [final_repr_output, output_layer, last_attention_scores]
+    # else:
+    #     model_output = final_repr_output
     if output_dim > 0:
         output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
-        model_output = [final_repr_output, output_layer]
+        model_output = {
+            'repr': final_repr_output,
+            'output': output_layer,
+            'attention_scores': last_attention_scores
+        }
     else:
-        model_output = final_repr_output
+        model_output = {
+            'repr': final_repr_output,
+            'attention_scores': last_attention_scores
+        }
 
     if sam_rho > 0.0:
         model = SAMModel(inputs=input_layer, outputs=model_output, rho=sam_rho, name=name)
