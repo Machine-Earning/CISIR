@@ -370,20 +370,21 @@ class TanhAttentiveBlockV2(Layer):
         # Compute attention scores
         self.attention_scores = self.attention_block(inputs)
 
-        # Apply scaling factor a and tanh to obtain attention weights between -1 and 1
+        # Apply scaling factor `a` and tanh to obtain attention weights between -1 and 1
         attention_weights = self.tanh(self.a * self.attention_scores)
 
         # Reshape attention weights to match the shape of the dense weights
-        attention_weights = tf.reshape(attention_weights, [-1, inputs.shape[-1], self.output_dim])
+        attention_weights = tf.reshape(attention_weights, [-1, self.output_dim, inputs.shape[-1]])
 
-        # Transpose attention_weights to match the shape of dense_weights
-        attention_weights = tf.transpose(attention_weights, perm=[0, 2, 1])
+        # Transpose the attention weights to match dense weights shape (output_dim, input_dim)
+        attention_weights = tf.transpose(attention_weights,
+                                         perm=[0, 2, 1])  # Now shape is (batch_size, input_dim, output_dim)
 
-        # Expand the input dimension to match batch size
-        dense_weights_expanded = tf.expand_dims(self.dense_weights, axis=0)
+        # Expand dimensions of dense_weights to match the batch size
+        dense_weights_expanded = tf.expand_dims(self.dense_weights, axis=0)  # Shape (1, input_dim, output_dim)
 
         # Apply the attention weights to the dense weights
-        modulated_weights = dense_weights_expanded * attention_weights
+        modulated_weights = dense_weights_expanded * attention_weights  # Shape (batch_size, input_dim, output_dim)
 
         # Calculate the final output using the modulated weights
         modulated_output = tf.matmul(inputs, modulated_weights) + self.dense_bias
