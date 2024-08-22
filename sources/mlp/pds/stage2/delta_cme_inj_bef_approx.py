@@ -62,7 +62,7 @@ def main():
                                 outputs_to_use = OUTPUTS_TO_USE
                                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
-                                lambda_ = 2 # LAMBDA
+                                lambda_ = 0.22 # LAMBDA
                                 # Construct the title
                                 title = f'MLP_S2min_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_rho{rho:.2f}_lambda{lambda_}_nonorm'
 
