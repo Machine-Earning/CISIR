@@ -3213,7 +3213,7 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3, norm_factor: flo
             pcc_values = pcc_intermediate(y_true, y_pred)
 
             # Apply lambda factor and normalization factor to the PCC values
-            pcc_loss = lambda_factor * pcc_values / norm_factor
+            pcc_loss = lambda_factor * (1 - pcc_values / norm_factor)
 
             # Combine the MSE and PCC parts of the loss
             combined_loss = mse_loss + pcc_loss
