@@ -18,7 +18,7 @@ from modules.training.ts_modeling import set_seed
 from sources.transformer.modules import *
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
@@ -32,7 +32,8 @@ cme_speed_threshold = -1  # CME_SPEED_THRESHOLD[0]
 using_cme = True if cme_speed_threshold >= 0 else False
 add_slope = False
 hiddens = [128 for _ in range(7)]
-blocks = [128 for _ in range(3)]
+# blocks = [128 for _ in range(4)]
+blocks = [512, 512, 256, 256, 128, 128]
 
 a = 1
 LR = 3e-3
