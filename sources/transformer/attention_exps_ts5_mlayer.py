@@ -18,7 +18,7 @@ from modules.training.ts_modeling import set_seed
 from sources.transformer.modules import *
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
@@ -32,8 +32,8 @@ cme_speed_threshold = -1  # CME_SPEED_THRESHOLD[0]
 using_cme = True if cme_speed_threshold >= 0 else False
 add_slope = False
 hiddens = [128 for _ in range(7)]
-blocks = [128 for _ in range(3)]
-# blocks = [512, 512, 256, 256, 128, 128]
+# blocks = [128, 64, 128]
+blocks = []
 
 a = 1
 LR = 3e-3
@@ -42,7 +42,7 @@ BS = 4096
 PATIENCE = int(3e3)
 bandwidth = BANDWIDTH
 residual = True
-skipped_layers = 1
+skipped_layers = 2
 weight_decay = 1e-8
 loss_key = 'mse_pcc'
 lambda_ = 2.1
@@ -175,24 +175,26 @@ def train_and_print_results(
         attention_scores = predictions['attention_scores']
         print("Predictions on initial data:")
 
-        if block_name != '2':
-            # Retrieve the weights and bias of the last dense layer
-            dense_layer_weights, dense_layer_bias = model.layers[-1].get_dense_weights()
-            print('weights')
-            print(dense_layer_weights)
-            print(dense_layer_bias)
-        else:
-            dense_layer_weights, dense_layer_bias = np.array([[1], [1]]), np.array([0])
+        # if block_name != '2':
+        #     # Retrieve the weights and bias of the last dense layer
+        #     dense_layer_weights, dense_layer_bias = model.layers[-1].get_dense_weights()
+        #     print('weights')
+        #     print(dense_layer_weights)
+        #     print(dense_layer_bias)
+        # else:
+        # dense_layer_weights, dense_layer_bias = np.array([[1], [1]]), np.array([0])
 
         results = []
         for pred, true, inp, attn in zip(output_predictions, y_debug, x_debug, attention_scores):
-            attention_weighted_values = [a * w for a, w in zip(attn, dense_layer_weights[:, 0])]
+            # attention_weighted_values = [a * w for a, w in zip(attn, 
+            #                                                 #    dense_layer_weights[:, 0]
+            #                                                    )]
             results.append(
                 list(inp) + [true[0], pred[0]]
                 + attn.tolist()
-                + attention_weighted_values
-                + [dense_layer_bias[0]]
-                + dense_layer_weights[:, 0].tolist()
+                # + attention_weighted_values
+                # + [dense_layer_bias[0]]
+                # + dense_layer_weights[:, 0].tolist()
             )
 
         # Print results in a table
@@ -200,8 +202,8 @@ def train_and_print_results(
                 [f'x{i + 1}' for i in range(len(inp))]
                 + ['True y', 'Predicted y']
                 + [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])]
-                + [f'Attention_Weight_{i + 1}' for i in range(attention_scores.shape[1])]
-                + ['Bias'] + [f'Weight_{i + 1}' for i in range(dense_layer_weights.shape[0])]
+                # + [f'Attention_Weight_{i + 1}' for i in range(attention_scores.shape[1])]
+                # + ['Bias'] + [f'Weight_{i + 1}' for i in range(dense_layer_weights.shape[0])]
         )
 
         df_results = pd.DataFrame(results, columns=headers)

@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
@@ -62,7 +62,7 @@ def main():
                                 outputs_to_use = OUTPUTS_TO_USE
                                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
-                                lambda_ = 0.22 # LAMBDA
+                                lambda_ = 3.3 # LAMBDA
                                 # Construct the title
                                 title = f'MLP_S2min_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_rho{rho:.2f}_lambda{lambda_}_nonorm'
 
@@ -215,6 +215,7 @@ def main():
                                     debug=False).reweights
                                 print(f'training set rebalanced.')
                                 sum_train_weights = np.sum(y_train_weights)
+                                norm_factor = sum_train_weights
 
                                 print(f'rebalancing the subtraining set...')
                                 min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
@@ -316,7 +317,7 @@ def main():
                                         'forecast_head': get_loss(
                                             loss_key,
                                             lambda_factor=lambda_,
-                                            norm_factor=1
+                                            norm_factor=norm_factor
                                         )
                                     },
                                 )
@@ -379,7 +380,7 @@ def main():
                                         'forecast_head': get_loss(
                                             loss_key,
                                             lambda_factor=lambda_,
-                                            norm_factor=1
+                                            norm_factor=norm_factor
                                         )
                                     },
                                 )  # Compile the model just like before
