@@ -37,7 +37,7 @@ from tensorflow.keras.layers import (
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Optimizer
 from tensorflow.keras.regularizers import l2
-
+from tensorflow.keras import backend as K
 from modules.training.cme_modeling import NormalizeLayer
 from modules.training.sam_keras import SAMModel
 

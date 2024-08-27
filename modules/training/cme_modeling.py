@@ -15,6 +15,7 @@ import tensorflow as tf
 from keras.regularizers import l2
 from numpy import ndarray
 from tensorflow import Tensor
+from tensorflow.keras import backend as K
 from tensorflow.keras import layers, callbacks, Model
 from tensorflow.keras.layers import (
     Dense,
@@ -2164,29 +2165,44 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
-    def pds_loss_vec(self, y_true, z_pred, sample_weights=None, reduction=tf.keras.losses.Reduction.NONE):
+    def pds_loss_vec(self,
+                     y_true: tf.Tensor, z_pred: tf.Tensor,
+                     train_sample_weights: dict = None,
+                     val_sample_weights: dict = None,
+                     reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE) -> tf.Tensor:
         """
         Computes the weighted loss for a batch of predicted features and their labels.
 
         :param y_true: A batch of true label values, shape of [batch_size, 1].
         :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
-        :param sample_weights: A dictionary mapping label values to their corresponding reweight.
+        :param train_sample_weights: A dictionary mapping label values to their corresponding reweight during training.
+        :param val_sample_weights: A dictionary mapping label values to their corresponding reweight during validation.
         :param reduction: The type of reduction to apply to the loss.
         :return: The weighted average error for all unique combinations of the samples in the batch.
         """
-
         batch_size = tf.shape(y_true)[0]
+
         # Compute pairwise differences for z_pred and y_true using broadcasting
         y_true_diff = y_true - tf.transpose(y_true)
         z_pred_diff = z_pred[:, tf.newaxis, :] - z_pred[tf.newaxis, :, :]
+
         # Calculate squared L2 norm for z_pred differences
         z_diff_squared = tf.reduce_sum(tf.square(z_pred_diff), axis=-1)
+
         # Calculate squared differences for y_true
         y_diff_squared = tf.square(y_true_diff)
+
         # Cast y_diff_squared to match the data type of z_diff_squared
         y_diff_squared = tf.cast(y_diff_squared, dtype=z_diff_squared.dtype)
+
         # Compute the loss for each pair
         pairwise_loss = tf.square(z_diff_squared - y_diff_squared)
+
+        # Determine if the current mode is training or validation/testing
+        is_training = K.learning_phase()
+
+        # Select the appropriate weight dictionary based on the mode
+        sample_weights = train_sample_weights if is_training else val_sample_weights
 
         # Apply sample weights if provided
         if sample_weights is not None:
@@ -2194,21 +2210,25 @@ class ModelBuilder:
             keys = tf.constant(list(map(str, sample_weights.keys())), dtype=tf.string)
             values = tf.constant(list(sample_weights.values()), dtype=tf.float32)
             table = tf.lookup.StaticHashTable(tf.lookup.KeyValueTensorInitializer(keys, values), default_value=1.0)
+
             # Lookup the weights for each y_true value
             weights = table.lookup(tf.as_string(tf.reshape(y_true, [-1])))
             weights_matrix = weights[:, None] * weights[None, :]
+
             # Cast weights_matrix to the same data type as z_diff_squared
             weights_matrix = tf.cast(weights_matrix, dtype=z_diff_squared.dtype)
+
             # Apply the weights to the pairwise loss
             pairwise_loss *= weights_matrix
 
         # Get the total error
         total_error = tf.reduce_sum(pairwise_loss)
+
         # Number of unique comparisons, excluding self-pairs
         num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=z_diff_squared.dtype)
 
         if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error * 0.5  # upper triangle
+            return total_error * 0.5  # Consider only the upper triangle
         elif reduction == tf.keras.losses.Reduction.NONE:
             # Avoid division by zero
             return total_error / num_comparisons
