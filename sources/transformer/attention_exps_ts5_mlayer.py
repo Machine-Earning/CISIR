@@ -9,10 +9,11 @@ from tensorflow.keras.models import Model
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
+from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.DenseReweights import exDenseReweights
 from modules.training.ts_modeling import (
-    evaluate_mae, process_sep_events, get_loss, evaluate_pcc, build_dataset)
+    evaluate_mae, process_sep_events, evaluate_pcc, build_dataset, mse_pcc)
 from modules.training.ts_modeling import set_seed
 # Importing the Blocks
 from sources.transformer.modules import *
@@ -44,8 +45,7 @@ bandwidth = BANDWIDTH
 residual = True
 skipped_layers = 2
 weight_decay = 1e-8
-loss_key = 'mse_pcc'
-lambda_ = 2.1
+lambda_ = 0.05
 
 
 def create_model(input_shape: int, rho: float, hiddens: list, blocks: list) -> Model:
@@ -104,10 +104,8 @@ def train_and_print_results(
         model: Model,
         x_train: np.ndarray,
         y_train: np.ndarray,
-        y_train_weights: np.ndarray,
         x_test: np.ndarray,
         y_test: np.ndarray,
-        y_test_weights: np.ndarray,
         x_debug: np.ndarray = None,
         y_debug: np.ndarray = None,
         learning_rate: float = 0.003,
@@ -117,7 +115,9 @@ def train_and_print_results(
         patience: int = 100,
         debug: bool = True,
         time: str = "",
-        norm_factor: int = None) -> None:
+        train_weights_dict: dict = None,
+        val_weights_dict: dict = None
+) -> None:
     """
     Train the model and print the results, including learned weights and attention scores.
 
@@ -137,11 +137,17 @@ def train_and_print_results(
         batch_size (int): Batch size for training.
         patience (int): Patience for early stopping.
         time (str): The current time for the experiment.
-        norm_factor (int): The normalization factor for the attention scores.
+        train_weights_dict: Dictionary containing the weights for the training set
+        val_weights_dict: Dictionary containing the weights for the validation set
     """
     model.compile(
         optimizer=AdamW(learning_rate=learning_rate, weight_decay=weight_decay),
-        loss={'output': get_loss(loss_key, lambda_factor=lambda_, norm_factor=norm_factor)},
+        loss={'output': lambda y_true, y_pred: mse_pcc(
+            y_true, y_pred,
+            lambda_factor=lambda_,
+            train_weight_dict=train_weights_dict,
+            val_weight_dict=val_weights_dict
+        )},
     )
 
     early_stopping = EarlyStopping(
@@ -154,11 +160,10 @@ def train_and_print_results(
     model.fit(
         x_train,
         {'output': y_train},
-        sample_weight={'output': y_train_weights},
         epochs=epochs,
         batch_size=batch_size,
         verbose=VERBOSE,
-        validation_data=(x_test, {'output': y_test}, y_test_weights),
+        validation_data=(x_test, {'output': y_test}),
         callbacks=[early_stopping, WandbCallback(save_model=False)],
     )
 
@@ -202,8 +207,8 @@ def train_and_print_results(
                 [f'x{i + 1}' for i in range(len(inp))]
                 + ['True y', 'Predicted y']
                 + [f'Attention_{i + 1}' for i in range(attention_scores.shape[1])]
-                # + [f'Attention_Weight_{i + 1}' for i in range(attention_scores.shape[1])]
-                # + ['Bias'] + [f'Weight_{i + 1}' for i in range(dense_layer_weights.shape[0])]
+            # + [f'Attention_Weight_{i + 1}' for i in range(attention_scores.shape[1])]
+            # + ['Bias'] + [f'Weight_{i + 1}' for i in range(dense_layer_weights.shape[0])]
         )
 
         df_results = pd.DataFrame(results, columns=headers)
@@ -363,21 +368,20 @@ for alpha_val in [0.75]:
 
             print(f'rebalancing the training set...')
             min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
-            y_train_weights = exDenseReweights(
+            train_weights_dict = exDenseReweightsD(
                 x_train, delta_train,
                 alpha=alpha, bw=bandwidth,
                 min_norm_weight=min_norm_weight,
-                debug=False).reweights
+                debug=False).label_reweight_dict
             print(f'training set rebalanced.')
-            sum_train_weights = np.sum(y_train_weights)
 
             print(f'rebalancing the test set...')
             min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_test)
-            y_test_weights = exDenseReweights(
+            test_weights_dict = exDenseReweightsD(
                 x_test, delta_test,
                 alpha=alpha_val, bw=bandwidth,
                 min_norm_weight=min_norm_weight,
-                debug=False).reweights
+                debug=False).label_reweight_dict
             print(f'test set rebalanced.')
 
             # Training and printing results for each attention type
@@ -402,7 +406,7 @@ for alpha_val in [0.75]:
                 'residual': residual,
                 "skipped_layers": skipped_layers,
                 'sam_rho': rho,
-                'loss_key': loss_key,
+                'loss_key': 'mse_pcc',
             })
 
             print(f"\nAttention Type 7")
@@ -422,14 +426,15 @@ for alpha_val in [0.75]:
             # tf.keras.utils.plot_model(model, to_file=f'./model_{i}.png', show_shapes=True)
             train_and_print_results(
                 "7", model,
-                x_train, y_train, y_train_weights,
-                x_test, y_test, y_test_weights,
+                x_train, y_train,
+                x_test, y_test,
                 x_debug=x_debug, y_debug=y_debug,
                 learning_rate=LR, epochs=EPOCHS,
                 batch_size=BS, patience=PATIENCE,
                 weight_decay=weight_decay,
                 time=current_time,
-                norm_factor=sum_train_weights,
+                train_weights_dict=train_weights_dict,
+                val_weights_dict=test_weights_dict
             )
 
             # Finish the wandb run
