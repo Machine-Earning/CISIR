@@ -3125,6 +3125,56 @@ def evaluate_lag_error(
     return threshold_lag, shift_lag, avg_lag
 
 
+def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
+            lambda_factor: float,
+            train_weight_dict: dict = None,
+            val_weight_dict: dict = None) -> tf.Tensor:
+    """
+    Custom loss function combining Mean Squared Error (MSE) and Pearson Correlation Coefficient (PCC)
+    with re-weighting based on label values. The final loss is a combination of weighted MSE and
+    weighted PCC with a scaling factor lambda_factor.
+
+    Args:
+    - y_true (tf.Tensor): Ground truth labels.
+    - y_pred (tf.Tensor): Predicted labels.
+    - lambda_factor (float): Scaling factor for the PCC portion of the loss.
+    - train_weight_dict (dict, optional): Dictionary mapping label values to weights for training samples.
+    - val_weight_dict (dict, optional): Dictionary mapping label values to weights for validation samples.
+
+    Returns:
+    - tf.Tensor: The calculated loss value.
+    """
+    # Determine if the current mode is training or validation/testing
+    is_training = K.learning_phase()
+
+    # Select the appropriate weight dictionary based on the mode
+    weight_dict = train_weight_dict if is_training else val_weight_dict
+
+    # Create a weight tensor based on the labels
+    if weight_dict is not None:
+        sample_weights = tf.map_fn(lambda x: weight_dict.get(x.numpy(), 1.0), y_true, dtype=tf.float32)
+    else:
+        sample_weights = tf.ones_like(y_true, dtype=tf.float32)
+
+    # Compute the Mean Squared Error (MSE)
+    mse = tf.reduce_mean(sample_weights * tf.square(y_true - y_pred))
+
+    # Compute the Pearson Correlation Coefficient (PCC)
+    y_true_centered = y_true - tf.reduce_mean(y_true)
+    y_pred_centered = y_pred - tf.reduce_mean(y_pred)
+
+    cov = tf.reduce_sum(sample_weights * y_true_centered * y_pred_centered)
+    std_y_true = tf.sqrt(tf.reduce_sum(sample_weights * tf.square(y_true_centered)))
+    std_y_pred = tf.sqrt(tf.reduce_sum(sample_weights * tf.square(y_pred_centered)))
+
+    pcc = cov / (std_y_true * std_y_pred + K.epsilon())
+
+    # Combine the weighted MSE and weighted PCC with lambda_factor
+    loss = mse + lambda_factor * (1.0 - pcc)
+
+    return loss
+
+
 def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3, norm_factor: float = 1) -> Callable[[tf.Tensor, tf.Tensor], tf.Tensor]:
     """
     Given the key, return the appropriate loss function for the model.

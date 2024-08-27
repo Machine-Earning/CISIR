@@ -11,7 +11,7 @@ from wandb.integration.keras import WandbCallback
 import numpy as np
 
 from modules.evaluate.utils import plot_tsne_delta, plot_repr_corr_dist
-from modules.training.DenseReweights import exDenseReweights
+from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.training.cme_modeling import ModelBuilder
 from modules.training.ts_modeling import (
     build_dataset,
@@ -19,7 +19,7 @@ from modules.training.ts_modeling import (
     evaluate_mae,
     evaluate_pcc,
     process_sep_events,
-    get_loss,
+    mse_pcc,
     filter_ds,
     stratified_split,
     plot_error_hist,
@@ -62,7 +62,7 @@ def main():
                                 outputs_to_use = OUTPUTS_TO_USE
                                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
-                                lambda_ = 3.3 # LAMBDA
+                                lambda_ = 3.3  # LAMBDA
                                 # Construct the title
                                 title = f'MLP_S2min_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_rho{rho:.2f}_lambda{lambda_}_nonorm'
 
@@ -92,7 +92,7 @@ def main():
                                 proj_hiddens = PROJ_HIDDENS
                                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                                 loss_key = LOSS_KEY
-                                
+
                                 target_change = ('delta_p' in outputs_to_use)
                                 alpha_rw = alpha
                                 bandwidth = BANDWIDTH
@@ -208,31 +208,29 @@ def main():
 
                                 print(f'rebalancing the training set...')
                                 min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
-                                y_train_weights = exDenseReweights(
+                                train_weights_dict = exDenseReweightsD(
                                     X_train, delta_train,
                                     alpha=alpha_rw, bw=bandwidth,
                                     min_norm_weight=min_norm_weight,
-                                    debug=False).reweights
+                                    debug=False).label_reweight_dict
                                 print(f'training set rebalanced.')
-                                sum_train_weights = np.sum(y_train_weights)
-                                norm_factor = sum_train_weights
 
                                 print(f'rebalancing the subtraining set...')
                                 min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
-                                y_subtrain_weights = exDenseReweights(
+                                subtrain_weights_dict = exDenseReweightsD(
                                     X_subtrain, delta_subtrain,
                                     alpha=alpha_rw, bw=bandwidth,
                                     min_norm_weight=min_norm_weight,
-                                    debug=False).reweights
+                                    debug=False).label_reweight_dict
                                 print(f'subtraining set rebalanced.')
 
                                 print(f'rebalancing the validation set...')
                                 min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
-                                y_val_weights = exDenseReweights(
+                                val_weights_dict = exDenseReweightsD(
                                     X_val, delta_val,
                                     alpha=1, bw=bandwidth,
                                     min_norm_weight=min_norm_weight,
-                                    debug=False).reweights
+                                    debug=False).label_reweight_dict
                                 print(f'validation set rebalanced.')
 
                                 # get the number of features
@@ -314,21 +312,21 @@ def main():
                                         beta_1=momentum_beta1
                                     ),
                                     loss={
-                                        'forecast_head': get_loss(
-                                            loss_key,
+                                        'forecast_head': lambda y_true, y_pred: mse_pcc(
+                                            y_true, y_pred,
                                             lambda_factor=lambda_,
-                                            norm_factor=norm_factor
+                                            train_weight_dict=subtrain_weights_dict,
+                                            val_weight_dict=val_weights_dict
                                         )
-                                    },
+                                    }
                                 )
 
                                 # Train the model with the callback
                                 history = model_sep.fit(
                                     X_subtrain,
                                     {'forecast_head': y_subtrain},
-                                    sample_weight=y_subtrain_weights,
                                     epochs=epochs, batch_size=batch_size,
-                                    validation_data=(X_val, {'forecast_head': y_val}, y_val_weights),
+                                    validation_data=(X_val, {'forecast_head': y_val}),
                                     callbacks=[
                                         early_stopping,
                                         reduce_lr_on_plateau,  # Reduce learning rate on plateau
@@ -377,10 +375,10 @@ def main():
                                         beta_1=momentum_beta1
                                     ),
                                     loss={
-                                        'forecast_head': get_loss(
-                                            loss_key,
+                                        'forecast_head': lambda y_true, y_pred: mse_pcc(
+                                            y_true, y_pred,
                                             lambda_factor=lambda_,
-                                            norm_factor=norm_factor
+                                            train_weight_dict=train_weights_dict,
                                         )
                                     },
                                 )  # Compile the model just like before
@@ -389,7 +387,6 @@ def main():
                                 final_model_sep.fit(
                                     X_train,
                                     {'forecast_head': y_train},
-                                    sample_weight=y_train_weights,
                                     epochs=optimal_epochs,
                                     batch_size=batch_size,
                                     callbacks=[
@@ -535,14 +532,6 @@ def main():
                                     title=title,
                                     prefix='training')
                                 wandb.log({"training_error_hist": wandb.Image(filename)})
-
-                                filename = plot_error_hist(
-                                    final_model_sep,
-                                    X_train, y_train,
-                                    sample_weights=y_train_weights,
-                                    title=title,
-                                    prefix='training_weighted')
-                                wandb.log({"training_weighted_error_hist": wandb.Image(filename)})
 
                                 filename = plot_error_hist(
                                     final_model_sep,
