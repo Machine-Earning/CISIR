@@ -3142,7 +3142,7 @@ def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
     - val_weight_dict (dict, optional): Dictionary mapping label values to weights for validation samples.
 
     Returns:
-    - tf.Tensor: The calculated loss value.
+    - tf.Tensor: The calculated loss value as a single scalar.
     """
     # Determine if the current mode is training or validation/testing
     is_training = K.learning_phase()
@@ -3152,26 +3152,38 @@ def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
 
     # Create a weight tensor based on the labels
     if weight_dict is not None:
-        sample_weights = tf.map_fn(lambda x: weight_dict.get(x.numpy(), 1.0), y_true, dtype=tf.float32)
+        # Convert the dictionary keys to strings and values to tensors
+        keys = tf.constant(list(map(str, weight_dict.keys())), dtype=tf.string)
+        values = tf.constant(list(weight_dict.values()), dtype=tf.float32)
+
+        # Create a lookup table
+        table = tf.lookup.StaticHashTable(
+            initializer=tf.lookup.KeyValueTensorInitializer(keys, values),
+            default_value=1.0  # Default weight if a key is not found
+        )
+
+        # Lookup the weights for each y_true value
+        weights = table.lookup(tf.as_string(tf.reshape(y_true, [-1])))
     else:
-        sample_weights = tf.ones_like(y_true, dtype=tf.float32)
+        weights = tf.ones_like(y_true, dtype=tf.float32)
 
     # Compute the Mean Squared Error (MSE)
-    mse = tf.reduce_mean(sample_weights * tf.square(y_true - y_pred))
+    mse = tf.reduce_mean(weights * tf.square(y_true - y_pred))
 
     # Compute the Pearson Correlation Coefficient (PCC)
     y_true_centered = y_true - tf.reduce_mean(y_true)
     y_pred_centered = y_pred - tf.reduce_mean(y_pred)
 
-    cov = tf.reduce_sum(sample_weights * y_true_centered * y_pred_centered)
-    std_y_true = tf.sqrt(tf.reduce_sum(sample_weights * tf.square(y_true_centered)))
-    std_y_pred = tf.sqrt(tf.reduce_sum(sample_weights * tf.square(y_pred_centered)))
+    cov = tf.reduce_sum(weights * y_true_centered * y_pred_centered)
+    std_y_true = tf.sqrt(tf.reduce_sum(weights * tf.square(y_true_centered)))
+    std_y_pred = tf.sqrt(tf.reduce_sum(weights * tf.square(y_pred_centered)))
 
     pcc = cov / (std_y_true * std_y_pred + K.epsilon())
 
     # Combine the weighted MSE and weighted PCC with lambda_factor
     loss = mse + lambda_factor * (1.0 - pcc)
 
+    # Return the final loss as a single scalar value
     return loss
 
 
