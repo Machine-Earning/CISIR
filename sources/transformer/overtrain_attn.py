@@ -89,7 +89,7 @@ def main():
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                             # Initialize wandb
-                            wandb.init(project="nasa-ts-delta-v7-nl", name=experiment_name, config={
+                            wandb.init(project="overtrain_attn", name=experiment_name, config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
                                 "patience": patience,
