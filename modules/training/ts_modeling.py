@@ -3186,6 +3186,61 @@ def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
     # Return the final loss as a single scalar value
     return loss
 
+def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,
+             train_weight_dict: dict = None,
+             val_weight_dict: dict = None) -> tf.Tensor:
+    """
+    Custom loss function based on the Pearson Correlation Coefficient (PCC)
+    with re-weighting based on label values. The final loss is 1 - PCC.
+
+    Args:
+    - y_true (tf.Tensor): Ground truth labels.
+    - y_pred (tf.Tensor): Predicted labels.
+    - train_weight_dict (dict, optional): Dictionary mapping label values to weights for training samples.
+    - val_weight_dict (dict, optional): Dictionary mapping label values to weights for validation samples.
+
+    Returns:
+    - tf.Tensor: The calculated loss value as a single scalar.
+    """
+    # Determine if the current mode is training or validation/testing
+    is_training = K.learning_phase()
+
+    # Select the appropriate weight dictionary based on the mode
+    weight_dict = train_weight_dict if is_training else val_weight_dict
+
+    # Create a weight tensor based on the labels
+    if weight_dict is not None:
+        # Convert the dictionary keys to strings and values to tensors
+        keys = tf.constant(list(map(str, weight_dict.keys())), dtype=tf.string)
+        values = tf.constant(list(weight_dict.values()), dtype=tf.float32)
+
+        # Create a lookup table
+        table = tf.lookup.StaticHashTable(
+            initializer=tf.lookup.KeyValueTensorInitializer(keys, values),
+            default_value=1.0  # Default weight if a key is not found
+        )
+
+        # Lookup the weights for each y_true value
+        weights = table.lookup(tf.as_string(tf.reshape(y_true, [-1])))
+    else:
+        weights = tf.ones_like(y_true, dtype=tf.float32)
+
+    # Compute the Pearson Correlation Coefficient (PCC)
+    y_true_centered = y_true - tf.reduce_mean(y_true)
+    y_pred_centered = y_pred - tf.reduce_mean(y_pred)
+
+    cov = tf.reduce_sum(weights * y_true_centered * y_pred_centered)
+    std_y_true = tf.sqrt(tf.reduce_sum(weights * tf.square(y_true_centered)))
+    std_y_pred = tf.sqrt(tf.reduce_sum(weights * tf.square(y_pred_centered)))
+
+    pcc = cov / (std_y_true * std_y_pred + K.epsilon())
+
+    # The loss is 1 - PCC
+    loss = 1.0 - pcc
+
+    # Return the final loss as a single scalar value
+    return loss
+
 
 def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3, norm_factor: float = 1) -> Callable[[tf.Tensor, tf.Tensor], tf.Tensor]:
     """
