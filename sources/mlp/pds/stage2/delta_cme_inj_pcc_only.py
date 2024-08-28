@@ -19,7 +19,7 @@ from modules.training.ts_modeling import (
     evaluate_mae,
     evaluate_pcc,
     process_sep_events,
-    mse_pcc,
+    pcc_loss,
     filter_ds,
     stratified_split,
     plot_error_hist,
@@ -54,7 +54,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha in [0.5]:
+                    for alpha in [1]:
                         for freeze in [False]:
                             # for rho in [0.3, 0.21]:
                             for rho in [0]:

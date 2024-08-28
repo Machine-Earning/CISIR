@@ -53,7 +53,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha in [0.5]:
+                    for alpha in [0]:
                         for freeze in [False]:
                             # for rho in [0.3, 0.21]:
                             for rho in [0]:
@@ -61,9 +61,9 @@ def main():
                                 outputs_to_use = OUTPUTS_TO_USE
                                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
-                                lambda_ = 6  # LAMBDA
+                                lambda_ = 3 # LAMBDA
                                 # Construct the title
-                                title = f'MLP_S2min_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_rho{rho:.2f}_lambda{lambda_}'
+                                title = f'MLP_S2min_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_rho{rho:.2f}_none'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -90,7 +90,7 @@ def main():
                                 hiddens = MLP_HIDDENS
                                 proj_hiddens = PROJ_HIDDENS
                                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-                                loss_key = LOSS_KEY
+                                loss_key = 'pcc'
 
                                 target_change = ('delta_p' in outputs_to_use)
                                 alpha_rw = alpha
@@ -111,7 +111,7 @@ def main():
                                 mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                                 # Initialize wandb
-                                wandb.init(project="nasa-ts-delta-v7-inv", name=experiment_name, config={
+                                wandb.init(project="nasa-ts-delta-v7-inv-pcc", name=experiment_name, config={
                                     "inputs_to_use": inputs_to_use,
                                     "add_slope": add_slope,
                                     "patience": patience,
@@ -334,6 +334,8 @@ def main():
                                 #     verbose=VERBOSE
                                 # )
 
+                                print(f'train weight dict: {train_weights_dict}')
+
                                 # Determine the optimal number of epochs from the fit history
                                 optimal_epochs = int(3.5e3)  # np.argmin(history.history[ES_CB_MONITOR]) + 1
 
@@ -377,7 +379,8 @@ def main():
                                         'forecast_head': lambda y_true, y_pred: pcc_loss(
                                             y_true, y_pred,
                                             # lambda_factor=lambda_,
-                                            train_weight_dict=train_weights_dict,
+                                            # train_weight_dict=train_weights_dict,
+                                            train_weight_dict=None,
                                         )
                                     },
                                 )  # Compile the model just like before
