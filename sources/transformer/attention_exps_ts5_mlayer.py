@@ -11,7 +11,6 @@ from wandb.integration.keras import WandbCallback
 
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
-from modules.training.DenseReweights import exDenseReweights
 from modules.training.ts_modeling import (
     evaluate_mae, process_sep_events, evaluate_pcc, build_dataset, mse_pcc)
 from modules.training.ts_modeling import set_seed
@@ -19,7 +18,7 @@ from modules.training.ts_modeling import set_seed
 from sources.transformer.modules import *
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 devices = tf.config.list_physical_devices('GPU')
 print(f'devices: {devices}')
@@ -29,21 +28,21 @@ set_seed(SEEDS[0])  # Set seed for reproducibility
 root_dir = DS_PATH
 inputs_to_use = INPUTS_TO_USE[0]
 outputs_to_use = OUTPUTS_TO_USE
-cme_speed_threshold = -1  # CME_SPEED_THRESHOLD[0]
+cme_speed_threshold = CME_SPEED_THRESHOLD[0]
 using_cme = True if cme_speed_threshold >= 0 else False
 add_slope = False
 hiddens = [128 for _ in range(7)]
 # blocks = [128, 64, 128]
-blocks = []
+blocks = [128, 128, 128]
 
 a = 1
-LR = 3e-3
+LR = 3e-4
 EPOCHS = int(1e4)
-BS = 4096
+BS = 1024
 PATIENCE = int(3e3)
 bandwidth = BANDWIDTH
 residual = True
-skipped_layers = 2
+skipped_layers = 1
 weight_decay = 1e-8
 lambda_ = 0.05
 
@@ -318,8 +317,8 @@ def train_and_print_results(
             wandb.log({f'training_{log_title}': wandb.Image(filename)})
 
 
-for alpha_val in [0.75]:
-    for alpha in [0.25]:
+for alpha_val in [1]:
+    for alpha in [0.5]:
         for rho in [0]:
             # for alpha in np.arange(1.1, 1.5, 0.1):
             # for alpha in np.arange(0, 1.1, 0.1):
