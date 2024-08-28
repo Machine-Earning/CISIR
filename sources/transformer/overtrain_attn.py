@@ -1,17 +1,12 @@
 import os
 from datetime import datetime
 
-from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
-
-# Set the environment variable for CUDA (in case it is necessary)
-# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
-
 import wandb
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
-import numpy as np
 
+from modules.shared.globals import *
 from modules.training.DenseReweights import exDenseReweights
 from modules.training.ts_modeling import (
     build_dataset,
@@ -21,11 +16,12 @@ from modules.training.ts_modeling import (
     get_loss,
     filter_ds,
     stratified_split,
-    plot_error_hist,
     set_seed)
-
-from modules.shared.globals import *
 from sources.transformer.modules import create_attentive_model
+
+
+# Set the environment variable for CUDA (in case it is necessary)
+# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 
 def main():
@@ -58,7 +54,7 @@ def main():
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
                             patience = PATIENCE  # higher patience
-                            learning_rate = START_LR  # og learning rate
+                            learning_rate = 1e-3  # og learning rate
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
@@ -68,14 +64,14 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=LR_CB_MIN_LR)
 
-                            weight_decay = 1e-8 #WEIGHT_DECAY  # higher weight decay
+                            weight_decay = 1e-8  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
                             hiddens = MLP_HIDDENS  # hidden layers
 
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-                            loss_key = 'mse' # LOSS_KEY
+                            loss_key = 'mse'  # LOSS_KEY
                             target_change = ('delta_p' in outputs_to_use)
                             alpha_rw = alpha
                             bandwidth = BANDWIDTH
@@ -83,9 +79,9 @@ def main():
                             output_dim = len(outputs_to_use)
                             dropout = DROPOUT
                             activation = ACTIVATION
-                            norm = None #NORM
+                            norm = None  # NORM
                             cme_speed_threshold = cme_speed_threshold
-                            residual = False #RESIDUAL
+                            residual = False  # RESIDUAL
                             skipped_layers = SKIPPED_LAYERS
                             N = N_FILTERED  # number of samples to keep outside the threshold
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
@@ -124,7 +120,7 @@ def main():
                                 'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
-                                'attm_hiddens': ATTM_HIDDENS,
+                                'attm_hiddens': BLOCKS_HIDDENS,
                                 'attn_hiddens': ATTN_HIDDENS
                             })
 
@@ -216,80 +212,78 @@ def main():
                             print(f'n_features: {n_features}')
 
                             # create the model
-                            model_sep = create_attentive_model(
-                                input_dim=n_features,
-                                output_dim=output_dim,
-                                hidden_blocks=ATTM_HIDDENS,
-                                attn_hidden_units=ATTN_HIDDENS,
-                                attn_hidden_activation='leaky_relu',
-                                attn_skipped_layers=skipped_layers,
-                                attn_residual=False,
-                                attn_dropout_rate=0,
-                                attn_norm=None,
-                                skipped_blocks=skipped_layers,
-                                repr_dim=repr_dim,
-                                dropout_rate=dropout,
-                                activation='leaky_relu',
-                                norm=norm,
-                                residual=residual,
-                                sam_rho=rho
-                            )
-                            model_sep.summary()
-
-                            # Define the EarlyStopping callback
-                            early_stopping = EarlyStopping(
-                                monitor=ES_CB_MONITOR,
-                                patience=patience,
-                                verbose=VERBOSE,
-                                restore_best_weights=ES_CB_RESTORE_WEIGHTS)
-
-                            # Compile the model with the specified learning rate
-                            model_sep.compile(
-                                optimizer=AdamW(
-                                    learning_rate=learning_rate,
-                                    weight_decay=weight_decay,
-                                    beta_1=momentum_beta1
-                                ),
-                                loss={'forecast_head': get_loss(loss_key)}
-                            )
-
-                            # Train the model with the callback
-                            history = model_sep.fit(
-                                X_subtrain,
-                                {'forecast_head': y_subtrain},
-                                sample_weight=y_subtrain_weights,
-                                epochs=epochs, batch_size=batch_size,
-                                validation_data=(X_val, {'forecast_head': y_val}, y_val_weights),
-                                callbacks=[
-                                    early_stopping,
-                                    reduce_lr_on_plateau,
-                                    WandbCallback(save_model=WANDB_SAVE_MODEL)
-                                ],
-                                verbose=VERBOSE
-                            )
-
-                            # Determine the optimal number of epochs from early stopping
-                            # optimal_epochs = early_stopping.best_epoch + 1  # Adjust for the offset
+                            # model_sep = create_attentive_model(
+                            #     input_dim=n_features,
+                            #     output_dim=output_dim,
+                            #     hidden_blocks=BLOCKS_HIDDENS,
+                            #     attn_hidden_units=ATTN_HIDDENS,
+                            #     attn_hidden_activation='leaky_relu',
+                            #     attn_skipped_layers=skipped_layers,
+                            #     attn_residual=False,
+                            #     attn_dropout_rate=0,
+                            #     attn_norm=None,
+                            #     skipped_blocks=skipped_layers,
+                            #     repr_dim=repr_dim,
+                            #     dropout_rate=dropout,
+                            #     activation='leaky_relu',
+                            #     norm=norm,
+                            #     residual=residual,
+                            #     sam_rho=rho
+                            # )
+                            # model_sep.summary()
+                            #
+                            # # Define the EarlyStopping callback
+                            # early_stopping = EarlyStopping(
+                            #     monitor=ES_CB_MONITOR,
+                            #     patience=patience,
+                            #     verbose=VERBOSE,
+                            #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
+                            #
+                            # # Compile the model with the specified learning rate
+                            # model_sep.compile(
+                            #     optimizer=AdamW(
+                            #         learning_rate=learning_rate,
+                            #         weight_decay=weight_decay,
+                            #         beta_1=momentum_beta1
+                            #     ),
+                            #     loss={'forecast_head': get_loss(loss_key)}
+                            # )
+                            #
+                            # # Train the model with the callback
+                            # history = model_sep.fit(
+                            #     X_subtrain,
+                            #     {'forecast_head': y_subtrain},
+                            #     sample_weight=y_subtrain_weights,
+                            #     epochs=epochs, batch_size=batch_size,
+                            #     validation_data=(X_val, {'forecast_head': y_val}, y_val_weights),
+                            #     callbacks=[
+                            #         early_stopping,
+                            #         reduce_lr_on_plateau,
+                            #         WandbCallback(save_model=WANDB_SAVE_MODEL)
+                            #     ],
+                            #     verbose=VERBOSE
+                            # )
 
                             # Determine the optimal number of epochs from the fit history
-                            optimal_epochs = np.argmin(
-                                history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
+                            # optimal_epochs = np.argmin(
+                            #     history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
+                            optimal_epochs = int(1e5)
 
-                            final_model_sep =  create_attentive_model(
+                            final_model_sep = create_attentive_model(
                                 input_dim=n_features,
                                 output_dim=output_dim,
-                                hidden_blocks=ATTM_HIDDENS,
+                                hidden_blocks=BLOCKS_HIDDENS,
                                 attn_hidden_units=ATTN_HIDDENS,
                                 attn_hidden_activation='leaky_relu',
-                                attn_skipped_layers=skipped_layers,
+                                attn_skipped_layers=0,
                                 attn_residual=False,
                                 attn_dropout_rate=0,
                                 attn_norm=None,
-                                skipped_blocks=skipped_layers,
+                                skipped_blocks=1,
                                 repr_dim=repr_dim,
-                                dropout_rate=dropout,
+                                dropout_rate=0,
                                 activation='leaky_relu',
-                                norm=norm,
+                                norm=None,
                                 residual=residual,
                                 sam_rho=rho
                             )
@@ -323,22 +317,22 @@ def main():
                             print(f"Model weights are saved in final_model_weights_{experiment_name}_reg.h5")
 
                             # evaluate the model error on test set
-                            error_mae = evaluate_mae(final_model_sep, X_test, y_test)
+                            error_mae = evaluate_mae(final_model_sep, X_test, y_test, use_dict=True)
                             print(f'mae error: {error_mae}')
                             wandb.log({"mae": error_mae})
 
                             # evaluate the model error on training set
-                            error_mae_train = evaluate_mae(final_model_sep, X_train, y_train)
+                            error_mae_train = evaluate_mae(final_model_sep, X_train, y_train, use_dict=True)
                             print(f'mae error train: {error_mae_train}')
                             wandb.log({"train_mae": error_mae_train})
 
                             # evaluate the model correlation on test set
-                            error_pcc = evaluate_pcc(final_model_sep, X_test, y_test)
+                            error_pcc = evaluate_pcc(final_model_sep, X_test, y_test, use_dict=True)
                             print(f'pcc error: {error_pcc}')
                             wandb.log({"pcc": error_pcc})
 
                             # evaluate the model correlation on training set
-                            error_pcc_train = evaluate_pcc(final_model_sep, X_train, y_train)
+                            error_pcc_train = evaluate_pcc(final_model_sep, X_train, y_train, use_dict=True)
                             print(f'pcc error train: {error_pcc_train}')
                             wandb.log({"train_pcc": error_pcc_train})
 
@@ -346,25 +340,25 @@ def main():
                             above_threshold = mae_plus_threshold
                             # evaluate the model error for rare samples on test set
                             error_mae_cond = evaluate_mae(
-                                final_model_sep, X_test, y_test, above_threshold=above_threshold)
+                                final_model_sep, X_test, y_test, above_threshold=above_threshold, use_dict=True)
                             print(f'mae error delta >= {above_threshold} test: {error_mae_cond}')
                             wandb.log({"mae+": error_mae_cond})
 
                             # evaluate the model error for rare samples on training set
                             error_mae_cond_train = evaluate_mae(
-                                final_model_sep, X_train, y_train, above_threshold=above_threshold)
+                                final_model_sep, X_train, y_train, above_threshold=above_threshold, use_dict=True)
                             print(f'mae error delta >= {above_threshold} train: {error_mae_cond_train}')
                             wandb.log({"train_mae+": error_mae_cond_train})
 
                             # evaluate the model correlation for rare samples on test set
                             error_pcc_cond = evaluate_pcc(
-                                final_model_sep, X_test, y_test, above_threshold=above_threshold)
+                                final_model_sep, X_test, y_test, above_threshold=above_threshold, use_dict=True)
                             print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
                             wandb.log({"pcc+": error_pcc_cond})
 
                             # evaluate the model correlation for rare samples on training set
                             error_pcc_cond_train = evaluate_pcc(
-                                final_model_sep, X_train, y_train, above_threshold=above_threshold)
+                                final_model_sep, X_train, y_train, above_threshold=above_threshold, use_dict=True)
                             print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
                             wandb.log({"train_pcc+": error_pcc_cond_train})
 
@@ -379,7 +373,8 @@ def main():
                                 outputs_to_use=outputs_to_use,
                                 show_avsp=True,
                                 using_cme=True,
-                                cme_speed_threshold=cme_speed_threshold)
+                                cme_speed_threshold=cme_speed_threshold,
+                                use_dict=True)
 
                             # Log the plot to wandb
                             for filename in filenames:
@@ -398,80 +393,71 @@ def main():
                                 show_avsp=True,
                                 prefix='training',
                                 using_cme=True,
-                                cme_speed_threshold=cme_speed_threshold)
+                                cme_speed_threshold=cme_speed_threshold,
+                                use_dict=True)
 
                             # Log the plot to wandb
                             for filename in filenames:
                                 log_title = os.path.basename(filename)
                                 wandb.log({f'training_{log_title}': wandb.Image(filename)})
 
-
-                            # Evaluate the model correlation with colored
-                            file_path = plot_repr_corr_dist(
-                                final_model_sep,
-                                X_train_filtered, y_train_filtered,
-                                title + "_training",
-                                model_type='features_reg'
-                            )
-                            wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
-                            print('file_path: ' + file_path)
-
-                            file_path = plot_repr_corr_dist(
-                                final_model_sep,
-                                X_test_filtered, y_test_filtered,
-                                title + "_test",
-                                model_type='features_reg'
-                            )
-                            wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
-                            print('file_path: ' + file_path)
-
-                            # Log t-SNE plot
-                            # Log the training t-SNE plot to wandb
-                            stage1_file_path = plot_tsne_delta(
-                                final_model_sep,
-                                X_train_filtered, y_train_filtered, title,
-                                'stage2_training',
-                                model_type='features_reg',
-                                save_tag=current_time, seed=seed)
-                            wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
-                            print('stage1_file_path: ' + stage1_file_path)
-
-                            # Log the testing t-SNE plot to wandb
-                            stage1_file_path = plot_tsne_delta(
-                                final_model_sep,
-                                X_test_filtered, y_test_filtered, title,
-                                'stage2_testing',
-                                model_type='features_reg',
-                                save_tag=current_time, seed=seed)
-                            wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
-                            print('stage1_file_path: ' + stage1_file_path)
-
-                            # Plot the error histograms
-                            filename = plot_error_hist(
-                                final_model_sep,
-                                X_train, y_train,
-                                sample_weights=None,
-                                title=title,
-                                prefix='training')
-                            wandb.log({"training_error_hist": wandb.Image(filename)})
-
-                            # Plot the error weighted histograms
-                            filename = plot_error_hist(
-                                final_model_sep,
-                                X_train, y_train,
-                                sample_weights=y_train_weights,
-                                title=title,
-                                prefix='training_weighted')
-                            wandb.log({"training_weighted_error_hist": wandb.Image(filename)})
-
-                            # Plot the error histograms on the testing set
-                            filename = plot_error_hist(
-                                final_model_sep,
-                                X_test, y_test,
-                                sample_weights=None,
-                                title=title,
-                                prefix='testing')
-                            wandb.log({"testing_error_hist": wandb.Image(filename)})
+                            # # Evaluate the model correlation with colored
+                            # file_path = plot_repr_corr_dist(
+                            #     final_model_sep,
+                            #     X_train_filtered, y_train_filtered,
+                            #     title + "_training",
+                            #     model_type='features_reg'
+                            # )
+                            # wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
+                            # print('file_path: ' + file_path)
+                            #
+                            # file_path = plot_repr_corr_dist(
+                            #     final_model_sep,
+                            #     X_test_filtered, y_test_filtered,
+                            #     title + "_test",
+                            #     model_type='features_reg'
+                            # )
+                            # wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
+                            # print('file_path: ' + file_path)
+                            #
+                            # # Log t-SNE plot
+                            # # Log the training t-SNE plot to wandb
+                            # stage1_file_path = plot_tsne_delta(
+                            #     final_model_sep,
+                            #     X_train_filtered, y_train_filtered, title,
+                            #     'stage2_training',
+                            #     model_type='features_reg',
+                            #     save_tag=current_time, seed=seed)
+                            # wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
+                            # print('stage1_file_path: ' + stage1_file_path)
+                            #
+                            # # Log the testing t-SNE plot to wandb
+                            # stage1_file_path = plot_tsne_delta(
+                            #     final_model_sep,
+                            #     X_test_filtered, y_test_filtered, title,
+                            #     'stage2_testing',
+                            #     model_type='features_reg',
+                            #     save_tag=current_time, seed=seed)
+                            # wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
+                            # print('stage1_file_path: ' + stage1_file_path)
+                            #
+                            # # Plot the error histograms
+                            # filename = plot_error_hist(
+                            #     final_model_sep,
+                            #     X_train, y_train,
+                            #     sample_weights=None,
+                            #     title=title,
+                            #     prefix='training')
+                            # wandb.log({"training_error_hist": wandb.Image(filename)})
+                            #
+                            # # Plot the error histograms on the testing set
+                            # filename = plot_error_hist(
+                            #     final_model_sep,
+                            #     X_test, y_test,
+                            #     sample_weights=None,
+                            #     title=title,
+                            #     prefix='testing')
+                            # wandb.log({"testing_error_hist": wandb.Image(filename)})
 
                             # Finish the wandb run
                             wandb.finish()

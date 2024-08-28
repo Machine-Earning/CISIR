@@ -201,97 +201,97 @@ class exDenseReweightsD:
             print('reweights: ', self.reweights[:12])
             self.plot_density_kde_reweights(tag)
 
-    def plot_density_kde_reweights(self, tag: Optional[str] = None):
-        """
-        Plot the label density, KDE, and reweights for the y_train dataset.
-        """
-        # Points where you want to find the density
-        points_to_evaluate = [self.min_y, self.max_y, self.max_y - 1, 1.4]
-        # Get the density at these points
-        density_values = get_density_at_points(self.kde, points_to_evaluate)
-        # Print the density values
-        print(f"Density at min_y background ({self.min_y}): {density_values[0]}")
-        print(f"Density at max_y Sep ({self.max_y}): {density_values[1]}")
-        print(f"Density at max_y lower Sep ({self.max_y - 1}): {density_values[2]}")
-        print(f"Density at y=1.4 elevated: {density_values[3]}")
-        # print the probability of background, elevated, and seps
-        event_probs = calc_event_probs(self.y_train, self.kde)
-        print(f'event probabilities: {event_probs}')
-        kde_ratio = event_probs["background"] / event_probs["sep"]
-        print(f'KDE background to SEP ratio: {kde_ratio}')
-        # get background to sep ratio in frequency
-        background_threshold: float = np.log(10 / np.exp(2))
-        sep_threshold: float = np.log(10)
-        background_count = np.sum(self.y_train <= background_threshold)
-        sep_count = np.sum(self.y_train > sep_threshold)
-        # Avoid division by zero
-        if sep_count == 0:
-            return float('inf')  # Return infinity if there are no SEP events
-        freq_ratio = background_count / sep_count
-        print(f'Frequency background to SEP ratio: {freq_ratio}')
-
-        # Compute KDE values at the sample y values
-        kde_values_samples = self.kde.evaluate(self.y_train)
-        # Get reweights for the sample y values
-        reweights_samples = self.normalized_reweight(self.y_train, self.alpha)
-
-        fig, axs = plt.subplots(4, 1, figsize=(12, 16))
-
-        # Formatter for two decimal places
-        formatter = FormatStrFormatter('%.2f')
-
-        # Filter for positive ln(Intensity)
-        positive_mask = self.y_train > 0
-        y_train_positive = self.y_train[positive_mask]
-        kde_values_samples_positive = kde_values_samples[positive_mask]
-        reweights_samples_positive = reweights_samples[positive_mask]
-
-        # Plot for KDE with all y values
-        axs[0].grid(True, which="both", ls="--", c='#dddddd', zorder=0)
-        axs[0].scatter(self.y_train, kde_values_samples, label='KDE', color='green', alpha=0.7, s=10, zorder=5)
-        axs[0].xaxis.set_major_formatter(formatter)
-        axs[0].set_xticks(np.linspace(min(self.y_train), max(self.y_train), 10))
-        axs[0].set_xlabel('ln(Intensity)')
-        axs[0].set_ylabel('KDE')
-        axs[0].legend()
-        axs[0].set_title(f'KDE for all y values, kde factor {self.kde.factor}')
-
-        # Plot for KDE with positive ln(Intensity)
-        axs[1].grid(True, which="both", ls="--", c='#dddddd', zorder=0)
-        axs[1].scatter(y_train_positive, kde_values_samples_positive, label='KDE', color='green', alpha=0.7, s=10,
-                       zorder=5)
-        axs[1].xaxis.set_major_formatter(formatter)
-        axs[1].set_xticks(np.linspace(min(y_train_positive), max(y_train_positive), 10))
-        axs[1].set_xlabel('ln(Intensity)')
-        axs[1].set_ylabel('KDE')
-        axs[1].legend()
-        axs[1].set_title('KDE for positive ln(Intensity)')
-
-        # Plot for Reweights with all y values
-        axs[2].grid(True, which="both", ls="--", c='#dddddd', zorder=0)
-        axs[2].scatter(self.y_train, reweights_samples, label='Reweights', color='red', alpha=0.7, s=10, zorder=5)
-        axs[2].xaxis.set_major_formatter(formatter)
-        axs[2].set_xticks(np.linspace(min(self.y_train), max(self.y_train), 10))
-        axs[2].set_xlabel('ln(Intensity)')
-        axs[2].set_ylabel('Reweights')
-        axs[2].legend()
-        axs[2].set_title('Reweights for all y values')
-
-        # Plot for Reweights with positive ln(Intensity)
-        axs[3].grid(True, which="both", ls="--", c='#dddddd', zorder=0)
-        axs[3].scatter(y_train_positive, reweights_samples_positive, label='Reweights', color='red', alpha=0.7,
-                       s=10,
-                       zorder=5)
-        axs[3].xaxis.set_major_formatter(formatter)
-        axs[3].set_xticks(np.linspace(min(y_train_positive), max(y_train_positive), 10))
-        axs[3].set_xlabel('ln(Intensity)')
-        axs[3].set_ylabel('Reweights')
-        axs[3].legend()
-        axs[3].set_title('Reweights for positive ln(Intensity)')
-
-        plt.tight_layout()
-        plt.savefig(tag)
-        plt.close()
+    # def plot_density_kde_reweights(self, tag: Optional[str] = None):
+    #     """
+    #     Plot the label density, KDE, and reweights for the y_train dataset.
+    #     """
+    #     # Points where you want to find the density
+    #     points_to_evaluate = [self.min_y, self.max_y, self.max_y - 1, 1.4]
+    #     # Get the density at these points
+    #     density_values = get_density_at_points(self.kde, points_to_evaluate)
+    #     # Print the density values
+    #     print(f"Density at min_y background ({self.min_y}): {density_values[0]}")
+    #     print(f"Density at max_y Sep ({self.max_y}): {density_values[1]}")
+    #     print(f"Density at max_y lower Sep ({self.max_y - 1}): {density_values[2]}")
+    #     print(f"Density at y=1.4 elevated: {density_values[3]}")
+    #     # print the probability of background, elevated, and seps
+    #     event_probs = calc_event_probs(self.y_train, self.kde)
+    #     print(f'event probabilities: {event_probs}')
+    #     kde_ratio = event_probs["background"] / event_probs["sep"]
+    #     print(f'KDE background to SEP ratio: {kde_ratio}')
+    #     # get background to sep ratio in frequency
+    #     background_threshold: float = np.log(10 / np.exp(2))
+    #     sep_threshold: float = np.log(10)
+    #     background_count = np.sum(self.y_train <= background_threshold)
+    #     sep_count = np.sum(self.y_train > sep_threshold)
+    #     # Avoid division by zero
+    #     if sep_count == 0:
+    #         return float('inf')  # Return infinity if there are no SEP events
+    #     freq_ratio = background_count / sep_count
+    #     print(f'Frequency background to SEP ratio: {freq_ratio}')
+    #
+    #     # Compute KDE values at the sample y values
+    #     kde_values_samples = self.kde.evaluate(self.y_train)
+    #     # Get reweights for the sample y values
+    #     reweights_samples = self.normalized_reweight(self.y_train, self.alpha)
+    #
+    #     fig, axs = plt.subplots(4, 1, figsize=(12, 16))
+    #
+    #     # Formatter for two decimal places
+    #     formatter = FormatStrFormatter('%.2f')
+    #
+    #     # Filter for positive ln(Intensity)
+    #     positive_mask = self.y_train > 0
+    #     y_train_positive = self.y_train[positive_mask]
+    #     kde_values_samples_positive = kde_values_samples[positive_mask]
+    #     reweights_samples_positive = reweights_samples[positive_mask]
+    #
+    #     # Plot for KDE with all y values
+    #     axs[0].grid(True, which="both", ls="--", c='#dddddd', zorder=0)
+    #     axs[0].scatter(self.y_train, kde_values_samples, label='KDE', color='green', alpha=0.7, s=10, zorder=5)
+    #     axs[0].xaxis.set_major_formatter(formatter)
+    #     axs[0].set_xticks(np.linspace(min(self.y_train), max(self.y_train), 10))
+    #     axs[0].set_xlabel('ln(Intensity)')
+    #     axs[0].set_ylabel('KDE')
+    #     axs[0].legend()
+    #     axs[0].set_title(f'KDE for all y values, kde factor {self.kde.factor}')
+    #
+    #     # Plot for KDE with positive ln(Intensity)
+    #     axs[1].grid(True, which="both", ls="--", c='#dddddd', zorder=0)
+    #     axs[1].scatter(y_train_positive, kde_values_samples_positive, label='KDE', color='green', alpha=0.7, s=10,
+    #                    zorder=5)
+    #     axs[1].xaxis.set_major_formatter(formatter)
+    #     axs[1].set_xticks(np.linspace(min(y_train_positive), max(y_train_positive), 10))
+    #     axs[1].set_xlabel('ln(Intensity)')
+    #     axs[1].set_ylabel('KDE')
+    #     axs[1].legend()
+    #     axs[1].set_title('KDE for positive ln(Intensity)')
+    #
+    #     # Plot for Reweights with all y values
+    #     axs[2].grid(True, which="both", ls="--", c='#dddddd', zorder=0)
+    #     axs[2].scatter(self.y_train, reweights_samples, label='Reweights', color='red', alpha=0.7, s=10, zorder=5)
+    #     axs[2].xaxis.set_major_formatter(formatter)
+    #     axs[2].set_xticks(np.linspace(min(self.y_train), max(self.y_train), 10))
+    #     axs[2].set_xlabel('ln(Intensity)')
+    #     axs[2].set_ylabel('Reweights')
+    #     axs[2].legend()
+    #     axs[2].set_title('Reweights for all y values')
+    #
+    #     # Plot for Reweights with positive ln(Intensity)
+    #     axs[3].grid(True, which="both", ls="--", c='#dddddd', zorder=0)
+    #     axs[3].scatter(y_train_positive, reweights_samples_positive, label='Reweights', color='red', alpha=0.7,
+    #                    s=10,
+    #                    zorder=5)
+    #     axs[3].xaxis.set_major_formatter(formatter)
+    #     axs[3].set_xticks(np.linspace(min(y_train_positive), max(y_train_positive), 10))
+    #     axs[3].set_xlabel('ln(Intensity)')
+    #     axs[3].set_ylabel('Reweights')
+    #     axs[3].legend()
+    #     axs[3].set_title('Reweights for positive ln(Intensity)')
+    #
+    #     plt.tight_layout()
+    #     plt.savefig(tag)
+    #     plt.close()
 
     def pdf(self, y: ndarray) -> ndarray:
         """

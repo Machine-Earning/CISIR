@@ -15,6 +15,7 @@ from scipy.signal import correlate, correlation_lags
 from scipy.stats import pearsonr
 from sklearn.metrics import mean_absolute_error
 from sklearn.utils import shuffle
+from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import Callback
 from tensorflow.keras.layers import (
     Input,
@@ -37,7 +38,7 @@ from tensorflow.keras.layers import (
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Optimizer
 from tensorflow.keras.regularizers import l2
-from tensorflow.keras import backend as K
+
 from modules.training.cme_modeling import NormalizeLayer
 from modules.training.sam_keras import SAMModel
 
@@ -3186,6 +3187,7 @@ def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
     # Return the final loss as a single scalar value
     return loss
 
+
 def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,
              train_weight_dict: dict = None,
              val_weight_dict: dict = None) -> tf.Tensor:
@@ -3242,7 +3244,8 @@ def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,
     return loss
 
 
-def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3, norm_factor: float = 1) -> Callable[[tf.Tensor, tf.Tensor], tf.Tensor]:
+def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3, norm_factor: float = 1) -> Callable[
+    [tf.Tensor, tf.Tensor], tf.Tensor]:
     """
     Given the key, return the appropriate loss function for the model.
 
@@ -3256,20 +3259,7 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3, norm_factor: flo
     """
 
     if loss_key == 'mse':
-        def mse(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-            """
-            Mean Squared Error (MSE) loss function.
-
-            Calculates the average of the squared differences between the true
-            and predicted values.
-
-            :param y_true: Ground truth values.
-            :param y_pred: Predicted values by the model.
-            :return: MSE loss value.
-            """
-            return tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)
-
-        return mse
+        return tf.keras.losses.MeanSquaredError()
 
     elif loss_key == 'mse_pcc_full':
         def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor, sample_weights: Optional[tf.Tensor] = None) -> tf.Tensor:
