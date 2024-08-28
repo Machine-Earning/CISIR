@@ -275,7 +275,7 @@ def main():
                                 hidden_blocks=BLOCKS_HIDDENS,
                                 attn_hidden_units=ATTN_HIDDENS,
                                 attn_hidden_activation='leaky_relu',
-                                attn_skipped_layers=1,
+                                attn_skipped_layers=2,
                                 attn_residual=False,
                                 attn_dropout_rate=0,
                                 attn_norm=None,
@@ -284,7 +284,7 @@ def main():
                                 dropout_rate=0,
                                 activation='leaky_relu',
                                 norm=None,
-                                residual=residual,
+                                residual=True,
                                 sam_rho=rho
                             )
                             # Recreate the model architecture
