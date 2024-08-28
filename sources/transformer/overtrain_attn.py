@@ -275,7 +275,7 @@ def main():
                                 hidden_blocks=BLOCKS_HIDDENS,
                                 attn_hidden_units=ATTN_HIDDENS,
                                 attn_hidden_activation='leaky_relu',
-                                attn_skipped_layers=0,
+                                attn_skipped_layers=1,
                                 attn_residual=False,
                                 attn_dropout_rate=0,
                                 attn_norm=None,
