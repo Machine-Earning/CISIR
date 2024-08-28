@@ -294,13 +294,13 @@ def main():
                                     weight_decay=weight_decay,
                                     beta_1=momentum_beta1
                                 ),
-                                loss={'forecast_head': get_loss(loss_key)}
+                                loss={'output': get_loss(loss_key)}
                             )
 
                             # Train on the full dataset
                             final_model_sep.fit(
                                 X_train,
-                                {'forecast_head': y_train},
+                                {'output': y_train},
                                 sample_weight=y_train_weights,
                                 epochs=optimal_epochs,
                                 batch_size=batch_size,
