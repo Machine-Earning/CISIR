@@ -120,7 +120,7 @@ def main():
                                 'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
-                                'attm_hiddens': BLOCKS_HIDDENS,
+                                'blocks_hiddens': BLOCKS_HIDDENS,
                                 'attn_hiddens': ATTN_HIDDENS
                             })
 
