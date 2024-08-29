@@ -248,16 +248,16 @@ def main():
                                     weight_decay=weight_decay,
                                     beta_1=momentum_beta1
                                 ),
-                                loss={'forecast_head': get_loss(loss_key)}
+                                loss={'output': get_loss(loss_key)}
                             )
 
                             # Train the model with the callback
                             history = model_sep.fit(
                                 X_subtrain,
-                                {'forecast_head': y_subtrain},
+                                {'output': y_subtrain},
                                 sample_weight=y_subtrain_weights,
                                 epochs=epochs, batch_size=batch_size,
-                                validation_data=(X_val, {'forecast_head': y_val}, y_val_weights),
+                                validation_data=(X_val, {'output': y_val}, y_val_weights),
                                 callbacks=[
                                     early_stopping,
                                     reduce_lr_on_plateau,
