@@ -3207,25 +3207,24 @@ def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,
     # Determine if the current mode is training or validation/testing
     is_training = K.learning_phase()
 
+    # print(f"Is training: {is_training}")
+
     # Select the appropriate weight dictionary based on the mode
     weight_dict = train_weight_dict if is_training else val_weight_dict
 
-    # Create a weight tensor based on the labels
     if weight_dict is not None:
-        # Convert the dictionary keys to strings and values to tensors
-        keys = tf.constant(list(map(str, weight_dict.keys())), dtype=tf.string)
-        values = tf.constant(list(weight_dict.values()), dtype=tf.float32)
+        # Initialize the weights tensor with ones
+        weights = tf.ones_like(y_true, dtype=tf.float32)
 
-        # Create a lookup table
-        table = tf.lookup.StaticHashTable(
-            initializer=tf.lookup.KeyValueTensorInitializer(keys, values),
-            default_value=1.0  # Default weight if a key is not found
-        )
-
-        # Lookup the weights for each y_true value
-        weights = table.lookup(tf.as_string(tf.reshape(y_true, [-1])))
+        # Apply the weights based on the values in y_true
+        for label, weight in weight_dict.items():
+            weights = tf.where(tf.equal(y_true, label), weight, weights)
     else:
         weights = tf.ones_like(y_true, dtype=tf.float32)
+
+    # print(f"Y_true: {y_true}")
+    # print(f"Y_pred: {y_pred}")
+    # print(f"Weights: {weights}")
 
     # Compute the Pearson Correlation Coefficient (PCC)
     y_true_centered = y_true - tf.reduce_mean(y_true)

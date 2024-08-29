@@ -2205,14 +2205,31 @@ class ModelBuilder:
         sample_weights = train_sample_weights if is_training else val_sample_weights
 
         # Apply sample weights if provided
-        if sample_weights is not None:
-            # Convert sample_weights keys to strings
-            keys = tf.constant(list(map(str, sample_weights.keys())), dtype=tf.string)
-            values = tf.constant(list(sample_weights.values()), dtype=tf.float32)
-            table = tf.lookup.StaticHashTable(tf.lookup.KeyValueTensorInitializer(keys, values), default_value=1.0)
+        # if sample_weights is not None:
+        #     # Convert sample_weights keys to strings
+        #     keys = tf.constant(list(map(str, sample_weights.keys())), dtype=tf.string)
+        #     values = tf.constant(list(sample_weights.values()), dtype=tf.float32)
+        #     table = tf.lookup.StaticHashTable(tf.lookup.KeyValueTensorInitializer(keys, values), default_value=1.0)
+        #
+        #     # Lookup the weights for each y_true value
+        #     weights = table.lookup(tf.as_string(tf.reshape(y_true, [-1])))
+        #     weights_matrix = weights[:, None] * weights[None, :]
+        #
+        #     # Cast weights_matrix to the same data type as z_diff_squared
+        #     weights_matrix = tf.cast(weights_matrix, dtype=z_diff_squared.dtype)
+        #
+        #     # Apply the weights to the pairwise loss
+        #     pairwise_loss *= weights_matrix
 
-            # Lookup the weights for each y_true value
-            weights = table.lookup(tf.as_string(tf.reshape(y_true, [-1])))
+        # Apply sample weights if provided
+        if sample_weights is not None:
+            # Initialize the weights tensor with ones
+            weights = tf.ones_like(y_true, dtype=tf.float32)
+
+            # Apply the weights based on the values in y_true
+            for label, weight in sample_weights.items():
+                weights = tf.where(tf.equal(y_true, label), weight, weights)
+
             weights_matrix = weights[:, None] * weights[None, :]
 
             # Cast weights_matrix to the same data type as z_diff_squared
@@ -2220,6 +2237,7 @@ class ModelBuilder:
 
             # Apply the weights to the pairwise loss
             pairwise_loss *= weights_matrix
+
 
         # Get the total error
         total_error = tf.reduce_sum(pairwise_loss)
