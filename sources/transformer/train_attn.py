@@ -44,7 +44,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}'
+                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}_bnorm'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -63,7 +63,7 @@ def main():
                             attn_dropout_rate = 0  # DROPOUT
                             dropout = 0  # DROPOUT
                             attn_norm = None  # NORM
-                            norm = None  # NORM
+                            norm = 'batch_norm'  # NORM
                             skipped_blocks = 1  # SKIPPED_LAYERS
                             residual = True  # RESIDUAL
 
