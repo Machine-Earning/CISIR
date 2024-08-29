@@ -53,7 +53,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha in [0]:
+                    for alpha in [0, 0.5, 1, 2]:
                         for freeze in [False]:
                             # for rho in [0.3, 0.21]:
                             for rho in [0]:
@@ -337,7 +337,7 @@ def main():
                                 print(f'train weight dict: {train_weights_dict}')
 
                                 # Determine the optimal number of epochs from the fit history
-                                optimal_epochs = int(3.5e3)  # np.argmin(history.history[ES_CB_MONITOR]) + 1
+                                optimal_epochs = int(0.5e3)  # np.argmin(history.history[ES_CB_MONITOR]) + 1
 
                                 final_model_sep_stage1 = create_mlp(
                                     input_dim=n_features,
