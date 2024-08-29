@@ -55,8 +55,17 @@ def main():
 
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
-                            patience = int(3.5e4) #PATIENCE  # higher patience
+                            patience = int(5e3)  # PATIENCE  # higher patience
                             learning_rate = 3e-4  # og learning rate
+                            activation = 'leaky_relu'  # ACTIVATION
+                            attn_skipped_layers = 1  # SKIPPED_LAYERS
+                            attn_residual = False  # RESIDUAL
+                            attn_dropout_rate = 0  # DROPOUT
+                            dropout = 0  # DROPOUT
+                            attn_norm = None  # NORM
+                            norm = None  # NORM
+                            skipped_blocks = 1  # SKIPPED_LAYERS
+                            residual = True  # RESIDUAL
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
@@ -64,27 +73,27 @@ def main():
                                 patience=LR_CB_PATIENCE,
                                 verbose=VERBOSE,
                                 min_delta=LR_CB_MIN_DELTA,
-                                min_lr=LR_CB_MIN_LR)
+                                min_lr=1e-5)  # LR_CB_MIN_LR)
 
-                            weight_decay = 1e-8 # WEIGHT_DECAY  # higher weight decay
+                            weight_decay = 1e-8  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
-                            hiddens = MLP_HIDDENS  # hidden layers
+                            # hiddens = MLP_HIDDENS  # hidden layers
 
-                            hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
+                            # hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             loss_key = 'mse'  # LOSS_KEY
                             target_change = ('delta_p' in outputs_to_use)
                             alpha_rw = alpha
                             bandwidth = BANDWIDTH
                             repr_dim = REPR_DIM
                             output_dim = len(outputs_to_use)
-                            dropout = DROPOUT
-                            activation = ACTIVATION
-                            norm = None  # NORM
+                            # dropout = DROPOUT
+                            # activation = ACTIVATION
+                            # norm = None  # NORM
                             cme_speed_threshold = cme_speed_threshold
-                            residual = False  # RESIDUAL
-                            skipped_layers = SKIPPED_LAYERS
+                            # residual = False  # RESIDUAL
+                            # skipped_layers = SKIPPED_LAYERS
                             N = N_FILTERED  # number of samples to keep outside the threshold
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
@@ -101,7 +110,7 @@ def main():
                                 "batch_size": batch_size,
                                 "epochs": epochs,
                                 # hidden in a more readable format  (wandb does not support lists)
-                                "hiddens": hiddens_str,
+                                # "hiddens": hiddens_str,
                                 "loss": loss_key,
                                 "target_change": target_change,
                                 "seed": seed,
@@ -118,7 +127,9 @@ def main():
                                 'architecture': 'attm',
                                 'cme_speed_threshold': cme_speed_threshold,
                                 'residual': residual,
-                                'skipped_layers': skipped_layers,
+                                'attn_residual': attn_residual,
+                                'skipped_blocks': skipped_blocks,
+                                'skipped_layers': attn_skipped_layers,
                                 'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
@@ -219,17 +230,17 @@ def main():
                                 output_dim=output_dim,
                                 hidden_blocks=BLOCKS_HIDDENS,
                                 attn_hidden_units=ATTN_HIDDENS,
-                                attn_hidden_activation='leaky_relu',
-                                attn_skipped_layers=1,
-                                attn_residual=False,
-                                attn_dropout_rate=0.1,
-                                attn_norm=None,
-                                skipped_blocks=1,
+                                attn_hidden_activation=activation,
+                                attn_skipped_layers=attn_skipped_layers,
+                                attn_residual=attn_residual,
+                                attn_dropout_rate=attn_dropout_rate,
+                                attn_norm=attn_norm,
+                                skipped_blocks=skipped_blocks,
                                 repr_dim=repr_dim,
-                                dropout_rate=0.1,
-                                activation='leaky_relu',
-                                norm=None,
-                                residual=True,
+                                dropout_rate=dropout,
+                                activation=activation,
+                                norm=norm,
+                                residual=residual,
                                 sam_rho=rho
                             )
                             model_sep.summary()
@@ -276,17 +287,17 @@ def main():
                                 output_dim=output_dim,
                                 hidden_blocks=BLOCKS_HIDDENS,
                                 attn_hidden_units=ATTN_HIDDENS,
-                                attn_hidden_activation='leaky_relu',
-                                attn_skipped_layers=1,
-                                attn_residual=False,
-                                attn_dropout_rate=0.1,
-                                attn_norm=None,
-                                skipped_blocks=1,
+                                attn_hidden_activation=activation,
+                                attn_skipped_layers=attn_skipped_layers,
+                                attn_residual=attn_residual,
+                                attn_dropout_rate=attn_dropout_rate,
+                                attn_norm=attn_norm,
+                                skipped_blocks=skipped_blocks,
                                 repr_dim=repr_dim,
-                                dropout_rate=0.1,
-                                activation='leaky_relu',
-                                norm=None,
-                                residual=True,
+                                dropout_rate=dropout,
+                                activation=activation,
+                                norm=norm,
+                                residual=residual,
                                 sam_rho=rho
                             )
 

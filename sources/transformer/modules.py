@@ -130,7 +130,7 @@ class TanhAttentiveBlock(Layer):
                  output_activation: Optional[str] = 'leaky_relu',
                  dropout_rate: float = 0.0,
                  norm: Optional[str] = None,
-                 a: float = 1.5):
+                 a: float = 1):
         """
         Initialize the TanhAttentiveBlock.
 
@@ -544,7 +544,23 @@ def create_attentive_model(
     # else:
     #     model_output = final_repr_output
     if output_dim > 0:
-        output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+        output_block = TanhAttentiveBlock(
+            attn_hidden_units=attn_hiddens,
+            attn_hidden_activation=attn_hidden_activation,
+            attn_dropout_rate=attn_dropout_rate,
+            attn_norm=attn_norm,
+            attn_residual=attn_residual,
+            attn_skipped_layers=attn_skipped_layers,
+            output_dim=output_dim,
+            norm=norm,
+            dropout_rate=dropout_rate,
+            output_activation=activation
+        )
+        # output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+        output = output_block(final_repr_output)
+        output_layer = output['output']
+        last_attention_scores = output['attention_scores']
+        
         model_output = {
             'repr': final_repr_output,
             'output': output_layer,
