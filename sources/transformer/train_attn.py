@@ -1,7 +1,9 @@
 import os
 from datetime import datetime
 
+import numpy as np
 import wandb
+from keras.callbacks import EarlyStopping
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
@@ -32,7 +34,7 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha, alpha_val in zip([0.4], [1]):
+                for alpha, alpha_val in zip([0.5], [1]):
                     for rho in [0]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
@@ -42,7 +44,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}'
+                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}_bnorm'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -53,8 +55,17 @@ def main():
 
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
-                            patience = PATIENCE  # higher patience
-                            learning_rate = 1e-4  # og learning rate
+                            patience = int(5e3)  # PATIENCE  # higher patience
+                            learning_rate = 3e-4  # og learning rate
+                            activation = 'leaky_relu'  # ACTIVATION
+                            attn_skipped_layers = 1  # SKIPPED_LAYERS
+                            attn_residual = False  # RESIDUAL
+                            attn_dropout_rate = 0  # DROPOUT
+                            dropout = 0  # DROPOUT
+                            attn_norm = None  # NORM
+                            norm = 'batch_norm'  # NORM
+                            skipped_blocks = 1  # SKIPPED_LAYERS
+                            residual = True  # RESIDUAL
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
@@ -62,34 +73,34 @@ def main():
                                 patience=LR_CB_PATIENCE,
                                 verbose=VERBOSE,
                                 min_delta=LR_CB_MIN_DELTA,
-                                min_lr=LR_CB_MIN_LR)
+                                min_lr=1e-5)  # LR_CB_MIN_LR)
 
                             weight_decay = 1e-8  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
-                            hiddens = MLP_HIDDENS  # hidden layers
+                            # hiddens = MLP_HIDDENS  # hidden layers
 
-                            hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
+                            # hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             loss_key = 'mse'  # LOSS_KEY
                             target_change = ('delta_p' in outputs_to_use)
                             alpha_rw = alpha
                             bandwidth = BANDWIDTH
                             repr_dim = REPR_DIM
                             output_dim = len(outputs_to_use)
-                            dropout = DROPOUT
-                            activation = ACTIVATION
-                            norm = None  # NORM
+                            # dropout = DROPOUT
+                            # activation = ACTIVATION
+                            # norm = None  # NORM
                             cme_speed_threshold = cme_speed_threshold
-                            residual = False  # RESIDUAL
-                            skipped_layers = SKIPPED_LAYERS
+                            # residual = False  # RESIDUAL
+                            # skipped_layers = SKIPPED_LAYERS
                             N = N_FILTERED  # number of samples to keep outside the threshold
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                             # Initialize wandb
-                            wandb.init(project="overtrain_attn", name=experiment_name, config={
+                            wandb.init(project="train_attn", name=experiment_name, config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
                                 "patience": patience,
@@ -99,7 +110,7 @@ def main():
                                 "batch_size": batch_size,
                                 "epochs": epochs,
                                 # hidden in a more readable format  (wandb does not support lists)
-                                "hiddens": hiddens_str,
+                                # "hiddens": hiddens_str,
                                 "loss": loss_key,
                                 "target_change": target_change,
                                 "seed": seed,
@@ -116,7 +127,9 @@ def main():
                                 'architecture': 'attm',
                                 'cme_speed_threshold': cme_speed_threshold,
                                 'residual': residual,
-                                'skipped_layers': skipped_layers,
+                                'attn_residual': attn_residual,
+                                'skipped_blocks': skipped_blocks,
+                                'skipped_layers': attn_skipped_layers,
                                 'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
@@ -212,83 +225,83 @@ def main():
                             print(f'n_features: {n_features}')
 
                             # create the model
-                            # model_sep = create_attentive_model(
-                            #     input_dim=n_features,
-                            #     output_dim=output_dim,
-                            #     hidden_blocks=BLOCKS_HIDDENS,
-                            #     attn_hidden_units=ATTN_HIDDENS,
-                            #     attn_hidden_activation='leaky_relu',
-                            #     attn_skipped_layers=skipped_layers,
-                            #     attn_residual=False,
-                            #     attn_dropout_rate=0,
-                            #     attn_norm=None,
-                            #     skipped_blocks=skipped_layers,
-                            #     repr_dim=repr_dim,
-                            #     dropout_rate=dropout,
-                            #     activation='leaky_relu',
-                            #     norm=norm,
-                            #     residual=residual,
-                            #     sam_rho=rho
-                            # )
-                            # model_sep.summary()
-                            #
-                            # # Define the EarlyStopping callback
-                            # early_stopping = EarlyStopping(
-                            #     monitor=ES_CB_MONITOR,
-                            #     patience=patience,
-                            #     verbose=VERBOSE,
-                            #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
-                            #
-                            # # Compile the model with the specified learning rate
-                            # model_sep.compile(
-                            #     optimizer=AdamW(
-                            #         learning_rate=learning_rate,
-                            #         weight_decay=weight_decay,
-                            #         beta_1=momentum_beta1
-                            #     ),
-                            #     loss={'forecast_head': get_loss(loss_key)}
-                            # )
-                            #
-                            # # Train the model with the callback
-                            # history = model_sep.fit(
-                            #     X_subtrain,
-                            #     {'forecast_head': y_subtrain},
-                            #     sample_weight=y_subtrain_weights,
-                            #     epochs=epochs, batch_size=batch_size,
-                            #     validation_data=(X_val, {'forecast_head': y_val}, y_val_weights),
-                            #     callbacks=[
-                            #         early_stopping,
-                            #         reduce_lr_on_plateau,
-                            #         WandbCallback(save_model=WANDB_SAVE_MODEL)
-                            #     ],
-                            #     verbose=VERBOSE
-                            # )
+                            model_sep = create_attentive_model(
+                                input_dim=n_features,
+                                output_dim=output_dim,
+                                hidden_blocks=BLOCKS_HIDDENS,
+                                attn_hidden_units=ATTN_HIDDENS,
+                                attn_hidden_activation=activation,
+                                attn_skipped_layers=attn_skipped_layers,
+                                attn_residual=attn_residual,
+                                attn_dropout_rate=attn_dropout_rate,
+                                attn_norm=attn_norm,
+                                skipped_blocks=skipped_blocks,
+                                repr_dim=repr_dim,
+                                dropout_rate=dropout,
+                                activation=activation,
+                                norm=norm,
+                                residual=residual,
+                                sam_rho=rho
+                            )
+                            model_sep.summary()
+
+                            # Define the EarlyStopping callback
+                            early_stopping = EarlyStopping(
+                                monitor=ES_CB_MONITOR,
+                                patience=patience,
+                                verbose=VERBOSE,
+                                restore_best_weights=ES_CB_RESTORE_WEIGHTS)
+
+                            # Compile the model with the specified learning rate
+                            model_sep.compile(
+                                optimizer=AdamW(
+                                    learning_rate=learning_rate,
+                                    weight_decay=weight_decay,
+                                    beta_1=momentum_beta1
+                                ),
+                                loss={'output': get_loss(loss_key)}
+                            )
+
+                            # Train the model with the callback
+                            history = model_sep.fit(
+                                X_subtrain,
+                                {'output': y_subtrain},
+                                sample_weight=y_subtrain_weights,
+                                epochs=epochs, batch_size=batch_size,
+                                validation_data=(X_val, {'output': y_val}, y_val_weights),
+                                callbacks=[
+                                    early_stopping,
+                                    reduce_lr_on_plateau,
+                                    WandbCallback(save_model=WANDB_SAVE_MODEL)
+                                ],
+                                verbose=VERBOSE
+                            )
 
                             # Determine the optimal number of epochs from the fit history
-                            # optimal_epochs = np.argmin(
-                            #     history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
-                            optimal_epochs = int(10e4)
+                            optimal_epochs = np.argmin(
+                                history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
+                            # optimal_epochs = int(3e4)
 
                             final_model_sep = create_attentive_model(
                                 input_dim=n_features,
                                 output_dim=output_dim,
                                 hidden_blocks=BLOCKS_HIDDENS,
                                 attn_hidden_units=ATTN_HIDDENS,
-                                attn_hidden_activation='leaky_relu',
-                                attn_skipped_layers=1,
-                                attn_residual=False,
-                                attn_dropout_rate=0,
-                                attn_norm=None,
-                                skipped_blocks=1,
+                                attn_hidden_activation=activation,
+                                attn_skipped_layers=attn_skipped_layers,
+                                attn_residual=attn_residual,
+                                attn_dropout_rate=attn_dropout_rate,
+                                attn_norm=attn_norm,
+                                skipped_blocks=skipped_blocks,
                                 repr_dim=repr_dim,
-                                dropout_rate=0,
-                                activation='leaky_relu',
-                                norm=None,
-                                residual=True,
+                                dropout_rate=dropout,
+                                activation=activation,
+                                norm=norm,
+                                residual=residual,
                                 sam_rho=rho
                             )
 
-                            final_model_sep.summary()
+                            # final_model_sep.summary()
                             # Recreate the model architecture
                             final_model_sep.compile(
                                 optimizer=AdamW(
