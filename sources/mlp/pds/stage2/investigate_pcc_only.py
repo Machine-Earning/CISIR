@@ -379,8 +379,8 @@ def main():
                                         'forecast_head': lambda y_true, y_pred: pcc_loss(
                                             y_true, y_pred,
                                             # lambda_factor=lambda_,
-                                            # train_weight_dict=train_weights_dict,
-                                            train_weight_dict=None,
+                                            train_weight_dict=train_weights_dict,
+                                            # train_weight_dict=None,
                                         )
                                     },
                                 )  # Compile the model just like before
