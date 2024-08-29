@@ -380,6 +380,7 @@ def main():
                                             y_true, y_pred,
                                             # lambda_factor=lambda_,
                                             train_weight_dict=train_weights_dict,
+                                            val_weight_dict=train_weights_dict,
                                             # train_weight_dict=None,
                                         )
                                     },
