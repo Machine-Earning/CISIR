@@ -54,7 +54,7 @@ def main():
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
                             patience = PATIENCE  # higher patience
-                            learning_rate = 1e-3  # og learning rate
+                            learning_rate = 1e-4  # og learning rate
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
@@ -267,7 +267,7 @@ def main():
                             # Determine the optimal number of epochs from the fit history
                             # optimal_epochs = np.argmin(
                             #     history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
-                            optimal_epochs = int(1e5)
+                            optimal_epochs = int(3e4)
 
                             final_model_sep = create_attentive_model(
                                 input_dim=n_features,
@@ -275,7 +275,7 @@ def main():
                                 hidden_blocks=BLOCKS_HIDDENS,
                                 attn_hidden_units=ATTN_HIDDENS,
                                 attn_hidden_activation='leaky_relu',
-                                attn_skipped_layers=2,
+                                attn_skipped_layers=1,
                                 attn_residual=False,
                                 attn_dropout_rate=0,
                                 attn_norm=None,
@@ -287,6 +287,8 @@ def main():
                                 residual=True,
                                 sam_rho=rho
                             )
+
+                            final_model_sep.summary()
                             # Recreate the model architecture
                             final_model_sep.compile(
                                 optimizer=AdamW(
