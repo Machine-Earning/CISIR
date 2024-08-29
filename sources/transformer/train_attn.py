@@ -66,7 +66,7 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=LR_CB_MIN_LR)
 
-                            weight_decay = 1e-8  # WEIGHT_DECAY  # higher weight decay
+                            weight_decay = 1e-8 # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
@@ -91,7 +91,7 @@ def main():
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                             # Initialize wandb
-                            wandb.init(project="overtrain_attn", name=experiment_name, config={
+                            wandb.init(project="train_attn", name=experiment_name, config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
                                 "patience": patience,
@@ -222,11 +222,11 @@ def main():
                                 attn_hidden_activation='leaky_relu',
                                 attn_skipped_layers=1,
                                 attn_residual=False,
-                                attn_dropout_rate=0,
+                                attn_dropout_rate=0.1,
                                 attn_norm=None,
                                 skipped_blocks=1,
                                 repr_dim=repr_dim,
-                                dropout_rate=0,
+                                dropout_rate=0.1,
                                 activation='leaky_relu',
                                 norm=None,
                                 residual=True,
@@ -279,11 +279,11 @@ def main():
                                 attn_hidden_activation='leaky_relu',
                                 attn_skipped_layers=1,
                                 attn_residual=False,
-                                attn_dropout_rate=0,
+                                attn_dropout_rate=0.1,
                                 attn_norm=None,
                                 skipped_blocks=1,
                                 repr_dim=repr_dim,
-                                dropout_rate=0,
+                                dropout_rate=0.1,
                                 activation='leaky_relu',
                                 norm=None,
                                 residual=True,
