@@ -4,7 +4,7 @@ from datetime import datetime
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 import tensorflow as tf
 import wandb
@@ -18,6 +18,7 @@ from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
     evaluate_mae,
+    evaluate_pcc,
     process_sep_events,
     get_loss,
     filter_ds, 
@@ -36,7 +37,7 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha in [0.9, 1]:
+                for alpha in [0.5]:
                     for add_slope in ADD_SLOPE:
                         # PARAMS
                         outputs_to_use = OUTPUTS_TO_USE
@@ -57,7 +58,7 @@ def main():
                         # Set the early stopping patience and learning rate as variables
                         set_seed(seed)
                         patience = PATIENCE  # higher patience
-                        learning_rate = START_LR  # og learning rate
+                        learning_rate = 1e-4 #START_LR  # og learning rate
 
                         reduce_lr_on_plateau = ReduceLROnPlateau(
                             monitor=LR_CB_MONITOR,
@@ -74,7 +75,7 @@ def main():
                         hiddens = MLP_HIDDENS  # hidden layers
 
                         hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-                        loss_key = LOSS_KEY
+                        loss_key = 'mse' # LOSS_KEY
                         target_change = ('delta_p' in outputs_to_use)
                         alpha_rw = alpha
                         bandwidth = BANDWIDTH
@@ -92,7 +93,7 @@ def main():
                         mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                         # Initialize wandb
-                        wandb.init(project="nasa-ts-delta-v7", name=experiment_name, config={
+                        wandb.init(project="overtrain_attn", name=experiment_name, config={
                             "inputs_to_use": inputs_to_use,
                             "add_slope": add_slope,
                             "patience": patience,
@@ -210,69 +211,73 @@ def main():
                         n_features = X_train.shape[1]
                         print(f'n_features: {n_features}')
 
-                        # create the model
-                        model_sep = create_mlp(
-                            input_dim=n_features,
-                            hiddens=hiddens,
-                            repr_dim=repr_dim,
-                            output_dim=output_dim,
-                            dropout_rate=dropout,
-                            activation=activation,
-                            norm=norm,
-                            residual=residual,
-                            skipped_layers=skipped_layers
-                        )
-                        model_sep.summary()
+                        # # create the model
+                        # model_sep = create_mlp(
+                        #     input_dim=n_features,
+                        #     hiddens=hiddens,
+                        #     repr_dim=repr_dim,
+                        #     output_dim=output_dim,
+                        #     dropout_rate=dropout,
+                        #     activation=activation,
+                        #     norm=norm,
+                        #     residual=residual,
+                        #     skipped_layers=skipped_layers
+                        # )
+                        # model_sep.summary()
 
-                        # Define the EarlyStopping callback
-                        early_stopping = EarlyStopping(
-                            monitor=ES_CB_MONITOR,
-                            patience=patience,
-                            verbose=VERBOSE,
-                            restore_best_weights=ES_CB_RESTORE_WEIGHTS)
+                        # # Define the EarlyStopping callback
+                        # early_stopping = EarlyStopping(
+                        #     monitor=ES_CB_MONITOR,
+                        #     patience=patience,
+                        #     verbose=VERBOSE,
+                        #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
 
-                        # Compile the model with the specified learning rate
-                        model_sep.compile(
-                            optimizer=AdamW(
-                                learning_rate=learning_rate,
-                                weight_decay=weight_decay,
-                                beta_1=momentum_beta1
-                            ),
-                            loss={'forecast_head': get_loss(loss_key)}
-                        )
+                        # # Compile the model with the specified learning rate
+                        # model_sep.compile(
+                        #     optimizer=AdamW(
+                        #         learning_rate=learning_rate,
+                        #         weight_decay=weight_decay,
+                        #         beta_1=momentum_beta1
+                        #     ),
+                        #     loss={'forecast_head': get_loss(loss_key)}
+                        # )
 
-                        # Train the model with the callback
-                        history = model_sep.fit(
-                            X_subtrain,
-                            {'forecast_head': y_subtrain},
-                            sample_weight=y_subtrain_weights,
-                            epochs=epochs, batch_size=batch_size,
-                            validation_data=(X_val, {'forecast_head': y_val}, y_val_weights),
-                            callbacks=[
-                                early_stopping,
-                                reduce_lr_on_plateau,
-                                WandbCallback(save_model=WANDB_SAVE_MODEL)
-                            ],
-                            verbose=VERBOSE
-                        )
+                        # # Train the model with the callback
+                        # history = model_sep.fit(
+                        #     X_subtrain,
+                        #     {'forecast_head': y_subtrain},
+                        #     sample_weight=y_subtrain_weights,
+                        #     epochs=epochs, batch_size=batch_size,
+                        #     validation_data=(X_val, {'forecast_head': y_val}, y_val_weights),
+                        #     callbacks=[
+                        #         early_stopping,
+                        #         reduce_lr_on_plateau,
+                        #         WandbCallback(save_model=WANDB_SAVE_MODEL)
+                        #     ],
+                        #     verbose=VERBOSE
+                        # )
 
                         # Determine the optimal number of epochs from early stopping
                         # optimal_epochs = early_stopping.best_epoch + 1  # Adjust for the offset
 
                         # Determine the optimal number of epochs from the fit history
-                        optimal_epochs = np.argmin(history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
+                        # optimal_epochs = np.argmin(history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
+
+                        optimal_epochs = int(4e4)
 
                         final_model_sep = create_mlp(
                             input_dim=n_features,
                             hiddens=hiddens,
                             repr_dim=repr_dim,
                             output_dim=output_dim,
-                            dropout_rate=dropout,
+                            dropout_rate=0, #dropout,
                             activation=activation,
                             norm=norm,
                             residual=residual,
                             skipped_layers=skipped_layers
                         )
+
+                        final_model_sep.summary()
 
                         # Recreate the model architecture
                         final_model_sep.compile(
@@ -303,17 +308,52 @@ def main():
                         # print where the model weights are saved
                         print(f"Model weights are saved in final_model_weights_{experiment_name}_reg.h5")
 
-                        # evaluate the model on test cme_files
+                        # TODO: put the battery of evaluation in a function since they always repeat
+                        # evaluate the model error on test set
                         error_mae = evaluate_mae(final_model_sep, X_test, y_test)
                         print(f'mae error: {error_mae}')
-                        # Log the MAE error to wandb
-                        wandb.log({"mae_error": error_mae})
+                        wandb.log({"mae": error_mae})
 
-                        # evaluate the model on training cme_files
+                        # evaluate the model error on training set
                         error_mae_train = evaluate_mae(final_model_sep, X_train, y_train)
                         print(f'mae error train: {error_mae_train}')
-                        # Log the MAE error to wandb
-                        wandb.log({"train_mae_error": error_mae_train})
+                        wandb.log({"train_mae": error_mae_train})
+
+                        # evaluate the model correlation on test set
+                        error_pcc = evaluate_pcc(final_model_sep, X_test, y_test)
+                        print(f'pcc error: {error_pcc}')
+                        wandb.log({"pcc": error_pcc})
+
+                        # evaluate the model correlation on training set
+                        error_pcc_train = evaluate_pcc(final_model_sep, X_train, y_train)
+                        print(f'pcc error train: {error_pcc_train}')
+                        wandb.log({"train_pcc": error_pcc_train})
+
+                        # evaluate the model on test cme_files
+                        above_threshold = mae_plus_threshold
+                        # evaluate the model error for rare samples on test set
+                        error_mae_cond = evaluate_mae(
+                            final_model_sep, X_test, y_test, above_threshold=above_threshold)
+                        print(f'mae error delta >= {above_threshold} test: {error_mae_cond}')
+                        wandb.log({"mae+": error_mae_cond})
+
+                        # evaluate the model error for rare samples on training set
+                        error_mae_cond_train = evaluate_mae(
+                            final_model_sep, X_train, y_train, above_threshold=above_threshold)
+                        print(f'mae error delta >= {above_threshold} train: {error_mae_cond_train}')
+                        wandb.log({"train_mae+": error_mae_cond_train})
+
+                        # evaluate the model correlation for rare samples on test set
+                        error_pcc_cond = evaluate_pcc(
+                            final_model_sep, X_test, y_test, above_threshold=above_threshold)
+                        print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
+                        wandb.log({"pcc+": error_pcc_cond})
+
+                        # evaluate the model correlation for rare samples on training set
+                        error_pcc_cond_train = evaluate_pcc(
+                            final_model_sep, X_train, y_train, above_threshold=above_threshold)
+                        print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
+                        wandb.log({"train_pcc+": error_pcc_cond_train})
 
                         # Process SEP event files in the specified directory
                         test_directory = root_dir + '/testing'
@@ -351,24 +391,6 @@ def main():
                         for filename in filenames:
                             log_title = os.path.basename(filename)
                             wandb.log({f'training_{log_title}': wandb.Image(filename)})
-
-                        # evaluate the model on test cme_files
-                        above_threshold = mae_plus_threshold
-                        error_mae_cond = evaluate_mae(
-                            final_model_sep, X_test, y_test, above_threshold=above_threshold)
-
-                        print(f'mae error delta >= 0.1 test: {error_mae_cond}')
-                        # Log the MAE error to wandb
-                        wandb.log({"mae_error_cond_test": error_mae_cond})
-
-                        # evaluate the model on training cme_files
-                        error_mae_cond_train = evaluate_mae(
-                            final_model_sep, X_train, y_train, above_threshold=above_threshold)
-
-                        print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
-                        # Log the MAE error to wandb
-                        wandb.log({"mae_error_cond_train": error_mae_cond_train})
-                        # Log the MAE error to wandb
 
                         # Evaluate the model correlation with colored
                         file_path = plot_repr_corr_dist(
@@ -410,7 +432,6 @@ def main():
                         wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
                         print('stage1_file_path: ' + stage1_file_path)
 
-                        # Plot the error histograms
                         filename = plot_error_hist(
                             final_model_sep,
                             X_train, y_train,
@@ -419,16 +440,6 @@ def main():
                             prefix='training')
                         wandb.log({"training_error_hist": wandb.Image(filename)})
 
-                        # Plot the error weighted histograms
-                        filename = plot_error_hist(
-                            final_model_sep,
-                            X_train, y_train,
-                            sample_weights=y_train_weights,
-                            title=title,
-                            prefix='training_weighted')
-                        wandb.log({"training_weighted_error_hist": wandb.Image(filename)})
-
-                        # Plot the error histograms on the testing set
                         filename = plot_error_hist(
                             final_model_sep,
                             X_test, y_test,

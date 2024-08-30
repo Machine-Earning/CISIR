@@ -32,7 +32,7 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha, alpha_val in zip([0.4], [1]):
+                for alpha, alpha_val in zip([0.5], [1]):
                     for rho in [0]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
@@ -79,7 +79,7 @@ def main():
                             output_dim = len(outputs_to_use)
                             dropout = DROPOUT
                             activation = ACTIVATION
-                            norm = None  # NORM
+                            norm = NORM
                             cme_speed_threshold = cme_speed_threshold
                             residual = False  # RESIDUAL
                             skipped_layers = SKIPPED_LAYERS
@@ -267,7 +267,7 @@ def main():
                             # Determine the optimal number of epochs from the fit history
                             # optimal_epochs = np.argmin(
                             #     history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
-                            optimal_epochs = int(10e4)
+                            optimal_epochs = int(4e4)
 
                             final_model_sep = create_attentive_model(
                                 input_dim=n_features,
@@ -283,7 +283,7 @@ def main():
                                 repr_dim=repr_dim,
                                 dropout_rate=0,
                                 activation='leaky_relu',
-                                norm=None,
+                                norm=NORM,
                                 residual=True,
                                 sam_rho=rho
                             )

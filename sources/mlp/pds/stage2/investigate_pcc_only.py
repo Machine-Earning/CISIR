@@ -24,6 +24,7 @@ from modules.training.ts_modeling import (
     plot_error_hist,
     set_seed)
 from modules.training.utils import get_weight_path
+import numpy as np
 
 from modules.shared.globals import *
 
@@ -53,7 +54,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha in [2]:
+                    for alpha in np.arange(1, 1.6, 0.2):
                         for freeze in [False]:
                             # for rho in [0.3, 0.21]:
                             for rho in [0]:
@@ -67,6 +68,9 @@ def main():
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
+
+                                # is copilot a 
+
 
                                 # Create a unique experiment name with a timestamp
                                 current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -337,7 +341,7 @@ def main():
                                 print(f'train weight dict: {train_weights_dict}')
 
                                 # Determine the optimal number of epochs from the fit history
-                                optimal_epochs = int(1e3)  # np.argmin(history.history[ES_CB_MONITOR]) + 1
+                                optimal_epochs = int(15e3)  # np.argmin(history.history[ES_CB_MONITOR]) + 1
 
                                 final_model_sep_stage1 = create_mlp(
                                     input_dim=n_features,
