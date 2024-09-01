@@ -3022,39 +3022,6 @@ def pearson_correlation_coefficient(y_true: tf.Tensor, y_pred: tf.Tensor, sample
     return pcc
 
 
-def pcc_intermediate(x: tf.Tensor, y: tf.Tensor) -> tf.Tensor:
-    """
-    Computes the intermediate vector for the Pearson correlation coefficient (PCC)
-    before the final summation.
-    :param x (tf.Tensor): A 1D tensor containing the first set of samples.
-    :param y (tf.Tensor): A 1D tensor containing the second set of samples.
-    :return tf.Tensor: A tensor containing the intermediate PCC values for each element.
-    """
-    # Ensure the inputs are tensors of type float32
-    x = tf.convert_to_tensor(x, dtype=tf.float32)
-    y = tf.convert_to_tensor(y, dtype=tf.float32)
-
-    # Compute the means of x and y
-    mean_x = tf.reduce_mean(x)
-    mean_y = tf.reduce_mean(y)
-
-    # Compute the differences from the means
-    diff_x = x - mean_x
-    diff_y = y - mean_y
-
-    # Compute the product of the differences (numerator component)
-    numerator_vector = diff_x * diff_y
-
-    # Compute the denominator (which is constant for all i's)
-    denominator_x = tf.reduce_sum(tf.square(diff_x))
-    denominator_y = tf.reduce_sum(tf.square(diff_y))
-    denominator = tf.sqrt(denominator_x * denominator_y)
-
-    # Compute the final PCC value for each element
-    pcc_values = numerator_vector / denominator
-
-    return pcc_values
-
 
 def evaluate_lag_error(
         timestamps: np.ndarray,
@@ -3207,7 +3174,7 @@ def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,
     # Determine if the current mode is training or validation/testing
     is_training = K.learning_phase()
 
-    # print(f"Is training: {is_training}")
+    print(f"Is training: {is_training}")
 
     # Select the appropriate weight dictionary based on the mode
     weight_dict = train_weight_dict if is_training else val_weight_dict
@@ -3215,7 +3182,6 @@ def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,
     if weight_dict is not None:
         # Initialize the weights tensor with ones
         weights = tf.ones_like(y_true, dtype=tf.float32)
-
         # Apply the weights based on the values in y_true
         for label, weight in weight_dict.items():
             weights = tf.where(tf.equal(y_true, label), weight, weights)

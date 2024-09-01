@@ -560,7 +560,7 @@ def create_attentive_model(
         output = output_block(final_repr_output)
         output_layer = output['output']
         last_attention_scores = output['attention_scores']
-        
+
         model_output = {
             'repr': final_repr_output,
             'output': output_layer,
