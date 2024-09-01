@@ -1,5 +1,4 @@
 import os
-import random
 from datetime import datetime
 
 from modules.training.cme_modeling import pds_space_norm
@@ -7,13 +6,13 @@ from modules.training.cme_modeling import pds_space_norm
 # Set the environment variable for CUDA (in case it is necessary)
 os.environ['CUDA_VISIBLE_DEVICES'] = '2'  # left is 1
 
-import numpy as np
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from wandb.integration.keras import WandbCallback
 
-from modules.evaluate.utils import plot_tsne_delta, plot_repr_correlation, plot_repr_corr_dist, plot_repr_corr_density, evaluate_pcc_repr
+from modules.evaluate.utils import plot_tsne_delta, plot_repr_correlation, plot_repr_corr_dist, plot_repr_corr_density, \
+    evaluate_pcc_repr
 from modules.training import cme_modeling
 from modules.training.ts_modeling import build_dataset, create_mlp, filter_ds, stratified_split, set_seed
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
@@ -38,7 +37,7 @@ def main():
                 for add_slope in ADD_SLOPE:
                     for rho in [0.7]:
                         # for alpha in [5, 10]:
-                        for alpha in [2.5, 5]:
+                        for alpha, alphaV in zip([2.5, 5], [2.5, 5]):
                             # PARAMS
                             # Set NumPy seed
                             set_seed(SEED)
@@ -117,6 +116,7 @@ def main():
                                 "optimizer": "adam",
                                 "architecture": "mlp",
                                 "alpha": alpha_rw,
+                                "alphaVal": alphaV,
                                 "bandwidth": bandwidth,
                                 "residual": residual,
                                 "skipped_layers": skipped_layers,
@@ -196,6 +196,18 @@ def main():
                                 split=VAL_SPLIT,
                                 debug=False)
 
+                            delta_val = y_val_norm[:, 0]
+                            print(f'delta_val.shape: {delta_val.shape}')
+
+                            print(f'rebalancing the subtraining set...')
+                            min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
+
+                            val_weights_dict = exDenseReweightsD(
+                                X_subtrain, delta_val,
+                                alpha=alphaV, bw=bandwidth,
+                                min_norm_weight=min_norm_weight,
+                                debug=False).label_reweight_dict
+
                             # filter validation set
                             # X_val, y_val_norm = filter_ds(
                             #     X_val, y_val_norm,
@@ -233,6 +245,7 @@ def main():
                                 X_subtrain, y_subtrain_norm,
                                 X_val, y_val_norm,
                                 train_label_weights_dict=train_weights_dict,
+                                val_label_weights_dict=val_weights_dict,
                                 learning_rate=Options['learning_rate'],
                                 epochs=Options['epochs'],
                                 batch_size=Options['batch_size'],

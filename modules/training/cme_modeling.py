@@ -26,8 +26,8 @@ from tensorflow.keras.layers import (
 )
 from tensorflow_addons.optimizers import AdamW
 
+from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.sam_keras import SAMModel
-from modules.training.ts_modeling import TrainingPhaseManager
 
 
 # from tensorflow.python.profiler import profiler_v2 as profiler
@@ -734,6 +734,7 @@ class ModelBuilder:
                   X_val: np.ndarray,
                   y_val: np.ndarray,
                   train_label_weights_dict: Optional[Dict[float, float]] = None,
+                  val_label_weights_dict: Optional[Dict[float, float]] = None,
                   learning_rate: float = 1e-3,
                   epochs: int = 100,
                   batch_size: int = 32,
@@ -754,6 +755,7 @@ class ModelBuilder:
         :param y_val: Validation labels.
         :param model: The TensorFlow model to train.
         :param train_label_weights_dict: Dictionary containing label weights for the training set.
+        :param val_label_weights_dict: Dictionary containing label weights for the validation set.
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
         :param batch_size: The batch size for training.
@@ -768,8 +770,13 @@ class ModelBuilder:
         :return: The training history as a dictionary.
         """
 
+        pm = TrainingPhaseManager()
+
         if callbacks_list is None:
             callbacks_list = []
+
+        # Add the IsTraining callback to the list
+        callbacks_list.append(IsTraining(pm))
 
         # Initialize early stopping and model checkpointing for subtraining
         early_stopping_cb = tf.keras.callbacks.EarlyStopping(
@@ -798,7 +805,10 @@ class ModelBuilder:
                 beta_1=momentum_beta1
             ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
-                y_true, y_pred, sample_weights=train_label_weights_dict
+                y_true, y_pred,
+                phase_manager=pm,
+                train_sample_weights=train_label_weights_dict,
+                val_sample_weights=val_label_weights_dict,
             )
         )
 
@@ -828,7 +838,9 @@ class ModelBuilder:
                 beta_1=momentum_beta1
             ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
-                y_true, y_pred, sample_weights=train_label_weights_dict
+                y_true, y_pred,
+                phase_manager=pm,
+                train_sample_weights=train_label_weights_dict,
             )
         )
 
@@ -1071,6 +1083,7 @@ class ModelBuilder:
                       X_val: np.ndarray,
                       y_val: np.ndarray,
                       train_label_weights_dict: Optional[Dict[float, float]] = None,
+                      val_label_weights_dict: Optional[Dict[float, float]] = None,
                       learning_rate: float = 1e-3,
                       epochs: int = 100,
                       batch_size: int = 32,
@@ -1094,6 +1107,7 @@ class ModelBuilder:
         :param y_val: Validation labels.
         :param model: The TensorFlow model to train.
         :param train_label_weights_dict: Dictionary containing label weights for the training set.
+        :param val_label_weights_dict: Dictionary containing label weights for the validation set.
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
         :param batch_size: The batch size for training.
@@ -1110,8 +1124,13 @@ class ModelBuilder:
         :return: The training history as a History object.
         """
 
+        pm = TrainingPhaseManager()
+
         if callbacks_list is None:
             callbacks_list = []
+
+        # Add the IsTraining callback to the list
+        callbacks_list.append(IsTraining(pm))
 
         # Initialize early stopping and model checkpointing for subtraining
         early_stopping_cb = tf.keras.callbacks.EarlyStopping(
@@ -1281,7 +1300,10 @@ class ModelBuilder:
                 beta_1=momentum_beta1
             ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
-                y_true, y_pred, sample_weights=train_label_weights_dict
+                y_true, y_pred,
+                phase_manager=pm,
+                train_sample_weights=train_label_weights_dict,
+                val_sample_weights=val_label_weights_dict,
             )
         )
 
@@ -1316,7 +1338,9 @@ class ModelBuilder:
                 beta_1=momentum_beta1
             ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
-                y_true, y_pred, sample_weights=train_label_weights_dict
+                y_true, y_pred,
+                phase_manager=pm,
+                train_sample_weights=train_label_weights_dict,
             )
         )
 
@@ -1352,6 +1376,7 @@ class ModelBuilder:
                             X_val: np.ndarray,
                             y_val: np.ndarray,
                             train_label_weights_dict: Optional[Dict[float, float]] = None,
+                            val_label_weights_dict: Optional[Dict[float, float]] = None,
                             learning_rate: float = 1e-3,
                             epochs: int = 100,
                             batch_size: int = 32,
@@ -1377,6 +1402,7 @@ class ModelBuilder:
         :param y_val: Validation labels.
         :param model: The TensorFlow model to train.
         :param train_label_weights_dict: Dictionary containing label weights for the training set.
+        :param val_label_weights_dict: Dictionary containing label weights for the validation set.
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
         :param batch_size: The batch size for training.
@@ -1393,8 +1419,13 @@ class ModelBuilder:
         :return: The training history as a History object.
         """
 
+        pm = TrainingPhaseManager()
+
         if callbacks_list is None:
             callbacks_list = []
+
+        # Add the IsTraining callback to the list
+        callbacks_list.append(IsTraining(pm))
 
         # Initialize early stopping and model checkpointing for subtraining
         early_stopping_cb = tf.keras.callbacks.EarlyStopping(
@@ -1557,7 +1588,10 @@ class ModelBuilder:
                 beta_1=momentum_beta1
             ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
-                y_true, y_pred, sample_weights=train_label_weights_dict
+                y_true, y_pred,
+                phase_manager=pm,
+                train_sample_weights=train_label_weights_dict,
+                val_sample_weights=val_label_weights_dict,
             )
         )
 
@@ -1589,7 +1623,9 @@ class ModelBuilder:
                 beta_1=momentum_beta1
             ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
-                y_true, y_pred, sample_weights=train_label_weights_dict
+                y_true, y_pred,
+                phase_manager=pm,
+                train_sample_weights=train_label_weights_dict,
             )
         )
 

@@ -1,5 +1,4 @@
 import os
-import random
 from datetime import datetime
 
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density, \
@@ -9,7 +8,6 @@ from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 # Set the environment variable for CUDA (in case it is necessary)
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-import numpy as np
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
@@ -46,7 +44,7 @@ def main():
                 for add_slope in ADD_SLOPE:
                     for rho in [0]:
                         # for alpha in [2]:
-                        for alpha in [7]:
+                        for alpha, alphaV in zip([7], [5]):
                             # Set NumPy seed
                             set_seed(SEED)
                             # add_slope = True
@@ -128,6 +126,7 @@ def main():
                                 'cme_speed_threshold': cme_speed_threshold,
                                 "reweighting": True,
                                 "alpha": alpha_rw,
+                                "alphaVal": alphaV,
                                 "bandwidth": bandwidth,
                                 "residual": residual,
                                 "skipped_layers": skipped_layers,
@@ -207,12 +206,17 @@ def main():
                                 split=VAL_SPLIT,
                                 debug=False)
 
-                            # filter validation set
-                            # X_val, y_val_norm = filter_ds(
-                            #     X_val, y_val_norm,
-                            #     low_threshold=norm_lower_t,
-                            #     high_threshold=norm_upper_t,
-                            #     N=200, seed=SEED)
+                            delta_val = y_val_norm[:, 0]
+                            print(f'delta_val.shape: {delta_val.shape}')
+
+                            print(f'rebalancing the subtraining set...')
+                            min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
+
+                            val_weights_dict = exDenseReweightsD(
+                                X_subtrain, delta_val,
+                                alpha=alphaV, bw=bandwidth,
+                                min_norm_weight=min_norm_weight,
+                                debug=False).label_reweight_dict
 
                             print(f'X_val.shape: {X_val.shape}')
                             print(f'y_val.shape: {y_val_norm.shape}')
@@ -247,6 +251,7 @@ def main():
                                 X_subtrain, y_subtrain_norm,
                                 X_val, y_val_norm,
                                 train_label_weights_dict=train_weights_dict,
+                                val_label_weights_dict=val_weights_dict,
                                 learning_rate=Options['learning_rate'],
                                 epochs=Options['epochs'],
                                 batch_size=Options['batch_size'],
@@ -263,12 +268,13 @@ def main():
                                 ]
                             )
 
-                                                    # Evaluate PCC
+                            # Evaluate PCC
                             pcc = evaluate_pcc_repr(model_sep, X_test_filtered, y_test_filtered)
                             print(f"PCC: {pcc}")
 
                             # Evaluate conditional PCC (i >= 0.5)
-                            pcc_cond = evaluate_pcc_repr(model_sep, X_test_filtered, y_test_filtered, i_above_threshold=0.5)
+                            pcc_cond = evaluate_pcc_repr(model_sep, X_test_filtered, y_test_filtered,
+                                                         i_above_threshold=0.5)
                             print(f"Conditional PCC (i >= 0.5): {pcc_cond}")
 
                             # Log to wandb
@@ -345,8 +351,6 @@ def main():
                             )
                             wandb.log({'representation_correlation_density_plot_test': wandb.Image(file_path)})
                             print('file_path: ' + file_path)
-
-
 
                             # Finish the wandb run
                             wandb.finish()

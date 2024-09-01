@@ -25,10 +25,12 @@ from modules.training.ts_modeling import (
     plot_error_hist,
     set_seed)
 from modules.training.utils import get_weight_path
+from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 
 from modules.shared.globals import *
 
 mb = ModelBuilder()
+pm = TrainingPhaseManager()
 
 # Define the lookup dictionary
 weight_paths = {
@@ -314,6 +316,7 @@ def main():
                                     loss={
                                         'forecast_head': lambda y_true, y_pred: mse_pcc(
                                             y_true, y_pred,
+                                            phase_manager=pm,
                                             lambda_factor=lambda_,
                                             train_weight_dict=subtrain_weights_dict,
                                             val_weight_dict=val_weights_dict
@@ -331,6 +334,7 @@ def main():
                                         early_stopping,
                                         reduce_lr_on_plateau,  # Reduce learning rate on plateau
                                         WandbCallback(save_model=WANDB_SAVE_MODEL),
+                                        IsTraining(pm)  # Custom callback to set the training phase
                                     ],
                                     verbose=VERBOSE
                                 )
@@ -377,6 +381,7 @@ def main():
                                     loss={
                                         'forecast_head': lambda y_true, y_pred: mse_pcc(
                                             y_true, y_pred,
+                                            phase_manager=pm,
                                             lambda_factor=lambda_,
                                             train_weight_dict=train_weights_dict,
                                         )
@@ -391,7 +396,8 @@ def main():
                                     batch_size=batch_size,
                                     callbacks=[
                                         reduce_lr_on_plateau,
-                                        WandbCallback(save_model=WANDB_SAVE_MODEL)
+                                        WandbCallback(save_model=WANDB_SAVE_MODEL),
+                                        IsTraining(pm)
                                     ],
                                     verbose=VERBOSE
                                 )

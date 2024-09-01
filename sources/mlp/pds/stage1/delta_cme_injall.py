@@ -47,7 +47,7 @@ def main():
                 for add_slope in ADD_SLOPE:
                     for rho in [0, 0.7]:
                         # for alpha in [2]:
-                        for alpha in [2.5]:
+                        for alpha, alphaV in zip([2.5], [5]):
                             # Set NumPy seed
                             set_seed(SEED)
                             # add_slope = True
@@ -129,6 +129,7 @@ def main():
                                 'cme_speed_threshold': cme_speed_threshold,
                                 "reweighting": True,
                                 "alpha": alpha_rw,
+                                "alphaVal": alphaV,
                                 "bandwidth": bandwidth,
                                 "residual": residual,
                                 "skipped_layers": skipped_layers,
@@ -207,12 +208,17 @@ def main():
                                 split=VAL_SPLIT,
                                 debug=False)
 
-                            # filter validation set
-                            # X_val, y_val_norm = filter_ds(
-                            #     X_val, y_val_norm,
-                            #     low_threshold=norm_lower_t,
-                            #     high_threshold=norm_upper_t,
-                            #     N=200, seed=SEED)
+                            delta_val = y_val_norm[:, 0]
+                            print(f'delta_val.shape: {delta_val.shape}')
+
+                            print(f'rebalancing the subtraining set...')
+                            min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
+
+                            val_weights_dict = exDenseReweightsD(
+                                X_subtrain, delta_val,
+                                alpha=alphaV, bw=bandwidth,
+                                min_norm_weight=min_norm_weight,
+                                debug=False).label_reweight_dict
 
                             print(f'X_val.shape: {X_val.shape}')
                             print(f'y_val.shape: {y_val_norm.shape}')
@@ -247,6 +253,7 @@ def main():
                                 X_subtrain, y_subtrain_norm,
                                 X_val, y_val_norm,
                                 train_label_weights_dict=train_weights_dict,
+                                val_label_weights_dict=val_weights_dict,
                                 learning_rate=Options['learning_rate'],
                                 epochs=Options['epochs'],
                                 batch_size=Options['batch_size'],
