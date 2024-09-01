@@ -263,7 +263,7 @@ def main():
                         # Determine the optimal number of epochs from the fit history
                         # optimal_epochs = np.argmin(history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
 
-                        optimal_epochs = int(4e4)
+                        optimal_epochs = int(14091)
 
                         final_model_sep = create_mlp(
                             input_dim=n_features,
