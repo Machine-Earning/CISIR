@@ -15,7 +15,6 @@ import tensorflow as tf
 from keras.regularizers import l2
 from numpy import ndarray
 from tensorflow import Tensor
-from tensorflow.keras import backend as K
 from tensorflow.keras import layers, callbacks, Model
 from tensorflow.keras.layers import (
     Dense,
@@ -28,6 +27,7 @@ from tensorflow.keras.layers import (
 from tensorflow_addons.optimizers import AdamW
 
 from modules.training.sam_keras import SAMModel
+from modules.training.ts_modeling import TrainingPhaseManager
 
 
 # from tensorflow.python.profiler import profiler_v2 as profiler
@@ -2123,50 +2123,9 @@ class ModelBuilder:
 
         return squared_difference
 
-    def pds_loss_dl(self, y_true, z_pred, sample_weights=None, reduction=tf.keras.losses.Reduction.NONE):
-        """
-        Computes the weighted loss for a batch of predicted features and their labels.
-
-        :param y_true: A batch of true label values, shape of [batch_size, 1].
-        :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
-        :param sample_weights: A batch of sample weights, shape of [batch_size, 1].
-        :param reduction: The type of reduction to apply to the loss.
-        :return: The weighted average error for all unique combinations of the samples in the batch.
-        """
-        int_batch_size = tf.shape(z_pred)[0]
-        batch_size = tf.cast(int_batch_size, dtype=tf.float32)
-        total_error = tf.constant(0.0, dtype=tf.float32)
-
-        # Initialize counter for sample_weights
-        weight_idx = 0
-
-        # Loop through all unique pairs of samples in the batch
-        for i in tf.range(int_batch_size):
-            for j in tf.range(i + 1, int_batch_size):
-                z1, z2 = z_pred[i], z_pred[j]
-                label1, label2 = y_true[i], y_true[j]
-                err = error(z1, z2, label1, label2)  # Assuming `error` is defined elsewhere in your code
-
-                # Apply sample weights if provided
-                if sample_weights is not None:
-                    weight = sample_weights[weight_idx]  # Get the weight for this pair
-                    weighted_err = err * weight
-                    weight_idx += 1  # Move to the next weight
-                else:
-                    weighted_err = err
-
-                total_error += tf.cast(weighted_err, dtype=tf.float32)
-
-        if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error  # Total loss
-        elif reduction == tf.keras.losses.Reduction.NONE:
-            denom = tf.cast(batch_size * (batch_size - 1) / 2 + 1e-9, dtype=tf.float32)
-            return total_error / denom  # Average loss
-        else:
-            raise ValueError(f"Unsupported reduction type: {reduction}.")
-
     def pds_loss_vec(self,
                      y_true: tf.Tensor, z_pred: tf.Tensor,
+                     phase_manager: TrainingPhaseManager,
                      train_sample_weights: dict = None,
                      val_sample_weights: dict = None,
                      reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE) -> tf.Tensor:
@@ -2175,6 +2134,7 @@ class ModelBuilder:
 
         :param y_true: A batch of true label values, shape of [batch_size, 1].
         :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
+        :param phase_manager: Manager that tracks whether we are in training or validation phase.
         :param train_sample_weights: A dictionary mapping label values to their corresponding reweight during training.
         :param val_sample_weights: A dictionary mapping label values to their corresponding reweight during validation.
         :param reduction: The type of reduction to apply to the loss.
@@ -2198,28 +2158,8 @@ class ModelBuilder:
         # Compute the loss for each pair
         pairwise_loss = tf.square(z_diff_squared - y_diff_squared)
 
-        # Determine if the current mode is training or validation/testing
-        is_training = K.learning_phase()
-
         # Select the appropriate weight dictionary based on the mode
-        sample_weights = train_sample_weights if is_training else val_sample_weights
-
-        # Apply sample weights if provided
-        # if sample_weights is not None:
-        #     # Convert sample_weights keys to strings
-        #     keys = tf.constant(list(map(str, sample_weights.keys())), dtype=tf.string)
-        #     values = tf.constant(list(sample_weights.values()), dtype=tf.float32)
-        #     table = tf.lookup.StaticHashTable(tf.lookup.KeyValueTensorInitializer(keys, values), default_value=1.0)
-        #
-        #     # Lookup the weights for each y_true value
-        #     weights = table.lookup(tf.as_string(tf.reshape(y_true, [-1])))
-        #     weights_matrix = weights[:, None] * weights[None, :]
-        #
-        #     # Cast weights_matrix to the same data type as z_diff_squared
-        #     weights_matrix = tf.cast(weights_matrix, dtype=z_diff_squared.dtype)
-        #
-        #     # Apply the weights to the pairwise loss
-        #     pairwise_loss *= weights_matrix
+        sample_weights = train_sample_weights if phase_manager.is_training_phase() else val_sample_weights
 
         # Apply sample weights if provided
         if sample_weights is not None:
@@ -2237,7 +2177,6 @@ class ModelBuilder:
 
             # Apply the weights to the pairwise loss
             pairwise_loss *= weights_matrix
-
 
         # Get the total error
         total_error = tf.reduce_sum(pairwise_loss)
