@@ -357,7 +357,7 @@ def main():
                                     residual=residual,
                                     skipped_layers=skipped_layers
                                 )
-                                # final_model_sep_stage1.load_weights(weight_path)
+                                final_model_sep_stage1.load_weights(weight_path)
 
                                 # Recreate the model architecture for final_model_sep
                                 final_model_sep = mb.add_proj_head(
@@ -392,7 +392,6 @@ def main():
                                     },
                                 )  # Compile the model just like before
 
-                                print('about to fit the model')
                                 # Train on the full dataset
                                 final_model_sep.fit(
                                     X_train,
