@@ -3095,9 +3095,11 @@ def evaluate_lag_error(
 
 def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
             lambda_factor: float,
-            phase_manager: TrainingPhaseManager,
-            train_weight_dict: dict = None,
-            val_weight_dict: dict = None) -> tf.Tensor:
+            phase_manager: 'TrainingPhaseManager',
+            train_mse_weight_dict: Optional[Dict[float, float]] = None,
+            val_mse_weight_dict: Optional[Dict[float, float]] = None,
+            train_pcc_weight_dict: Optional[Dict[float, float]] = None,
+            val_pcc_weight_dict: Optional[Dict[float, float]] = None) -> tf.Tensor:
     """
     Custom loss function combining Mean Squared Error (MSE) and Pearson Correlation Coefficient (PCC)
     with re-weighting based on label values. The final loss is a combination of weighted MSE and
@@ -3108,28 +3110,32 @@ def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
     - y_pred (tf.Tensor): Predicted labels.
     - lambda_factor (float): Scaling factor for the PCC portion of the loss.
     - phase_manager (TrainingPhaseManager): Manager that tracks whether we are in training or validation phase.
-    - train_weight_dict (dict, optional): Dictionary mapping label values to weights for training samples.
-    - val_weight_dict (dict, optional): Dictionary mapping label values to weights for validation samples.
+    - train_mse_weight_dict (dict, optional): Dictionary mapping label values to weights for training MSE samples.
+    - val_mse_weight_dict (dict, optional): Dictionary mapping label values to weights for validation MSE samples.
+    - train_pcc_weight_dict (dict, optional): Dictionary mapping label values to weights for training PCC samples.
+    - val_pcc_weight_dict (dict, optional): Dictionary mapping label values to weights for validation PCC samples.
 
     Returns:
     - tf.Tensor: The calculated loss value as a single scalar.
     """
-    # Select the appropriate weight dictionary based on the mode
-    weight_dict = train_weight_dict if phase_manager.is_training_phase() else val_weight_dict
+    # Select the appropriate weight dictionaries based on the mode
+    mse_weight_dict = train_mse_weight_dict if phase_manager.is_training_phase() else val_mse_weight_dict
+    pcc_weight_dict = train_pcc_weight_dict if phase_manager.is_training_phase() else val_pcc_weight_dict
 
-    # Generate the weight tensor using the optimized function
-    weights = create_weight_tensor_fast(y_true, weight_dict)
+    # Generate the weight tensors for MSE and PCC using the optimized function
+    mse_weights = create_weight_tensor_fast(y_true, mse_weight_dict)
+    pcc_weights = create_weight_tensor_fast(y_true, pcc_weight_dict)
 
     # Compute the Mean Squared Error (MSE)
-    mse = tf.reduce_mean(weights * tf.square(y_true - y_pred))
+    mse = tf.reduce_mean(mse_weights * tf.square(y_true - y_pred))
 
     # Compute the Pearson Correlation Coefficient (PCC)
     y_true_centered = y_true - tf.reduce_mean(y_true)
     y_pred_centered = y_pred - tf.reduce_mean(y_pred)
 
-    cov = tf.reduce_sum(weights * y_true_centered * y_pred_centered)
-    std_y_true = tf.sqrt(tf.reduce_sum(weights * tf.square(y_true_centered)))
-    std_y_pred = tf.sqrt(tf.reduce_sum(weights * tf.square(y_pred_centered)))
+    cov = tf.reduce_sum(pcc_weights * y_true_centered * y_pred_centered)
+    std_y_true = tf.sqrt(tf.reduce_sum(pcc_weights * tf.square(y_true_centered)))
+    std_y_pred = tf.sqrt(tf.reduce_sum(pcc_weights * tf.square(y_pred_centered)))
 
     pcc = cov / (std_y_true * std_y_pred + K.epsilon())
 
