@@ -2,7 +2,7 @@ import os
 import random
 import traceback
 from collections import Counter
-from typing import Tuple, List, Optional, Union, Callable, Dict
+from typing import Tuple, List, Optional, Union, Callable, Dict, Generator
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -852,7 +852,7 @@ def stratified_split(X: np.ndarray, y: np.ndarray, shuffle: bool = True, seed: i
                      debug: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Splits the dataset into subtraining and validation sets using stratified sampling.
-    TODO: upgrade to support folds 
+    TODO: upgrade to support folds
     Parameters:
     X (np.ndarray): Feature matrix of shape (n_samples, n_features).
     y (np.ndarray): Label vector of shape (n_samples, 1).
@@ -921,6 +921,65 @@ def stratified_split(X: np.ndarray, y: np.ndarray, shuffle: bool = True, seed: i
         plot_distributions(y, y_subtrain, y_val)
 
     return X_subtrain, y_subtrain, X_val, y_val
+
+
+def stratified_4fold_split(
+        X: np.ndarray,
+        y: np.ndarray,
+        shuffle: bool = True,
+        seed: int = None,
+        debug: bool = False
+) -> Generator[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], None, None]:
+    """
+    Splits the dataset into 4 folds using stratified sampling and yields one fold at a time.
+
+    Parameters:
+    X (np.ndarray): Feature matrix of shape (n_samples, n_features).
+    y (np.ndarray): Label vector of shape (n_samples, 1).
+    shuffle (bool): Whether to shuffle the data before splitting. Default is True.
+    seed (int): Random seed for reproducibility. Default is None.
+    debug (bool): Whether to plot the distributions of the original, subtrain, and validation sets. Default is False.
+
+    Yields:
+    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Split feature and label matrices:
+        - X_subtrain: Features for the subtraining set.
+        - y_subtrain: Labels for the subtraining set.
+        - X_val: Features for the validation set.
+        - y_val: Labels for the validation set.
+    """
+    if shuffle:
+        np.random.seed(seed)
+
+    # Sort the data by the labels
+    sorted_indices = np.argsort(y, axis=0).flatten()
+    X_sorted = X[sorted_indices]
+    y_sorted = y[sorted_indices]
+
+    num_samples = X.shape[0]
+    fold_size = num_samples // 4
+
+    # Initialize lists to hold indices for each fold
+    fold_indices = [[] for _ in range(4)]
+
+    # Divide into groups of 4 and distribute across folds
+    for i in range(0, num_samples, 4):
+        group_indices = list(range(i, min(i + 4, num_samples)))
+        if shuffle:
+            np.random.shuffle(group_indices)  # Shuffle within the group
+
+        for j, index in enumerate(group_indices):
+            fold_indices[j % 4].append(index)
+
+    for fold in range(4):
+        val_indices = fold_indices[fold]
+        subtrain_indices = [idx for i in range(4) if i != fold for idx in fold_indices[i]]
+
+        X_val = X_sorted[val_indices]
+        y_val = y_sorted[val_indices]
+        X_subtrain = X_sorted[subtrain_indices]
+        y_subtrain = y_sorted[subtrain_indices]
+
+        yield X_subtrain, y_subtrain, X_val, y_val
 
 
 def plot_distributions(y_train: np.ndarray, y_subtrain: np.ndarray, y_val: np.ndarray) -> None:
