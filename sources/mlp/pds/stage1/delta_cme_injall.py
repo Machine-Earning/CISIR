@@ -48,7 +48,7 @@ def main():
                             # add_slope = True
                             outputs_to_use = OUTPUTS_TO_USE
 
-                            bs = BATCH_SIZE  # full dataset used
+                            bs = 1024 #BATCH_SIZE  # full dataset used
                             print(f'batch size : {bs}')
 
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
