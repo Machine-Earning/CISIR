@@ -220,23 +220,23 @@ def main():
                                     debug=False).label_reweight_dict
                                 print(f'training set rebalanced.')
 
-                                print(f'rebalancing the subtraining set...')
-                                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
-                                subtrain_weights_dict = exDenseReweightsD(
-                                    X_subtrain, delta_subtrain,
-                                    alpha=alpha_rw, bw=bandwidth,
-                                    min_norm_weight=min_norm_weight,
-                                    debug=False).label_reweight_dict
-                                print(f'subtraining set rebalanced.')
-
-                                print(f'rebalancing the validation set...')
-                                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
-                                val_weights_dict = exDenseReweightsD(
-                                    X_val, delta_val,
-                                    alpha=1, bw=bandwidth,
-                                    min_norm_weight=min_norm_weight,
-                                    debug=False).label_reweight_dict
-                                print(f'validation set rebalanced.')
+                                # print(f'rebalancing the subtraining set...')
+                                # min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
+                                # subtrain_weights_dict = exDenseReweightsD(
+                                #     X_subtrain, delta_subtrain,
+                                #     alpha=alpha_rw, bw=bandwidth,
+                                #     min_norm_weight=min_norm_weight,
+                                #     debug=False).label_reweight_dict
+                                # print(f'subtraining set rebalanced.')
+                                #
+                                # print(f'rebalancing the validation set...')
+                                # min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
+                                # val_weights_dict = exDenseReweightsD(
+                                #     X_val, delta_val,
+                                #     alpha=1, bw=bandwidth,
+                                #     min_norm_weight=min_norm_weight,
+                                #     debug=False).label_reweight_dict
+                                # print(f'validation set rebalanced.')
 
                                 # get the number of features
                                 n_features = X_train.shape[1]
@@ -357,7 +357,7 @@ def main():
                                     residual=residual,
                                     skipped_layers=skipped_layers
                                 )
-                                final_model_sep_stage1.load_weights(weight_path)
+                                # final_model_sep_stage1.load_weights(weight_path)
 
                                 # Recreate the model architecture for final_model_sep
                                 final_model_sep = mb.add_proj_head(
@@ -392,6 +392,7 @@ def main():
                                     },
                                 )  # Compile the model just like before
 
+                                print('about to fit the model')
                                 # Train on the full dataset
                                 final_model_sep.fit(
                                     X_train,
