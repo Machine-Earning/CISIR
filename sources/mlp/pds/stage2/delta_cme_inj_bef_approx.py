@@ -1,18 +1,17 @@
 import os
 from datetime import datetime
 
-# Set the environment variable for CUDA (in case it is necessary)
-# os.environ['CUDA_VISIBLE_DEVICES'] = '2'
-
+import numpy as np
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
-import numpy as np
 
 from modules.evaluate.utils import plot_tsne_delta, plot_repr_corr_dist
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.shared.globals import *
 from modules.training.cme_modeling import ModelBuilder
+from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
@@ -25,9 +24,9 @@ from modules.training.ts_modeling import (
     plot_error_hist,
     set_seed)
 from modules.training.utils import get_weight_path
-from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 
-from modules.shared.globals import *
+# Set the environment variable for CUDA (in case it is necessary)
+# os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 mb = ModelBuilder()
 pm = TrainingPhaseManager()
@@ -64,7 +63,9 @@ def main():
                                 outputs_to_use = OUTPUTS_TO_USE
                                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
-                                lambda_ = 16  # LAMBDA
+                                lambda_ = 0.05  # LAMBDA
+                                alphaV_mse = 1  # alpha for mse on validation
+                                alphaV_pcc = 0  # alpha for pcc on validation
                                 # Construct the title
                                 title = f'MLP_S2min_{inputs_str}_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_rho{rho:.2f}_lambda{lambda_}'
 
@@ -113,7 +114,7 @@ def main():
                                 mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                                 # Initialize wandb
-                                wandb.init(project="nasa-ts-delta-v7-nl", name=experiment_name, config={
+                                wandb.init(project="mse-pcc-v7", name=experiment_name, config={
                                     "inputs_to_use": inputs_to_use,
                                     "add_slope": add_slope,
                                     "patience": patience,
@@ -129,6 +130,9 @@ def main():
                                     "target_change": target_change,
                                     "seed": seed,
                                     "alpha_mse": alpha_mse,
+                                    "alpha_pcc": alpha_pcc,
+                                    "alphaV_mse": alphaV_mse,
+                                    "alphaV_pcc": alphaV_pcc,
                                     "bandwidth": bandwidth,
                                     "reciprocal_reweight": RECIPROCAL_WEIGHTS,
                                     "repr_dim": repr_dim,
@@ -209,27 +213,42 @@ def main():
 
                                 print(f'rebalancing the training set...')
                                 min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
-                                train_weights_dict = exDenseReweightsD(
+                                mse_train_weights_dict = exDenseReweightsD(
                                     X_train, delta_train,
-                                    alpha=alpha_rw, bw=bandwidth,
+                                    alpha=alpha_mse, bw=bandwidth,
+                                    min_norm_weight=min_norm_weight,
+                                    debug=False).label_reweight_dict
+                                pcc_train_weights_dict = exDenseReweightsD(
+                                    X_train, delta_train,
+                                    alpha=alpha_pcc, bw=bandwidth,
                                     min_norm_weight=min_norm_weight,
                                     debug=False).label_reweight_dict
                                 print(f'training set rebalanced.')
 
                                 print(f'rebalancing the subtraining set...')
                                 min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
-                                subtrain_weights_dict = exDenseReweightsD(
+                                mse_subtrain_weights_dict = exDenseReweightsD(
                                     X_subtrain, delta_subtrain,
-                                    alpha=alpha_rw, bw=bandwidth,
+                                    alpha=alpha_mse, bw=bandwidth,
+                                    min_norm_weight=min_norm_weight,
+                                    debug=False).label_reweight_dict
+                                pcc_subtrain_weights_dict = exDenseReweightsD(
+                                    X_subtrain, delta_subtrain,
+                                    alpha=alpha_pcc, bw=bandwidth,
                                     min_norm_weight=min_norm_weight,
                                     debug=False).label_reweight_dict
                                 print(f'subtraining set rebalanced.')
 
                                 print(f'rebalancing the validation set...')
                                 min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
-                                val_weights_dict = exDenseReweightsD(
+                                mse_val_weights_dict = exDenseReweightsD(
                                     X_val, delta_val,
-                                    alpha=1, bw=bandwidth,
+                                    alpha=alphaV_mse, bw=bandwidth,
+                                    min_norm_weight=min_norm_weight,
+                                    debug=False).label_reweight_dict
+                                pcc_val_weights_dict = exDenseReweightsD(
+                                    X_val, delta_val,
+                                    alpha=alphaV_pcc, bw=bandwidth,
                                     min_norm_weight=min_norm_weight,
                                     debug=False).label_reweight_dict
                                 print(f'validation set rebalanced.')
@@ -317,8 +336,10 @@ def main():
                                             y_true, y_pred,
                                             phase_manager=pm,
                                             lambda_factor=lambda_,
-                                            train_weight_dict=subtrain_weights_dict,
-                                            val_weight_dict=val_weights_dict
+                                            train_mse_weight_dict=mse_subtrain_weights_dict,
+                                            train_pcc_weight_dict=pcc_subtrain_weights_dict,
+                                            val_mse_weight_dict=mse_val_weights_dict,
+                                            val_pcc_weight_dict=pcc_val_weights_dict,
                                         )
                                     }
                                 )
@@ -382,7 +403,8 @@ def main():
                                             y_true, y_pred,
                                             phase_manager=pm,
                                             lambda_factor=lambda_,
-                                            train_weight_dict=train_weights_dict,
+                                            train_mse_weight_dict=mse_train_weights_dict,
+                                            train_pcc_weight_dict=pcc_train_weights_dict,
                                         )
                                     },
                                 )  # Compile the model just like before
