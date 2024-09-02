@@ -1,7 +1,6 @@
 import os
 from datetime import datetime
 
-import numpy as np
 import wandb
 from keras.callbacks import EarlyStopping
 from tensorflow.keras.callbacks import ReduceLROnPlateau
@@ -236,65 +235,6 @@ def main():
                             print(f'n_features: {n_features}')
 
                             # create the model
-                            model_sep = create_attentive_model(
-                                input_dim=n_features,
-                                output_dim=output_dim,
-                                hidden_blocks=BLOCKS_HIDDENS,
-                                attn_hidden_units=ATTN_HIDDENS,
-                                attn_hidden_activation=activation,
-                                attn_skipped_layers=attn_skipped_layers,
-                                attn_residual=attn_residual,
-                                attn_dropout_rate=attn_dropout_rate,
-                                attn_norm=attn_norm,
-                                skipped_blocks=skipped_blocks,
-                                repr_dim=repr_dim,
-                                dropout_rate=dropout,
-                                activation=activation,
-                                norm=norm,
-                                residual=residual,
-                                sam_rho=rho
-                            )
-                            model_sep.summary()
-
-                            # Define the EarlyStopping callback
-                            early_stopping = EarlyStopping(
-                                monitor=ES_CB_MONITOR,
-                                patience=patience,
-                                verbose=VERBOSE,
-                                restore_best_weights=ES_CB_RESTORE_WEIGHTS)
-
-                            # Compile the model with the specified learning rate
-                            model_sep.compile(
-                                optimizer=AdamW(
-                                    learning_rate=learning_rate,
-                                    weight_decay=weight_decay,
-                                    beta_1=momentum_beta1
-                                ),
-                                loss={'output': get_loss(loss_key)}
-                            )
-
-                            # Train the model with the callback
-                            history = model_sep.fit(
-                                X_subtrain,
-                                {'output': y_subtrain},
-                                sample_weight=y_subtrain_weights,
-                                epochs=epochs, batch_size=batch_size,
-                                # validation_data=(X_val, {'output': y_val}, y_val_weights),
-                                validation_data=(X_test, {'output': y_test}, y_test_weights),  # cheating to find best
-                                # val epoch
-                                callbacks=[
-                                    early_stopping,
-                                    reduce_lr_on_plateau,
-                                    WandbCallback(save_model=WANDB_SAVE_MODEL)
-                                ],
-                                verbose=VERBOSE
-                            )
-
-                            # Determine the optimal number of epochs from the fit history
-                            optimal_epochs = np.argmin(
-                                history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
-                            # optimal_epochs = int(3e4)
-
                             final_model_sep = create_attentive_model(
                                 input_dim=n_features,
                                 output_dim=output_dim,
@@ -313,9 +253,16 @@ def main():
                                 residual=residual,
                                 sam_rho=rho
                             )
+                            final_model_sep.summary()
 
-                            # final_model_sep.summary()
-                            # Recreate the model architecture
+                            # Define the EarlyStopping callback
+                            early_stopping = EarlyStopping(
+                                monitor=ES_CB_MONITOR,
+                                patience=patience,
+                                verbose=VERBOSE,
+                                restore_best_weights=True)
+
+                            # Compile the model with the specified learning rate
                             final_model_sep.compile(
                                 optimizer=AdamW(
                                     learning_rate=learning_rate,
@@ -325,14 +272,17 @@ def main():
                                 loss={'output': get_loss(loss_key)}
                             )
 
-                            # Train on the full dataset
-                            final_model_sep.fit(
+                            # Train the model with the callback
+                            history = final_model_sep.fit(
                                 X_train,
                                 {'output': y_train},
                                 sample_weight=y_train_weights,
-                                epochs=optimal_epochs,
-                                batch_size=batch_size,
+                                epochs=epochs, batch_size=batch_size,
+                                # validation_data=(X_val, {'output': y_val}, y_val_weights),
+                                validation_data=(X_test, {'output': y_test}, y_test_weights),  # cheating to find best
+                                # val epoch
                                 callbacks=[
+                                    early_stopping,
                                     reduce_lr_on_plateau,
                                     WandbCallback(save_model=WANDB_SAVE_MODEL)
                                 ],

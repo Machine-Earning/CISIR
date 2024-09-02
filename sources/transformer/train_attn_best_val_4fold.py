@@ -289,10 +289,7 @@ def main():
                                     {'output': y_subtrain},
                                     sample_weight=y_subtrain_weights,
                                     epochs=epochs, batch_size=batch_size,
-                                    # validation_data=(X_val, {'output': y_val}, y_val_weights),
-                                    validation_data=(X_test, {'output': y_test}, y_test_weights),
-                                    # cheating to find best
-                                    # val epoch
+                                    validation_data=(X_val, {'output': y_val}, y_val_weights),
                                     callbacks=[
                                         early_stopping,
                                         reduce_lr_on_plateau,
