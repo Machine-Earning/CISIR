@@ -852,7 +852,7 @@ def stratified_split(X: np.ndarray, y: np.ndarray, shuffle: bool = True, seed: i
                      debug: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Splits the dataset into subtraining and validation sets using stratified sampling.
-
+    TODO: upgrade to support folds 
     Parameters:
     X (np.ndarray): Feature matrix of shape (n_samples, n_features).
     y (np.ndarray): Label vector of shape (n_samples, 1).

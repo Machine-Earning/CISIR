@@ -44,7 +44,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}_normLongP'
+                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}_cheat'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -56,16 +56,16 @@ def main():
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
                             patience = PATIENCE  # higher patience
-                            learning_rate = 3e-4  # og learning rate
-                            activation = 'leaky_relu'  # ACTIVATION
-                            attn_skipped_layers = 1  # SKIPPED_LAYERS
-                            attn_residual = False  # RESIDUAL
-                            attn_dropout_rate = 0  # DROPOUT
-                            dropout = 0  # DROPOUT
-                            attn_norm = None  # NORM
-                            norm = NORM
-                            skipped_blocks = 1  # SKIPPED_LAYERS
-                            residual = True  # RESIDUAL
+                            learning_rate = ATTM_START_LR  # higher learning rate
+                            activation = ATTM_ACTIVATION  # 'LeakyReLU'  # higher learning rate
+                            attn_skipped_layers = ATTN_SKIPPED_LAYERS  # SKIPPED_LAYERS
+                            attn_residual = ATTN_RESIDUAL  # RESIDUAL
+                            attn_dropout_rate = ATTN_DROPOUT  # DROPOUT
+                            dropout = ATTM_DROPOUT
+                            attn_norm = ATTN_NORM
+                            norm = ATTM_NORM
+                            skipped_blocks = ATTM_SKIPPED_BLOCKS
+                            residual = ATTM_RESIDUAL
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
@@ -73,9 +73,9 @@ def main():
                                 patience=LR_CB_PATIENCE,
                                 verbose=VERBOSE,
                                 min_delta=LR_CB_MIN_DELTA,
-                                min_lr=1e-5)  # LR_CB_MIN_LR)
+                                min_lr=ATTM_LR_CB_MIN_LR)
 
-                            weight_decay = 1e-8  # WEIGHT_DECAY  # higher weight decay
+                            weight_decay = ATTM_WD  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
@@ -189,9 +189,11 @@ def main():
                             delta_train = y_train[:, 0]
                             delta_subtrain = y_subtrain[:, 0]
                             delta_val = y_val[:, 0]
+                            delta_test = y_test[:, 0]
                             print(f'delta_train.shape: {delta_train.shape}')
                             print(f'delta_subtrain.shape: {delta_subtrain.shape}')
                             print(f'delta_val.shape: {delta_val.shape}')
+                            print(f'delta_test.shape: {delta_test.shape}')
 
                             print(f'rebalancing the training set...')
                             min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
@@ -219,6 +221,15 @@ def main():
                                 min_norm_weight=min_norm_weight,
                                 debug=False).reweights
                             print(f'validation set rebalanced.')
+
+                            print(f'rebalancing the testing set...')
+                            min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(y_test)
+                            y_test_weights = exDenseReweights(
+                                X_test, delta_test,
+                                alpha=alpha_val, bw=bandwidth,
+                                min_norm_weight=min_norm_weight,
+                                debug=False).reweights
+                            print(f'testing set rebalanced.')
 
                             # get the number of features
                             n_features = X_train.shape[1]
@@ -268,7 +279,9 @@ def main():
                                 {'output': y_subtrain},
                                 sample_weight=y_subtrain_weights,
                                 epochs=epochs, batch_size=batch_size,
-                                validation_data=(X_val, {'output': y_val}, y_val_weights),
+                                # validation_data=(X_val, {'output': y_val}, y_val_weights),
+                                validation_data=(X_test, {'output': y_test}, y_test_weights),  # cheating to find best
+                                # val epoch
                                 callbacks=[
                                     early_stopping,
                                     reduce_lr_on_plateau,

@@ -13,8 +13,6 @@ MLP_HIDDENS = [
     512, 256, 512, 256, 256, 128, 256, 128,
     256, 128, 128, 128, 128, 128, 128, 128
 ]  # Hidden layers
-BLOCKS_HIDDENS = [128 for _ in range(32)]
-ATTN_HIDDENS = [128 for _ in range(7)]
 PROJ_HIDDENS = [64]  # Projection hidden layers
 LOSS_KEY = 'mse_pcc'  # Mean squared error regression loss
 LAMBDA = 3.3  # Lambda for the loss
@@ -33,7 +31,7 @@ START_LR_FT = 3e-3  # Lower due to fine-tuning
 START_LR = 1e-2  # starting learning rate
 START_LR_PDS = 7e-2  # starting learning rate
 WEIGHT_DECAY = 1e-5  # Higher weight decay
-WEIGHT_DECAY_PDS =  1e-5  # Higher weight decay for projection layers
+WEIGHT_DECAY_PDS = 1e-5  # Higher weight decay for projection layers
 MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 BANDWIDTH = 4.42e-2  # Bandwidth for rebalancing
 PATIENCE = int(7e3)  # Higher patience
@@ -48,9 +46,25 @@ DS_VERSION = 7  # Dataset version
 DS_PATH = 'data/electron_cme_data_split_v7'  # Path to the dataset
 VAL_SPLIT = 0.25  # Validation split
 TARGET_MIN_NORM_WEIGHT = 0.01  # Minimum weight for the target normalization
-COMMON_VAL_ALPHA = 0.75 #1  # Common validation alpha
+COMMON_VAL_ALPHA = 0.75  #1  # Common validation alpha
 ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
 ES_CB_RESTORE_WEIGHTS = False  # Restore weights
 WANDB_SAVE_MODEL = False  # Save model to wandb
 RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 SAM_RHOS = [0.05, 0.5]  # Rho values for SAM
+
+# ATTM AREA
+BLOCKS_HIDDENS = [128 for _ in range(32)]
+ATTN_HIDDENS = [128 for _ in range(7)]
+ATTM_START_LR = 3e-4
+ATTM_ACTIVATION = 'leaky_relu'
+ATTN_SKIPPED_LAYERS = 2
+ATTM_SKIPPED_BLOCKS = 1
+ATTN_RESIDUAL = False
+ATTM_RESIDUAL = True
+ATTM_DROPOUT = 0
+ATTN_DROPOUT = 0
+ATTN_NORM = None
+ATTM_NORM = 'batch_norm'
+ATTM_LR_CB_MIN_LR = 5e-6
+ATTM_WD = 1e-8
