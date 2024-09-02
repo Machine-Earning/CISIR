@@ -1,19 +1,14 @@
-import os
-import random
 from datetime import datetime
 
-from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density, evaluate_pcc_repr
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
-
-# Set the environment variable for CUDA (in case it is necessary)
-# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
-
-import numpy as np
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from wandb.integration.keras import WandbCallback
 
+from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density, \
+    evaluate_pcc_repr
+from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.shared.globals import *
 from modules.training import cme_modeling
 from modules.training.cme_modeling import pds_space_norm
 from modules.training.ts_modeling import (
@@ -24,7 +19,8 @@ from modules.training.ts_modeling import (
     set_seed)
 
 
-from modules.shared.globals import *
+# Set the environment variable for CUDA (in case it is necessary)
+# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 
 def main():
@@ -38,16 +34,15 @@ def main():
     # Define the dataset options, including the sharding policy
 
     for SEED in SEEDS:
-        
 
         mb = cme_modeling.ModelBuilder()
 
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for add_slope in ADD_SLOPE:
-                    for rho in [0, 0.7]:
+                    for rho in [0]:
                         # for alpha in [2]:
-                        for alpha, alphaV in zip([2.5], [5]):
+                        for alpha, alphaV in zip([2], [1]):
                             # Set NumPy seed
                             set_seed(SEED)
                             # add_slope = True
@@ -60,7 +55,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'MLPall_{inputs_str}_PDSinj_bs{bs}_alpha{alpha:.2f}_rho{rho:.2f}'
+                            title = f'MLPall_{inputs_str}_a{alpha:.2f}_aV{alphaV:.2f}_rho{rho:.2f}'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -105,7 +100,7 @@ def main():
                             n_inj = -1
 
                             # Initialize wandb
-                            wandb.init(project="nasa-ts-delta-v7-pds", name=experiment_name, config={
+                            wandb.init(project="pds-v7-fixed", name=experiment_name, config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
                                 "target_change": target_change,
@@ -275,13 +270,13 @@ def main():
 
                             print(f'pcc error delta i>= 0.5 test: {error_pcc_cond}')
                             # Log the MAE error to wandb
-                            wandb.log({"pcc_error_cond_test": error_pcc_cond})
+                            wandb.log({"pcc+": error_pcc_cond})
 
                             error_pcc = evaluate_pcc_repr(model_sep, X_test, y_test)
 
                             print(f'pcc error delta test: {error_pcc}')
                             # Log the MAE error to wandb
-                            wandb.log({"pcc_error_test": error_pcc})
+                            wandb.log({"pcc": error_pcc})
 
                             # Evaluate the model correlation with colored
                             file_path = plot_repr_corr_dist(
