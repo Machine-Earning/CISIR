@@ -28,6 +28,7 @@ from tensorflow_addons.optimizers import AdamW
 
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.sam_keras import SAMModel
+from modules.training.ts_modeling import create_weight_tensor_fast
 
 
 # from tensorflow.python.profiler import profiler_v2 as profiler
@@ -2177,46 +2178,32 @@ class ModelBuilder:
         :return: The weighted average error for all unique combinations of the samples in the batch.
         """
         batch_size = tf.shape(y_true)[0]
-
         # Compute pairwise differences for z_pred and y_true using broadcasting
         y_true_diff = y_true - tf.transpose(y_true)
         z_pred_diff = z_pred[:, tf.newaxis, :] - z_pred[tf.newaxis, :, :]
-
         # Calculate squared L2 norm for z_pred differences
         z_diff_squared = tf.reduce_sum(tf.square(z_pred_diff), axis=-1)
-
         # Calculate squared differences for y_true
         y_diff_squared = tf.square(y_true_diff)
-
         # Cast y_diff_squared to match the data type of z_diff_squared
         y_diff_squared = tf.cast(y_diff_squared, dtype=z_diff_squared.dtype)
-
         # Compute the loss for each pair
         pairwise_loss = tf.square(z_diff_squared - y_diff_squared)
-
         # Select the appropriate weight dictionary based on the mode
         sample_weights = train_sample_weights if phase_manager.is_training_phase() else val_sample_weights
 
         # Apply sample weights if provided
         if sample_weights is not None:
-            # Initialize the weights tensor with ones
-            weights = tf.ones_like(y_true, dtype=tf.float32)
-
-            # Apply the weights based on the values in y_true
-            for label, weight in sample_weights.items():
-                weights = tf.where(tf.equal(y_true, label), weight, weights)
-
+            # Use create_weight_tensor to get the weights for y_true
+            weights = create_weight_tensor_fast(y_true, sample_weights)
             weights_matrix = weights[:, None] * weights[None, :]
-
             # Cast weights_matrix to the same data type as z_diff_squared
             weights_matrix = tf.cast(weights_matrix, dtype=z_diff_squared.dtype)
-
             # Apply the weights to the pairwise loss
             pairwise_loss *= weights_matrix
 
         # Get the total error
         total_error = tf.reduce_sum(pairwise_loss)
-
         # Number of unique comparisons, excluding self-pairs
         num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=z_diff_squared.dtype)
 
