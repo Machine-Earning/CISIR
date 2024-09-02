@@ -52,11 +52,11 @@ def main():
     Main function to run the E-MLP model
     :return:
     """
-    for seed in SEEDS:
+    for seed in [456789, 42, 1234]:
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha in [0.5]:
+                    for alpha_mse, alpha_pcc in zip([0.5], [0.1]):
                         for freeze in [False]:
                             # for rho in [0.3, 0.21]:
                             for rho in [0]:
@@ -66,7 +66,7 @@ def main():
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                                 lambda_ = 16  # LAMBDA
                                 # Construct the title
-                                title = f'MLP_S2min_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_rho{rho:.2f}_lambda{lambda_}'
+                                title = f'MLP_S2min_{inputs_str}_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_rho{rho:.2f}_lambda{lambda_}'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -96,7 +96,6 @@ def main():
                                 loss_key = LOSS_KEY
 
                                 target_change = ('delta_p' in outputs_to_use)
-                                alpha_rw = alpha
                                 bandwidth = BANDWIDTH
                                 repr_dim = REPR_DIM
                                 output_dim = len(outputs_to_use)
@@ -129,7 +128,7 @@ def main():
                                     "lambda": lambda_,
                                     "target_change": target_change,
                                     "seed": seed,
-                                    "alpha_rw": alpha_rw,
+                                    "alpha_mse": alpha_mse,
                                     "bandwidth": bandwidth,
                                     "reciprocal_reweight": RECIPROCAL_WEIGHTS,
                                     "repr_dim": repr_dim,
