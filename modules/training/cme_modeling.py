@@ -26,9 +26,8 @@ from tensorflow.keras.layers import (
 )
 from tensorflow_addons.optimizers import AdamW
 
-from modules.training.phase_manager import TrainingPhaseManager, IsTraining
+from modules.training.phase_manager import TrainingPhaseManager, IsTraining, create_weight_tensor_fast
 from modules.training.sam_keras import SAMModel
-from modules.training.ts_modeling import create_weight_tensor_fast
 
 
 # from tensorflow.python.profiler import profiler_v2 as profiler
