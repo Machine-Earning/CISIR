@@ -24,11 +24,13 @@ from modules.training.ts_modeling import (
     plot_error_hist,
     set_seed)
 from modules.training.utils import get_weight_path
+from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 import numpy as np
 
 from modules.shared.globals import *
 
 mb = ModelBuilder()
+pm = TrainingPhaseManager()
 
 # Define the lookup dictionary
 weight_paths = {
@@ -54,7 +56,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha in np.arange(1, 1.6, 0.2):
+                    for alpha in [0.7]:
                         for freeze in [False]:
                             # for rho in [0.3, 0.21]:
                             for rho in [0]:
@@ -381,7 +383,7 @@ def main():
                                     ),
                                     loss={
                                         'forecast_head': lambda y_true, y_pred: pcc_loss(
-                                            y_true, y_pred,
+                                            y_true, y_pred, pm,
                                             # lambda_factor=lambda_,
                                             train_weight_dict=train_weights_dict,
                                             val_weight_dict=train_weights_dict,
@@ -398,7 +400,8 @@ def main():
                                     batch_size=batch_size,
                                     callbacks=[
                                         reduce_lr_on_plateau,
-                                        WandbCallback(save_model=WANDB_SAVE_MODEL)
+                                        WandbCallback(save_model=WANDB_SAVE_MODEL),
+                                        IsTraining(pm)
                                     ],
                                     verbose=VERBOSE
                                 )

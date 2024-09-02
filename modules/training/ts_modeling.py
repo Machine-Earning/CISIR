@@ -3144,6 +3144,31 @@ def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
     # Return the final loss as a single scalar value
     return loss
 
+def create_weight_tensor_fast(y_true: tf.Tensor, weight_dict: Optional[Dict[float, float]]) -> tf.Tensor:
+    """
+    Creates a tensor of weights corresponding to the values in y_true based on the provided weight_dict.
+
+    Args:
+        y_true (tf.Tensor): The tensor containing the ground truth labels.
+        weight_dict (Dict[float, float], optional): A dictionary mapping label values to their corresponding weights.
+
+    Returns:
+        tf.Tensor: A tensor of weights corresponding to y_true.
+    """
+    # If no weight dictionary is provided, return a tensor of ones (default weight 1.0)
+    if weight_dict is None:
+        return tf.ones_like(y_true, dtype=tf.float32)
+
+    # Extract unique values and corresponding weights from the weight_dict
+    unique_labels = tf.constant(list(weight_dict.keys()), dtype=y_true.dtype)
+    weights = tf.constant(list(weight_dict.values()), dtype=tf.float32)
+
+    # Use a lookup table to efficiently map labels in y_true to their corresponding weights
+    initializer = tf.lookup.KeyValueTensorInitializer(keys=unique_labels, values=weights)
+    table = tf.lookup.StaticHashTable(initializer, default_value=1.0)  # Default weight is 1.0 if no match is found
+    y_true_weights = table.lookup(y_true)
+
+    return y_true_weights
 
 def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,
              phase_manager: TrainingPhaseManager,
@@ -3165,12 +3190,8 @@ def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,
     """
     weight_dict = train_weight_dict if phase_manager.is_training_phase() else val_weight_dict
 
-    if weight_dict is not None:
-        weights = tf.ones_like(y_true, dtype=tf.float32)
-        for label, weight in weight_dict.items():
-            weights = tf.where(tf.equal(y_true, label), weight, weights)
-    else:
-        weights = tf.ones_like(y_true, dtype=tf.float32)
+    # Generate the weight tensor using the optimized function
+    weights = create_weight_tensor_fast(y_true, weight_dict)
 
     # Ensure y_true and y_pred are of type float32
     y_true = tf.cast(y_true, tf.float32)
