@@ -44,7 +44,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}_skip3'
+                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}_llr'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -56,7 +56,7 @@ def main():
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
                             patience = int(3e3) #PATIENCE  # higher patience
-                            learning_rate = 3e-4  # og learning rate
+                            learning_rate = 7e-5  # og learning rate
                             activation = 'leaky_relu'  # ACTIVATION
                             attn_skipped_layers = 1  # SKIPPED_LAYERS
                             attn_residual = False  # RESIDUAL
@@ -64,7 +64,7 @@ def main():
                             dropout = 0  # DROPOUT
                             attn_norm = None  # NORM
                             norm = 'batch_norm'
-                            skipped_blocks = 3  # SKIPPED_LAYERS
+                            skipped_blocks = 1  # SKIPPED_LAYERS
                             residual = True  # RESIDUAL
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
@@ -73,7 +73,7 @@ def main():
                                 patience=LR_CB_PATIENCE,
                                 verbose=VERBOSE,
                                 min_delta=LR_CB_MIN_DELTA,
-                                min_lr=1e-5)  # LR_CB_MIN_LR)
+                                min_lr=1e-6)  # LR_CB_MIN_LR)
 
                             weight_decay = 1e-8  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
