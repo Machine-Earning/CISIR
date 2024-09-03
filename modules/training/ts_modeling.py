@@ -932,11 +932,12 @@ def stratified_4fold_split(
 ) -> Generator[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], None, None]:
     """
     Splits the dataset into 4 folds using stratified sampling and yields one fold at a time.
+    This method ensures no overlap between validation folds.
 
     Parameters:
     X (np.ndarray): Feature matrix of shape (n_samples, n_features).
     y (np.ndarray): Label vector of shape (n_samples, 1).
-    shuffle (bool): Whether to shuffle the data before splitting. Default is True.
+    shuffle (bool): Whether to shuffle the data after splitting. Default is True.
     seed (int): Random seed for reproducibility. Default is None.
     debug (bool): Whether to plot the distributions of the original, subtrain, and validation sets. Default is False.
 
@@ -956,28 +957,38 @@ def stratified_4fold_split(
     y_sorted = y[sorted_indices]
 
     num_samples = X.shape[0]
-    fold_size = num_samples // 4
+    group_size = 4  # Size of each group
+    num_groups = num_samples // group_size
 
     # Initialize lists to hold indices for each fold
     fold_indices = [[] for _ in range(4)]
 
-    # Divide into groups of 4 and distribute across folds
-    for i in range(0, num_samples, 4):
-        group_indices = list(range(i, min(i + 4, num_samples)))
-        if shuffle:
-            np.random.shuffle(group_indices)  # Shuffle within the group
+    # Divide the sorted data into groups of 4 and assign indices to each fold
+    for group_start in range(0, num_groups * group_size, group_size):
+        group_indices = list(range(group_start, group_start + group_size))
 
-        for j, index in enumerate(group_indices):
-            fold_indices[j % 4].append(index)
+        # Ensure that each fold gets one unique sample from each group
+        for fold in range(4):
+            val_index = group_indices[fold]
+            fold_indices[fold].append(val_index)
 
+    # Generate the folds
     for fold in range(4):
         val_indices = fold_indices[fold]
-        subtrain_indices = [idx for i in range(4) if i != fold for idx in fold_indices[i]]
+        subtrain_indices = [index for i in range(4) if i != fold for index in fold_indices[i]]
 
         X_val = X_sorted[val_indices]
         y_val = y_sorted[val_indices]
         X_subtrain = X_sorted[subtrain_indices]
         y_subtrain = y_sorted[subtrain_indices]
+
+        # Optional: shuffle the resulting folds
+        if shuffle:
+            perm = np.random.permutation(len(X_subtrain))
+            X_subtrain, y_subtrain = X_subtrain[perm], y_subtrain[perm]
+
+            perm = np.random.permutation(len(X_val))
+            X_val, y_val = X_val[perm], y_val[perm]
 
         yield X_subtrain, y_subtrain, X_val, y_val
 

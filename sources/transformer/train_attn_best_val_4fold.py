@@ -54,7 +54,7 @@ def main():
 
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
-                            patience = PATIENCE  # higher patience
+                            patience = FOLD_PATIENCE  # higher patience
                             learning_rate = ATTM_START_LR  # higher learning rate
                             activation = ATTM_ACTIVATION  # 'LeakyReLU'  # higher learning rate
                             attn_skipped_layers = ATTN_SKIPPED_LAYERS  # SKIPPED_LAYERS

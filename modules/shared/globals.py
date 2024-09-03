@@ -69,3 +69,4 @@ ATTM_NORM = 'batch_norm'
 ATTM_LR_CB_MIN_LR = 1e-6
 ATTM_WD = 1e-8
 ATTM_LR_CB_FACTOR = 0.75
+FOLD_PATIENCE = int(3e3)
