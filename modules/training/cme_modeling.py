@@ -15,7 +15,6 @@ import tensorflow as tf
 from keras.regularizers import l2
 from numpy import ndarray
 from tensorflow import Tensor
-from tensorflow.keras import backend as K
 from tensorflow.keras import layers, callbacks, Model
 from tensorflow.keras.layers import (
     Dense,
@@ -27,6 +26,7 @@ from tensorflow.keras.layers import (
 )
 from tensorflow_addons.optimizers import AdamW
 
+from modules.training.phase_manager import TrainingPhaseManager, IsTraining, create_weight_tensor_fast
 from modules.training.sam_keras import SAMModel
 
 
@@ -734,6 +734,7 @@ class ModelBuilder:
                   X_val: np.ndarray,
                   y_val: np.ndarray,
                   train_label_weights_dict: Optional[Dict[float, float]] = None,
+                  val_label_weights_dict: Optional[Dict[float, float]] = None,
                   learning_rate: float = 1e-3,
                   epochs: int = 100,
                   batch_size: int = 32,
@@ -754,6 +755,7 @@ class ModelBuilder:
         :param y_val: Validation labels.
         :param model: The TensorFlow model to train.
         :param train_label_weights_dict: Dictionary containing label weights for the training set.
+        :param val_label_weights_dict: Dictionary containing label weights for the validation set.
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
         :param batch_size: The batch size for training.
@@ -768,8 +770,13 @@ class ModelBuilder:
         :return: The training history as a dictionary.
         """
 
+        pm = TrainingPhaseManager()
+
         if callbacks_list is None:
             callbacks_list = []
+
+        # Add the IsTraining callback to the list
+        callbacks_list.append(IsTraining(pm))
 
         # Initialize early stopping and model checkpointing for subtraining
         early_stopping_cb = tf.keras.callbacks.EarlyStopping(
@@ -798,7 +805,10 @@ class ModelBuilder:
                 beta_1=momentum_beta1
             ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
-                y_true, y_pred, sample_weights=train_label_weights_dict
+                y_true, y_pred,
+                phase_manager=pm,
+                train_sample_weights=train_label_weights_dict,
+                val_sample_weights=val_label_weights_dict,
             )
         )
 
@@ -828,7 +838,9 @@ class ModelBuilder:
                 beta_1=momentum_beta1
             ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
-                y_true, y_pred, sample_weights=train_label_weights_dict
+                y_true, y_pred,
+                phase_manager=pm,
+                train_sample_weights=train_label_weights_dict,
             )
         )
 
@@ -1071,6 +1083,7 @@ class ModelBuilder:
                       X_val: np.ndarray,
                       y_val: np.ndarray,
                       train_label_weights_dict: Optional[Dict[float, float]] = None,
+                      val_label_weights_dict: Optional[Dict[float, float]] = None,
                       learning_rate: float = 1e-3,
                       epochs: int = 100,
                       batch_size: int = 32,
@@ -1094,6 +1107,7 @@ class ModelBuilder:
         :param y_val: Validation labels.
         :param model: The TensorFlow model to train.
         :param train_label_weights_dict: Dictionary containing label weights for the training set.
+        :param val_label_weights_dict: Dictionary containing label weights for the validation set.
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
         :param batch_size: The batch size for training.
@@ -1110,8 +1124,13 @@ class ModelBuilder:
         :return: The training history as a History object.
         """
 
+        pm = TrainingPhaseManager()
+
         if callbacks_list is None:
             callbacks_list = []
+
+        # Add the IsTraining callback to the list
+        callbacks_list.append(IsTraining(pm))
 
         # Initialize early stopping and model checkpointing for subtraining
         early_stopping_cb = tf.keras.callbacks.EarlyStopping(
@@ -1281,7 +1300,10 @@ class ModelBuilder:
                 beta_1=momentum_beta1
             ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
-                y_true, y_pred, sample_weights=train_label_weights_dict
+                y_true, y_pred,
+                phase_manager=pm,
+                train_sample_weights=train_label_weights_dict,
+                val_sample_weights=val_label_weights_dict,
             )
         )
 
@@ -1316,7 +1338,9 @@ class ModelBuilder:
                 beta_1=momentum_beta1
             ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
-                y_true, y_pred, sample_weights=train_label_weights_dict
+                y_true, y_pred,
+                phase_manager=pm,
+                train_sample_weights=train_label_weights_dict,
             )
         )
 
@@ -1352,6 +1376,7 @@ class ModelBuilder:
                             X_val: np.ndarray,
                             y_val: np.ndarray,
                             train_label_weights_dict: Optional[Dict[float, float]] = None,
+                            val_label_weights_dict: Optional[Dict[float, float]] = None,
                             learning_rate: float = 1e-3,
                             epochs: int = 100,
                             batch_size: int = 32,
@@ -1377,6 +1402,7 @@ class ModelBuilder:
         :param y_val: Validation labels.
         :param model: The TensorFlow model to train.
         :param train_label_weights_dict: Dictionary containing label weights for the training set.
+        :param val_label_weights_dict: Dictionary containing label weights for the validation set.
         :param learning_rate: The learning rate for the Adam optimizer.
         :param epochs: The maximum number of epochs for training.
         :param batch_size: The batch size for training.
@@ -1393,8 +1419,13 @@ class ModelBuilder:
         :return: The training history as a History object.
         """
 
+        pm = TrainingPhaseManager()
+
         if callbacks_list is None:
             callbacks_list = []
+
+        # Add the IsTraining callback to the list
+        callbacks_list.append(IsTraining(pm))
 
         # Initialize early stopping and model checkpointing for subtraining
         early_stopping_cb = tf.keras.callbacks.EarlyStopping(
@@ -1557,7 +1588,10 @@ class ModelBuilder:
                 beta_1=momentum_beta1
             ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
-                y_true, y_pred, sample_weights=train_label_weights_dict
+                y_true, y_pred,
+                phase_manager=pm,
+                train_sample_weights=train_label_weights_dict,
+                val_sample_weights=val_label_weights_dict,
             )
         )
 
@@ -1589,7 +1623,9 @@ class ModelBuilder:
                 beta_1=momentum_beta1
             ),
             loss=lambda y_true, y_pred: self.pds_loss_vec(
-                y_true, y_pred, sample_weights=train_label_weights_dict
+                y_true, y_pred,
+                phase_manager=pm,
+                train_sample_weights=train_label_weights_dict,
             )
         )
 
@@ -2123,50 +2159,9 @@ class ModelBuilder:
 
         return squared_difference
 
-    def pds_loss_dl(self, y_true, z_pred, sample_weights=None, reduction=tf.keras.losses.Reduction.NONE):
-        """
-        Computes the weighted loss for a batch of predicted features and their labels.
-
-        :param y_true: A batch of true label values, shape of [batch_size, 1].
-        :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
-        :param sample_weights: A batch of sample weights, shape of [batch_size, 1].
-        :param reduction: The type of reduction to apply to the loss.
-        :return: The weighted average error for all unique combinations of the samples in the batch.
-        """
-        int_batch_size = tf.shape(z_pred)[0]
-        batch_size = tf.cast(int_batch_size, dtype=tf.float32)
-        total_error = tf.constant(0.0, dtype=tf.float32)
-
-        # Initialize counter for sample_weights
-        weight_idx = 0
-
-        # Loop through all unique pairs of samples in the batch
-        for i in tf.range(int_batch_size):
-            for j in tf.range(i + 1, int_batch_size):
-                z1, z2 = z_pred[i], z_pred[j]
-                label1, label2 = y_true[i], y_true[j]
-                err = error(z1, z2, label1, label2)  # Assuming `error` is defined elsewhere in your code
-
-                # Apply sample weights if provided
-                if sample_weights is not None:
-                    weight = sample_weights[weight_idx]  # Get the weight for this pair
-                    weighted_err = err * weight
-                    weight_idx += 1  # Move to the next weight
-                else:
-                    weighted_err = err
-
-                total_error += tf.cast(weighted_err, dtype=tf.float32)
-
-        if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error  # Total loss
-        elif reduction == tf.keras.losses.Reduction.NONE:
-            denom = tf.cast(batch_size * (batch_size - 1) / 2 + 1e-9, dtype=tf.float32)
-            return total_error / denom  # Average loss
-        else:
-            raise ValueError(f"Unsupported reduction type: {reduction}.")
-
     def pds_loss_vec(self,
                      y_true: tf.Tensor, z_pred: tf.Tensor,
+                     phase_manager: TrainingPhaseManager,
                      train_sample_weights: dict = None,
                      val_sample_weights: dict = None,
                      reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE) -> tf.Tensor:
@@ -2175,73 +2170,39 @@ class ModelBuilder:
 
         :param y_true: A batch of true label values, shape of [batch_size, 1].
         :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
+        :param phase_manager: Manager that tracks whether we are in training or validation phase.
         :param train_sample_weights: A dictionary mapping label values to their corresponding reweight during training.
         :param val_sample_weights: A dictionary mapping label values to their corresponding reweight during validation.
         :param reduction: The type of reduction to apply to the loss.
         :return: The weighted average error for all unique combinations of the samples in the batch.
         """
         batch_size = tf.shape(y_true)[0]
-
         # Compute pairwise differences for z_pred and y_true using broadcasting
         y_true_diff = y_true - tf.transpose(y_true)
         z_pred_diff = z_pred[:, tf.newaxis, :] - z_pred[tf.newaxis, :, :]
-
         # Calculate squared L2 norm for z_pred differences
         z_diff_squared = tf.reduce_sum(tf.square(z_pred_diff), axis=-1)
-
         # Calculate squared differences for y_true
         y_diff_squared = tf.square(y_true_diff)
-
         # Cast y_diff_squared to match the data type of z_diff_squared
         y_diff_squared = tf.cast(y_diff_squared, dtype=z_diff_squared.dtype)
-
         # Compute the loss for each pair
         pairwise_loss = tf.square(z_diff_squared - y_diff_squared)
-
-        # Determine if the current mode is training or validation/testing
-        is_training = K.learning_phase()
-
         # Select the appropriate weight dictionary based on the mode
-        sample_weights = train_sample_weights if is_training else val_sample_weights
-
-        # Apply sample weights if provided
-        # if sample_weights is not None:
-        #     # Convert sample_weights keys to strings
-        #     keys = tf.constant(list(map(str, sample_weights.keys())), dtype=tf.string)
-        #     values = tf.constant(list(sample_weights.values()), dtype=tf.float32)
-        #     table = tf.lookup.StaticHashTable(tf.lookup.KeyValueTensorInitializer(keys, values), default_value=1.0)
-        #
-        #     # Lookup the weights for each y_true value
-        #     weights = table.lookup(tf.as_string(tf.reshape(y_true, [-1])))
-        #     weights_matrix = weights[:, None] * weights[None, :]
-        #
-        #     # Cast weights_matrix to the same data type as z_diff_squared
-        #     weights_matrix = tf.cast(weights_matrix, dtype=z_diff_squared.dtype)
-        #
-        #     # Apply the weights to the pairwise loss
-        #     pairwise_loss *= weights_matrix
+        sample_weights = train_sample_weights if phase_manager.is_training_phase() else val_sample_weights
 
         # Apply sample weights if provided
         if sample_weights is not None:
-            # Initialize the weights tensor with ones
-            weights = tf.ones_like(y_true, dtype=tf.float32)
-
-            # Apply the weights based on the values in y_true
-            for label, weight in sample_weights.items():
-                weights = tf.where(tf.equal(y_true, label), weight, weights)
-
+            # Use create_weight_tensor to get the weights for y_true
+            weights = create_weight_tensor_fast(y_true, sample_weights)
             weights_matrix = weights[:, None] * weights[None, :]
-
             # Cast weights_matrix to the same data type as z_diff_squared
             weights_matrix = tf.cast(weights_matrix, dtype=z_diff_squared.dtype)
-
             # Apply the weights to the pairwise loss
             pairwise_loss *= weights_matrix
 
-
         # Get the total error
         total_error = tf.reduce_sum(pairwise_loss)
-
         # Number of unique comparisons, excluding self-pairs
         num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=z_diff_squared.dtype)
 

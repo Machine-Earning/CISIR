@@ -2,7 +2,7 @@ import os
 import random
 import traceback
 from collections import Counter
-from typing import Tuple, List, Optional, Union, Callable, Dict
+from typing import Tuple, List, Optional, Union, Callable, Dict, Generator
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -40,6 +40,7 @@ from tensorflow.keras.optimizers import Optimizer
 from tensorflow.keras.regularizers import l2
 
 from modules.training.cme_modeling import NormalizeLayer
+from modules.training.phase_manager import TrainingPhaseManager, create_weight_tensor_fast
 from modules.training.sam_keras import SAMModel
 
 # Seeds for reproducibility
@@ -851,7 +852,7 @@ def stratified_split(X: np.ndarray, y: np.ndarray, shuffle: bool = True, seed: i
                      debug: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Splits the dataset into subtraining and validation sets using stratified sampling.
-
+    TODO: upgrade to support folds
     Parameters:
     X (np.ndarray): Feature matrix of shape (n_samples, n_features).
     y (np.ndarray): Label vector of shape (n_samples, 1).
@@ -920,6 +921,65 @@ def stratified_split(X: np.ndarray, y: np.ndarray, shuffle: bool = True, seed: i
         plot_distributions(y, y_subtrain, y_val)
 
     return X_subtrain, y_subtrain, X_val, y_val
+
+
+def stratified_4fold_split(
+        X: np.ndarray,
+        y: np.ndarray,
+        shuffle: bool = True,
+        seed: int = None,
+        debug: bool = False
+) -> Generator[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], None, None]:
+    """
+    Splits the dataset into 4 folds using stratified sampling and yields one fold at a time.
+
+    Parameters:
+    X (np.ndarray): Feature matrix of shape (n_samples, n_features).
+    y (np.ndarray): Label vector of shape (n_samples, 1).
+    shuffle (bool): Whether to shuffle the data before splitting. Default is True.
+    seed (int): Random seed for reproducibility. Default is None.
+    debug (bool): Whether to plot the distributions of the original, subtrain, and validation sets. Default is False.
+
+    Yields:
+    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Split feature and label matrices:
+        - X_subtrain: Features for the subtraining set.
+        - y_subtrain: Labels for the subtraining set.
+        - X_val: Features for the validation set.
+        - y_val: Labels for the validation set.
+    """
+    if shuffle:
+        np.random.seed(seed)
+
+    # Sort the data by the labels
+    sorted_indices = np.argsort(y, axis=0).flatten()
+    X_sorted = X[sorted_indices]
+    y_sorted = y[sorted_indices]
+
+    num_samples = X.shape[0]
+    fold_size = num_samples // 4
+
+    # Initialize lists to hold indices for each fold
+    fold_indices = [[] for _ in range(4)]
+
+    # Divide into groups of 4 and distribute across folds
+    for i in range(0, num_samples, 4):
+        group_indices = list(range(i, min(i + 4, num_samples)))
+        if shuffle:
+            np.random.shuffle(group_indices)  # Shuffle within the group
+
+        for j, index in enumerate(group_indices):
+            fold_indices[j % 4].append(index)
+
+    for fold in range(4):
+        val_indices = fold_indices[fold]
+        subtrain_indices = [idx for i in range(4) if i != fold for idx in fold_indices[i]]
+
+        X_val = X_sorted[val_indices]
+        y_val = y_sorted[val_indices]
+        X_subtrain = X_sorted[subtrain_indices]
+        y_subtrain = y_sorted[subtrain_indices]
+
+        yield X_subtrain, y_subtrain, X_val, y_val
 
 
 def plot_distributions(y_train: np.ndarray, y_subtrain: np.ndarray, y_val: np.ndarray) -> None:
@@ -3022,40 +3082,6 @@ def pearson_correlation_coefficient(y_true: tf.Tensor, y_pred: tf.Tensor, sample
     return pcc
 
 
-def pcc_intermediate(x: tf.Tensor, y: tf.Tensor) -> tf.Tensor:
-    """
-    Computes the intermediate vector for the Pearson correlation coefficient (PCC)
-    before the final summation.
-    :param x (tf.Tensor): A 1D tensor containing the first set of samples.
-    :param y (tf.Tensor): A 1D tensor containing the second set of samples.
-    :return tf.Tensor: A tensor containing the intermediate PCC values for each element.
-    """
-    # Ensure the inputs are tensors of type float32
-    x = tf.convert_to_tensor(x, dtype=tf.float32)
-    y = tf.convert_to_tensor(y, dtype=tf.float32)
-
-    # Compute the means of x and y
-    mean_x = tf.reduce_mean(x)
-    mean_y = tf.reduce_mean(y)
-
-    # Compute the differences from the means
-    diff_x = x - mean_x
-    diff_y = y - mean_y
-
-    # Compute the product of the differences (numerator component)
-    numerator_vector = diff_x * diff_y
-
-    # Compute the denominator (which is constant for all i's)
-    denominator_x = tf.reduce_sum(tf.square(diff_x))
-    denominator_y = tf.reduce_sum(tf.square(diff_y))
-    denominator = tf.sqrt(denominator_x * denominator_y)
-
-    # Compute the final PCC value for each element
-    pcc_values = numerator_vector / denominator
-
-    return pcc_values
-
-
 def evaluate_lag_error(
         timestamps: np.ndarray,
         actual_ts: np.ndarray,
@@ -3128,8 +3154,11 @@ def evaluate_lag_error(
 
 def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
             lambda_factor: float,
-            train_weight_dict: dict = None,
-            val_weight_dict: dict = None) -> tf.Tensor:
+            phase_manager: 'TrainingPhaseManager',
+            train_mse_weight_dict: Optional[Dict[float, float]] = None,
+            val_mse_weight_dict: Optional[Dict[float, float]] = None,
+            train_pcc_weight_dict: Optional[Dict[float, float]] = None,
+            val_pcc_weight_dict: Optional[Dict[float, float]] = None) -> tf.Tensor:
     """
     Custom loss function combining Mean Squared Error (MSE) and Pearson Correlation Coefficient (PCC)
     with re-weighting based on label values. The final loss is a combination of weighted MSE and
@@ -3139,45 +3168,33 @@ def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
     - y_true (tf.Tensor): Ground truth labels.
     - y_pred (tf.Tensor): Predicted labels.
     - lambda_factor (float): Scaling factor for the PCC portion of the loss.
-    - train_weight_dict (dict, optional): Dictionary mapping label values to weights for training samples.
-    - val_weight_dict (dict, optional): Dictionary mapping label values to weights for validation samples.
+    - phase_manager (TrainingPhaseManager): Manager that tracks whether we are in training or validation phase.
+    - train_mse_weight_dict (dict, optional): Dictionary mapping label values to weights for training MSE samples.
+    - val_mse_weight_dict (dict, optional): Dictionary mapping label values to weights for validation MSE samples.
+    - train_pcc_weight_dict (dict, optional): Dictionary mapping label values to weights for training PCC samples.
+    - val_pcc_weight_dict (dict, optional): Dictionary mapping label values to weights for validation PCC samples.
 
     Returns:
     - tf.Tensor: The calculated loss value as a single scalar.
     """
-    # Determine if the current mode is training or validation/testing
-    is_training = K.learning_phase()
+    # Select the appropriate weight dictionaries based on the mode
+    mse_weight_dict = train_mse_weight_dict if phase_manager.is_training_phase() else val_mse_weight_dict
+    pcc_weight_dict = train_pcc_weight_dict if phase_manager.is_training_phase() else val_pcc_weight_dict
 
-    # Select the appropriate weight dictionary based on the mode
-    weight_dict = train_weight_dict if is_training else val_weight_dict
-
-    # Create a weight tensor based on the labels
-    if weight_dict is not None:
-        # Convert the dictionary keys to strings and values to tensors
-        keys = tf.constant(list(map(str, weight_dict.keys())), dtype=tf.string)
-        values = tf.constant(list(weight_dict.values()), dtype=tf.float32)
-
-        # Create a lookup table
-        table = tf.lookup.StaticHashTable(
-            initializer=tf.lookup.KeyValueTensorInitializer(keys, values),
-            default_value=1.0  # Default weight if a key is not found
-        )
-
-        # Lookup the weights for each y_true value
-        weights = table.lookup(tf.as_string(tf.reshape(y_true, [-1])))
-    else:
-        weights = tf.ones_like(y_true, dtype=tf.float32)
+    # Generate the weight tensors for MSE and PCC using the optimized function
+    mse_weights = create_weight_tensor_fast(y_true, mse_weight_dict)
+    pcc_weights = create_weight_tensor_fast(y_true, pcc_weight_dict)
 
     # Compute the Mean Squared Error (MSE)
-    mse = tf.reduce_mean(weights * tf.square(y_true - y_pred))
+    mse = tf.reduce_mean(mse_weights * tf.square(y_true - y_pred))
 
     # Compute the Pearson Correlation Coefficient (PCC)
     y_true_centered = y_true - tf.reduce_mean(y_true)
     y_pred_centered = y_pred - tf.reduce_mean(y_pred)
 
-    cov = tf.reduce_sum(weights * y_true_centered * y_pred_centered)
-    std_y_true = tf.sqrt(tf.reduce_sum(weights * tf.square(y_true_centered)))
-    std_y_pred = tf.sqrt(tf.reduce_sum(weights * tf.square(y_pred_centered)))
+    cov = tf.reduce_sum(pcc_weights * y_true_centered * y_pred_centered)
+    std_y_true = tf.sqrt(tf.reduce_sum(pcc_weights * tf.square(y_true_centered)))
+    std_y_pred = tf.sqrt(tf.reduce_sum(pcc_weights * tf.square(y_pred_centered)))
 
     pcc = cov / (std_y_true * std_y_pred + K.epsilon())
 
@@ -3189,50 +3206,45 @@ def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
 
 
 def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,
-             train_weight_dict: dict = None,
-             val_weight_dict: dict = None,
-             training: bool = True) -> tf.Tensor:
+             phase_manager: TrainingPhaseManager,
+             train_weight_dict: Optional[Dict[int, float]] = None,
+             val_weight_dict: Optional[Dict[int, float]] = None) -> tf.Tensor:
     """
-    Custom loss function based on the Pearson Correlation Coefficient (PCC)
+    Custom loss function based on the Pearson Correlation Coefficient (PCC),
     with re-weighting based on label values. The final loss is 1 - PCC.
 
     Args:
-    - y_true (tf.Tensor): Ground truth labels.
-    - y_pred (tf.Tensor): Predicted labels.
-    - train_weight_dict (dict, optional): Dictionary mapping label values to weights for training samples.
-    - val_weight_dict (dict, optional): Dictionary mapping label values to weights for validation samples.
-    - training (bool, optional): Flag indicating whether the model is in training mode.
+        y_true (tf.Tensor): Ground truth labels.
+        y_pred (tf.Tensor): Predicted labels.
+        phase_manager (TrainingPhaseManager): Manager that tracks whether we are in training or validation phase.
+        train_weight_dict (dict, optional): Dictionary mapping label values to weights for training samples.
+        val_weight_dict (dict, optional): Dictionary mapping label values to weights for validation samples.
 
     Returns:
-    - tf.Tensor: The calculated loss value as a single scalar.
+        tf.Tensor: The calculated loss value as a single scalar.
     """
-    # Select the appropriate weight dictionary based on the mode
-    weight_dict = train_weight_dict if training else val_weight_dict
+    weight_dict = train_weight_dict if phase_manager.is_training_phase() else val_weight_dict
 
-    if weight_dict is not None:
-        # Initialize the weights tensor with ones
-        weights = tf.ones_like(y_true, dtype=tf.float32)
+    # Generate the weight tensor using the optimized function
+    weights = create_weight_tensor_fast(y_true, weight_dict)
 
-        # Apply the weights based on the values in y_true
-        for label, weight in weight_dict.items():
-            weights = tf.where(tf.equal(y_true, label), weight, weights)
-    else:
-        weights = tf.ones_like(y_true, dtype=tf.float32)
+    # Ensure y_true and y_pred are of type float32
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
 
-    # Compute the Pearson Correlation Coefficient (PCC)
+    # Calculate centered values
     y_true_centered = y_true - tf.reduce_mean(y_true)
     y_pred_centered = y_pred - tf.reduce_mean(y_pred)
 
+    # Calculate covariance and standard deviations
     cov = tf.reduce_sum(weights * y_true_centered * y_pred_centered)
     std_y_true = tf.sqrt(tf.reduce_sum(weights * tf.square(y_true_centered)))
     std_y_pred = tf.sqrt(tf.reduce_sum(weights * tf.square(y_pred_centered)))
 
+    # Calculate PCC and the final loss
     pcc = cov / (std_y_true * std_y_pred + K.epsilon())
-
-    # The loss is 1 - PCC
     loss = 1.0 - pcc
 
-    # Return the final loss as a single scalar value
     return loss
 
 
@@ -3253,73 +3265,6 @@ def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3, norm_factor: flo
     if loss_key == 'mse':
         return tf.keras.losses.MeanSquaredError()
 
-    elif loss_key == 'mse_pcc_full':
-        def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor, sample_weights: Optional[tf.Tensor] = None) -> tf.Tensor:
-            """
-            Combined Mean Squared Error (MSE) and Pearson Correlation Coefficient (PCC) loss function.
-
-            This loss function calculates the sum of MSE and a weighted PCC loss.
-            The lambda_factor controls the weight of the PCC term.
-
-            :param y_true: Ground truth values.
-            :param y_pred: Predicted values by the model.
-            :param sample_weights: Optional sample weights for the loss calculation.
-            :return: Combined MSE and PCC loss value as a single scalar.
-            """
-
-            # Calculate MSE per sample
-            mse_loss_per_sample = tf.reduce_mean(tf.square(y_pred - y_true), axis=-1)  # Shape: [batch_size]
-
-            if sample_weights is not None:
-                mse_loss_per_sample *= sample_weights  # Apply sample weights to MSE only
-
-            # Calculate the mean of MSE loss across the batch
-            mse_loss = tf.reduce_mean(mse_loss_per_sample)  # Scalar value
-
-            # Calculate PCC (which is already a single scalar value)
-            pcc_value = pearson_correlation_coefficient(y_true, y_pred, sample_weights)  # Scalar value
-
-            # PCC loss is 1 - PCC value
-            pcc_loss = 1 - pcc_value  # Scalar value
-
-            # Combine MSE and PCC loss
-            combined_loss = mse_loss + lambda_factor * pcc_loss
-
-            return combined_loss
-
-        return mse_pcc
-    elif loss_key == 'mse_pcc':
-        def mse_pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-            """
-            Computes a combined loss function that integrates Mean Squared Error (MSE)
-            with Pearson Correlation Coefficient (PCC), applying a lambda factor and normalization.
-
-            Args:
-                y_true (tf.Tensor): Ground truth values.
-                y_pred (tf.Tensor): Predicted values.
-
-            Returns:
-                tf.Tensor: A tensor containing the per-sample combined loss values.
-            """
-            # Ensure y_true and y_pred are tensors
-            y_true = tf.convert_to_tensor(y_true, dtype=tf.float32)
-            y_pred = tf.convert_to_tensor(y_pred, dtype=tf.float32)
-
-            # Compute Mean Squared Error (MSE) loss
-            mse_loss = tf.reduce_mean(tf.square(y_true - y_pred), axis=-1)
-
-            # Compute the PCC intermediate values
-            pcc_values = pcc_intermediate(y_true, y_pred)
-
-            # Apply lambda factor and normalization factor to the PCC values
-            pcc_loss = lambda_factor * (1 - pcc_values / norm_factor)
-
-            # Combine the MSE and PCC parts of the loss
-            combined_loss = mse_loss + pcc_loss
-
-            return combined_loss
-
-        return mse_pcc_loss
     else:
 
         raise ValueError(f"Unknown loss key: {loss_key}")
@@ -3550,3 +3495,60 @@ def set_seed(seed: int) -> None:
 
     # Set TensorFlow to use deterministic operations
     os.environ['TF_DETERMINISTIC_OPS'] = '1'
+
+
+class TrainingPhaseManager:
+    """
+    Manages the training phase flag to switch between training and validation modes.
+    This class encapsulates the `is_training` state, making it easier to integrate
+    with the custom loss function and callback.
+    """
+
+    def __init__(self):
+        self.is_training = True
+
+    def set_training(self, is_training: bool) -> None:
+        """
+        Sets the current phase to training or validation.
+
+        Args:
+            is_training (bool): True if training phase, False if validation/testing phase.
+        """
+        self.is_training = is_training
+
+    def is_training_phase(self) -> bool:
+        """
+        Returns whether the current phase is training.
+
+        Returns:
+            bool: True if in training phase, False otherwise.
+        """
+        return self.is_training
+
+
+class IsTrainingCallback(tf.keras.callbacks.Callback):
+    """
+    Custom Keras callback to update the training phase flag in the TrainingPhaseManager object.
+    """
+
+    def __init__(self, phase_manager: TrainingPhaseManager):
+        """
+        Initializes the callback with a reference to the TrainingPhaseManager.
+
+        Args:
+            phase_manager (TrainingPhaseManager): The manager that tracks the training phase.
+        """
+        super().__init__()
+        self.phase_manager = phase_manager
+
+    def on_train_batch_begin(self, batch, logs=None) -> None:
+        """
+        Called at the beginning of each training batch.
+        """
+        self.phase_manager.set_training(True)
+
+    def on_test_batch_begin(self, batch, logs=None) -> None:
+        """
+        Called at the beginning of each validation batch.
+        """
+        self.phase_manager.set_training(False)

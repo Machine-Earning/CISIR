@@ -16,8 +16,7 @@ from modules.training.ts_modeling import (
     evaluate_pcc,
     process_sep_events,
     get_loss,
-    filter_ds,
-    stratified_split,
+    stratified_4fold_split,
     set_seed)
 from sources.transformer.modules import create_attentive_model
 
@@ -44,7 +43,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}_normLongP'
+                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}_cheat4fold'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -56,16 +55,16 @@ def main():
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
                             patience = PATIENCE  # higher patience
-                            learning_rate = 3e-4  # og learning rate
-                            activation = 'leaky_relu'  # ACTIVATION
-                            attn_skipped_layers = 1  # SKIPPED_LAYERS
-                            attn_residual = False  # RESIDUAL
-                            attn_dropout_rate = 0  # DROPOUT
-                            dropout = 0  # DROPOUT
-                            attn_norm = None  # NORM
-                            norm = NORM
-                            skipped_blocks = 1  # SKIPPED_LAYERS
-                            residual = True  # RESIDUAL
+                            learning_rate = ATTM_START_LR  # higher learning rate
+                            activation = ATTM_ACTIVATION  # 'LeakyReLU'  # higher learning rate
+                            attn_skipped_layers = ATTN_SKIPPED_LAYERS  # SKIPPED_LAYERS
+                            attn_residual = ATTN_RESIDUAL  # RESIDUAL
+                            attn_dropout_rate = ATTN_DROPOUT  # DROPOUT
+                            dropout = ATTM_DROPOUT
+                            attn_norm = ATTN_NORM
+                            norm = ATTM_NORM
+                            skipped_blocks = ATTM_SKIPPED_BLOCKS
+                            residual = ATTM_RESIDUAL
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
@@ -73,9 +72,9 @@ def main():
                                 patience=LR_CB_PATIENCE,
                                 verbose=VERBOSE,
                                 min_delta=LR_CB_MIN_DELTA,
-                                min_lr=1e-5)  # LR_CB_MIN_LR)
+                                min_lr=ATTM_LR_CB_MIN_LR)
 
-                            weight_decay = 1e-8  # WEIGHT_DECAY  # higher weight decay
+                            weight_decay = ATTM_WD  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
@@ -155,43 +154,40 @@ def main():
                                 outputs_to_use=outputs_to_use,
                                 cme_speed_threshold=cme_speed_threshold)
 
-                            X_train_filtered, y_train_filtered = filter_ds(
-                                X_train, y_train,
-                                low_threshold=lower_threshold,
-                                high_threshold=upper_threshold,
-                                N=N, seed=seed)
+                            # X_train_filtered, y_train_filtered = filter_ds(
+                            #     X_train, y_train,
+                            #     low_threshold=lower_threshold,
+                            #     high_threshold=upper_threshold,
+                            #     N=N, seed=seed)
+                            #
+                            # X_test_filtered, y_test_filtered = filter_ds(
+                            #     X_test, y_test,
+                            #     low_threshold=lower_threshold,
+                            #     high_threshold=upper_threshold,
+                            #     N=N, seed=seed)
 
-                            X_test_filtered, y_test_filtered = filter_ds(
-                                X_test, y_test,
-                                low_threshold=lower_threshold,
-                                high_threshold=upper_threshold,
-                                N=N, seed=seed)
-
-                            X_subtrain, y_subtrain, X_val, y_val = stratified_split(
-                                X_train,
-                                y_train,
-                                shuffle=True,
-                                seed=seed,
-                                split=VAL_SPLIT,
-                                debug=False)
-
-                            # print all cme_files shapes
+                            # X_subtrain, y_subtrain, X_val, y_val = stratified_split(
+                            #     X_train,
+                            #     y_train,
+                            #     shuffle=True,
+                            #     seed=seed,
+                            #     split=VAL_SPLIT,
+                            #     debug=False)
                             print(f'X_train.shape: {X_train.shape}')
                             print(f'y_train.shape: {y_train.shape}')
-                            print(f'X_subtrain.shape: {X_subtrain.shape}')
-                            print(f'y_subtrain.shape: {y_subtrain.shape}')
                             print(f'X_test.shape: {X_test.shape}')
                             print(f'y_test.shape: {y_test.shape}')
-                            print(f'X_val.shape: {X_val.shape}')
-                            print(f'y_val.shape: {y_val.shape}')
+
+                            # get the number of features
+                            n_features = X_train.shape[1]
+                            print(f'n_features: {n_features}')
 
                             # Compute the sample weights
                             delta_train = y_train[:, 0]
-                            delta_subtrain = y_subtrain[:, 0]
-                            delta_val = y_val[:, 0]
+                            delta_test = y_test[:, 0]
+
                             print(f'delta_train.shape: {delta_train.shape}')
-                            print(f'delta_subtrain.shape: {delta_subtrain.shape}')
-                            print(f'delta_val.shape: {delta_val.shape}')
+                            print(f'delta_test.shape: {delta_test.shape}')
 
                             print(f'rebalancing the training set...')
                             min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
@@ -202,85 +198,122 @@ def main():
                                 debug=False).reweights
                             print(f'training set rebalanced.')
 
-                            print(f'rebalancing the subtraining set...')
-                            min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
-                            y_subtrain_weights = exDenseReweights(
-                                X_subtrain, delta_subtrain,
-                                alpha=alpha_rw, bw=bandwidth,
-                                min_norm_weight=min_norm_weight,
-                                debug=False).reweights
-                            print(f'subtraining set rebalanced.')
-
-                            print(f'rebalancing the validation set...')
-                            min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
-                            y_val_weights = exDenseReweights(
-                                X_val, delta_val,
+                            print(f'rebalancing the testing set...')
+                            min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(y_test)
+                            y_test_weights = exDenseReweights(
+                                X_test, delta_test,
                                 alpha=alpha_val, bw=bandwidth,
                                 min_norm_weight=min_norm_weight,
                                 debug=False).reweights
-                            print(f'validation set rebalanced.')
+                            print(f'testing set rebalanced.')
 
-                            # get the number of features
-                            n_features = X_train.shape[1]
-                            print(f'n_features: {n_features}')
+                            # 4-fold cross-validation
+                            folds_optimal_epochs = []
+                            for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
+                                    stratified_4fold_split(X_train, y_train, seed=seed, shuffle=True, debug=False)):
+                                print(f'Fold: {fold_idx}')
 
-                            # create the model
-                            model_sep = create_attentive_model(
-                                input_dim=n_features,
-                                output_dim=output_dim,
-                                hidden_blocks=BLOCKS_HIDDENS,
-                                attn_hidden_units=ATTN_HIDDENS,
-                                attn_hidden_activation=activation,
-                                attn_skipped_layers=attn_skipped_layers,
-                                attn_residual=attn_residual,
-                                attn_dropout_rate=attn_dropout_rate,
-                                attn_norm=attn_norm,
-                                skipped_blocks=skipped_blocks,
-                                repr_dim=repr_dim,
-                                dropout_rate=dropout,
-                                activation=activation,
-                                norm=norm,
-                                residual=residual,
-                                sam_rho=rho
-                            )
-                            model_sep.summary()
+                                # print all cme_files shapes
 
-                            # Define the EarlyStopping callback
-                            early_stopping = EarlyStopping(
-                                monitor=ES_CB_MONITOR,
-                                patience=patience,
-                                verbose=VERBOSE,
-                                restore_best_weights=ES_CB_RESTORE_WEIGHTS)
+                                print(f'X_subtrain.shape: {X_subtrain.shape}')
+                                print(f'y_subtrain.shape: {y_subtrain.shape}')
+                                print(f'X_val.shape: {X_val.shape}')
+                                print(f'y_val.shape: {y_val.shape}')
 
-                            # Compile the model with the specified learning rate
-                            model_sep.compile(
-                                optimizer=AdamW(
-                                    learning_rate=learning_rate,
-                                    weight_decay=weight_decay,
-                                    beta_1=momentum_beta1
-                                ),
-                                loss={'output': get_loss(loss_key)}
-                            )
+                                # Compute the sample weights
+                                delta_subtrain = y_subtrain[:, 0]
+                                delta_val = y_val[:, 0]
 
-                            # Train the model with the callback
-                            history = model_sep.fit(
-                                X_subtrain,
-                                {'output': y_subtrain},
-                                sample_weight=y_subtrain_weights,
-                                epochs=epochs, batch_size=batch_size,
-                                validation_data=(X_val, {'output': y_val}, y_val_weights),
-                                callbacks=[
-                                    early_stopping,
-                                    reduce_lr_on_plateau,
-                                    WandbCallback(save_model=WANDB_SAVE_MODEL)
-                                ],
-                                verbose=VERBOSE
-                            )
+                                print(f'delta_subtrain.shape: {delta_subtrain.shape}')
+                                print(f'delta_val.shape: {delta_val.shape}')
+
+                                print(f'rebalancing the subtraining set...')
+                                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
+                                y_subtrain_weights = exDenseReweights(
+                                    X_subtrain, delta_subtrain,
+                                    alpha=alpha_rw, bw=bandwidth,
+                                    min_norm_weight=min_norm_weight,
+                                    debug=False).reweights
+                                print(f'subtraining set rebalanced.')
+
+                                print(f'rebalancing the validation set...')
+                                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
+                                y_val_weights = exDenseReweights(
+                                    X_val, delta_val,
+                                    alpha=alpha_val, bw=bandwidth,
+                                    min_norm_weight=min_norm_weight,
+                                    debug=False).reweights
+                                print(f'validation set rebalanced.')
+
+                                # create the model
+                                model_sep = create_attentive_model(
+                                    input_dim=n_features,
+                                    output_dim=output_dim,
+                                    hidden_blocks=BLOCKS_HIDDENS,
+                                    attn_hidden_units=ATTN_HIDDENS,
+                                    attn_hidden_activation=activation,
+                                    attn_skipped_layers=attn_skipped_layers,
+                                    attn_residual=attn_residual,
+                                    attn_dropout_rate=attn_dropout_rate,
+                                    attn_norm=attn_norm,
+                                    skipped_blocks=skipped_blocks,
+                                    repr_dim=repr_dim,
+                                    dropout_rate=dropout,
+                                    activation=activation,
+                                    norm=norm,
+                                    residual=residual,
+                                    sam_rho=rho
+                                )
+                                model_sep.summary()
+
+                                # Define the EarlyStopping callback
+                                early_stopping = EarlyStopping(
+                                    monitor=ES_CB_MONITOR,
+                                    patience=patience,
+                                    verbose=VERBOSE,
+                                    restore_best_weights=ES_CB_RESTORE_WEIGHTS)
+
+                                # Compile the model with the specified learning rate
+                                model_sep.compile(
+                                    optimizer=AdamW(
+                                        learning_rate=learning_rate,
+                                        weight_decay=weight_decay,
+                                        beta_1=momentum_beta1
+                                    ),
+                                    loss={'output': get_loss(loss_key)}
+                                )
+
+                                # Train the model with the callback
+                                history = model_sep.fit(
+                                    X_subtrain,
+                                    {'output': y_subtrain},
+                                    sample_weight=y_subtrain_weights,
+                                    epochs=epochs, batch_size=batch_size,
+                                    validation_data=(X_val, {'output': y_val}, y_val_weights),
+                                    callbacks=[
+                                        early_stopping,
+                                        reduce_lr_on_plateau,
+                                        WandbCallback(save_model=WANDB_SAVE_MODEL)
+                                    ],
+                                    verbose=VERBOSE
+                                )
+
+                                # optimal epoch for fold
+                                folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
+
+                                # wandb log the fold's optimal
+                                print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
+                                wandb.log({f'fold_{fold_idx}_best_epoch': folds_optimal_epochs[-1]})
 
                             # Determine the optimal number of epochs from the fit history
-                            optimal_epochs = np.argmin(
-                                history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
+                            # optimal_epochs = np.argmin(
+                            #     history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
                             # optimal_epochs = int(3e4)
+
+                            # determine the optimal number of epochs from the folds
+                            optimal_epochs = int(np.mean(folds_optimal_epochs))
+                            print(f'optimal_epochs: {optimal_epochs}')
+                            wandb.log({'optimal_epochs': optimal_epochs})
 
                             final_model_sep = create_attentive_model(
                                 input_dim=n_features,

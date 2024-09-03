@@ -1,19 +1,14 @@
-import os
-import random
 from datetime import datetime
 
-from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density, evaluate_pcc_repr
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
-
-# Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
-
-import numpy as np
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from wandb.integration.keras import WandbCallback
 
+from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density, \
+    evaluate_pcc_repr
+from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.shared.globals import *
 from modules.training import cme_modeling
 from modules.training.cme_modeling import pds_space_norm
 from modules.training.ts_modeling import (
@@ -24,7 +19,8 @@ from modules.training.ts_modeling import (
     set_seed)
 
 
-from modules.shared.globals import *
+# Set the environment variable for CUDA (in case it is necessary)
+# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 
 def main():
@@ -38,29 +34,28 @@ def main():
     # Define the dataset options, including the sharding policy
 
     for SEED in SEEDS:
-        
 
         mb = cme_modeling.ModelBuilder()
 
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for add_slope in ADD_SLOPE:
-                    for rho in [0, 0.7]:
+                    for rho in [0]:
                         # for alpha in [2]:
-                        for alpha in [2.5]:
+                        for alpha, alphaV in zip([2], [1]):
                             # Set NumPy seed
                             set_seed(SEED)
                             # add_slope = True
                             outputs_to_use = OUTPUTS_TO_USE
 
-                            bs = BATCH_SIZE  # full dataset used
+                            bs = 1024 #BATCH_SIZE  # full dataset used
                             print(f'batch size : {bs}')
 
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'MLPall_{inputs_str}_PDSinj_bs{bs}_alpha{alpha:.2f}_rho{rho:.2f}'
+                            title = f'MLPall_{inputs_str}_a{alpha:.2f}_aV{alphaV:.2f}_rho{rho:.2f}'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -105,7 +100,7 @@ def main():
                             n_inj = -1
 
                             # Initialize wandb
-                            wandb.init(project="nasa-ts-delta-v7-pds", name=experiment_name, config={
+                            wandb.init(project="pds-v7-fixed", name=experiment_name, config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
                                 "target_change": target_change,
@@ -129,6 +124,7 @@ def main():
                                 'cme_speed_threshold': cme_speed_threshold,
                                 "reweighting": True,
                                 "alpha": alpha_rw,
+                                "alphaVal": alphaV,
                                 "bandwidth": bandwidth,
                                 "residual": residual,
                                 "skipped_layers": skipped_layers,
@@ -207,12 +203,17 @@ def main():
                                 split=VAL_SPLIT,
                                 debug=False)
 
-                            # filter validation set
-                            # X_val, y_val_norm = filter_ds(
-                            #     X_val, y_val_norm,
-                            #     low_threshold=norm_lower_t,
-                            #     high_threshold=norm_upper_t,
-                            #     N=200, seed=SEED)
+                            delta_val = y_val_norm[:, 0]
+                            print(f'delta_val.shape: {delta_val.shape}')
+
+                            print(f'rebalancing the subtraining set...')
+                            min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
+
+                            val_weights_dict = exDenseReweightsD(
+                                X_subtrain, delta_val,
+                                alpha=alphaV, bw=bandwidth,
+                                min_norm_weight=min_norm_weight,
+                                debug=False).label_reweight_dict
 
                             print(f'X_val.shape: {X_val.shape}')
                             print(f'y_val.shape: {y_val_norm.shape}')
@@ -247,6 +248,7 @@ def main():
                                 X_subtrain, y_subtrain_norm,
                                 X_val, y_val_norm,
                                 train_label_weights_dict=train_weights_dict,
+                                val_label_weights_dict=val_weights_dict,
                                 learning_rate=Options['learning_rate'],
                                 epochs=Options['epochs'],
                                 batch_size=Options['batch_size'],
@@ -268,13 +270,13 @@ def main():
 
                             print(f'pcc error delta i>= 0.5 test: {error_pcc_cond}')
                             # Log the MAE error to wandb
-                            wandb.log({"pcc_error_cond_test": error_pcc_cond})
+                            wandb.log({"pcc+": error_pcc_cond})
 
                             error_pcc = evaluate_pcc_repr(model_sep, X_test, y_test)
 
                             print(f'pcc error delta test: {error_pcc}')
                             # Log the MAE error to wandb
-                            wandb.log({"pcc_error_test": error_pcc})
+                            wandb.log({"pcc": error_pcc})
 
                             # Evaluate the model correlation with colored
                             file_path = plot_repr_corr_dist(

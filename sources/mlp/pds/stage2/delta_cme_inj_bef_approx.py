@@ -1,18 +1,17 @@
 import os
 from datetime import datetime
 
-# Set the environment variable for CUDA (in case it is necessary)
-# os.environ['CUDA_VISIBLE_DEVICES'] = '2'
-
+import numpy as np
 import wandb
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
-import numpy as np
 
 from modules.evaluate.utils import plot_tsne_delta, plot_repr_corr_dist
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.shared.globals import *
 from modules.training.cme_modeling import ModelBuilder
+from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
@@ -26,9 +25,11 @@ from modules.training.ts_modeling import (
     set_seed)
 from modules.training.utils import get_weight_path
 
-from modules.shared.globals import *
+# Set the environment variable for CUDA (in case it is necessary)
+# os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 mb = ModelBuilder()
+pm = TrainingPhaseManager()
 
 # Define the lookup dictionary
 weight_paths = {
@@ -50,11 +51,11 @@ def main():
     Main function to run the E-MLP model
     :return:
     """
-    for seed in SEEDS:
+    for seed in [456789, 42, 1234]:
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha in [0.5]:
+                    for alpha_mse, alpha_pcc in zip([0.5], [0.1]):
                         for freeze in [False]:
                             # for rho in [0.3, 0.21]:
                             for rho in [0]:
@@ -62,9 +63,11 @@ def main():
                                 outputs_to_use = OUTPUTS_TO_USE
                                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
-                                lambda_ = 16  # LAMBDA
+                                lambda_ = 6.5  # LAMBDA
+                                alphaV_mse = 1  # alpha for mse on validation
+                                alphaV_pcc = 0  # alpha for pcc on validation
                                 # Construct the title
-                                title = f'MLP_S2min_{inputs_str}_frozen{freeze}_alpha{alpha:.2f}_rho{rho:.2f}_lambda{lambda_}'
+                                title = f'MLP_S2min_{inputs_str}_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_rho{rho:.2f}_lambda{lambda_}'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -94,7 +97,6 @@ def main():
                                 loss_key = LOSS_KEY
 
                                 target_change = ('delta_p' in outputs_to_use)
-                                alpha_rw = alpha
                                 bandwidth = BANDWIDTH
                                 repr_dim = REPR_DIM
                                 output_dim = len(outputs_to_use)
@@ -112,7 +114,7 @@ def main():
                                 mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                                 # Initialize wandb
-                                wandb.init(project="nasa-ts-delta-v7-nl", name=experiment_name, config={
+                                wandb.init(project="mse-pcc-v7", name=experiment_name, config={
                                     "inputs_to_use": inputs_to_use,
                                     "add_slope": add_slope,
                                     "patience": patience,
@@ -127,7 +129,10 @@ def main():
                                     "lambda": lambda_,
                                     "target_change": target_change,
                                     "seed": seed,
-                                    "alpha_rw": alpha_rw,
+                                    "alpha_mse": alpha_mse,
+                                    "alpha_pcc": alpha_pcc,
+                                    "alphaV_mse": alphaV_mse,
+                                    "alphaV_pcc": alphaV_pcc,
                                     "bandwidth": bandwidth,
                                     "reciprocal_reweight": RECIPROCAL_WEIGHTS,
                                     "repr_dim": repr_dim,
@@ -208,27 +213,42 @@ def main():
 
                                 print(f'rebalancing the training set...')
                                 min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
-                                train_weights_dict = exDenseReweightsD(
+                                mse_train_weights_dict = exDenseReweightsD(
                                     X_train, delta_train,
-                                    alpha=alpha_rw, bw=bandwidth,
+                                    alpha=alpha_mse, bw=bandwidth,
+                                    min_norm_weight=min_norm_weight,
+                                    debug=False).label_reweight_dict
+                                pcc_train_weights_dict = exDenseReweightsD(
+                                    X_train, delta_train,
+                                    alpha=alpha_pcc, bw=bandwidth,
                                     min_norm_weight=min_norm_weight,
                                     debug=False).label_reweight_dict
                                 print(f'training set rebalanced.')
 
                                 print(f'rebalancing the subtraining set...')
                                 min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
-                                subtrain_weights_dict = exDenseReweightsD(
+                                mse_subtrain_weights_dict = exDenseReweightsD(
                                     X_subtrain, delta_subtrain,
-                                    alpha=alpha_rw, bw=bandwidth,
+                                    alpha=alpha_mse, bw=bandwidth,
+                                    min_norm_weight=min_norm_weight,
+                                    debug=False).label_reweight_dict
+                                pcc_subtrain_weights_dict = exDenseReweightsD(
+                                    X_subtrain, delta_subtrain,
+                                    alpha=alpha_pcc, bw=bandwidth,
                                     min_norm_weight=min_norm_weight,
                                     debug=False).label_reweight_dict
                                 print(f'subtraining set rebalanced.')
 
                                 print(f'rebalancing the validation set...')
                                 min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
-                                val_weights_dict = exDenseReweightsD(
+                                mse_val_weights_dict = exDenseReweightsD(
                                     X_val, delta_val,
-                                    alpha=1, bw=bandwidth,
+                                    alpha=alphaV_mse, bw=bandwidth,
+                                    min_norm_weight=min_norm_weight,
+                                    debug=False).label_reweight_dict
+                                pcc_val_weights_dict = exDenseReweightsD(
+                                    X_val, delta_val,
+                                    alpha=alphaV_pcc, bw=bandwidth,
                                     min_norm_weight=min_norm_weight,
                                     debug=False).label_reweight_dict
                                 print(f'validation set rebalanced.')
@@ -314,9 +334,12 @@ def main():
                                     loss={
                                         'forecast_head': lambda y_true, y_pred: mse_pcc(
                                             y_true, y_pred,
+                                            phase_manager=pm,
                                             lambda_factor=lambda_,
-                                            train_weight_dict=subtrain_weights_dict,
-                                            val_weight_dict=val_weights_dict
+                                            train_mse_weight_dict=mse_subtrain_weights_dict,
+                                            train_pcc_weight_dict=pcc_subtrain_weights_dict,
+                                            val_mse_weight_dict=mse_val_weights_dict,
+                                            val_pcc_weight_dict=pcc_val_weights_dict,
                                         )
                                     }
                                 )
@@ -331,6 +354,7 @@ def main():
                                         early_stopping,
                                         reduce_lr_on_plateau,  # Reduce learning rate on plateau
                                         WandbCallback(save_model=WANDB_SAVE_MODEL),
+                                        IsTraining(pm)  # Custom callback to set the training phase
                                     ],
                                     verbose=VERBOSE
                                 )
@@ -377,8 +401,10 @@ def main():
                                     loss={
                                         'forecast_head': lambda y_true, y_pred: mse_pcc(
                                             y_true, y_pred,
+                                            phase_manager=pm,
                                             lambda_factor=lambda_,
-                                            train_weight_dict=train_weights_dict,
+                                            train_mse_weight_dict=mse_train_weights_dict,
+                                            train_pcc_weight_dict=pcc_train_weights_dict,
                                         )
                                     },
                                 )  # Compile the model just like before
@@ -391,7 +417,8 @@ def main():
                                     batch_size=batch_size,
                                     callbacks=[
                                         reduce_lr_on_plateau,
-                                        WandbCallback(save_model=WANDB_SAVE_MODEL)
+                                        WandbCallback(save_model=WANDB_SAVE_MODEL),
+                                        IsTraining(pm)
                                     ],
                                     verbose=VERBOSE
                                 )
