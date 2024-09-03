@@ -67,4 +67,4 @@ ATTN_DROPOUT = 0
 ATTN_NORM = None
 ATTM_NORM = 'batch_norm'
 ATTM_LR_CB_MIN_LR = 5e-6
-ATTM_WD = 1e-8
+ATTM_WD = 1e-7
