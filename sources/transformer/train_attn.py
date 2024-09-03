@@ -44,7 +44,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}_wd1e-5'
+                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}_wd1e-7'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -75,7 +75,7 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=1e-6)  # LR_CB_MIN_LR)
 
-                            weight_decay = 1e-5  # WEIGHT_DECAY  # higher weight decay
+                            weight_decay = 1e-7  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
