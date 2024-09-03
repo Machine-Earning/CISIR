@@ -3190,7 +3190,8 @@ def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
 
 def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,
              train_weight_dict: dict = None,
-             val_weight_dict: dict = None) -> tf.Tensor:
+             val_weight_dict: dict = None,
+             training: bool = True) -> tf.Tensor:
     """
     Custom loss function based on the Pearson Correlation Coefficient (PCC)
     with re-weighting based on label values. The final loss is 1 - PCC.
@@ -3200,17 +3201,13 @@ def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,
     - y_pred (tf.Tensor): Predicted labels.
     - train_weight_dict (dict, optional): Dictionary mapping label values to weights for training samples.
     - val_weight_dict (dict, optional): Dictionary mapping label values to weights for validation samples.
+    - training (bool, optional): Flag indicating whether the model is in training mode.
 
     Returns:
     - tf.Tensor: The calculated loss value as a single scalar.
     """
-    # Determine if the current mode is training or validation/testing
-    is_training = K.learning_phase()
-
-    # print(f"Is training: {is_training}")
-
     # Select the appropriate weight dictionary based on the mode
-    weight_dict = train_weight_dict if is_training else val_weight_dict
+    weight_dict = train_weight_dict if training else val_weight_dict
 
     if weight_dict is not None:
         # Initialize the weights tensor with ones
@@ -3221,10 +3218,6 @@ def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,
             weights = tf.where(tf.equal(y_true, label), weight, weights)
     else:
         weights = tf.ones_like(y_true, dtype=tf.float32)
-
-    # print(f"Y_true: {y_true}")
-    # print(f"Y_pred: {y_pred}")
-    # print(f"Weights: {weights}")
 
     # Compute the Pearson Correlation Coefficient (PCC)
     y_true_centered = y_true - tf.reduce_mean(y_true)
