@@ -44,7 +44,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}_wd1e-7'
+                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}_lr1e-5'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -55,8 +55,8 @@ def main():
 
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
-                            patience = int(3e3) #PATIENCE  # higher patience
-                            learning_rate = 1e-4 # og learning rate
+                            patience = int(7e3) #PATIENCE  # higher patience
+                            learning_rate = 5e-6 # og learning rate
                             activation = 'leaky_relu'  # ACTIVATION
                             attn_skipped_layers = 1  # SKIPPED_LAYERS
                             attn_residual = False  # RESIDUAL
@@ -69,13 +69,13 @@ def main():
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
-                                factor=LR_CB_FACTOR,
+                                factor=0.9,
                                 patience=LR_CB_PATIENCE,
                                 verbose=VERBOSE,
                                 min_delta=LR_CB_MIN_DELTA,
-                                min_lr=1e-6)  # LR_CB_MIN_LR)
+                                min_lr=1e-7)  # LR_CB_MIN_LR)
 
-                            weight_decay = 1e-7  # WEIGHT_DECAY  # higher weight decay
+                            weight_decay = 5e-4  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
