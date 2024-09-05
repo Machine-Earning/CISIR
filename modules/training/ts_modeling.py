@@ -848,11 +848,16 @@ def load_file_data(
     return X, y
 
 
-def stratified_split(X: np.ndarray, y: np.ndarray, shuffle: bool = True, seed: int = None, split: float = 0.25,
-                     debug: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def stratified_split(
+        X: np.ndarray,
+        y: np.ndarray,
+        shuffle: bool = True,
+        seed: int = None,
+        split: float = 0.25,
+        debug: bool = False
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Splits the dataset into subtraining and validation sets using stratified sampling.
-    TODO: upgrade to support folds
     Parameters:
     X (np.ndarray): Feature matrix of shape (n_samples, n_features).
     y (np.ndarray): Label vector of shape (n_samples, 1).
@@ -878,7 +883,7 @@ def stratified_split(X: np.ndarray, y: np.ndarray, shuffle: bool = True, seed: i
 
     # Calculate the number of validation samples
     num_samples = X.shape[0]
-    val_size = int(num_samples * split)
+    # val_size = int(num_samples * split)
 
     # Initialize lists to hold subtraining and validation data
     X_subtrain = []
@@ -921,6 +926,96 @@ def stratified_split(X: np.ndarray, y: np.ndarray, shuffle: bool = True, seed: i
         plot_distributions(y, y_subtrain, y_val)
 
     return X_subtrain, y_subtrain, X_val, y_val
+
+
+def stratified_groups(X: np.ndarray, y: np.ndarray, batch_size: int) -> List[np.ndarray]:
+    """
+    Create stratified groups from the dataset by sorting it based on the labels.
+    The number of groups corresponds to the batch size, and each group will have
+    samples with similar label distributions.
+
+    Parameters:
+    -----------
+    X : np.ndarray
+        Feature matrix of shape (n_samples, n_features).
+    y : np.ndarray
+        Label vector of shape (n_samples,).
+    batch_size : int
+        Number of groups, which will correspond to the number of samples in each batch.
+
+    Returns:
+    --------
+    List[np.ndarray]:
+        List of arrays where each array contains indices for one stratified group.
+    """
+    # Sort the dataset according to the label values
+    # Sort the dataset according to the label values
+    sorted_indices = np.argsort(y)
+
+    # The number of samples per group
+    # group_size = len(y) // batch_size
+    # leftover = len(y) % batch_size
+
+    # Create groups by slicing the sorted data indices
+    groups = np.array_split(sorted_indices, batch_size)  # Splits equally with handling leftovers
+
+    return groups
+
+
+def stratified_data_generator(
+        X: np.ndarray,
+        y: np.ndarray,
+        batch_size: int,
+        shuffle: bool = True
+) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
+    """
+    Generator that yields stratified batches of (X, y) by selecting one sample from each group.
+    This ensures that each batch is representative of the entire dataset.
+
+    Parameters:
+    -----------
+    X : np.ndarray
+        Feature matrix of shape (n_samples, n_features).
+    y : np.ndarray
+        Label vector of shape (n_samples,).
+    batch_size : int
+        Number of samples in each batch (and the number of stratified groups).
+    shuffle : bool, optional
+        If True, shuffles the groups and the elements within each group before each epoch (default is True).
+
+    Yields:
+    -------
+    Tuple[np.ndarray, np.ndarray]:
+        Batches of feature matrix and label vector of size (batch_size, n_features) and (batch_size,) respectively.
+    """
+    # Create stratified groups based on labels
+    groups = stratified_groups(X, y, batch_size)
+
+    while True:
+        if shuffle:
+            # Shuffle the elements within each group (shuffle in-place)
+            for group in groups:
+                np.random.shuffle(group)
+
+        # Preallocate batch indices
+        batch_indices = np.zeros(batch_size, dtype=int)
+
+        # Efficiently pick one sample from each group without calling np.random.choice
+        for i, group in enumerate(groups):
+            batch_indices[i] = group[0]  # Pick the first element from each shuffled group
+
+        # Randomly shuffle the selected batch indices (randomize order within the batch)
+        np.random.shuffle(batch_indices)
+
+        # Create the feature and label batches using the selected indices
+        batch_X = X[batch_indices]
+        batch_y = y[batch_indices]
+
+        # Ensure the labels have the correct shape
+        batch_y = batch_y.reshape(-1)
+
+        # Yield the current batch
+        yield batch_X, batch_y
 
 
 def stratified_4fold_split(
