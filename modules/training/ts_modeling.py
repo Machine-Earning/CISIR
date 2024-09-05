@@ -965,12 +965,15 @@ def stratified_groups(X: np.ndarray, y: np.ndarray, batch_size: int) -> List[np.
 def stratified_data_generator(
         X: np.ndarray,
         y: np.ndarray,
+        groups: List[np.ndarray],
         batch_size: int,
         shuffle: bool = True
 ) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
     """
     Generator that yields stratified batches of (X, y) by selecting one sample from each group.
-    This ensures that each batch is representative of the entire dataset.
+    The groups are passed as an argument and are generated once.
+    TODO: can be made faster
+    TODO: can be madet to work without replacement
 
     Parameters:
     -----------
@@ -978,8 +981,10 @@ def stratified_data_generator(
         Feature matrix of shape (n_samples, n_features).
     y : np.ndarray
         Label vector of shape (n_samples,).
+    groups : List[np.ndarray]
+        Precomputed groups of sample indices for stratified sampling.
     batch_size : int
-        Number of samples in each batch (and the number of stratified groups).
+        Number of samples in each batch.
     shuffle : bool, optional
         If True, shuffles the groups and the elements within each group before each epoch (default is True).
 
@@ -988,19 +993,16 @@ def stratified_data_generator(
     Tuple[np.ndarray, np.ndarray]:
         Batches of feature matrix and label vector of size (batch_size, n_features) and (batch_size,) respectively.
     """
-    # Create stratified groups based on labels
-    groups = stratified_groups(X, y, batch_size)
-
     while True:
         if shuffle:
-            # Shuffle the elements within each group (shuffle in-place)
+            # Shuffle the elements within each group
             for group in groups:
                 np.random.shuffle(group)
 
         # Preallocate batch indices
         batch_indices = np.zeros(batch_size, dtype=int)
 
-        # Efficiently pick one sample from each group without calling np.random.choice
+        # Pick one sample from each group
         for i, group in enumerate(groups):
             batch_indices[i] = group[0]  # Pick the first element from each shuffled group
 
@@ -1017,6 +1019,52 @@ def stratified_data_generator(
         # Yield the current batch
         yield batch_X, batch_y
 
+
+def create_stratified_tf_dataset(
+        X: np.ndarray,
+        y: np.ndarray,
+        batch_size: int,
+        shuffle: bool = True
+) -> Tuple[tf.data.Dataset, int]:
+    """
+    Creates a TensorFlow dataset from the stratified data generator, with groups generated only once.
+
+    Parameters:
+    -----------
+    X : np.ndarray
+        Feature matrix of shape (n_samples, n_features).
+    y : np.ndarray
+        Label vector of shape (n_samples,).
+    batch_size : int
+        Number of samples in each batch.
+    shuffle : bool, optional
+        If True, shuffles the groups and the elements within each group before each epoch (default is True).
+
+    Returns:
+    --------
+    Tuple[tf.data.Dataset, int]:
+        - A TensorFlow dataset object with stratified batches.
+        - The number of steps per epoch (i.e., how many batches per epoch).
+    """
+    # Generate the stratified groups once
+    groups = stratified_groups(X, y, batch_size)
+
+    # Use from_generator to create a dataset from the stratified_data_generator
+    dataset = tf.data.Dataset.from_generator(
+        lambda: stratified_data_generator(X, y, groups, batch_size, shuffle=shuffle),
+        output_signature=(
+            tf.TensorSpec(shape=(None, X.shape[1]), dtype=tf.float32),
+            tf.TensorSpec(shape=(None,), dtype=tf.float32)
+        )
+    )
+
+    # Compute the number of steps per epoch
+    steps_per_epoch = len(y) // batch_size
+
+    # Prefetch for performance optimization
+    dataset = dataset.prefetch(tf.data.AUTOTUNE)
+
+    return dataset, steps_per_epoch
 
 def stratified_4fold_split(
         X: np.ndarray,
