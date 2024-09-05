@@ -1020,7 +1020,7 @@ def stratified_data_generator(
         yield batch_X, batch_y
 
 
-def create_stratified_tf_dataset(
+def create_stratified_batch_dataset(
         X: np.ndarray,
         y: np.ndarray,
         batch_size: int,
@@ -1053,8 +1053,8 @@ def create_stratified_tf_dataset(
     dataset = tf.data.Dataset.from_generator(
         lambda: stratified_data_generator(X, y, groups, batch_size, shuffle=shuffle),
         output_signature=(
-            tf.TensorSpec(shape=(None, X.shape[1]), dtype=tf.float32),
-            tf.TensorSpec(shape=(None,), dtype=tf.float32)
+            tf.TensorSpec(shape=(batch_size, X.shape[1]), dtype=tf.float32),
+            tf.TensorSpec(shape=(batch_size,), dtype=tf.float32)
         )
     )
 
