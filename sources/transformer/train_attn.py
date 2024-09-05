@@ -35,7 +35,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha, alpha_val in zip([0.5], [1]):
-                    for rho in [0.001]:  # SAM_RHOS:
+                    for rho in [0.0001]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -55,8 +55,8 @@ def main():
 
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
-                            patience = int(25e3) #PATIENCE  # higher patience
-                            learning_rate = 1e-4 # og learning rate
+                            patience = int(12e3) #PATIENCE  # higher patience
+                            learning_rate = 1e-5 # og learning rate
                             activation = 'leaky_relu'  # ACTIVATION
                             attn_skipped_layers = 1  # SKIPPED_LAYERS
                             attn_residual = False  # RESIDUAL
@@ -70,12 +70,12 @@ def main():
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
                                 factor=0.9,
-                                patience=LR_CB_PATIENCE,
+                                patience=500,
                                 verbose=VERBOSE,
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=1e-7)  # LR_CB_MIN_LR)
 
-                            weight_decay = 1e-9  # WEIGHT_DECAY  # higher weight decay
+                            weight_decay = 1e-4  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
