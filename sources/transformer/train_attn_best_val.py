@@ -33,7 +33,7 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha, alpha_val in zip([0.5], [0.5]):
+                for alpha, alpha_val in zip([0.5], [1]):
                     for rho in [0]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
@@ -54,7 +54,7 @@ def main():
 
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
-                            patience = PATIENCE  # higher patience
+                            patience = int(25e3) #PATIENCE  # higher patience
                             learning_rate = ATTM_START_LR  # higher learning rate
                             activation = ATTM_ACTIVATION  # 'LeakyReLU'  # higher learning rate
                             attn_skipped_layers = ATTN_SKIPPED_LAYERS  # SKIPPED_LAYERS
@@ -222,7 +222,7 @@ def main():
                             print(f'validation set rebalanced.')
 
                             print(f'rebalancing the testing set...')
-                            min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(y_test)
+                            min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_test)
                             y_test_weights = exDenseReweights(
                                 X_test, delta_test,
                                 alpha=alpha_val, bw=bandwidth,
