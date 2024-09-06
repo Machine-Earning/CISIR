@@ -82,7 +82,7 @@ def main():
 
                             weight_decay = 1e-7  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                            batch_size = BATCH_SIZE  # higher batch size
+                            batch_size = 8 #BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
                             # hiddens = MLP_HIDDENS  # hidden layers
 

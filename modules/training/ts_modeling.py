@@ -851,19 +851,19 @@ def load_file_data(
 def stratified_split(
         X: np.ndarray,
         y: np.ndarray,
-        shuffle: bool = True,
         seed: int = None,
-        split: float = 0.25,
+        shuffle: bool = True,
         debug: bool = False
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Splits the dataset into subtraining and validation sets using stratified sampling.
+    The validation is a quarter of the dataset, and the rest is used for subtraining.
+
     Parameters:
     X (np.ndarray): Feature matrix of shape (n_samples, n_features).
     y (np.ndarray): Label vector of shape (n_samples, 1).
     shuffle (bool): Whether to shuffle the data before splitting. Default is True.
     seed (int): Random seed for reproducibility. Default is None.
-    split (float): Proportion of the dataset to include in the validation set. Default is 0.25.
     debug (bool): Whether to plot the distributions of the original, subtrain, and validation sets. Default is False.
 
     Returns:
@@ -928,38 +928,48 @@ def stratified_split(
     return X_subtrain, y_subtrain, X_val, y_val
 
 
-def stratified_groups(X: np.ndarray, y: np.ndarray, batch_size: int) -> List[np.ndarray]:
+def stratified_groups(y: np.ndarray, batch_size: int, debug: bool = True) -> np.ndarray:
     """
     Create stratified groups from the dataset by sorting it based on the labels.
     The number of groups corresponds to the batch size, and each group will have
-    samples with similar label distributions.
+    samples with similar label distributions. The result is a 2D array where each
+    group is padded to the same size.
 
     Parameters:
     -----------
-    X : np.ndarray
-        Feature matrix of shape (n_samples, n_features).
     y : np.ndarray
-        Label vector of shape (n_samples,).
+        Label vector of shape (n_samples, 1).
     batch_size : int
         Number of groups, which will correspond to the number of samples in each batch.
 
     Returns:
     --------
-    List[np.ndarray]:
-        List of arrays where each array contains indices for one stratified group.
+    np.ndarray:
+        A 2D array where each row represents a stratified group, and all rows have the same length.
     """
-    # Sort the dataset according to the label values
-    # Sort the dataset according to the label values
-    sorted_indices = np.argsort(y)
+    # Sort the dataset along the second dimension (axis=0)
+    sorted_indices = np.argsort(y, axis=0).flatten()
 
-    # The number of samples per group
-    # group_size = len(y) // batch_size
-    # leftover = len(y) % batch_size
+    # Debugging: Check the shape of y and print sorted indices
+    if debug:
+        print(f"Shape of y: {y.shape}")
+        print(f"Unique values in y: {np.unique(y)}")
+        print(f"Sorted indices: {sorted_indices}")
+        print(f"Labels sorted by indices: {y[sorted_indices].flatten()}")  # To see how the labels are sorted
 
     # Create groups by slicing the sorted data indices
-    groups = np.array_split(sorted_indices, batch_size)  # Splits equally with handling leftovers
+    groups = np.array_split(sorted_indices, batch_size)
 
-    return groups
+    # Find the maximum group size
+    max_size = max(len(group) for group in groups)
+
+    # Pad the groups with their last element to make all groups the same size
+    padded_groups = np.array([
+        np.pad(group, (0, max_size - len(group)), 'edge') for group in groups
+    ])
+
+    return padded_groups
+
 
 
 def stratified_data_generator(
@@ -967,7 +977,8 @@ def stratified_data_generator(
         y: np.ndarray,
         groups: List[np.ndarray],
         batch_size: int,
-        shuffle: bool = True
+        shuffle: bool = True,
+        debug: bool = True
 ) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
     """
     Generator that yields stratified batches of (X, y) by selecting one sample from each group.
@@ -987,6 +998,8 @@ def stratified_data_generator(
         Number of samples in each batch.
     shuffle : bool, optional
         If True, shuffles the groups and the elements within each group before each epoch (default is True).
+    debug : bool, optional
+        If True, prints the generated batches for debugging purposes (default is False).
 
     Yields:
     -------
@@ -1015,6 +1028,12 @@ def stratified_data_generator(
 
         # Ensure the labels have the correct shape
         batch_y = batch_y.reshape(-1)
+
+        # Debugging: Print the current batch
+        if debug:
+            print(f"Batch indices: {batch_indices}")
+            print(f"Batch X:\n{batch_X}")
+            print(f"Batch y:\n{batch_y}")
 
         # Yield the current batch
         yield batch_X, batch_y
@@ -1047,7 +1066,7 @@ def stratified_batch_dataset(
         - The number of steps per epoch (i.e., how many batches per epoch).
     """
     # Generate the stratified groups once
-    groups = stratified_groups(X, y, batch_size)
+    groups = stratified_groups(y, batch_size)
 
     # Use from_generator to create a dataset from the stratified_data_generator
     dataset = tf.data.Dataset.from_generator(
@@ -1065,6 +1084,7 @@ def stratified_batch_dataset(
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
 
     return dataset, steps_per_epoch
+
 
 def stratified_4fold_split(
         X: np.ndarray,
@@ -3334,6 +3354,10 @@ def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
     # Select the appropriate weight dictionaries based on the mode
     mse_weight_dict = train_mse_weight_dict if phase_manager.is_training_phase() else val_mse_weight_dict
     pcc_weight_dict = train_pcc_weight_dict if phase_manager.is_training_phase() else val_pcc_weight_dict
+
+    # # print shape and elements of y_true and y_pred
+    # print(f"y_true shape: {y_true.shape}, y_pred shape: {y_pred.shape}")
+    # print(f"y_true elements: {y_true}, y_pred elements: {y_pred}")
 
     # Generate the weight tensors for MSE and PCC using the optimized function
     mse_weights = create_weight_tensor_fast(y_true, mse_weight_dict)
