@@ -28,6 +28,7 @@ from tensorflow_addons.optimizers import AdamW
 
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining, create_weight_tensor_fast
 from modules.training.sam_keras import SAMModel
+from modules.training.ts_modeling import stratified_batch_dataset
 
 
 # from tensorflow.python.profiler import profiler_v2 as profiler
@@ -1367,28 +1368,30 @@ class ModelBuilder:
 
         return history
 
-    def train_pds_inj_strat(self,
-                            model: tf.keras.Model,
-                            X_train: np.ndarray,
-                            y_train: np.ndarray,
-                            X_subtrain: np.ndarray,
-                            y_subtrain: np.ndarray,
-                            X_val: np.ndarray,
-                            y_val: np.ndarray,
-                            train_label_weights_dict: Optional[Dict[float, float]] = None,
-                            val_label_weights_dict: Optional[Dict[float, float]] = None,
-                            learning_rate: float = 1e-3,
-                            epochs: int = 100,
-                            batch_size: int = 32,
-                            rare_injection_count: int = -1,
-                            lower_bound: float = -0.5,
-                            upper_bound: float = 0.5,
-                            patience: int = 9,
-                            weight_decay: float = 0.0,
-                            momentum_beta1: float = 0.9,
-                            save_tag: Optional[str] = None,
-                            callbacks_list=None,
-                            verbose: int = 1) -> tf.keras.callbacks.History:
+    def train_pds_inj_strat(
+            self,
+            model: tf.keras.Model,
+            X_train: np.ndarray,
+            y_train: np.ndarray,
+            X_subtrain: np.ndarray,
+            y_subtrain: np.ndarray,
+            X_val: np.ndarray,
+            y_val: np.ndarray,
+            train_label_weights_dict: Optional[Dict[float, float]] = None,
+            val_label_weights_dict: Optional[Dict[float, float]] = None,
+            learning_rate: float = 1e-3,
+            epochs: int = 100,
+            batch_size: int = 32,
+            rare_injection_count: int = -1,
+            lower_bound: float = -0.5,
+            upper_bound: float = 0.5,
+            patience: int = 9,
+            weight_decay: float = 0.0,
+            momentum_beta1: float = 0.9,
+            save_tag: Optional[str] = None,
+            callbacks_list=None,
+            verbose: int = 1
+    ) -> tf.keras.callbacks.History:
         """
         TODO: implement when ratio < rare_injection_count
         Custom training loop to train the model with sample weights and injected rare samples.
@@ -1500,87 +1503,6 @@ class ModelBuilder:
             raise ValueError(f"Batch size must be at least the number of injected rare samples for training. "
                              f"Current batch size: {batch_size}, rare_injection_count_train: {rare_injection_count_train}")
 
-        # Stratified Sampling Preparation
-        def stratified_groups(X: np.ndarray, y: np.ndarray, batch_size: int) -> List[np.ndarray]:
-            """
-            Create stratified groups from the sorted data.
-
-            :param X: Feature set.
-            :param y: Labels.
-            :param batch_size: Size of each batch.
-
-            :return: List of stratified groups.
-            """
-            # Sort the data according to the labels
-            sorted_indices = np.argsort(y)
-            X_sorted = X[sorted_indices]
-            y_sorted = y[sorted_indices]
-
-            # Divide the sorted data into groups
-            num_groups = batch_size
-            groups = []
-            group_size = len(y_sorted) // num_groups
-            for i in range(num_groups):
-                groups.append(np.arange(i * group_size, (i + 1) * group_size))
-
-            return groups
-
-        # Prepare stratified groups for subtraining and full training
-        subtrain_groups = stratified_groups(X_subtrain, y_subtrain, batch_size)
-        train_groups = stratified_groups(X_train, y_train, batch_size)
-
-        def stratified_data_generator(
-                X: np.ndarray,
-                y: np.ndarray,
-                groups: List[np.ndarray]
-        ) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
-            """
-            Generalized data generator to yield batches with stratified sampling.
-
-            :param X: Feature set.
-            :param y: Labels.
-            :param groups: List of stratified groups.
-            :param batch_size: Size of each batch.
-
-            :yield: Batches of (features, labels) with stratified sampling.
-            """
-            while True:
-                batch_indices = []
-                for group in groups:
-                    batch_indices.append(np.random.choice(group, 1, replace=True)[0])
-                batch_indices = np.array(batch_indices)
-                np.random.shuffle(batch_indices)
-                batch_X = X[batch_indices]
-                batch_y = y[batch_indices]
-                # Ensure that batch_y has the correct shape
-                batch_y = batch_y.reshape(-1)
-                # Yield the current batch (features and labels) to be used by the training loop
-                yield batch_X, batch_y
-
-        def create_stratified_tf_dataset(
-                X: np.ndarray,
-                y: np.ndarray,
-                groups: List[np.ndarray]
-        ) -> tf.data.Dataset:
-            """
-            Creates a TensorFlow dataset from the stratified data generator.
-
-            :param X: Feature set.
-            :param y: Labels.
-            :param groups: List of stratified groups.
-            :param batch_size: Size of each batch.
-
-            :return: A tf.data.Dataset object.
-            """
-            dataset = tf.data.Dataset.from_generator(
-                lambda: stratified_data_generator(X, y, groups),
-                output_signature=(
-                    tf.TensorSpec(shape=(None, X.shape[1]), dtype=tf.float32),
-                    tf.TensorSpec(shape=(None,), dtype=tf.float32)
-                )
-            )
-            return dataset.prefetch(tf.data.AUTOTUNE)
-
         model.compile(
             optimizer=AdamW(
                 learning_rate=learning_rate,
@@ -1595,18 +1517,15 @@ class ModelBuilder:
             )
         )
 
-        steps_per_epoch_subtrain = len(y_subtrain) // batch_size
-
-        subtrain_dataset = create_stratified_tf_dataset(
-            X_subtrain,
-            y_subtrain,
-            subtrain_groups)
+        subtrain_ds, subtrain_steps = stratified_batch_dataset(X_subtrain, y_subtrain, batch_size)
+        val_ds, val_steps = stratified_batch_dataset(X_val, y_val, batch_size)
 
         history = model.fit(
-            subtrain_dataset,
-            steps_per_epoch=steps_per_epoch_subtrain,
+            subtrain_ds,
+            steps_per_epoch=subtrain_steps,
             epochs=epochs,
-            validation_data=(X_val, y_val),
+            validation_data=val_ds,
+            validation_steps=val_steps,
             callbacks=subtrain_callbacks_list,
             verbose=verbose
         )
@@ -1629,16 +1548,11 @@ class ModelBuilder:
             )
         )
 
-        steps_per_epoch_final = len(y_train) // batch_size
-
-        final_train_dataset = create_stratified_tf_dataset(
-            X_train,
-            y_train,
-            train_groups)
+        train_ds, train_steps = stratified_batch_dataset(X_train, y_train, batch_size)
 
         model.fit(
-            final_train_dataset,
-            steps_per_epoch=steps_per_epoch_final,
+            train_ds,
+            steps_per_epoch=train_steps,
             epochs=best_epoch,
             callbacks=callbacks_list,
             verbose=verbose
@@ -2159,12 +2073,14 @@ class ModelBuilder:
 
         return squared_difference
 
-    def pds_loss_vec(self,
-                     y_true: tf.Tensor, z_pred: tf.Tensor,
-                     phase_manager: TrainingPhaseManager,
-                     train_sample_weights: dict = None,
-                     val_sample_weights: dict = None,
-                     reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE) -> tf.Tensor:
+    def pds_loss_vec(
+            self,
+            y_true: tf.Tensor, z_pred: tf.Tensor,
+            phase_manager: TrainingPhaseManager,
+            train_sample_weights: dict = None,
+            val_sample_weights: dict = None,
+            reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
+    ) -> tf.Tensor:
         """
         Computes the weighted loss for a batch of predicted features and their labels.
 
