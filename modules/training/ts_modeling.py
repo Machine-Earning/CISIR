@@ -1020,7 +1020,7 @@ def stratified_data_generator(
         yield batch_X, batch_y
 
 
-def create_stratified_batch_dataset(
+def stratified_batch_dataset(
         X: np.ndarray,
         y: np.ndarray,
         batch_size: int,

@@ -16,9 +16,8 @@ from modules.training.ts_modeling import (
     evaluate_mae,
     evaluate_pcc,
     process_sep_events,
-    filter_ds,
     stratified_split,
-    create_stratified_batch_dataset,
+    stratified_batch_dataset,
     set_seed, mse_pcc)
 from sources.transformer.modules import create_attentive_model
 
@@ -61,8 +60,8 @@ def main():
 
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
-                            patience = int(3e3)  # PATIENCE  # higher patience
-                            learning_rate = 1e-4  # og learning rate
+                            patience = int(7e3)  # PATIENCE  # higher patience
+                            learning_rate = 1e-3  # og learning rate
                             activation = 'leaky_relu'  # ACTIVATION
                             attn_skipped_layers = 1  # SKIPPED_LAYERS
                             attn_residual = False  # RESIDUAL
@@ -161,17 +160,17 @@ def main():
                                 outputs_to_use=outputs_to_use,
                                 cme_speed_threshold=cme_speed_threshold)
 
-                            X_train_filtered, y_train_filtered = filter_ds(
-                                X_train, y_train,
-                                low_threshold=lower_threshold,
-                                high_threshold=upper_threshold,
-                                N=N, seed=seed)
-
-                            X_test_filtered, y_test_filtered = filter_ds(
-                                X_test, y_test,
-                                low_threshold=lower_threshold,
-                                high_threshold=upper_threshold,
-                                N=N, seed=seed)
+                            # X_train_filtered, y_train_filtered = filter_ds(
+                            #     X_train, y_train,
+                            #     low_threshold=lower_threshold,
+                            #     high_threshold=upper_threshold,
+                            #     N=N, seed=seed)
+                            #
+                            # X_test_filtered, y_test_filtered = filter_ds(
+                            #     X_test, y_test,
+                            #     low_threshold=lower_threshold,
+                            #     high_threshold=upper_threshold,
+                            #     N=N, seed=seed)
 
                             X_subtrain, y_subtrain, X_val, y_val = stratified_split(
                                 X_train,
@@ -294,27 +293,23 @@ def main():
                                 }
                             )
 
-                            # Step 1: Create stratified dataset for the subtraining set
-                            subtrain_dataset, subtrain_steps_per_epoch = create_stratified_batch_dataset(
-                                X_subtrain, y_subtrain, batch_size
-                            )
-                            # Step 2: Create stratified dataset for the validation set
-                            val_dataset, validation_steps = create_stratified_batch_dataset(
-                                X_val, y_val, batch_size
-                            )
+                            # Step 1: Create stratified dataset for the subtraining and validation set
+                            subtrain_ds, subtrain_steps = stratified_batch_dataset(
+                                X_subtrain, y_subtrain, batch_size)
+                            val_ds, val_steps = stratified_batch_dataset(
+                                X_val, y_val, batch_size)
 
                             # Map the subtraining dataset to return {'output': y} format
-                            subtrain_dataset = subtrain_dataset.map(lambda x, y: (x, {'output': y}))
-                            # Map the validation dataset to return {'output': y} format
-                            val_dataset = val_dataset.map(lambda x, y: (x, {'output': y}))
+                            subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'output': y}))
+                            val_ds = val_ds.map(lambda x, y: (x, {'output': y}))
 
                             # Train the model with the callback
                             history = model_sep.fit(
-                                subtrain_dataset,
-                                steps_per_epoch=subtrain_steps_per_epoch,
+                                subtrain_ds,
+                                steps_per_epoch=subtrain_steps,
                                 epochs=epochs, batch_size=batch_size,
-                                validation_data=val_dataset,
-                                validation_steps=validation_steps,
+                                validation_data=val_ds,
+                                validation_steps=val_steps,
                                 callbacks=[
                                     early_stopping,
                                     reduce_lr_on_plateau,
@@ -366,18 +361,16 @@ def main():
                                 },
                             )  # Compile the model just like before
 
-                            # Step 1: Create stratified dataset for the training set
-                            train_dataset, train_steps_per_epoch = create_stratified_batch_dataset(
-                                X_train, y_train, batch_size
-                            )
+                            train_ds, train_steps = stratified_batch_dataset(
+                                X_train, y_train, batch_size)
 
                             # Map the training dataset to return {'output': y} format
-                            train_dataset = subtrain_dataset.map(lambda x, y: (x, {'output': y}))
+                            train_ds = train_ds.map(lambda x, y: (x, {'output': y}))
 
                             # Train on the full dataset
                             final_model_sep.fit(
-                                train_dataset,
-                                steps_per_epoch=train_steps_per_epoch,
+                                train_ds,
+                                steps_per_epoch=train_steps,
                                 epochs=optimal_epochs,
                                 batch_size=batch_size,
                                 callbacks=[
