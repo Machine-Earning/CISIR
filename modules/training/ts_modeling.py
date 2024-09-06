@@ -1013,7 +1013,7 @@ def stratified_data_generator(
         if debug:
             print(f'Batch shape: {batch_X.shape}, {batch_y.shape}')
             print(f"Batch indices: {batch_indices}")
-            print(f"Batch X:\n{batch_X}")
+            # print(f"Batch X:\n{batch_X}")
             print(f"Batch y:\n{batch_y}")
 
         # Yield the current batch
