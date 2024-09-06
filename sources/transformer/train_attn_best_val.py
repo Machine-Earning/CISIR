@@ -7,17 +7,16 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
+from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
-from modules.training.DenseReweights import exDenseReweights
+from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.ts_modeling import (
     build_dataset,
     evaluate_mae,
     evaluate_pcc,
     process_sep_events,
-    get_loss,
-    filter_ds,
-    stratified_split,
-    set_seed)
+    stratified_batch_dataset,
+    set_seed, mse_pcc)
 from sources.transformer.modules import create_attentive_model
 
 
@@ -30,20 +29,25 @@ def main():
     Main function to run the E-MLP model
     :return:
     """
+
+    # set the training phase manager - necessary for mse + pcc loss
+    pm = TrainingPhaseManager()
+
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha, alpha_val in zip([0.5], [1]):
-                    for rho in [0]:  # SAM_RHOS:
+                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
+                    for rho in [0.]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
+                            lambda_factor = 0
 
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'ATTM_{inputs_str}_alpha{alpha:.2f}_rho{rho:.2f}_cheat'
+                            title = f'ATTM_{inputs_str}_amse{alpha_mse:.2f}_rho{rho:.2f}_cheat'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -54,36 +58,34 @@ def main():
 
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
-                            patience = int(25e3) #PATIENCE  # higher patience
-                            learning_rate = ATTM_START_LR  # higher learning rate
-                            activation = ATTM_ACTIVATION  # 'LeakyReLU'  # higher learning rate
-                            attn_skipped_layers = ATTN_SKIPPED_LAYERS  # SKIPPED_LAYERS
-                            attn_residual = ATTN_RESIDUAL  # RESIDUAL
-                            attn_dropout_rate = ATTN_DROPOUT  # DROPOUT
-                            dropout = ATTM_DROPOUT
-                            attn_norm = ATTN_NORM
-                            norm = ATTM_NORM
-                            skipped_blocks = ATTM_SKIPPED_BLOCKS
-                            residual = ATTM_RESIDUAL
+                            patience = int(7e3)  # PATIENCE  # higher patience
+                            learning_rate = 3e-4  # og learning rate
+                            activation = 'leaky_relu'  # ACTIVATION
+                            attn_skipped_layers = 1  # SKIPPED_LAYERS
+                            attn_residual = False  # RESIDUAL
+                            attn_dropout_rate = 0  # DROPOUT
+                            dropout = 0  # DROPOUT
+                            attn_norm = None  # NORM
+                            norm = 'batch_norm'
+                            skipped_blocks = 1  # SKIPPED_LAYERS
+                            residual = True  # RESIDUAL
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
-                                factor=LR_CB_FACTOR,
-                                patience=LR_CB_PATIENCE,
+                                factor=0.9,
+                                patience=500,
                                 verbose=VERBOSE,
                                 min_delta=LR_CB_MIN_DELTA,
-                                min_lr=ATTM_LR_CB_MIN_LR)
+                                min_lr=1e-7)  # LR_CB_MIN_LR)
 
-                            weight_decay = ATTM_WD  # higher weight decay
+                            weight_decay = 1e-7  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
                             # hiddens = MLP_HIDDENS  # hidden layers
 
                             # hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-                            loss_key = 'mse'  # LOSS_KEY
                             target_change = ('delta_p' in outputs_to_use)
-                            alpha_rw = alpha
                             bandwidth = BANDWIDTH
                             repr_dim = REPR_DIM
                             output_dim = len(outputs_to_use)
@@ -93,9 +95,9 @@ def main():
                             cme_speed_threshold = cme_speed_threshold
                             # residual = False  # RESIDUAL
                             # skipped_layers = SKIPPED_LAYERS
-                            N = N_FILTERED  # number of samples to keep outside the threshold
-                            lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
-                            upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
+                            # N = N_FILTERED  # number of samples to keep outside the threshold
+                            # lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
+                            # upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                             # Initialize wandb
@@ -110,11 +112,13 @@ def main():
                                 "epochs": epochs,
                                 # hidden in a more readable format  (wandb does not support lists)
                                 # "hiddens": hiddens_str,
-                                "loss": loss_key,
+                                "loss": 'mse_pcc',
                                 "target_change": target_change,
                                 "seed": seed,
-                                "alpha_rw": alpha_rw,
-                                "alpha_val": alpha_val,
+                                "alpha_mse": alpha_mse,
+                                "alphaV_mse": alphaV_mse,
+                                "alpha_pcc": alpha_pcc,
+                                "alphaV_pcc": alphaV_pcc,
                                 "bandwidth": bandwidth,
                                 "reciprocal_reweight": RECIPROCAL_WEIGHTS,
                                 "repr_dim": repr_dim,
@@ -154,81 +158,96 @@ def main():
                                 outputs_to_use=outputs_to_use,
                                 cme_speed_threshold=cme_speed_threshold)
 
-                            X_train_filtered, y_train_filtered = filter_ds(
-                                X_train, y_train,
-                                low_threshold=lower_threshold,
-                                high_threshold=upper_threshold,
-                                N=N, seed=seed)
+                            # X_train_filtered, y_train_filtered = filter_ds(
+                            #     X_train, y_train,
+                            #     low_threshold=lower_threshold,
+                            #     high_threshold=upper_threshold,
+                            #     N=N, seed=seed)
+                            #
+                            # X_test_filtered, y_test_filtered = filter_ds(
+                            #     X_test, y_test,
+                            #     low_threshold=lower_threshold,
+                            #     high_threshold=upper_threshold,
+                            #     N=N, seed=seed)
 
-                            X_test_filtered, y_test_filtered = filter_ds(
-                                X_test, y_test,
-                                low_threshold=lower_threshold,
-                                high_threshold=upper_threshold,
-                                N=N, seed=seed)
-
-                            X_subtrain, y_subtrain, X_val, y_val = stratified_split(
-                                X_train,
-                                y_train,
-                                shuffle=True,
-                                seed=seed,
-                                split=VAL_SPLIT,
-                                debug=False)
+                            # X_subtrain, y_subtrain, X_val, y_val = stratified_split(X_train, y_train, seed=seed)
 
                             # print all cme_files shapes
                             print(f'X_train.shape: {X_train.shape}')
                             print(f'y_train.shape: {y_train.shape}')
-                            print(f'X_subtrain.shape: {X_subtrain.shape}')
-                            print(f'y_subtrain.shape: {y_subtrain.shape}')
+                            # print(f'X_subtrain.shape: {X_subtrain.shape}')
+                            # print(f'y_subtrain.shape: {y_subtrain.shape}')
                             print(f'X_test.shape: {X_test.shape}')
                             print(f'y_test.shape: {y_test.shape}')
-                            print(f'X_val.shape: {X_val.shape}')
-                            print(f'y_val.shape: {y_val.shape}')
+                            # print(f'X_val.shape: {X_val.shape}')
+                            # print(f'y_val.shape: {y_val.shape}')
 
                             # Compute the sample weights
                             delta_train = y_train[:, 0]
-                            delta_subtrain = y_subtrain[:, 0]
-                            delta_val = y_val[:, 0]
+                            # delta_subtrain = y_subtrain[:, 0]
+                            # delta_val = y_val[:, 0]
                             delta_test = y_test[:, 0]
+
                             print(f'delta_train.shape: {delta_train.shape}')
-                            print(f'delta_subtrain.shape: {delta_subtrain.shape}')
-                            print(f'delta_val.shape: {delta_val.shape}')
+                            # print(f'delta_subtrain.shape: {delta_subtrain.shape}')
+                            # print(f'delta_val.shape: {delta_val.shape}')
                             print(f'delta_test.shape: {delta_test.shape}')
 
                             print(f'rebalancing the training set...')
                             min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
-                            y_train_weights = exDenseReweights(
+                            mse_train_weights_dict = exDenseReweightsD(
                                 X_train, delta_train,
-                                alpha=alpha_rw, bw=bandwidth,
+                                alpha=alpha_mse, bw=bandwidth,
                                 min_norm_weight=min_norm_weight,
-                                debug=False).reweights
+                                debug=False).label_reweight_dict
+                            pcc_train_weights_dict = exDenseReweightsD(
+                                X_train, delta_train,
+                                alpha=alpha_pcc, bw=bandwidth,
+                                min_norm_weight=min_norm_weight,
+                                debug=False).label_reweight_dict
                             print(f'training set rebalanced.')
 
-                            print(f'rebalancing the subtraining set...')
-                            min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
-                            y_subtrain_weights = exDenseReweights(
-                                X_subtrain, delta_subtrain,
-                                alpha=alpha_rw, bw=bandwidth,
-                                min_norm_weight=min_norm_weight,
-                                debug=False).reweights
-                            print(f'subtraining set rebalanced.')
+                            # print(f'rebalancing the subtraining set...')
+                            # min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
+                            # mse_subtrain_weights_dict = exDenseReweightsD(
+                            #     X_subtrain, delta_subtrain,
+                            #     alpha=alpha_mse, bw=bandwidth,
+                            #     min_norm_weight=min_norm_weight,
+                            #     debug=False).label_reweight_dict
+                            # pcc_subtrain_weights_dict = exDenseReweightsD(
+                            #     X_subtrain, delta_subtrain,
+                            #     alpha=alpha_pcc, bw=bandwidth,
+                            #     min_norm_weight=min_norm_weight,
+                            #     debug=False).label_reweight_dict
+                            # print(f'subtraining set rebalanced.')
+                            #
+                            # print(f'rebalancing the validation set...')
+                            # min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
+                            # mse_val_weights_dict = exDenseReweightsD(
+                            #     X_val, delta_val,
+                            #     alpha=alphaV_mse, bw=bandwidth,
+                            #     min_norm_weight=min_norm_weight,
+                            #     debug=False).label_reweight_dict
+                            # pcc_val_weights_dict = exDenseReweightsD(
+                            #     X_val, delta_val,
+                            #     alpha=alphaV_pcc, bw=bandwidth,
+                            #     min_norm_weight=min_norm_weight,
+                            #     debug=False).label_reweight_dict
+                            # print(f'validation set rebalanced.')
 
-                            print(f'rebalancing the validation set...')
-                            min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
-                            y_val_weights = exDenseReweights(
-                                X_val, delta_val,
-                                alpha=alpha_val, bw=bandwidth,
-                                min_norm_weight=min_norm_weight,
-                                debug=False).reweights
-                            print(f'validation set rebalanced.')
-
-                            print(f'rebalancing the testing set...')
+                            print(f'rebalancing the test set...')
                             min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_test)
-                            y_test_weights = exDenseReweights(
+                            mse_test_weights_dict = exDenseReweightsD(
                                 X_test, delta_test,
-                                alpha=alpha_val, bw=bandwidth,
+                                alpha=alphaV_mse, bw=bandwidth,
                                 min_norm_weight=min_norm_weight,
-                                debug=False).reweights
-                            print(f'testing set rebalanced.')
+                                debug=False).label_reweight_dict
+                            pcc_test_weights_dict = exDenseReweightsD(
+                                X_test, delta_test,
+                                alpha=alphaV_pcc, bw=bandwidth,
+                                min_norm_weight=min_norm_weight,
+                                debug=False).label_reweight_dict
+                            print(f'test set rebalanced.')
 
                             # get the number of features
                             n_features = X_train.shape[1]
@@ -269,25 +288,106 @@ def main():
                                     weight_decay=weight_decay,
                                     beta_1=momentum_beta1
                                 ),
-                                loss={'output': get_loss(loss_key)}
+                                loss={
+                                    'output': lambda y_true, y_pred: mse_pcc(
+                                        y_true, y_pred,
+                                        phase_manager=pm,
+                                        lambda_factor=lambda_factor,
+                                        train_mse_weight_dict=mse_train_weights_dict,
+                                        train_pcc_weight_dict=pcc_train_weights_dict,
+                                        val_mse_weight_dict=mse_test_weights_dict,
+                                        val_pcc_weight_dict=pcc_test_weights_dict,
+                                    )
+                                }
                             )
+
+                            # Step 1: Create stratified dataset for the subtraining and validation set
+                            train_ds, train_steps = stratified_batch_dataset(
+                                X_train, y_train, batch_size)
+                            test_ds, test_steps = stratified_batch_dataset(
+                                X_test, y_test, batch_size)
+
+                            # Map the subtraining dataset to return {'output': y} format
+                            train_ds = train_ds.map(lambda x, y: (x, {'output': y}))
+                            test_ds = test_ds.map(lambda x, y: (x, {'output': y}))
 
                             # Train the model with the callback
                             history = final_model_sep.fit(
-                                X_train,
-                                {'output': y_train},
-                                sample_weight=y_train_weights,
+                                train_ds,
+                                steps_per_epoch=train_steps,
                                 epochs=epochs, batch_size=batch_size,
-                                # validation_data=(X_val, {'output': y_val}, y_val_weights),
-                                validation_data=(X_test, {'output': y_test}, y_test_weights),  # cheating to find best
-                                # val epoch
+                                validation_data=test_ds,
+                                validation_steps=test_steps,
                                 callbacks=[
                                     early_stopping,
                                     reduce_lr_on_plateau,
-                                    WandbCallback(save_model=WANDB_SAVE_MODEL)
+                                    WandbCallback(save_model=WANDB_SAVE_MODEL),
+                                    IsTraining(pm)
                                 ],
                                 verbose=VERBOSE
                             )
+
+                            # # Determine the optimal number of epochs from the fit history
+                            # optimal_epochs = np.argmin(
+                            #     history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
+                            # # optimal_epochs = int(3e4)
+                            #
+                            # final_model_sep = create_attentive_model(
+                            #     input_dim=n_features,
+                            #     output_dim=output_dim,
+                            #     hidden_blocks=BLOCKS_HIDDENS,
+                            #     attn_hidden_units=ATTN_HIDDENS,
+                            #     attn_hidden_activation=activation,
+                            #     attn_skipped_layers=attn_skipped_layers,
+                            #     attn_residual=attn_residual,
+                            #     attn_dropout_rate=attn_dropout_rate,
+                            #     attn_norm=attn_norm,
+                            #     skipped_blocks=skipped_blocks,
+                            #     repr_dim=repr_dim,
+                            #     dropout_rate=dropout,
+                            #     activation=activation,
+                            #     norm=norm,
+                            #     residual=residual,
+                            #     sam_rho=rho
+                            # )
+                            #
+                            # # final_model_sep.summary()
+                            # final_model_sep.compile(
+                            #     optimizer=AdamW(
+                            #         learning_rate=learning_rate,
+                            #         weight_decay=weight_decay,
+                            #         beta_1=momentum_beta1
+                            #     ),
+                            #     loss={
+                            #         'output': lambda y_true, y_pred: mse_pcc(
+                            #             y_true, y_pred,
+                            #             phase_manager=pm,
+                            #             lambda_factor=lambda_factor,
+                            #             train_mse_weight_dict=mse_train_weights_dict,
+                            #             train_pcc_weight_dict=pcc_train_weights_dict,
+                            #         )
+                            #     },
+                            # )  # Compile the model just like before
+                            #
+                            # train_ds, train_steps = stratified_batch_dataset(
+                            #     X_train, y_train, batch_size)
+                            #
+                            # # Map the training dataset to return {'output': y} format
+                            # train_ds = train_ds.map(lambda x, y: (x, {'output': y}))
+                            #
+                            # # Train on the full dataset
+                            # final_model_sep.fit(
+                            #     train_ds,
+                            #     steps_per_epoch=train_steps,
+                            #     epochs=optimal_epochs,
+                            #     batch_size=batch_size,
+                            #     callbacks=[
+                            #         reduce_lr_on_plateau,
+                            #         WandbCallback(save_model=WANDB_SAVE_MODEL),
+                            #         IsTraining(pm)
+                            #     ],
+                            #     verbose=VERBOSE
+                            # )
 
                             # Save the final model
                             final_model_sep.save_weights(f"final_model_weights_{experiment_name}_reg.h5")
