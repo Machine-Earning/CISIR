@@ -82,7 +82,7 @@ def main():
 
                             weight_decay = 1e-7  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                            batch_size = 8 #BATCH_SIZE  # higher batch size
+                            batch_size = 8  # BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
                             # hiddens = MLP_HIDDENS  # hidden layers
 
@@ -172,13 +172,7 @@ def main():
                             #     high_threshold=upper_threshold,
                             #     N=N, seed=seed)
 
-                            X_subtrain, y_subtrain, X_val, y_val = stratified_split(
-                                X_train,
-                                y_train,
-                                shuffle=True,
-                                seed=seed,
-                                split=VAL_SPLIT,
-                                debug=False)
+                            X_subtrain, y_subtrain, X_val, y_val = stratified_split(X_train, y_train, seed=seed)
 
                             # print all cme_files shapes
                             print(f'X_train.shape: {X_train.shape}')
