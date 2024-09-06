@@ -60,8 +60,8 @@ def main():
 
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
-                            patience = int(7e3)  # PATIENCE  # higher patience
-                            learning_rate = 1e-3  # og learning rate
+                            patience = int(3e3)  # PATIENCE  # higher patience
+                            learning_rate = 3e-4  # og learning rate
                             activation = 'leaky_relu'  # ACTIVATION
                             attn_skipped_layers = 1  # SKIPPED_LAYERS
                             attn_residual = False  # RESIDUAL
