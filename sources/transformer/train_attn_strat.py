@@ -80,7 +80,7 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=1e-7)  # LR_CB_MIN_LR)
 
-                            weight_decay = 1e-8  # WEIGHT_DECAY  # higher weight decay
+                            weight_decay = 1e-7  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
@@ -97,9 +97,9 @@ def main():
                             cme_speed_threshold = cme_speed_threshold
                             # residual = False  # RESIDUAL
                             # skipped_layers = SKIPPED_LAYERS
-                            N = N_FILTERED  # number of samples to keep outside the threshold
-                            lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
-                            upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
+                            # N = N_FILTERED  # number of samples to keep outside the threshold
+                            # lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
+                            # upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                             # Initialize wandb
@@ -198,7 +198,6 @@ def main():
                             print(f'delta_subtrain.shape: {delta_subtrain.shape}')
                             print(f'delta_val.shape: {delta_val.shape}')
 
-                            print(f'rebalancing the training set...')
                             print(f'rebalancing the training set...')
                             min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
                             mse_train_weights_dict = exDenseReweightsD(
