@@ -991,11 +991,7 @@ def stratified_data_generator(
     """
 
     while True:
-        if shuffle:
-            # Shuffle both the rows (groups) and the elements within each group
-            np.random.shuffle(groups)  # Shuffle the groups (rows)
-            np.apply_along_axis(np.random.shuffle, 1, groups)  # Shuffle within each group (columns)
-
+        if shuffle: np.apply_along_axis(np.random.shuffle, 1, groups)  # Shuffle within each group (columns)
         # Select the first element from each group to form the batch
         batch_indices = groups[:, 0]
 
