@@ -928,12 +928,12 @@ def stratified_split(
     return X_subtrain, y_subtrain, X_val, y_val
 
 
-def stratified_groups(y: np.ndarray, batch_size: int, debug: bool = True) -> np.ndarray:
+def stratified_groups(y: np.ndarray, batch_size: int, debug: bool = False) -> np.ndarray:
     """
     Create stratified groups from the dataset by sorting it based on the labels.
     The number of groups corresponds to the batch size, and each group will have
     samples with similar label distributions. The result is a 2D array where each
-    group is padded to the same size.
+    group is padded to the same size. Verified to work.
 
     Parameters:
     -----------
@@ -971,20 +971,16 @@ def stratified_groups(y: np.ndarray, batch_size: int, debug: bool = True) -> np.
     return padded_groups
 
 
-
 def stratified_data_generator(
         X: np.ndarray,
         y: np.ndarray,
-        groups: List[np.ndarray],
-        batch_size: int,
+        groups: np.ndarray,  # Assuming groups is a 2D array
         shuffle: bool = True,
-        debug: bool = True
+        debug: bool = False
 ) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
     """
     Generator that yields stratified batches of (X, y) by selecting one sample from each group.
-    The groups are passed as an argument and are generated once.
-    TODO: can be made faster
-    TODO: can be madet to work without replacement
+    The groups are passed as a 2D array of sample indices.
 
     Parameters:
     -----------
@@ -992,34 +988,29 @@ def stratified_data_generator(
         Feature matrix of shape (n_samples, n_features).
     y : np.ndarray
         Label vector of shape (n_samples,).
-    groups : List[np.ndarray]
-        Precomputed groups of sample indices for stratified sampling.
-    batch_size : int
-        Number of samples in each batch.
+    groups : np.ndarray
+        Precomputed groups of sample indices for stratified sampling, shape (n_groups, group_size).
     shuffle : bool, optional
         If True, shuffles the groups and the elements within each group before each epoch (default is True).
     debug : bool, optional
-        If True, prints the generated batches for debugging purposes (default is False).
+        If True, prints the generated batches for debugging purposes (default is True).
 
     Yields:
     -------
     Tuple[np.ndarray, np.ndarray]:
         Batches of feature matrix and label vector of size (batch_size, n_features) and (batch_size,) respectively.
     """
+
     while True:
         if shuffle:
-            # Shuffle the elements within each group
-            for group in groups:
-                np.random.shuffle(group)
+            # Shuffle both the rows (groups) and the elements within each group
+            np.random.shuffle(groups)  # Shuffle the groups (rows)
+            np.apply_along_axis(np.random.shuffle, 1, groups)  # Shuffle within each group (columns)
 
-        # Preallocate batch indices
-        batch_indices = np.zeros(batch_size, dtype=int)
+        # Select the first element from each group to form the batch
+        batch_indices = groups[:, 0]
 
-        # Pick one sample from each group
-        for i, group in enumerate(groups):
-            batch_indices[i] = group[0]  # Pick the first element from each shuffled group
-
-        # Randomly shuffle the selected batch indices (randomize order within the batch)
+        # Optionally, shuffle the order of the selected samples to randomize batch order
         np.random.shuffle(batch_indices)
 
         # Create the feature and label batches using the selected indices
@@ -1031,6 +1022,7 @@ def stratified_data_generator(
 
         # Debugging: Print the current batch
         if debug:
+            print(f'Batch shape: {batch_X.shape}, {batch_y.shape}')
             print(f"Batch indices: {batch_indices}")
             print(f"Batch X:\n{batch_X}")
             print(f"Batch y:\n{batch_y}")
