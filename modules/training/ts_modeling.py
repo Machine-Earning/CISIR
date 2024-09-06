@@ -873,54 +873,43 @@ def stratified_split(
         - X_val: Features for the validation set.
         - y_val: Labels for the validation set.
     """
-    if shuffle:
-        np.random.seed(seed)
-
+    if shuffle: np.random.seed(seed)
     # Sort the data by the labels
     sorted_indices = np.argsort(y, axis=0).flatten()
-    X_sorted = X[sorted_indices]
-    y_sorted = y[sorted_indices]
-
+    X_sorted, y_sorted = X[sorted_indices], y[sorted_indices]
     # Calculate the number of validation samples
     num_samples = X.shape[0]
     # val_size = int(num_samples * split)
-
     # Initialize lists to hold subtraining and validation data
-    X_subtrain = []
-    y_subtrain = []
-    X_val = []
-    y_val = []
-
+    X_subtrain, y_subtrain, X_val, y_val = [], [], [], []
     # Divide into groups of 4 and split into subtrain and validation
     for i in range(0, num_samples, 4):
         group_indices = list(range(i, min(i + 4, num_samples)))
-        if shuffle:
-            np.random.shuffle(group_indices)  # Shuffle within the group
+        if shuffle: np.random.shuffle(group_indices)  # Shuffle within the group
         val_indices = group_indices[:1]
         subtrain_indices = group_indices[1:]
-
+        # Append the samples to the subtraining and validation sets
         X_val.extend(X_sorted[val_indices])
         y_val.extend(y_sorted[val_indices])
         X_subtrain.extend(X_sorted[subtrain_indices])
         y_subtrain.extend(y_sorted[subtrain_indices])
 
     # Convert lists back to arrays
-    X_subtrain = np.array(X_subtrain)
-    y_subtrain = np.array(y_subtrain)
-    X_val = np.array(X_val)
-    y_val = np.array(y_val)
+    X_subtrain, y_subtrain = np.array(X_subtrain), np.array(y_subtrain)
+    X_val, y_val = np.array(X_val), np.array(y_val)
 
     # Ensure the largest y is in the validation set
-    max_y_index = np.argmax(y_sorted)
-    max_y_val = y_sorted[max_y_index]
+    max_y_index = np.argmax(y_sorted)  # Index of the largest y value
+    max_y_val = y_sorted[max_y_index]  # Largest y value
+    # Check if the largest y value is not in the validation set
     if max_y_val not in y_val:
         # Add the sample with the largest y value to the validation set
         X_val = np.vstack([X_val, X_sorted[max_y_index].reshape(1, -1)])
         y_val = np.vstack([y_val, max_y_val.reshape(1, -1)])
-        # Remove the largest y from the subtraining set
-        mask = y_subtrain != max_y_val
-        X_subtrain = X_subtrain[mask.flatten()]
-        y_subtrain = y_subtrain[mask.flatten()]
+        # # Remove the largest y from the subtraining set
+        # mask = y_subtrain != max_y_val
+        # X_subtrain = X_subtrain[mask.flatten()]
+        # y_subtrain = y_subtrain[mask.flatten()]
 
     if debug:
         plot_distributions(y, y_subtrain, y_val)
@@ -1059,19 +1048,16 @@ def stratified_batch_dataset(
     """
     # Generate the stratified groups once
     groups = stratified_groups(y, batch_size)
-
     # Use from_generator to create a dataset from the stratified_data_generator
     dataset = tf.data.Dataset.from_generator(
-        lambda: stratified_data_generator(X, y, groups, batch_size, shuffle=shuffle),
+        lambda: stratified_data_generator(X, y, groups, shuffle=shuffle),
         output_signature=(
             tf.TensorSpec(shape=(batch_size, X.shape[1]), dtype=tf.float32),
             tf.TensorSpec(shape=(batch_size,), dtype=tf.float32)
         )
     )
-
     # Compute the number of steps per epoch
     steps_per_epoch = len(y) // batch_size
-
     # Prefetch for performance optimization
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
 
@@ -1144,6 +1130,9 @@ def stratified_4fold_split(
 
             perm = np.random.permutation(len(X_val))
             X_val, y_val = X_val[perm], y_val[perm]
+
+        if debug:
+            plot_distributions(y, y_subtrain, y_val)
 
         yield X_subtrain, y_subtrain, X_val, y_val
 
