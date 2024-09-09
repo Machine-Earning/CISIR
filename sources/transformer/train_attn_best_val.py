@@ -2,8 +2,8 @@ import os
 from datetime import datetime
 
 import wandb
-from keras.callbacks import EarlyStopping
-from tensorflow.keras.callbacks import ReduceLROnPlateau
+import tensorflow as tf
+from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
@@ -158,39 +158,17 @@ def main():
                                 outputs_to_use=outputs_to_use,
                                 cme_speed_threshold=cme_speed_threshold)
 
-                            # X_train_filtered, y_train_filtered = filter_ds(
-                            #     X_train, y_train,
-                            #     low_threshold=lower_threshold,
-                            #     high_threshold=upper_threshold,
-                            #     N=N, seed=seed)
-                            #
-                            # X_test_filtered, y_test_filtered = filter_ds(
-                            #     X_test, y_test,
-                            #     low_threshold=lower_threshold,
-                            #     high_threshold=upper_threshold,
-                            #     N=N, seed=seed)
-
-                            # X_subtrain, y_subtrain, X_val, y_val = stratified_split(X_train, y_train, seed=seed)
-
                             # print all cme_files shapes
                             print(f'X_train.shape: {X_train.shape}')
                             print(f'y_train.shape: {y_train.shape}')
-                            # print(f'X_subtrain.shape: {X_subtrain.shape}')
-                            # print(f'y_subtrain.shape: {y_subtrain.shape}')
                             print(f'X_test.shape: {X_test.shape}')
                             print(f'y_test.shape: {y_test.shape}')
-                            # print(f'X_val.shape: {X_val.shape}')
-                            # print(f'y_val.shape: {y_val.shape}')
 
                             # Compute the sample weights
                             delta_train = y_train[:, 0]
-                            # delta_subtrain = y_subtrain[:, 0]
-                            # delta_val = y_val[:, 0]
                             delta_test = y_test[:, 0]
 
                             print(f'delta_train.shape: {delta_train.shape}')
-                            # print(f'delta_subtrain.shape: {delta_subtrain.shape}')
-                            # print(f'delta_val.shape: {delta_val.shape}')
                             print(f'delta_test.shape: {delta_test.shape}')
 
                             print(f'rebalancing the training set...')
@@ -206,34 +184,6 @@ def main():
                                 min_norm_weight=min_norm_weight,
                                 debug=False).label_reweight_dict
                             print(f'training set rebalanced.')
-
-                            # print(f'rebalancing the subtraining set...')
-                            # min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
-                            # mse_subtrain_weights_dict = exDenseReweightsD(
-                            #     X_subtrain, delta_subtrain,
-                            #     alpha=alpha_mse, bw=bandwidth,
-                            #     min_norm_weight=min_norm_weight,
-                            #     debug=False).label_reweight_dict
-                            # pcc_subtrain_weights_dict = exDenseReweightsD(
-                            #     X_subtrain, delta_subtrain,
-                            #     alpha=alpha_pcc, bw=bandwidth,
-                            #     min_norm_weight=min_norm_weight,
-                            #     debug=False).label_reweight_dict
-                            # print(f'subtraining set rebalanced.')
-                            #
-                            # print(f'rebalancing the validation set...')
-                            # min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
-                            # mse_val_weights_dict = exDenseReweightsD(
-                            #     X_val, delta_val,
-                            #     alpha=alphaV_mse, bw=bandwidth,
-                            #     min_norm_weight=min_norm_weight,
-                            #     debug=False).label_reweight_dict
-                            # pcc_val_weights_dict = exDenseReweightsD(
-                            #     X_val, delta_val,
-                            #     alpha=alphaV_pcc, bw=bandwidth,
-                            #     min_norm_weight=min_norm_weight,
-                            #     debug=False).label_reweight_dict
-                            # print(f'validation set rebalanced.')
 
                             print(f'rebalancing the test set...')
                             min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_test)
@@ -281,6 +231,17 @@ def main():
                                 verbose=VERBOSE,
                                 restore_best_weights=True)
 
+                            # Define ModelCheckpoint callback to save the best model during training
+                            checkpoint_filepath = f"best_model_checkpoint_{experiment_name}.h5"
+                            model_checkpoint = ModelCheckpoint(
+                                filepath=checkpoint_filepath,
+                                save_weights_only=False,  # Save the full model, not just the weights
+                                monitor='val_loss',  # Monitor validation loss (or any other metric)
+                                mode='min',  # 'min' because lower 'val_loss' is better
+                                save_best_only=True,  # Save only when the model has improved
+                                verbose=1  # Display when the model is saved
+                            )
+
                             # Compile the model with the specified learning rate
                             final_model_sep.compile(
                                 optimizer=AdamW(
@@ -322,72 +283,14 @@ def main():
                                     early_stopping,
                                     reduce_lr_on_plateau,
                                     WandbCallback(save_model=WANDB_SAVE_MODEL),
-                                    IsTraining(pm)
+                                    IsTraining(pm),
+                                    model_checkpoint
                                 ],
                                 verbose=VERBOSE
                             )
 
-                            # # Determine the optimal number of epochs from the fit history
-                            # optimal_epochs = np.argmin(
-                            #     history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
-                            # # optimal_epochs = int(3e4)
-                            #
-                            # final_model_sep = create_attentive_model(
-                            #     input_dim=n_features,
-                            #     output_dim=output_dim,
-                            #     hidden_blocks=BLOCKS_HIDDENS,
-                            #     attn_hidden_units=ATTN_HIDDENS,
-                            #     attn_hidden_activation=activation,
-                            #     attn_skipped_layers=attn_skipped_layers,
-                            #     attn_residual=attn_residual,
-                            #     attn_dropout_rate=attn_dropout_rate,
-                            #     attn_norm=attn_norm,
-                            #     skipped_blocks=skipped_blocks,
-                            #     repr_dim=repr_dim,
-                            #     dropout_rate=dropout,
-                            #     activation=activation,
-                            #     norm=norm,
-                            #     residual=residual,
-                            #     sam_rho=rho
-                            # )
-                            #
-                            # # final_model_sep.summary()
-                            # final_model_sep.compile(
-                            #     optimizer=AdamW(
-                            #         learning_rate=learning_rate,
-                            #         weight_decay=weight_decay,
-                            #         beta_1=momentum_beta1
-                            #     ),
-                            #     loss={
-                            #         'output': lambda y_true, y_pred: mse_pcc(
-                            #             y_true, y_pred,
-                            #             phase_manager=pm,
-                            #             lambda_factor=lambda_factor,
-                            #             train_mse_weight_dict=mse_train_weights_dict,
-                            #             train_pcc_weight_dict=pcc_train_weights_dict,
-                            #         )
-                            #     },
-                            # )  # Compile the model just like before
-                            #
-                            # train_ds, train_steps = stratified_batch_dataset(
-                            #     X_train, y_train, batch_size)
-                            #
-                            # # Map the training dataset to return {'output': y} format
-                            # train_ds = train_ds.map(lambda x, y: (x, {'output': y}))
-                            #
-                            # # Train on the full dataset
-                            # final_model_sep.fit(
-                            #     train_ds,
-                            #     steps_per_epoch=train_steps,
-                            #     epochs=optimal_epochs,
-                            #     batch_size=batch_size,
-                            #     callbacks=[
-                            #         reduce_lr_on_plateau,
-                            #         WandbCallback(save_model=WANDB_SAVE_MODEL),
-                            #         IsTraining(pm)
-                            #     ],
-                            #     verbose=VERBOSE
-                            # )
+                            # Load the best model from the checkpoint
+                            final_model_sep = tf.keras.models.load_model(checkpoint_filepath)
 
                             # Save the final model
                             final_model_sep.save_weights(f"final_model_weights_{experiment_name}_reg.h5")
