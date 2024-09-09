@@ -235,7 +235,7 @@ def main():
                             checkpoint_filepath = f"best_model_checkpoint_{experiment_name}.h5"
                             model_checkpoint = ModelCheckpoint(
                                 filepath=checkpoint_filepath,
-                                save_weights_only=False,  # Save the full model, not just the weights
+                                save_weights_only=True,  # Save the full model, not just the weights
                                 monitor='val_loss',  # Monitor validation loss (or any other metric)
                                 mode='min',  # 'min' because lower 'val_loss' is better
                                 save_best_only=True,  # Save only when the model has improved
@@ -289,8 +289,8 @@ def main():
                                 verbose=VERBOSE
                             )
 
-                            # Load the best model from the checkpoint
-                            final_model_sep = tf.keras.models.load_model(checkpoint_filepath)
+                            # Load the best weights from the checkpoint
+                            final_model_sep.load_weights(checkpoint_filepath)
 
                             # Save the final model
                             final_model_sep.save_weights(f"final_model_weights_{experiment_name}_reg.h5")
