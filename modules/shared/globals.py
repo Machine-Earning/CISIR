@@ -1,6 +1,7 @@
 # Global configurations
 SEEDS = [456789, 42, 1234]  # Seeds for reproducibility
 INPUTS_TO_USE = [['e0.5', 'e4.4', 'p6.1', 'p']]  # Inputs to use
+# INPUTS_TO_USE = [['e0.5', 'e1.8', 'p']]  # Inputs to use
 OUTPUTS_TO_USE = ['delta_p']  # Output to use
 CME_SPEED_THRESHOLD = [0]  # CME speed threshold
 # ALPHAS = [0, 0.3, 0.2, 0.1, 0.4]  # Alpha values for the loss

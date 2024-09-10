@@ -44,15 +44,15 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
-                    for rho in [0.0]:  # SAM_RHOS:
+                    for rho in [0]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
-                            lambda_factor = 0.0  # lambda for the loss
+                            lambda_factor = 8  # lambda for the loss
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'MLP_{inputs_str}_amse{alpha_mse:.2f}_rho{rho:.2f}_strat'
+                            title = f'MLP_{inputs_str}_amse{alpha_mse:.2f}_rho{rho}_strat'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
                             # Create a unique experiment name with a timestamp
