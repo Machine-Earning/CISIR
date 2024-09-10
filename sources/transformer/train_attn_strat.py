@@ -239,22 +239,16 @@ def main():
                             print(f'n_features: {n_features}')
 
                             # create the model
-                            model_sep = create_attentive_model(
+                            model_sep = create_mlp(
                                 input_dim=n_features,
-                                output_dim=output_dim,
-                                hidden_blocks=BLOCKS_HIDDENS,
-                                attn_hidden_units=ATTN_HIDDENS,
-                                attn_hidden_activation=activation,
-                                attn_skipped_layers=attn_skipped_layers,
-                                attn_residual=attn_residual,
-                                attn_dropout_rate=attn_dropout_rate,
-                                attn_norm=attn_norm,
-                                skipped_blocks=skipped_blocks,
+                                hiddens=hiddens,
                                 repr_dim=repr_dim,
+                                output_dim=output_dim,
                                 dropout_rate=dropout,
                                 activation=activation,
                                 norm=norm,
                                 residual=residual,
+                                skipped_layers=skipped_layers,
                                 sam_rho=rho
                             )
                             model_sep.summary()
@@ -317,22 +311,16 @@ def main():
                                 history.history[ES_CB_MONITOR]) + 1  # +1 to adjust for 0-based index
                             # optimal_epochs = int(3e4)
 
-                            final_model_sep = create_attentive_model(
+                            final_model_sep = create_mlp(
                                 input_dim=n_features,
-                                output_dim=output_dim,
-                                hidden_blocks=BLOCKS_HIDDENS,
-                                attn_hidden_units=ATTN_HIDDENS,
-                                attn_hidden_activation=activation,
-                                attn_skipped_layers=attn_skipped_layers,
-                                attn_residual=attn_residual,
-                                attn_dropout_rate=attn_dropout_rate,
-                                attn_norm=attn_norm,
-                                skipped_blocks=skipped_blocks,
+                                hiddens=hiddens,
                                 repr_dim=repr_dim,
+                                output_dim=output_dim,
                                 dropout_rate=dropout,
                                 activation=activation,
                                 norm=norm,
                                 residual=residual,
+                                skipped_layers=skipped_layers,
                                 sam_rho=rho
                             )
 

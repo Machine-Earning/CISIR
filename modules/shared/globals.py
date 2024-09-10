@@ -1,5 +1,5 @@
 # Global configurations
-SEEDS = [456789]  # Seeds for reproducibility
+SEEDS = [456789, 42, 1234]  # Seeds for reproducibility
 INPUTS_TO_USE = [['e0.5', 'e4.4', 'p6.1', 'p']]  # Inputs to use
 OUTPUTS_TO_USE = ['delta_p']  # Output to use
 CME_SPEED_THRESHOLD = [0]  # CME speed threshold
@@ -34,9 +34,9 @@ WEIGHT_DECAY = 1e-5  # Higher weight decay
 WEIGHT_DECAY_PDS = 1e-5  # Higher weight decay for projection layers
 MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 BANDWIDTH = 4.42e-2  # Bandwidth for rebalancing
-PATIENCE = int(7e3)  # Higher patience
+PATIENCE = int(5e3)  # Higher patience
 LR_CB_FACTOR = 0.9  # factor for reducing learning rate
-LR_CB_PATIENCE = 700  # patience for reducing learning rate
+LR_CB_PATIENCE = 500  # patience for reducing learning rate
 LR_CB_MIN_LR = 1e-6  # minimum learning rate
 VERBOSE = 1  # Verbose
 SAVE_BEST = False  # Save best model
@@ -48,7 +48,7 @@ VAL_SPLIT = 0.25  # Validation split
 TARGET_MIN_NORM_WEIGHT = 0.01  # Minimum weight for the target normalization
 COMMON_VAL_ALPHA = 0.75  #1  # Common validation alpha
 ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
-ES_CB_RESTORE_WEIGHTS = False  # Restore weights
+ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 WANDB_SAVE_MODEL = False  # Save model to wandb
 RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 SAM_RHOS = [0.05, 0.5]  # Rho values for SAM
