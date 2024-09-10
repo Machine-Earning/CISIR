@@ -17,9 +17,14 @@ from modules.training.ts_modeling import (
     evaluate_mae,
     evaluate_pcc,
     process_sep_events,
-    stratified_split,
     stratified_batch_dataset,
-    set_seed, mse_pcc, filter_ds, create_mlp, plot_error_hist, stratified_4fold_split)
+    set_seed,
+    mse_pcc,
+    filter_ds,
+    create_mlp,
+    plot_error_hist,
+    stratified_4fold_split
+)
 
 
 # Set the environment variable for CUDA (in case it is necessary)
@@ -132,8 +137,7 @@ def main():
                                 cme_speed_threshold=cme_speed_threshold,
                                 shuffle_data=True)
                             # print the training set shapes
-                            print(f'X_train.shape: {X_train.shape}')
-                            print(f'y_train.shape: {y_train.shape}')
+                            print(f'X_train.shape: {X_train.shape}, y_train.shape: {y_train.shape}')
                             # getting the reweights for training set
                             delta_train = y_train[:, 0]
                             print(f'delta_train.shape: {delta_train.shape}')
@@ -160,9 +164,8 @@ def main():
                                 add_slope=add_slope,
                                 outputs_to_use=outputs_to_use,
                                 cme_speed_threshold=cme_speed_threshold)
-
-                            print(f'X_test.shape: {X_test.shape}')
-                            print(f'y_test.shape: {y_test.shape}')
+                            # print the test set shapes
+                            print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
 
                             # filtering training and test sets for additional results
                             X_train_filtered, y_train_filtered = filter_ds(
@@ -179,13 +182,11 @@ def main():
                             # 4-fold cross-validation
                             folds_optimal_epochs = []
                             for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
-                                    stratified_4fold_split(X_train, y_train, seed=seed, shuffle=True, debug=False)):
+                                    stratified_4fold_split(X_train, y_train, seed=seed, shuffle=True)):
                                 print(f'Fold: {fold_idx}')
                                 # print all cme_files shapes
-                                print(f'X_subtrain.shape: {X_subtrain.shape}')
-                                print(f'y_subtrain.shape: {y_subtrain.shape}')
-                                print(f'X_val.shape: {X_val.shape}')
-                                print(f'y_val.shape: {y_val.shape}')
+                                print(f'X_subtrain.shape: {X_subtrain.shape}, y_subtrain.shape: {y_subtrain.shape}')
+                                print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val.shape}')
 
                                 # Compute the sample weights for subtraining
                                 delta_subtrain = y_subtrain[:, 0]
