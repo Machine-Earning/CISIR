@@ -79,12 +79,12 @@ def main():
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
                                 factor=0.9,
-                                patience=500,
+                                patience=200,
                                 verbose=VERBOSE,
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=1e-7)  # LR_CB_MIN_LR)
 
-                            weight_decay = 1e-7  # WEIGHT_DECAY  # higher weight decay
+                            weight_decay = 1e-5  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             # batch_size = BATCH_SIZE * strategy.num_replicas_in_sync  # Scale batch size by number of GPUs
