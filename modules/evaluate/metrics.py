@@ -68,12 +68,11 @@ class PCCPlusMetric(tf.keras.metrics.Metric):
     Attributes:
     - threshold (float, optional): The threshold value. If None, the metric behaves like standard PCC.
     """
-
     def __init__(self, threshold: Optional[float] = None, name: str = "pcc_plus", **kwargs):
         super(PCCPlusMetric, self).__init__(name=name, **kwargs)
         self.threshold = threshold
-        self.y_true_list = []  # Using lists to store values
-        self.y_pred_list = []  # Using lists to store values
+        self.y_true_array = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True, infer_shape=False)
+        self.y_pred_array = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True, infer_shape=False)
 
     def update_state(self, y_true: tf.Tensor, y_pred: tf.Tensor, sample_weight: Optional[tf.Tensor] = None):
         """
@@ -93,9 +92,9 @@ class PCCPlusMetric(tf.keras.metrics.Metric):
             y_true_filtered = y_true
             y_pred_filtered = y_pred
 
-        # Append the filtered true and predicted values for later PCC calculation
-        self.y_true_list.append(y_true_filtered)
-        self.y_pred_list.append(y_pred_filtered)
+        # Append the filtered true and predicted values to the TensorArrays
+        self.y_true_array = self.y_true_array.write(self.y_true_array.size(), y_true_filtered)
+        self.y_pred_array = self.y_pred_array.write(self.y_pred_array.size(), y_pred_filtered)
 
     def result(self) -> tf.Tensor:
         """
@@ -104,9 +103,9 @@ class PCCPlusMetric(tf.keras.metrics.Metric):
         Returns:
         - tf.Tensor: The Pearson Correlation Coefficient across all batches.
         """
-        # Concatenate the accumulated true and predicted values
-        y_true = tf.concat(self.y_true_list, axis=0)
-        y_pred = tf.concat(self.y_pred_list, axis=0)
+        # Concatenate the accumulated true and predicted values from the TensorArrays
+        y_true = self.y_true_array.concat()
+        y_pred = self.y_pred_array.concat()
 
         # Compute PCC using TensorFlow operations
         y_true_mean = tf.reduce_mean(y_true)
@@ -126,7 +125,7 @@ class PCCPlusMetric(tf.keras.metrics.Metric):
 
     def reset_states(self):
         """
-        Resets the metric state variables (lists) at the start of a new epoch.
+        Resets the metric state variables (TensorArrays) at the start of a new epoch.
         """
-        self.y_true_list = []  # Clear the list at the end of the epoch
-        self.y_pred_list = []  # Clear the list at the end of the epoch
+        self.y_true_array = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True, infer_shape=False)
+        self.y_pred_array = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True, infer_shape=False)
