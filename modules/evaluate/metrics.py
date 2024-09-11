@@ -1,6 +1,7 @@
 from typing import Optional
 
 import tensorflow as tf
+from scipy.stats import pearsonr
 
 
 class MAEPlusMetric(tf.keras.metrics.Metric):
@@ -61,25 +62,18 @@ class MAEPlusMetric(tf.keras.metrics.Metric):
         self.count.assign(0.0)
 
 
-from scipy.stats import pearsonr
-from typing import Optional
-
-
 class PCCPlusMetric(tf.keras.metrics.Metric):
     """
     Custom Pearson Correlation Coefficient (PCC+) metric that computes PCC for target values above a given threshold.
 
     Attributes:
     - threshold (float, optional): The threshold value. If None, the metric behaves like standard PCC.
-    - y_true_list (List[tf.Tensor]): List accumulating true values across batches.
-    - y_pred_list (List[tf.Tensor]): List accumulating predicted values across batches.
     """
-
     def __init__(self, threshold: Optional[float] = None, name: str = "pcc_plus", **kwargs):
         super(PCCPlusMetric, self).__init__(name=name, **kwargs)
         self.threshold = threshold
-        self.y_true_list = []
-        self.y_pred_list = []
+        self.y_true_list = self.add_weight(name="y_true", shape=(0,), initializer="zeros", aggregation="concat", dtype=tf.float32)
+        self.y_pred_list = self.add_weight(name="y_pred", shape=(0,), initializer="zeros", aggregation="concat", dtype=tf.float32)
 
     def update_state(self, y_true: tf.Tensor, y_pred: tf.Tensor, sample_weight: Optional[tf.Tensor] = None):
         """
@@ -100,8 +94,8 @@ class PCCPlusMetric(tf.keras.metrics.Metric):
             y_pred_filtered = y_pred
 
         # Append the filtered true and predicted values for later PCC calculation
-        self.y_true_list.append(y_true_filtered)
-        self.y_pred_list.append(y_pred_filtered)
+        self.y_true_list.assign(tf.concat([self.y_true_list, y_true_filtered], axis=0))
+        self.y_pred_list.assign(tf.concat([self.y_pred_list, y_pred_filtered], axis=0))
 
     def result(self) -> tf.Tensor:
         """
@@ -110,20 +104,26 @@ class PCCPlusMetric(tf.keras.metrics.Metric):
         Returns:
         - tf.Tensor: The Pearson Correlation Coefficient across all batches.
         """
-        # Concatenate the accumulated true and predicted values
-        y_true = tf.concat(self.y_true_list, axis=0).numpy()
-        y_pred = tf.concat(self.y_pred_list, axis=0).numpy()
+        # Calculate the Pearson Correlation Coefficient using TensorFlow operations
+        y_true_mean = tf.reduce_mean(self.y_true_list)
+        y_pred_mean = tf.reduce_mean(self.y_pred_list)
 
-        # Compute PCC using scipy's pearsonr
-        if len(y_true) > 0 and len(y_pred) > 0:
-            pcc_value, _ = pearsonr(y_true.flatten(), y_pred.flatten())
-            return tf.convert_to_tensor(pcc_value, dtype=tf.float32)
-        else:
-            return tf.convert_to_tensor(0.0, dtype=tf.float32)  # Return 0 if no values meet the threshold
+        y_true_centered = self.y_true_list - y_true_mean
+        y_pred_centered = self.y_pred_list - y_pred_mean
+
+        covariance = tf.reduce_sum(y_true_centered * y_pred_centered)
+        true_var = tf.reduce_sum(tf.square(y_true_centered))
+        pred_var = tf.reduce_sum(tf.square(y_pred_centered))
+
+        denominator = tf.sqrt(true_var) * tf.sqrt(pred_var)
+
+        pcc_value = covariance / denominator
+        return tf.where(tf.math.is_nan(pcc_value), 0.0, pcc_value)
 
     def reset_states(self):
         """
-        Resets the metric state variables (lists) at the start of a new epoch.
+        Resets the metric state variables at the start of a new epoch.
         """
-        self.y_true_list = []
-        self.y_pred_list = []
+        self.y_true_list.assign(tf.zeros(shape=(0,), dtype=tf.float32))
+        self.y_pred_list.assign(tf.zeros(shape=(0,), dtype=tf.float32))
+
