@@ -73,6 +73,7 @@ class PCCPlusMetric(tf.keras.metrics.Metric):
         self.threshold = threshold
         self.y_true_array = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True, infer_shape=False)
         self.y_pred_array = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True, infer_shape=False)
+        self.array_size = self.add_weight(name="array_size", initializer="zeros", dtype=tf.int32)
 
     def update_state(self, y_true: tf.Tensor, y_pred: tf.Tensor, sample_weight: Optional[tf.Tensor] = None):
         """
@@ -92,9 +93,12 @@ class PCCPlusMetric(tf.keras.metrics.Metric):
             y_true_filtered = y_true
             y_pred_filtered = y_pred
 
-        # Append the filtered true and predicted values to the TensorArrays
-        self.y_true_array = self.y_true_array.write(self.y_true_array.size(), y_true_filtered)
-        self.y_pred_array = self.y_pred_array.write(self.y_pred_array.size(), y_pred_filtered)
+        # Write the filtered values to the TensorArray using the current size index
+        self.y_true_array = self.y_true_array.write(self.array_size, y_true_filtered)
+        self.y_pred_array = self.y_pred_array.write(self.array_size, y_pred_filtered)
+
+        # Increment the size counter
+        self.array_size.assign_add(1)
 
     def result(self) -> tf.Tensor:
         """
@@ -129,3 +133,4 @@ class PCCPlusMetric(tf.keras.metrics.Metric):
         """
         self.y_true_array = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True, infer_shape=False)
         self.y_pred_array = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True, infer_shape=False)
+        self.array_size.assign(0)  # Reset the size counter to 0
