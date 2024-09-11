@@ -31,10 +31,10 @@ def main():
     """
 
     # Set the distribution strategy for multi-GPU training
-    strategy = tf.distribute.MirroredStrategy()  # Automatically detects available GPUs
+    # strategy = tf.distribute.MirroredStrategy()  # Automatically detects available GPUs
 
     # Log the number of GPUs being used
-    print(f"Number of devices: {strategy.num_replicas_in_sync}")
+    # print(f"Number of devices: {strategy.num_replicas_in_sync}")
 
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
@@ -64,7 +64,7 @@ def main():
 
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
-                            patience = int(25e3)  # PATIENCE  # higher patience
+                            patience = int(5e3)  # PATIENCE  # higher patience
                             learning_rate = 3e-5  # og learning rate
                             activation = 'leaky_relu'  # ACTIVATION
                             attn_skipped_layers = 4  # SKIPPED_LAYERS
@@ -86,8 +86,8 @@ def main():
 
                             weight_decay = 1e-7  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                            # batch_size = BATCH_SIZE  # higher batch size
-                            batch_size = BATCH_SIZE * strategy.num_replicas_in_sync  # Scale batch size by number of GPUs
+                            batch_size = BATCH_SIZE  # higher batch size
+                            # batch_size = BATCH_SIZE * strategy.num_replicas_in_sync  # Scale batch size by number of GPUs
                             epochs = EPOCHS  # higher epochs
                             # hiddens = MLP_HIDDENS  # hidden layers
 
@@ -210,47 +210,47 @@ def main():
                             n_features = X_train.shape[1]
                             print(f'n_features: {n_features}')
 
-                            with strategy.scope():  # Wrap model creation and compilation within strategy scope
-                                # create the model
-                                final_model_sep = create_attentive_model(
-                                    input_dim=n_features,
-                                    output_dim=output_dim,
-                                    hidden_blocks=BLOCKS_HIDDENS,
-                                    attn_hidden_units=ATTN_HIDDENS,
-                                    attn_hidden_activation=activation,
-                                    attn_skipped_layers=attn_skipped_layers,
-                                    attn_residual=attn_residual,
-                                    attn_dropout_rate=attn_dropout_rate,
-                                    attn_norm=attn_norm,
-                                    skipped_blocks=skipped_blocks,
-                                    repr_dim=repr_dim,
-                                    dropout_rate=dropout,
-                                    activation=activation,
-                                    norm=norm,
-                                    residual=residual,
-                                    sam_rho=rho
-                                )
-                                final_model_sep.summary()
+                            # with strategy.scope():  # Wrap model creation and compilation within strategy scope
+                            # create the model
+                            final_model_sep = create_attentive_model(
+                                input_dim=n_features,
+                                output_dim=output_dim,
+                                hidden_blocks=BLOCKS_HIDDENS,
+                                attn_hidden_units=ATTN_HIDDENS,
+                                attn_hidden_activation=activation,
+                                attn_skipped_layers=attn_skipped_layers,
+                                attn_residual=attn_residual,
+                                attn_dropout_rate=attn_dropout_rate,
+                                attn_norm=attn_norm,
+                                skipped_blocks=skipped_blocks,
+                                repr_dim=repr_dim,
+                                dropout_rate=dropout,
+                                activation=activation,
+                                norm=norm,
+                                residual=residual,
+                                sam_rho=rho
+                            )
+                            final_model_sep.summary()
 
-                                # Compile the model with the specified learning rate
-                                final_model_sep.compile(
-                                    optimizer=AdamW(
-                                        learning_rate=learning_rate,
-                                        weight_decay=weight_decay,
-                                        beta_1=momentum_beta1
-                                    ),
-                                    loss={
-                                        'output': lambda y_true, y_pred: mse_pcc(
-                                            y_true, y_pred,
-                                            phase_manager=pm,
-                                            lambda_factor=lambda_factor,
-                                            train_mse_weight_dict=mse_train_weights_dict,
-                                            train_pcc_weight_dict=pcc_train_weights_dict,
-                                            val_mse_weight_dict=mse_test_weights_dict,
-                                            val_pcc_weight_dict=pcc_test_weights_dict,
-                                        )
-                                    }
-                                )
+                            # Compile the model with the specified learning rate
+                            final_model_sep.compile(
+                                optimizer=AdamW(
+                                    learning_rate=learning_rate,
+                                    weight_decay=weight_decay,
+                                    beta_1=momentum_beta1
+                                ),
+                                loss={
+                                    'output': lambda y_true, y_pred: mse_pcc(
+                                        y_true, y_pred,
+                                        phase_manager=pm,
+                                        lambda_factor=lambda_factor,
+                                        train_mse_weight_dict=mse_train_weights_dict,
+                                        train_pcc_weight_dict=pcc_train_weights_dict,
+                                        val_mse_weight_dict=mse_test_weights_dict,
+                                        val_pcc_weight_dict=pcc_test_weights_dict,
+                                    )
+                                }
+                            )
 
                             # Define the EarlyStopping callback
                             early_stopping = EarlyStopping(
