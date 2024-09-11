@@ -2,11 +2,11 @@ import os
 from datetime import datetime
 
 import wandb
-import tensorflow as tf
 from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
+from modules.evaluate.metrics import MAEPlusMetric, PCCPlusMetric
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
@@ -232,6 +232,12 @@ def main():
                             )
                             final_model_sep.summary()
 
+                            # Instantiate custom metrics
+                            mae_metric = MAEPlusMetric(threshold=None, name='mae')
+                            pcc_metric = PCCPlusMetric(threshold=None, name='pcc')
+                            mae_plus_metric = MAEPlusMetric(threshold=0.5)
+                            pcc_plus_metric = PCCPlusMetric(threshold=0.5)
+
                             # Compile the model with the specified learning rate
                             final_model_sep.compile(
                                 optimizer=AdamW(
@@ -249,6 +255,9 @@ def main():
                                         val_mse_weight_dict=mse_test_weights_dict,
                                         val_pcc_weight_dict=pcc_test_weights_dict,
                                     )
+                                },
+                                metrics={
+                                    'output': [mae_metric, pcc_metric, mae_plus_metric, pcc_plus_metric]
                                 }
                             )
 
