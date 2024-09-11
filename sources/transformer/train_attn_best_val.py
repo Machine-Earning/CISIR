@@ -43,7 +43,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
-                    for rho in [1e-4]:  # SAM_RHOS:
+                    for rho in [1e-3]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -53,7 +53,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'ATTM_{inputs_str}_amse{alpha_mse:.2f}_rho{rho}_cheatAttnNorm'
+                            title = f'ATTM_{inputs_str}_amse{alpha_mse:.2f}_rho{rho}_cheat'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -65,9 +65,9 @@ def main():
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
                             patience = int(5e3)  # PATIENCE  # higher patience
-                            learning_rate = 1e-4  # og learning rate
+                            learning_rate = 3e-5  # og learning rate
                             activation = 'leaky_relu'  # ACTIVATION
-                            attn_skipped_layers = 4  # SKIPPED_LAYERS
+                            attn_skipped_layers = 1  # SKIPPED_LAYERS
                             attn_residual = True  # RESIDUAL
                             attn_dropout_rate = 0  # DROPOUT
                             dropout = 0  # DROPOUT
@@ -84,7 +84,7 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=1e-7)  # LR_CB_MIN_LR)
 
-                            weight_decay = 1e-5  # WEIGHT_DECAY  # higher weight decay
+                            weight_decay = 1e-6  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             # batch_size = BATCH_SIZE * strategy.num_replicas_in_sync  # Scale batch size by number of GPUs

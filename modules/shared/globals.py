@@ -1,5 +1,5 @@
 # Global configurations
-SEEDS = [456789, 42, 1234]  # Seeds for reproducibility
+SEEDS = [456789] #, 42, 1234]  # Seeds for reproducibility
 INPUTS_TO_USE = [['e0.5', 'e4.4', 'p6.1', 'p']]  # Inputs to use
 # INPUTS_TO_USE = [['e0.5', 'e1.8', 'p']]  # Inputs to use
 OUTPUTS_TO_USE = ['delta_p']  # Output to use
