@@ -232,11 +232,12 @@ def main():
                             )
                             final_model_sep.summary()
 
-                            # Instantiate custom metrics
-                            mae_metric = MAEPlusMetric(threshold=None, name='mae')
-                            pcc_metric = PCCPlusMetric(threshold=None, name='pcc')
-                            mae_plus_metric = MAEPlusMetric(threshold=0.5)
-                            pcc_plus_metric = PCCPlusMetric(threshold=0.5)
+
+                            # Instantiate custom metrics - TODO: fix the metrics
+                            # mae_metric = MAEPlusMetric(threshold=None, name='mae')
+                            # pcc_metric = PCCPlusMetric(threshold=None, name='pcc')
+                            # mae_plus_metric = MAEPlusMetric(threshold=0.5)
+                            # pcc_plus_metric = PCCPlusMetric(threshold=0.5)
 
                             # Compile the model with the specified learning rate
                             final_model_sep.compile(
@@ -256,9 +257,9 @@ def main():
                                         val_pcc_weight_dict=pcc_test_weights_dict,
                                     )
                                 },
-                                metrics={
-                                    'output': [mae_metric, pcc_metric, mae_plus_metric, pcc_plus_metric]
-                                }
+                                # metrics={
+                                #     'output': [mae_metric, pcc_metric, mae_plus_metric, pcc_plus_metric]
+                                # }
                             )
 
                             # Define the EarlyStopping callback
