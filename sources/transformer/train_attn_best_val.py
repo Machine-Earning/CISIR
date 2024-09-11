@@ -6,7 +6,7 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCh
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
-from modules.evaluate.metrics import MAEPlusMetric, PCCPlusMetric
+# from modules.evaluate.metrics import MAEPlusMetric, PCCPlusMetric
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
@@ -18,6 +18,7 @@ from modules.training.ts_modeling import (
     stratified_batch_dataset,
     set_seed, mse_pcc)
 from sources.transformer.modules import create_attentive_model
+from modules.training.warmup_scheduler import WarmupScheduler
 
 
 # Set the environment variable for CUDA (in case it is necessary)
@@ -75,6 +76,16 @@ def main():
                             norm = 'batch_norm'
                             skipped_blocks = 1  # SKIPPED_LAYERS
                             residual = True  # RESIDUAL
+                            warmup_steps = 500  # Number of batches for warmup
+                            initial_lr = 3e-7  # Start with a very low learning rate
+                            target_lr = learning_rate  # The original learning rate defined in your code
+
+                            # Initialize warmup callback
+                            warmup = WarmupScheduler(
+                                warmup_steps=warmup_steps,
+                                initial_lr=initial_lr,
+                                target_lr=target_lr
+                            )
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
@@ -298,6 +309,7 @@ def main():
                                 validation_data=test_ds,
                                 validation_steps=test_steps,
                                 callbacks=[
+                                    warmup,
                                     early_stopping,
                                     reduce_lr_on_plateau,
                                     WandbCallback(save_model=WANDB_SAVE_MODEL),
