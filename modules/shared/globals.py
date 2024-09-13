@@ -1,5 +1,6 @@
 # Global configurations
-SEEDS = [456789] #, 42, 1234]  # Seeds for reproducibility
+SEEDS = [456789, 42, 1234]  # Seeds for reproducibility
+# SEEDS = [0, 100, 9999]  # Seeds for reproducibility
 INPUTS_TO_USE = [['e0.5', 'e4.4', 'p6.1', 'p']]  # Inputs to use
 # INPUTS_TO_USE = [['e0.5', 'e1.8', 'p']]  # Inputs to use
 OUTPUTS_TO_USE = ['delta_p']  # Output to use
@@ -55,8 +56,8 @@ RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 SAM_RHOS = [0.05, 0.5]  # Rho values for SAM
 
 # ATTM AREA
-BLOCKS_HIDDENS = [128 for _ in range(32)]
-ATTN_HIDDENS = [128 for _ in range(16)]
+BLOCKS_HIDDENS = [128 for _ in range(30)]
+ATTN_HIDDENS = [128 for _ in range(20)]
 ATTM_START_LR = 1e-5
 ATTM_ACTIVATION = 'leaky_relu'
 ATTN_SKIPPED_LAYERS = 1

@@ -27,7 +27,7 @@ from modules.training.warmup_scheduler import WarmupScheduler
 
 def main():
     """
-    Main function to run the E-MLP model
+    Main function to run the E-ATTM model
     :return:
     """
 
@@ -44,7 +44,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
-                    for rho in [1e-3]:  # SAM_RHOS:
+                    for rho in [0]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -65,27 +65,27 @@ def main():
 
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
-                            patience = int(5e3)  # PATIENCE  # higher patience
-                            learning_rate = 3e-5  # og learning rate
+                            patience = int(12e3)  # PATIENCE  # higher patience
+                            learning_rate = 1e-4  # og learning rate
                             activation = 'leaky_relu'  # ACTIVATION
                             attn_skipped_layers = 1  # SKIPPED_LAYERS
                             attn_residual = True  # RESIDUAL
                             attn_dropout_rate = 0  # DROPOUT
                             dropout = 0  # DROPOUT
-                            attn_norm = 'batch_norm'  # NORM
+                            attn_norm = None  # NORM
                             norm = 'batch_norm'
                             skipped_blocks = 1  # SKIPPED_LAYERS
                             residual = True  # RESIDUAL
-                            warmup_steps = 500  # Number of batches for warmup
-                            initial_lr = 3e-7  # Start with a very low learning rate
-                            target_lr = learning_rate  # The original learning rate defined in your code
+                            # warmup_steps = 500  # Number of batches for warmup
+                            # initial_lr = 3e-7  # Start with a very low learning rate
+                            # target_lr = learning_rate  # The original learning rate defined in your code
 
                             # Initialize warmup callback
-                            warmup = WarmupScheduler(
-                                warmup_steps=warmup_steps,
-                                initial_lr=initial_lr,
-                                target_lr=target_lr
-                            )
+                            # warmup = WarmupScheduler(
+                            #     warmup_steps=warmup_steps,
+                            #     initial_lr=initial_lr,
+                            #     target_lr=target_lr
+                            # )
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
@@ -95,7 +95,7 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=1e-7)  # LR_CB_MIN_LR)
 
-                            weight_decay = 1e-6  # WEIGHT_DECAY  # higher weight decay
+                            weight_decay = 1e-8  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             # batch_size = BATCH_SIZE * strategy.num_replicas_in_sync  # Scale batch size by number of GPUs
@@ -155,7 +155,10 @@ def main():
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
                                 'blocks_hiddens': BLOCKS_HIDDENS,
-                                'attn_hiddens': ATTN_HIDDENS
+                                'attn_hiddens': ATTN_HIDDENS,
+                                # 'warmup_steps': warmup_steps,
+                                # 'initial_lr': initial_lr,
+                                # 'target_lr': target_lr
                             })
 
                             # set the root directory
@@ -281,15 +284,15 @@ def main():
                                 restore_best_weights=True)
 
                             # Define ModelCheckpoint callback to save the best model during training
-                            checkpoint_filepath = f"best_model_checkpoint_{experiment_name}.h5"
-                            model_checkpoint = ModelCheckpoint(
-                                filepath=checkpoint_filepath,
-                                save_weights_only=True,  # Save the full model, not just the weights
-                                monitor='val_loss',  # Monitor validation loss (or any other metric)
-                                mode='min',  # 'min' because lower 'val_loss' is better
-                                save_best_only=True,  # Save only when the model has improved
-                                verbose=1  # Display when the model is saved
-                            )
+                            # checkpoint_filepath = f"best_model_checkpoint_{experiment_name}.h5"
+                            # model_checkpoint = ModelCheckpoint(
+                            #     filepath=checkpoint_filepath,
+                            #     save_weights_only=True,  # Save the full model, not just the weights
+                            #     monitor='val_loss',  # Monitor validation loss (or any other metric)
+                            #     mode='min',  # 'min' because lower 'val_loss' is better
+                            #     save_best_only=True,  # Save only when the model has improved
+                            #     verbose=1  # Display when the model is saved
+                            # )
 
                             # Step 1: Create stratified dataset for the subtraining and validation set
                             train_ds, train_steps = stratified_batch_dataset(
@@ -309,18 +312,18 @@ def main():
                                 validation_data=test_ds,
                                 validation_steps=test_steps,
                                 callbacks=[
-                                    warmup,
+                                    # warmup,
                                     early_stopping,
                                     reduce_lr_on_plateau,
                                     WandbCallback(save_model=WANDB_SAVE_MODEL),
                                     IsTraining(pm),
-                                    model_checkpoint
+                                    # model_checkpoint
                                 ],
                                 verbose=VERBOSE
                             )
 
                             # Load the best weights from the checkpoint
-                            final_model_sep.load_weights(checkpoint_filepath)
+                            # final_model_sep.load_weights(checkpoint_filepath)
 
                             # Save the final model
                             final_model_sep.save_weights(f"final_model_weights_{experiment_name}_reg.h5")
