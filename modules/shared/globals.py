@@ -1,4 +1,5 @@
 # Global configurations
+# SEEDS = [456789]
 SEEDS = [456789, 42, 1234]  # Seeds for reproducibility
 # SEEDS = [0, 100, 9999]  # Seeds for reproducibility
 INPUTS_TO_USE = [['e0.5', 'e4.4', 'p6.1', 'p']]  # Inputs to use
