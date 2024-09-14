@@ -81,7 +81,7 @@ def main():
                             bandwidth = BANDWIDTH
                             repr_dim = REPR_DIM
                             output_dim = len(outputs_to_use)
-                            attn_dropout = ATTN_NORM
+                            attn_dropout = ATTN_DROPOUT
                             attm_dropout = ATTM_DROPOUT
                             activation = ATTM_ACTIVATION
                             attn_norm = ATTN_NORM
