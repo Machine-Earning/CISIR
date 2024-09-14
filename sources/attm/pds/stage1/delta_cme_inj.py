@@ -25,7 +25,7 @@ from modules.training.ts_modeling import (
     set_seed)
 
 from modules.shared.globals import *
-from sources.transformer.modules import create_attentive_model
+from sources.attm.modules import create_attentive_model
 
 
 def main():

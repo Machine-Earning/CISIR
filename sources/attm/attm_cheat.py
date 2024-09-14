@@ -17,7 +17,7 @@ from modules.training.ts_modeling import (
     process_sep_events,
     stratified_batch_dataset,
     set_seed, mse_pcc)
-from sources.transformer.modules import create_attentive_model
+from sources.attm.modules import create_attentive_model
 from modules.training.warmup_scheduler import WarmupScheduler
 
 
@@ -44,7 +44,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
-                    for rho in [1]:  # SAM_RHOS:
+                    for rho in ATTM_RHO:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -65,14 +65,14 @@ def main():
 
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
-                            patience = int(12e3)  # PATIENCE  # higher patience
+                            patience = int(7e3)  # PATIENCE  # higher patience
                             learning_rate = 1e-4  # og learning rate
                             activation = 'leaky_relu'  # ACTIVATION
                             attn_skipped_layers = 1  # SKIPPED_LAYERS
                             attn_residual = True  # RESIDUAL
                             attn_dropout_rate = 0  # DROPOUT
                             dropout = 0  # DROPOUT
-                            attn_norm = None  # NORM
+                            attn_norm = 'batch_norm'  # NORM
                             norm = 'batch_norm'
                             skipped_blocks = 1  # SKIPPED_LAYERS
                             residual = True  # RESIDUAL
@@ -95,7 +95,7 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=1e-7)  # LR_CB_MIN_LR)
 
-                            weight_decay = 1e-8  # WEIGHT_DECAY  # higher weight decay
+                            weight_decay = 1e-7  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             # batch_size = BATCH_SIZE * strategy.num_replicas_in_sync  # Scale batch size by number of GPUs

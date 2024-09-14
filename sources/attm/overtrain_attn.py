@@ -17,7 +17,7 @@ from modules.training.ts_modeling import (
     filter_ds,
     stratified_split,
     set_seed)
-from sources.transformer.modules import create_attentive_model
+from sources.attm.modules import create_attentive_model
 
 
 # Set the environment variable for CUDA (in case it is necessary)
