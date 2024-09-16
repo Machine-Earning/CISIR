@@ -54,7 +54,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'ATTM_{inputs_str}_amse{alpha_mse:.2f}_rho{rho}_cheatNorm'
+                            title = f'ATTM_{inputs_str}_amse{alpha_mse:.2f}_rho{rho}_cheatNoNorm'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -72,7 +72,7 @@ def main():
                             attn_residual = True  # RESIDUAL
                             attn_dropout_rate = 0  # DROPOUT
                             dropout = 0  # DROPOUT
-                            attn_norm = 'batch_norm'  # NORM
+                            attn_norm = None #'batch_norm'  
                             norm = 'batch_norm'
                             skipped_blocks = 1  # SKIPPED_LAYERS
                             residual = True  # RESIDUAL
@@ -95,7 +95,7 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=1e-7)  # LR_CB_MIN_LR)
 
-                            weight_decay = 1e-7  # WEIGHT_DECAY  # higher weight decay
+                            weight_decay = 1e-6  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             # batch_size = BATCH_SIZE * strategy.num_replicas_in_sync  # Scale batch size by number of GPUs
@@ -143,6 +143,7 @@ def main():
                                 "dropout": dropout,
                                 "activation": 'LeakyReLU',
                                 "norm": norm,
+                                "attn_norm": attn_norm,
                                 'optimizer': 'adamw',
                                 'output_dim': output_dim,
                                 'architecture': 'attm',
