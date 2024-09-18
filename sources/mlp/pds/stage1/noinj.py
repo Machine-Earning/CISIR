@@ -27,7 +27,6 @@ from modules.training.ts_modeling import (
     set_seed, stratified_4fold_split
 )
 
-
 # Set the environment variable for CUDA (in case it is necessary)
 # os.environ['CUDA_VISIBLE_DEVICES'] = '2'  # left is 1
 
@@ -40,8 +39,6 @@ def main():
     # list the devices available
     devices = tf.config.list_physical_devices('GPU')
     print(f'devices: {devices}')
-    for gpu in devices:
-        tf.config.experimental.set_memory_growth(gpu, True)
 
     # Define the dataset options, including the sharding policy
     mb = cme_modeling.ModelBuilder()  # Model builder
