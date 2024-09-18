@@ -1,28 +1,37 @@
-import os
+# import os
 from datetime import datetime
 
-from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta, plot_repr_correlation, plot_repr_corr_density, \
-    evaluate_pcc_repr
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
-
-# Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-
+import numpy as np
 import tensorflow as tf
 import wandb
-from tensorflow.keras.callbacks import ReduceLROnPlateau
+from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
+from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
+from modules.evaluate.utils import (
+    plot_tsne_delta,
+    plot_repr_correlation,
+    plot_repr_corr_dist,
+    plot_repr_corr_density,
+    evaluate_pcc_repr
+)
+from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.shared.globals import *
 from modules.training import cme_modeling
 from modules.training.cme_modeling import pds_space_norm
+from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
     filter_ds,
-    stratified_split,
-    set_seed)
+    set_seed, stratified_4fold_split
+)
 
-from modules.shared.globals import *
+
+# Set the environment variable for CUDA (in case it is necessary)
+# os.environ['CUDA_VISIBLE_DEVICES'] = '2'  # left is 1
+
+
 
 
 def main():
@@ -34,11 +43,11 @@ def main():
     devices = tf.config.list_physical_devices('GPU')
     print(f'devices: {devices}')
     # Define the dataset options, including the sharding policy
+    mb = cme_modeling.ModelBuilder()  # Model builder
+    pm = TrainingPhaseManager()  # Training phase manager
 
-    for SEED in SEEDS:
 
-        mb = cme_modeling.ModelBuilder()
-
+    for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for add_slope in ADD_SLOPE:
@@ -46,7 +55,7 @@ def main():
                         # for alpha in [2]:
                         for alpha, alphaV in zip([7], [5]):
                             # Set NumPy seed
-                            set_seed(SEED)
+                            set_seed(seed)
                             # add_slope = True
                             outputs_to_use = OUTPUTS_TO_USE
 
@@ -115,7 +124,7 @@ def main():
                                 # hidden in a more readable format  (wandb does not support lists)
                                 "hiddens": hiddens_str,
                                 "pds": pds,
-                                "seed": SEED,
+                                "seed": seed,
                                 "stage": 1,
                                 "reduce_lr_on_plateau": True,
                                 "dropout": dropout_rate,
@@ -161,13 +170,13 @@ def main():
                                 X_train, y_train,
                                 low_threshold=lower_threshold,
                                 high_threshold=upper_threshold,
-                                N=N, seed=SEED)
+                                N=N, seed=seed)
 
                             X_test_filtered, y_test_filtered = filter_ds(
                                 X_test, y_test,
                                 low_threshold=lower_threshold,
                                 high_threshold=upper_threshold,
-                                N=N, seed=SEED)
+                                N=N, seed=seed)
 
                             # pds normalize the data
                             y_train_norm, norm_lower_t, norm_upper_t = pds_space_norm(y_train)
@@ -202,7 +211,7 @@ def main():
                                 X_train,
                                 y_train_norm,
                                 shuffle=True,
-                                seed=SEED,
+                                seed=seed,
                                 split=VAL_SPLIT,
                                 debug=False)
 
@@ -304,7 +313,7 @@ def main():
                                 X_train_filtered, y_train_filtered, title,
                                 'stage1_training',
                                 model_type='features',
-                                save_tag=current_time, seed=SEED)
+                                save_tag=current_time, seed=seed)
                             wandb.log({'stage1_tsne_training_plot': wandb.Image(stage1_file_path)})
                             print('stage1_file_path: ' + stage1_file_path)
 
@@ -314,7 +323,7 @@ def main():
                                 X_test_filtered, y_test_filtered, title,
                                 'stage1_testing',
                                 model_type='features',
-                                save_tag=current_time, seed=SEED)
+                                save_tag=current_time, seed=seed)
                             wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
                             print('stage1_file_path: ' + stage1_file_path)
 

@@ -40,6 +40,9 @@ def main():
     # list the devices available
     devices = tf.config.list_physical_devices('GPU')
     print(f'devices: {devices}')
+    for gpu in devices:
+        tf.config.experimental.set_memory_growth(gpu, True)
+
     # Define the dataset options, including the sharding policy
     mb = cme_modeling.ModelBuilder()  # Model builder
     pm = TrainingPhaseManager()  # Training phase manager
