@@ -1240,8 +1240,8 @@ class ModelBuilder:
                 rare_injection_count
             ),
             output_signature=(
-                tf.TensorSpec(shape=(batch_size, X.shape[1]), dtype=tf.float32),
-                tf.TensorSpec(shape=(batch_size,), dtype=tf.float32)
+                tf.TensorSpec(shape=(None, X.shape[1]), dtype=tf.float32),
+                tf.TensorSpec(shape=(None,), dtype=tf.float32)
             )
         )
         return dataset.prefetch(tf.data.AUTOTUNE)
