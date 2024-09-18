@@ -3,8 +3,8 @@ from datetime import datetime
 
 import numpy as np
 import wandb
-from keras.callbacks import EarlyStopping
-from tensorflow.keras.callbacks import ReduceLROnPlateau
+
+from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 

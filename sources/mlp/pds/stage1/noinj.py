@@ -1,9 +1,11 @@
 # import os
 from datetime import datetime
 
+import numpy as np
 import tensorflow as tf
 import wandb
-from tensorflow.keras.callbacks import ReduceLROnPlateau
+from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
+from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import (
@@ -17,11 +19,12 @@ from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training import cme_modeling
 from modules.training.cme_modeling import pds_space_norm
+from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
     filter_ds,
-    set_seed
+    set_seed, stratified_4fold_split
 )
 
 
@@ -38,9 +41,10 @@ def main():
     devices = tf.config.list_physical_devices('GPU')
     print(f'devices: {devices}')
     # Define the dataset options, including the sharding policy
-    mb = cme_modeling.ModelBuilder()
+    mb = cme_modeling.ModelBuilder()  # Model builder
+    pm = TrainingPhaseManager()  # Training phase manager
 
-    for SEED in SEEDS:
+    for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha, alphaV in [(0.5, 1)]:
@@ -48,28 +52,25 @@ def main():
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
-                            bs = PDS_BATCH_SIZE  # full dataset used
-                            print(f'batch size : {bs}')
+                            batch_size = PDS_BATCH_SIZE  # full dataset used
+                            print(f'batch size : {batch_size}')
 
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'MLP_{inputs_str}_PDS_bs{bs}_alpha{alpha:.2f}_rho{rho:.2f}'
+                            title = f'MLP_pds_{inputs_str}_bs{batch_size}_alpha{alpha:.2f}_rho{rho:.2f}'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
                             # Create a unique experiment name with a timestamp
                             current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
                             experiment_name = f'{title}_{current_time}'
                             # Set the early stopping patience and learning rate as variables
-                            set_seed(SEED)
-                            Options = {
-                                'batch_size': bs,  # Assuming batch_size is defined elsewhere
-                                'epochs': EPOCHS,  # 35k epochs
-                                'patience': PDS_PATIENCE,
-                                'learning_rate': START_LR,  # initial learning rate
-                                'weight_decay': WEIGHT_DECAY_PDS,  # Added weight decay
-                                'momentum_beta1': MOMENTUM_BETA1,  # Added momentum beta1
-                            }
+                            set_seed(seed)
+                            epochs = EPOCHS
+                            patience = PDS_PATIENCE
+                            learning_rate = START_LR_PDS
+                            weight_decay = WEIGHT_DECAY_PDS
+                            momentum_beta1 = MOMENTUM_BETA1
 
                             hiddens = MLP_HIDDENS
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
@@ -99,16 +100,16 @@ def main():
                             wandb.init(project="PDS-Oct-Report", name=experiment_name, config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
-                                "patience": Options['patience'],
-                                "learning_rate": Options['learning_rate'],
-                                "weight_decay": Options['weight_decay'],
-                                "momentum_beta1": Options['momentum_beta1'],
-                                "batch_size": Options['batch_size'],
-                                "epochs": Options['epochs'],
+                                "patience": patience,
+                                "learning_rate": learning_rate,
+                                "weight_decay": weight_decay,
+                                "momentum_beta1": momentum_beta1,
+                                "batch_size": batch_size,
+                                "epochs": epochs,
                                 # hidden in a more readable format  (wandb does not support lists)
                                 "hiddens": hiddens_str,
                                 "pds": pds,
-                                "seed": SEED,
+                                "seed": seed,
                                 "stage": 1,
                                 "reduce_lr_on_plateau": True,
                                 "dropout": dropout_rate,
@@ -168,7 +169,7 @@ def main():
                                 X_train, y_train,
                                 low_threshold=lower_threshold,
                                 high_threshold=upper_threshold,
-                                N=N, seed=SEED)
+                                N=N, seed=seed)
 
                             # build the test set
                             X_test, y_test = build_dataset(
@@ -185,10 +186,108 @@ def main():
                                 X_test, y_test,
                                 low_threshold=lower_threshold,
                                 high_threshold=upper_threshold,
-                                N=N, seed=SEED)
+                                N=N, seed=seed)
+
+                            # 4-fold cross-validation
+                            folds_optimal_epochs = []
+                            for fold_idx, (X_subtrain, y_subtrain_norm, X_val, y_val_norm) in enumerate(
+                                    stratified_4fold_split(X_train, y_train_norm, seed=seed, shuffle=True)):
+                                print(f'Fold: {fold_idx}')
+                                # print all cme_files shapes
+                                print(f'X_subtrain.shape: {X_subtrain.shape}, y_subtrain.shape: {y_subtrain_norm.shape}')
+                                print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val_norm.shape}')
+
+                                # Compute the sample weights for subtraining
+                                delta_subtrain = y_subtrain_norm[:, 0]
+                                print(f'delta_subtrain.shape: {delta_subtrain.shape}')
+                                print(f'rebalancing the subtraining set...')
+                                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
+                                subtrain_weights_dict = exDenseReweightsD(
+                                    X_subtrain, delta_subtrain,
+                                    alpha=alpha, bw=bandwidth,
+                                    min_norm_weight=min_norm_weight,
+                                    debug=False).label_reweight_dict
+                                print(f'subtraining set rebalanced.')
+
+                                # Compute the sample weights for validation
+                                delta_val = y_val_norm[:, 0]
+                                print(f'delta_val.shape: {delta_val.shape}')
+                                print(f'rebalancing the validation set...')
+                                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
+                                val_weights_dict = exDenseReweightsD(
+                                    X_val, delta_val,
+                                    alpha=alphaV, bw=bandwidth,
+                                    min_norm_weight=min_norm_weight,
+                                    debug=False).label_reweight_dict
+                                print(f'validation set rebalanced.')
+
+                                # create the model
+                                model_sep = create_mlp(
+                                    input_dim=n_features,
+                                    hiddens=hiddens,
+                                    output_dim=0,
+                                    pds=pds,
+                                    repr_dim=repr_dim,
+                                    dropout_rate=dropout_rate,
+                                    activation=activation,
+                                    norm=norm,
+                                    residual=residual,
+                                    skipped_layers=skipped_layers,
+                                    sam_rho=rho,
+                                )
+                                model_sep.summary()
+
+                                # Define the EarlyStopping callback
+                                early_stopping = EarlyStopping(
+                                    monitor=ES_CB_MONITOR,
+                                    patience=patience,
+                                    verbose=VERBOSE,
+                                    restore_best_weights=ES_CB_RESTORE_WEIGHTS)
+
+                                # compile the model
+                                # Optimizer and history initialization
+                                model_sep.compile(
+                                    optimizer=AdamW(
+                                        learning_rate=learning_rate,
+                                        weight_decay=weight_decay,
+                                        beta_1=momentum_beta1
+                                    ),
+                                    loss=lambda y_true, y_pred: mb.pds_loss_vec(
+                                        y_true, y_pred,
+                                        phase_manager=pm,
+                                        train_sample_weights=subtrain_weights_dict,
+                                        val_sample_weights=val_weights_dict,
+                                    )
+                                )
+
+                                history = model_sep.fit(
+                                    X_subtrain, y_subtrain_norm,
+                                    epochs=epochs,
+                                    batch_size=batch_size if batch_size > 0 else len(y_subtrain_norm),
+                                    validation_data=(X_val, y_val_norm),
+                                    validation_batch_size=batch_size if batch_size > 0 else len(y_val_norm),
+                                    callbacks=[
+                                        reduce_lr_on_plateau,
+                                        early_stopping,
+                                        WandbCallback(save_model=WANDB_SAVE_MODEL),
+                                        IsTraining(pm)
+                                    ],
+                                    verbose=VERBOSE
+                                )
+
+                                # optimal epoch for fold
+                                folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
+                                # wandb log the fold's optimal
+                                print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
+                                wandb.log({f'fold_{fold_idx}_best_epoch': folds_optimal_epochs[-1]})
+
+                            # determine the optimal number of epochs from the folds
+                            optimal_epochs = int(np.mean(folds_optimal_epochs))
+                            print(f'optimal_epochs: {optimal_epochs}')
+                            wandb.log({'optimal_epochs': optimal_epochs})
 
                             # create the model
-                            model_sep = create_mlp(
+                            final_model_sep = create_mlp(
                                 input_dim=n_features,
                                 hiddens=hiddens,
                                 output_dim=0,
@@ -201,28 +300,34 @@ def main():
                                 skipped_layers=skipped_layers,
                                 sam_rho=rho,
                             )
-                            model_sep.summary()
 
-                            mb.train_pds_folds(
-                                model_sep,
-                                X_train, y_train_norm,
-                                train_label_weights_dict=train_weights_dict,
-                                alpha=alpha,
-                                alphaV=alphaV,
-                                seed=SEED,
-                                bandwidth=bandwidth,
-                                learning_rate=Options['learning_rate'],
-                                epochs=Options['epochs'],
-                                batch_size=Options['batch_size'],
-                                patience=Options['patience'],
-                                weight_decay=Options['weight_decay'],
-                                momentum_beta1=Options['momentum_beta1'],
-                                save_tag=current_time + title + "_feat_noinj",
-                                callbacks_list=[
-                                    WandbCallback(save_model=False),
-                                    reduce_lr_on_plateau
-                                ]
+                            mod.compile(
+                                optimizer=AdamW(
+                                    learning_rate=learning_rate,
+                                    weight_decay=weight_decay,
+                                    beta_1=momentum_beta1
+                                ),
+                                loss=lambda y_true, y_pred: self.pds_loss_vec(
+                                    y_true, y_pred,
+                                    phase_manager=pm,
+                                    train_sample_weights=train_label_weights_dict,
+                                    val_sample_weights=None
+                                )
                             )
+
+                            model.fit(
+                                X_train, y_train,
+                                epochs=optimal_epochs,
+                                batch_size=batch_size if batch_size > 0 else len(y_train),
+                                callbacks=callbacks_list,
+                                verbose=verbose
+                            )
+
+                            # Save the final model
+                            model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
+                            # print where the model weights are saved
+                            print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
+
 
                             above_threshold = norm_upper_t
                             # evaluate pcc+ on the test set
@@ -271,7 +376,7 @@ def main():
                                 X_train_filtered, y_train_filtered, title,
                                 'stage1_training',
                                 model_type='features',
-                                save_tag=current_time, seed=SEED)
+                                save_tag=current_time, seed=seed)
                             wandb.log({'stage1_tsne_training_plot': wandb.Image(stage1_file_path)})
                             print('stage1_file_path: ' + stage1_file_path)
 
@@ -281,7 +386,7 @@ def main():
                                 X_test_filtered, y_test_filtered, title,
                                 'stage1_testing',
                                 model_type='features',
-                                save_tag=current_time, seed=SEED)
+                                save_tag=current_time, seed=seed)
                             wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
                             print('stage1_file_path: ' + stage1_file_path)
 
