@@ -56,9 +56,6 @@ def main():
                             batch_size = PDS_BATCH_SIZE  # full dataset used
                             print(f'batch size : {batch_size}')
 
-                            bs = 1024  # BATCH_SIZE  # full dataset used
-                            print(f'batch size : {bs}')
-
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
