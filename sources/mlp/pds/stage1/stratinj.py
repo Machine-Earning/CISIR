@@ -198,6 +198,7 @@ def main():
                             folds_optimal_epochs = []
                             for fold_idx, (X_subtrain, y_subtrain_norm, X_val, y_val_norm) in enumerate(
                                     stratified_4fold_split(X_train, y_train_norm, seed=seed, shuffle=True)):
+                                    
                                 print(f'Fold: {fold_idx}')
                                 # print all cme_files shapes
                                 print(
