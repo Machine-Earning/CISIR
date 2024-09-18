@@ -10,6 +10,7 @@ CME_SPEED_THRESHOLD = [0]  # CME speed threshold
 ALPHAS = [1.0, 0.7, 0.5]  # Alpha values for the loss
 ADD_SLOPE = [False]  # Add slope to the inputs
 BATCH_SIZE = 4096  # Batch size
+PDS_BATCH_SIZE = 1024
 EPOCHS = int(1e6)  # Number of epochs
 MLP_HIDDENS = [
     2048, 1024, 2048, 1024, 1024, 512, 1024, 512,
@@ -38,7 +39,7 @@ WEIGHT_DECAY_PDS = 1e-5  # Higher weight decay for projection layers
 MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 BANDWIDTH = 4.42e-2  # Bandwidth for rebalancing
 PATIENCE = int(3e3)  # Higher patience
-PDS_PATIENCE = int(5e3)  # Higher patience
+PDS_PATIENCE = int(3e3)  # Higher patience
 LR_CB_FACTOR = 0.9  # factor for reducing learning rate
 LR_CB_PATIENCE = 500  # patience for reducing learning rate
 LR_CB_MIN_LR = 1e-6  # minimum learning rate

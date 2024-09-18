@@ -48,7 +48,7 @@ def main():
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
-                            bs = BATCH_SIZE  # full dataset used
+                            bs = PDS_BATCH_SIZE  # full dataset used
                             print(f'batch size : {bs}')
 
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
