@@ -47,8 +47,8 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha, alphaV in [(0.5, 1)]:
-                    for rho in [1.e-1]:
+                for alpha, alphaV in [(5, 1)]:
+                    for rho in [1e-1]:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -58,7 +58,7 @@ def main():
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'MLP_pds_{inputs_str}_bs{batch_size}_alpha{alpha:.2f}_rho{rho:.2f}'
+                            title = f'MLP_PDSnoinj_bs{batch_size}_alpha{alpha:.2f}_rho{rho:.2f}'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
                             # Create a unique experiment name with a timestamp
@@ -129,7 +129,9 @@ def main():
                                 "upper_t": upper_threshold,
                                 'mae_plus_th': mae_plus_threshold,
                                 "cme_speed_threshold": cme_speed_threshold,
-                                "sam_rho": rho
+                                "sam_rho": rho,
+                                'outputs_to_use': outputs_to_use,
+                                'inj': 'noinj'
                             })
 
                             # set the root directory
@@ -194,7 +196,8 @@ def main():
                                     stratified_4fold_split(X_train, y_train_norm, seed=seed, shuffle=True)):
                                 print(f'Fold: {fold_idx}')
                                 # print all cme_files shapes
-                                print(f'X_subtrain.shape: {X_subtrain.shape}, y_subtrain.shape: {y_subtrain_norm.shape}')
+                                print(
+                                    f'X_subtrain.shape: {X_subtrain.shape}, y_subtrain.shape: {y_subtrain_norm.shape}')
                                 print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val_norm.shape}')
 
                                 # Compute the sample weights for subtraining
@@ -301,60 +304,62 @@ def main():
                                 sam_rho=rho,
                             )
 
-                            mod.compile(
+                            final_model_sep.compile(
                                 optimizer=AdamW(
                                     learning_rate=learning_rate,
                                     weight_decay=weight_decay,
                                     beta_1=momentum_beta1
                                 ),
-                                loss=lambda y_true, y_pred: self.pds_loss_vec(
+                                loss=lambda y_true, y_pred: mb.pds_loss_vec(
                                     y_true, y_pred,
                                     phase_manager=pm,
-                                    train_sample_weights=train_label_weights_dict,
-                                    val_sample_weights=None
+                                    train_sample_weights=train_weights_dict,
                                 )
                             )
 
-                            model.fit(
+                            final_model_sep.fit(
                                 X_train, y_train,
                                 epochs=optimal_epochs,
                                 batch_size=batch_size if batch_size > 0 else len(y_train),
-                                callbacks=callbacks_list,
-                                verbose=verbose
+                                callbacks=[
+                                    reduce_lr_on_plateau,
+                                    WandbCallback(save_model=WANDB_SAVE_MODEL),
+                                    IsTraining(pm)
+                                ],
+                                verbose=VERBOSE
                             )
 
                             # Save the final model
-                            model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
+                            final_model_sep.save_weights(f"final_model_weights_{str(experiment_name)}.h5")
                             # print where the model weights are saved
-                            print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
-
+                            print(f"Model weights are saved in final_model_weights_{str(experiment_name)}.h5")
 
                             above_threshold = norm_upper_t
                             # evaluate pcc+ on the test set
                             error_pcc_cond = evaluate_pcc_repr(
-                                model_sep, X_test, y_test_norm, i_above_threshold=above_threshold)
+                                final_model_sep, X_test, y_test_norm, i_above_threshold=above_threshold)
                             print(f'pcc error delta i>= {above_threshold} test: {error_pcc_cond}')
                             wandb.log({"jpcc+": error_pcc_cond})
 
                             # evaluate pcc+ on the training set
                             error_pcc_cond_train = evaluate_pcc_repr(
-                                model_sep, X_train, y_train_norm, i_above_threshold=above_threshold)
+                                final_model_sep, X_train, y_train_norm, i_above_threshold=above_threshold)
                             print(f'pcc error delta i>= {above_threshold} train: {error_pcc_cond_train}')
                             wandb.log({"train_jpcc+": error_pcc_cond_train})
 
                             # Evaluate the model correlation on the test set
-                            error_pcc = evaluate_pcc_repr(model_sep, X_test, y_test_norm)
+                            error_pcc = evaluate_pcc_repr(final_model_sep, X_test, y_test_norm)
                             print(f'pcc error delta test: {error_pcc}')
                             wandb.log({"jpcc": error_pcc})
 
                             # Evaluate the model correlation on the training set
-                            error_pcc_train = evaluate_pcc_repr(model_sep, X_train, y_train_norm)
+                            error_pcc_train = evaluate_pcc_repr(final_model_sep, X_train, y_train_norm)
                             print(f'pcc error delta train: {error_pcc_train}')
                             wandb.log({"train_jpcc": error_pcc_train})
 
                             # Evaluate the model correlation with colored
                             file_path = plot_repr_corr_dist(
-                                model_sep,
+                                final_model_sep,
                                 X_train_filtered, y_train_filtered,
                                 title + "_training"
                             )
@@ -362,7 +367,7 @@ def main():
                             print('file_path: ' + file_path)
 
                             file_path = plot_repr_corr_dist(
-                                model_sep,
+                                final_model_sep,
                                 X_test_filtered, y_test_filtered,
                                 title + "_test"
                             )
@@ -372,7 +377,7 @@ def main():
                             # Log t-SNE plot
                             # Log the training t-SNE plot to wandb
                             stage1_file_path = plot_tsne_delta(
-                                model_sep,
+                                final_model_sep,
                                 X_train_filtered, y_train_filtered, title,
                                 'stage1_training',
                                 model_type='features',
@@ -382,7 +387,7 @@ def main():
 
                             # Log the testing t-SNE plot to wandb
                             stage1_file_path = plot_tsne_delta(
-                                model_sep,
+                                final_model_sep,
                                 X_test_filtered, y_test_filtered, title,
                                 'stage1_testing',
                                 model_type='features',
@@ -392,7 +397,7 @@ def main():
 
                             # Evaluate the model correlation
                             file_path = plot_repr_correlation(
-                                model_sep,
+                                final_model_sep,
                                 X_train_filtered, y_train_filtered,
                                 title + "_training"
                             )
@@ -400,7 +405,7 @@ def main():
                             print('file_path: ' + file_path)
 
                             file_path = plot_repr_correlation(
-                                model_sep,
+                                final_model_sep,
                                 X_test_filtered, y_test_filtered,
                                 title + "_test"
                             )
@@ -409,7 +414,7 @@ def main():
 
                             # Evaluate the model correlation density
                             file_path = plot_repr_corr_density(
-                                model_sep,
+                                final_model_sep,
                                 X_train_filtered, y_train_filtered,
                                 title + "_training"
                             )
@@ -417,7 +422,7 @@ def main():
                             print('file_path: ' + file_path)
 
                             file_path = plot_repr_corr_density(
-                                model_sep,
+                                final_model_sep,
                                 X_test_filtered, y_test_filtered,
                                 title + "_test"
                             )

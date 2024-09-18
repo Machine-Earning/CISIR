@@ -10,7 +10,7 @@ CME_SPEED_THRESHOLD = [0]  # CME speed threshold
 ALPHAS = [1.0, 0.7, 0.5]  # Alpha values for the loss
 ADD_SLOPE = [False]  # Add slope to the inputs
 BATCH_SIZE = 4096  # Batch size
-PDS_BATCH_SIZE = 1024
+PDS_BATCH_SIZE = 4096
 EPOCHS = int(1e6)  # Number of epochs
 MLP_HIDDENS = [
     2048, 1024, 2048, 1024, 1024, 512, 1024, 512,
