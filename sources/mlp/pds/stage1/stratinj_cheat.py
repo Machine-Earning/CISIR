@@ -188,115 +188,23 @@ def main():
 
                             y_test_norm, _, _ = pds_space_norm(y_test)
 
+                            # Compute the sample weights for test
+                            delta_test = y_test_norm[:, 0]
+                            print(f'delta_test.shape: {delta_test.shape}')
+                            print(f'rebalancing the test set...')
+                            min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_test)
+                            test_weights_dict = exDenseReweightsD(
+                                X_test, delta_test,
+                                alpha=alphaV, bw=bandwidth,
+                                min_norm_weight=min_norm_weight,
+                                debug=False).label_reweight_dict
+                            print(f'test set rebalanced.')
+
                             X_test_filtered, y_test_filtered = filter_ds(
                                 X_test, y_test,
                                 low_threshold=lower_threshold,
                                 high_threshold=upper_threshold,
                                 N=N, seed=seed)
-
-                            # 4-fold cross-validation
-                            folds_optimal_epochs = []
-                            for fold_idx, (X_subtrain, y_subtrain_norm, X_val, y_val_norm) in enumerate(
-                                    stratified_4fold_split(X_train, y_train_norm, seed=seed, shuffle=True)):
-                                    
-                                print(f'Fold: {fold_idx}')
-                                # print all cme_files shapes
-                                print(
-                                    f'X_subtrain.shape: {X_subtrain.shape}, y_subtrain.shape: {y_subtrain_norm.shape}')
-                                print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val_norm.shape}')
-
-                                # Compute the sample weights for subtraining
-                                delta_subtrain = y_subtrain_norm[:, 0]
-                                print(f'delta_subtrain.shape: {delta_subtrain.shape}')
-                                print(f'rebalancing the subtraining set...')
-                                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
-                                subtrain_weights_dict = exDenseReweightsD(
-                                    X_subtrain, delta_subtrain,
-                                    alpha=alpha, bw=bandwidth,
-                                    min_norm_weight=min_norm_weight,
-                                    debug=False).label_reweight_dict
-                                print(f'subtraining set rebalanced.')
-
-                                # Compute the sample weights for validation
-                                delta_val = y_val_norm[:, 0]
-                                print(f'delta_val.shape: {delta_val.shape}')
-                                print(f'rebalancing the validation set...')
-                                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
-                                val_weights_dict = exDenseReweightsD(
-                                    X_val, delta_val,
-                                    alpha=alphaV, bw=bandwidth,
-                                    min_norm_weight=min_norm_weight,
-                                    debug=False).label_reweight_dict
-                                print(f'validation set rebalanced.')
-
-                                # create the model
-                                model_sep = create_mlp(
-                                    input_dim=n_features,
-                                    hiddens=hiddens,
-                                    output_dim=0,
-                                    pds=pds,
-                                    repr_dim=repr_dim,
-                                    dropout_rate=dropout_rate,
-                                    activation=activation,
-                                    norm=norm,
-                                    residual=residual,
-                                    skipped_layers=skipped_layers,
-                                    sam_rho=rho,
-                                )
-                                model_sep.summary()
-
-                                # Define the EarlyStopping callback
-                                early_stopping = EarlyStopping(
-                                    monitor=ES_CB_MONITOR,
-                                    patience=patience,
-                                    verbose=VERBOSE,
-                                    restore_best_weights=ES_CB_RESTORE_WEIGHTS)
-
-                                model_sep.compile(
-                                    optimizer=AdamW(
-                                        learning_rate=learning_rate,
-                                        weight_decay=weight_decay,
-                                        beta_1=momentum_beta1
-                                    ),
-                                    loss=lambda y_true, y_pred: mb.pds_loss_vec(
-                                        y_true, y_pred,
-                                        phase_manager=pm,
-                                        train_sample_weights=subtrain_weights_dict,
-                                        val_sample_weights=val_weights_dict,
-                                    )
-                                )
-
-                                subtrain_ds, subtrain_steps = stratified_batch_dataset(
-                                    X_subtrain, y_subtrain_norm, batch_size)
-                                val_ds, val_steps = stratified_batch_dataset(
-                                    X_val, y_val_norm, batch_size)
-
-                                history = model_sep.fit(
-                                    subtrain_ds,
-                                    steps_per_epoch=subtrain_steps,
-                                    epochs=epochs,
-                                    validation_data=val_ds,
-                                    validation_steps=val_steps,
-                                    batch_size=batch_size,
-                                    callbacks=[
-                                        reduce_lr_on_plateau,
-                                        early_stopping,
-                                        WandbCallback(save_model=WANDB_SAVE_MODEL),
-                                        IsTraining(pm)
-                                    ],
-                                    verbose=VERBOSE
-                                )
-
-                                # optimal epoch for fold
-                                folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
-                                # wandb log the fold's optimal
-                                print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
-                                wandb.log({f'fold_{fold_idx}_best_epoch': folds_optimal_epochs[-1]})
-
-                            # determine the optimal number of epochs from the folds
-                            optimal_epochs = int(np.mean(folds_optimal_epochs))
-                            print(f'optimal_epochs: {optimal_epochs}')
-                            wandb.log({'optimal_epochs': optimal_epochs})
 
                             # create the model
                             final_model_sep = create_mlp(
@@ -312,6 +220,14 @@ def main():
                                 skipped_layers=skipped_layers,
                                 sam_rho=rho,
                             )
+                            final_model_sep.summary()
+
+                            # Define the EarlyStopping callback
+                            early_stopping = EarlyStopping(
+                                monitor=ES_CB_MONITOR,
+                                patience=patience,
+                                verbose=VERBOSE,
+                                restore_best_weights=ES_CB_RESTORE_WEIGHTS)
 
                             final_model_sep.compile(
                                 optimizer=AdamW(
@@ -323,19 +239,25 @@ def main():
                                     y_true, y_pred,
                                     phase_manager=pm,
                                     train_sample_weights=train_weights_dict,
+                                    val_sample_weights=test_weights_dict,
                                 )
                             )
 
                             train_ds, train_steps = stratified_batch_dataset(
-                                X_train, y_train, batch_size)
+                                X_train, y_train_norm, batch_size)
+                            test_ds, test_steps = stratified_batch_dataset(
+                                X_test, y_test_norm, batch_size)
 
-                            final_model_sep.fit(
+                            history = final_model_sep.fit(
                                 train_ds,
                                 steps_per_epoch=train_steps,
-                                epochs=optimal_epochs,
+                                epochs=epochs,
+                                validation_data=test_ds,
+                                validation_steps=test_steps,
                                 batch_size=batch_size,
                                 callbacks=[
                                     reduce_lr_on_plateau,
+                                    early_stopping,
                                     WandbCallback(save_model=WANDB_SAVE_MODEL),
                                     IsTraining(pm)
                                 ],
