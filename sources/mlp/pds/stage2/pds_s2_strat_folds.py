@@ -40,8 +40,8 @@ weight_paths = {
     # # inj min 
     (False,
      0):
-        '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240731-084027MLP_strat_e0_5_e4_4_p6_1_p_slopeFalse_PDSinj_bs4096_alpha0.50_CME0_features_inj.h5'
-    # '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240803-153026MLP_strat_e0_5_e4_4_p6_1_p_PDSinj_bs4096_alpha2.50_rho0.00_features_inj.h5'
+        # '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240731-084027MLP_strat_e0_5_e4_4_p6_1_p_slopeFalse_PDSinj_bs4096_alpha0.50_CME0_features_inj.h5'
+    '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240803-153026MLP_strat_e0_5_e4_4_p6_1_p_PDSinj_bs4096_alpha2.50_rho0.00_features_inj.h5'
     ,
 
 }
@@ -68,7 +68,7 @@ def main():
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                                 lambda_ = 3.3  # LAMBDA
                                 # Construct the title
-                                title = f'MLP_pdsS2strat_amse{alpha_mse:.2f}_rho{rho:.2f}_lambda{lambda_}'
+                                title = f'MLP_pdsS2strat_amse{alpha_mse:.2f}_rho{rho:.2f}_lambda{lambda_}_hpccp'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
