@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 import wandb
-from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
+from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
@@ -18,7 +18,6 @@ from modules.training.ts_modeling import (
     stratified_batch_dataset,
     set_seed, mse_pcc)
 from sources.attm.modules import create_attentive_model
-from modules.training.warmup_scheduler import WarmupScheduler
 
 
 # Set the environment variable for CUDA (in case it is necessary)
@@ -54,7 +53,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'ATTM_{inputs_str}_amse{alpha_mse:.2f}_rho{rho}_cheatNoNorm'
+                            title = f'ATTM_{inputs_str}_amse{alpha_mse:.2f}_rho{rho}'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -72,7 +71,7 @@ def main():
                             attn_residual = True  # RESIDUAL
                             attn_dropout_rate = 0  # DROPOUT
                             dropout = 0  # DROPOUT
-                            attn_norm = None #'batch_norm'  
+                            attn_norm = None
                             norm = 'batch_norm'
                             skipped_blocks = 1  # SKIPPED_LAYERS
                             residual = True  # RESIDUAL
@@ -95,7 +94,7 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=1e-7)  # LR_CB_MIN_LR)
 
-                            weight_decay = 1e-6  # WEIGHT_DECAY  # higher weight decay
+                            weight_decay = 1e-7  # WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             # batch_size = BATCH_SIZE * strategy.num_replicas_in_sync  # Scale batch size by number of GPUs
@@ -246,7 +245,6 @@ def main():
                                 sam_rho=rho
                             )
                             final_model_sep.summary()
-
 
                             # Instantiate custom metrics - TODO: fix the metrics
                             # mae_metric = MAEPlusMetric(threshold=None, name='mae')

@@ -561,16 +561,19 @@ def create_attentive_model(
         output_layer = output['output']
         last_attention_scores = output['attention_scores']
 
-        model_output = {
-            'repr': final_repr_output,
-            'output': output_layer,
-            'attention_scores': last_attention_scores
-        }
+        # model_output = {
+        #     'repr': final_repr_output,
+        #     'output': output_layer,
+        #     'attention_scores': last_attention_scores
+        # }
+
+        model_output = [final_repr_output, output_layer]
     else:
-        model_output = {
-            'repr': final_repr_output,
-            'attention_scores': last_attention_scores
-        }
+        # model_output = {
+        #     'repr': final_repr_output,
+        #     'attention_scores': last_attention_scores
+        # }
+        model_output = final_repr_output
 
     if sam_rho > 0.0:
         model = SAMModel(inputs=input_layer, outputs=model_output, rho=sam_rho, name=name)
