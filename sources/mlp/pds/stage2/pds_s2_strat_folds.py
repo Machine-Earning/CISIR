@@ -41,8 +41,8 @@ weight_paths = {
     (False,
      0):
         # '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240731-084027MLP_strat_e0_5_e4_4_p6_1_p_slopeFalse_PDSinj_bs4096_alpha0.50_CME0_features_inj.h5'
-        '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240803-153026MLP_strat_e0_5_e4_4_p6_1_p_PDSinj_bs4096_alpha2.50_rho0.00_features_inj.h5'
-        # '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240803-214949MLP_strat_e0_5_e4_4_p6_1_p_PDSinj_bs4096_alpha5.00_rho0.00_features_inj.h5'
+        # '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240803-153026MLP_strat_e0_5_e4_4_p6_1_p_PDSinj_bs4096_alpha2.50_rho0.00_features_inj.h5'
+        '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240803-214949MLP_strat_e0_5_e4_4_p6_1_p_PDSinj_bs4096_alpha5.00_rho0.00_features_inj.h5'
     ,
 
 }
@@ -60,7 +60,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
+                    for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1, 1, 0.1, 0)]:
                         for freeze in [False]:
                             for rho in [1e-3]:
                                 # PARAMS

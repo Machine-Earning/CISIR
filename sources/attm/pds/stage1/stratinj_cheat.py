@@ -48,7 +48,7 @@ def main():
     for seed in [456789]:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha, alphaV in [(1, 1)]:
+                for alpha, alphaV in [(1, 0.5)]:
                     for rho in [0]:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
@@ -74,7 +74,6 @@ def main():
                             learning_rate = ATTM_START_LR
                             weight_decay = ATTM_WD  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                            batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
                             attn_hiddens = ATTN_HIDDENS
                             blocks_hiddens = BLOCKS_HIDDENS

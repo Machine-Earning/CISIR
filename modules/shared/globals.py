@@ -11,6 +11,7 @@ ALPHAS = [1.0, 0.7, 0.5]  # Alpha values for the loss
 ADD_SLOPE = [False]  # Add slope to the inputs
 BATCH_SIZE = 4096  # Batch size
 PDS_BATCH_SIZE = 1268
+# ATTM_PDS_BS = 512
 EPOCHS = int(1e6)  # Number of epochs
 MLP_HIDDENS = [
     2048, 1024, 2048, 1024, 1024, 512, 1024, 512,
@@ -69,7 +70,7 @@ ATTN_RESIDUAL = True
 ATTM_RESIDUAL = True
 ATTM_DROPOUT = 0
 ATTN_DROPOUT = 0
-ATTN_NORM = None
+ATTN_NORM = 'batch_norm'
 ATTM_NORM = 'batch_norm'
 ATTM_LR_CB_MIN_LR = 1e-6
 ATTM_WD = 1e-7
