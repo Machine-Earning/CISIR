@@ -39,7 +39,7 @@ weight_paths = {
     # # inj min 
     (False,
      0):
-        '/home1/jmoukpe2016/keras-functional-api/.h5'
+        '/home1/jmoukpe2016/keras-functional-api/final_model_weights_ATTM_PDSstratinj_bs1268_alpha0.00_rho0.00_cheat_20241004-034558.h5'
     ,
 
 }
@@ -360,8 +360,8 @@ def main():
                                         X_val, y_val, batch_size)
 
                                     # Map the subtraining dataset to return {'output': y} format
-                                    subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'output_layer': y}))
-                                    val_ds = val_ds.map(lambda x, y: (x, {'output_layer': y}))
+                                    subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'tf.identity': y}))
+                                    val_ds = val_ds.map(lambda x, y: (x, {'tf.identity': y}))
 
                                     # Train the model with the callback
                                     history = model_sep.fit(
@@ -453,7 +453,7 @@ def main():
                                     X_train, y_train, batch_size)
 
                                 # Map the training dataset to return {'output': y} format
-                                train_ds = train_ds.map(lambda x, y: (x, {'output_layer': y}))
+                                train_ds = train_ds.map(lambda x, y: (x, {'tf.identity': y}))
 
                                 # Train on the full dataset
                                 final_model_sep.fit(
