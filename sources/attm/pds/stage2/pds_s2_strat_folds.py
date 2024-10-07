@@ -341,7 +341,7 @@ def main():
                                             beta_1=momentum_beta1
                                         ),
                                         loss={
-                                            'forecast_head': lambda y_true, y_pred: mse_pcc(
+                                            'tf.identity': lambda y_true, y_pred: mse_pcc(
                                                 y_true, y_pred,
                                                 phase_manager=pm,
                                                 lambda_factor=lambda_,
@@ -439,7 +439,7 @@ def main():
                                         beta_1=momentum_beta1
                                     ),
                                     loss={
-                                        'forecast_head': lambda y_true, y_pred: mse_pcc(
+                                        'tf.identity': lambda y_true, y_pred: mse_pcc(
                                             y_true, y_pred,
                                             phase_manager=pm,
                                             lambda_factor=lambda_,
