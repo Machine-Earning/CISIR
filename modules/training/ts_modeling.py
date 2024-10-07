@@ -3303,6 +3303,36 @@ def evaluate_lag_error(
     return threshold_lag, shift_lag, avg_lag
 
 
+def find_optimal_epoch_by_quadratic_fit(metric_history):
+    """
+    Fits a quadratic function to the metric history and finds the epoch corresponding to the minimum of the quadratic fit.
+
+    Parameters:
+    - metric_history: List or array of metric values over epochs.
+
+    Returns:
+    - optimal_epoch: Epoch corresponding to the minimum of the quadratic fit (may be fractional).
+    """
+
+    # Epochs start from 1
+    epochs = np.arange(len(metric_history)) + 1
+    y = np.array(metric_history)
+
+    # Fit quadratic: y = a*x^2 + b*x + c
+    coefficients = np.polyfit(epochs, y, deg=2)
+    a, b, c = coefficients
+
+    # Handle the case where 'a' is zero (linear function)
+    if a == 0:
+        optimal_epoch = epochs[np.argmin(y)]
+    else:
+        optimal_epoch = int(-b / (2 * a))
+        # Ensure the optimal epoch is within the valid range
+        optimal_epoch = max(min(optimal_epoch, int(epochs[-1])), int(epochs[0]))
+
+    return optimal_epoch
+
+
 def asymmetric_weight_silu(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
     """
     Asymmetric weight based on SiLU function: AW = 1 + SiLU(y_true - y_pred)
