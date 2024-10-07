@@ -13,10 +13,16 @@ BATCH_SIZE = 4096  # Batch size
 PDS_BATCH_SIZE = 1268
 # ATTM_PDS_BS = 512
 EPOCHS = int(1e6)  # Number of epochs
+# MLP_HIDDENS = [
+#     2048, 1024, 2048, 1024, 1024, 512, 1024, 512,
+#     512, 256, 512, 256, 256, 128, 256, 128,
+#     256, 128, 128, 128, 128, 128, 128, 128
+# ]  # Hidden layers
 MLP_HIDDENS = [
-    2048, 1024, 2048, 1024, 1024, 512, 1024, 512,
-    512, 256, 512, 256, 256, 128, 256, 128,
-    256, 128, 128, 128, 128, 128, 128, 128
+    # 2048, 1024, 2048, 1024, 1024, 512, 1024, 512,
+    # 512, 256, 512, 256, 256, 128, 256, 128,
+    # 256, 128, 256, 128, 256, 128,
+    128, 128
 ]  # Hidden layers
 PROJ_HIDDENS = [64]  # Projection hidden layers
 LOSS_KEY = 'mse_pcc'  # Mean squared error regression loss

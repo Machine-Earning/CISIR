@@ -24,7 +24,8 @@ from modules.training.ts_modeling import (
     create_mlp,
     filter_ds,
     set_seed,
-    stratified_batch_dataset
+    stratified_batch_dataset,
+    find_optimal_epoch_by_quadratic_fit
 )
 from sources.attm.modules import create_attentive_model
 
@@ -48,7 +49,7 @@ def main():
     for seed in [456789]:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha, alphaV in [(1, 0.5)]:
+                for alpha, alphaV in [(0, 0)]:
                     for rho in [0]:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
@@ -60,7 +61,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'ATTM_PDSstratinj_bs{batch_size}_alpha{alpha:.2f}_rho{rho:.2f}_cheat'
+                            title = f'ATTM_PDSstratinj_bs{batch_size}_alpha{alpha:.2f}_rho{rho:.2f}_cheatQuad'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')

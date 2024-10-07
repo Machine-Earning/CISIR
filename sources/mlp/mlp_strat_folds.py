@@ -23,7 +23,8 @@ from modules.training.ts_modeling import (
     filter_ds,
     create_mlp,
     plot_error_hist,
-    stratified_4fold_split
+    stratified_4fold_split,
+    find_optimal_epoch_by_quadratic_fit
 )
 
 
@@ -40,11 +41,11 @@ def main():
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
 
-    for seed in SEEDS:
+    for seed in [456789]:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
-                    for rho in [5.5e-3]:  # SAM_RHOS:
+                    for rho in [1e-3]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -52,7 +53,7 @@ def main():
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'MLP_{inputs_str}_amse{alpha_mse:.2f}_rho{rho}_strat'
+                            title = f'MLP_{inputs_str}_amse{alpha_mse:.2f}_rho{rho}_strat_smollerQ'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
                             # Create a unique experiment name with a timestamp
@@ -71,7 +72,7 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=LR_CB_MIN_LR)
 
-                            weight_decay = WEIGHT_DECAY  # higher weight decay
+                            weight_decay = WEIGHT_DECAY #1e-5 # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
@@ -291,7 +292,10 @@ def main():
                                 )
 
                                 # optimal epoch for fold
-                                folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
+                                # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
+                                 # Use the quadratic fit function to find the optimal epoch
+                                optimal_epoch = find_optimal_epoch_by_quadratic_fit(history.history[ES_CB_MONITOR])
+                                folds_optimal_epochs.append(optimal_epoch)
                                 # wandb log the fold's optimal
                                 print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
                                 wandb.log({f'fold_{fold_idx}_best_epoch': folds_optimal_epochs[-1]})

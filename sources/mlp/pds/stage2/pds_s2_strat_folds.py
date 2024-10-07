@@ -56,11 +56,11 @@ def main():
     mb = ModelBuilder()
     pm = TrainingPhaseManager()
 
-    for seed in [1234]:
+    for seed in [456789]:
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(2, 1, 0.1, 0)]:
+                    for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(5, 1, 0.1, 0)]:
                         for freeze in [False]:
                             for rho in [1e-3]:
                                 # PARAMS
