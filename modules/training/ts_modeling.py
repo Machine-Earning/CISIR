@@ -3303,13 +3303,49 @@ def evaluate_lag_error(
     return threshold_lag, shift_lag, avg_lag
 
 
-def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
-            lambda_factor: float,
-            phase_manager: 'TrainingPhaseManager',
-            train_mse_weight_dict: Optional[Dict[float, float]] = None,
-            val_mse_weight_dict: Optional[Dict[float, float]] = None,
-            train_pcc_weight_dict: Optional[Dict[float, float]] = None,
-            val_pcc_weight_dict: Optional[Dict[float, float]] = None) -> tf.Tensor:
+def asymmetric_weight_silu(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+    """
+    Asymmetric weight based on SiLU function: AW = 1 + SiLU(y_true - y_pred)
+    Args:
+    - y_true (tf.Tensor): Ground truth labels.
+    - y_pred (tf.Tensor): Predicted labels.
+
+    Returns:
+    - tf.Tensor: The asymmetric weight tensor.
+    """
+    diff = y_true - y_pred
+    silu = diff / (1 + tf.exp(-diff))  # SiLU function
+    return 1 + silu
+
+
+def asymmetric_weight_sigmoid(y_true: tf.Tensor, y_pred: tf.Tensor, eta: float = 0.9, zeta: float = 2) -> tf.Tensor:
+    """
+    Asymmetric weight based on Sigmoid function:
+    AW = 2(1 - eta) * Sigmoid(zeta * (y_true - y_pred)) + eta
+    Args:
+    - y_true (tf.Tensor): Ground truth labels.
+    - y_pred (tf.Tensor): Predicted labels.
+    - eta (float, optional): percentage parameter that determines the error for the overestimation of the target.
+    - zeta (float, optional): Controls the steepness of the Sigmoid function.
+
+    Returns:
+    - tf.Tensor: The asymmetric weight tensor.
+    """
+    diff = y_true - y_pred
+    sigmoid = tf.nn.sigmoid(zeta * diff)  # Sigmoid with zeta controlling the steepness
+    return 2 * (1 - eta) * sigmoid + eta
+
+
+def mse_pcc(
+        y_true: tf.Tensor, y_pred: tf.Tensor,
+        lambda_factor: float,
+        phase_manager: 'TrainingPhaseManager',
+        train_mse_weight_dict: Optional[Dict[float, float]] = None,
+        val_mse_weight_dict: Optional[Dict[float, float]] = None,
+        train_pcc_weight_dict: Optional[Dict[float, float]] = None,
+        val_pcc_weight_dict: Optional[Dict[float, float]] = None,
+        asym_type: Optional[str] = None,  # New parameter to choose asymmetric weight type
+) -> tf.Tensor:
     """
     Custom loss function combining Mean Squared Error (MSE) and Pearson Correlation Coefficient (PCC)
     with re-weighting based on label values. The final loss is a combination of weighted MSE and
@@ -3324,6 +3360,7 @@ def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
     - val_mse_weight_dict (dict, optional): Dictionary mapping label values to weights for validation MSE samples.
     - train_pcc_weight_dict (dict, optional): Dictionary mapping label values to weights for training PCC samples.
     - val_pcc_weight_dict (dict, optional): Dictionary mapping label values to weights for validation PCC samples.
+    - asym_type (str, optional): Type of asymmetric weight to use ('silu' or 'sigmoid').
 
     Returns:
     - tf.Tensor: The calculated loss value as a single scalar.
@@ -3340,8 +3377,19 @@ def mse_pcc(y_true: tf.Tensor, y_pred: tf.Tensor,
     mse_weights = create_weight_tensor_fast(y_true, mse_weight_dict)
     pcc_weights = create_weight_tensor_fast(y_true, pcc_weight_dict)
 
+    # Apply asymmetric weight if specified
+    if asym_type == 'silu':
+        asym_weights = asymmetric_weight_silu(y_true, y_pred)
+    elif asym_type == 'sigmoid':
+        asym_weights = asymmetric_weight_sigmoid(y_true, y_pred)
+    else:
+        asym_weights = 1.0  # No asymmetric weighting if not specified
+
     # Compute the Mean Squared Error (MSE)
-    mse = tf.reduce_mean(mse_weights * tf.square(y_true - y_pred))
+    # mse = tf.reduce_mean(mse_weights * tf.square(y_pred - y_true))
+
+    # Compute the Mean Squared Error (MSE) with asymmetric weights
+    mse = tf.reduce_mean(asym_weights * mse_weights * tf.square(y_pred - y_true))
 
     # Compute the Pearson Correlation Coefficient (PCC)
     y_true_centered = y_true - tf.reduce_mean(y_true)
