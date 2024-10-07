@@ -561,19 +561,19 @@ def create_attentive_model(
         output_layer = output['output']
         last_attention_scores = output['attention_scores']
 
-        model_output = {
-            'repr': final_repr_output,
-            'output': output_layer,
-            'attention_scores': last_attention_scores
-        }
+        # model_output = {
+        #     'repr': final_repr_output,
+        #     'output': output_layer,
+        #     'attention_scores': last_attention_scores
+        # }
 
-        # model_output = [final_repr_output, output_layer]
+        model_output = [final_repr_output, output_layer]
     else:
-        model_output = {
-            'repr': final_repr_output,
-            'attention_scores': last_attention_scores
-        }
-        # model_output = final_repr_output
+        # model_output = {
+        #     'repr': final_repr_output,
+        #     'attention_scores': last_attention_scores
+        # }
+        model_output = final_repr_output
 
     if sam_rho > 0.0:
         model = SAMModel(inputs=input_layer, outputs=model_output, rho=sam_rho, name=name)
@@ -581,3 +581,161 @@ def create_attentive_model(
         model = Model(inputs=input_layer, outputs=model_output, name=name)
 
     return model
+
+
+def add_proj_head(
+        model: Model,
+        output_dim: int = 1,
+        freeze_features: bool = True,
+        pds: bool = False,
+        hidden_blocks=None,
+        attn_hidden_units: Optional[List[int]] = None,
+        attn_hidden_activation: str = 'tanh',
+        attn_dropout_rate: float = -1,
+        attn_norm: Optional[str] = None,
+        attn_residual: bool = False,
+        attn_skipped_layers: int = 2,
+        skipped_blocks: int = 1,
+        dropout_rate: float = 0.0,
+        activation='leaky_relu',
+        norm: str = None,
+        residual: bool = False,
+        sam_rho: float = 0.05,
+        name: str = 'mlp',
+) -> Model:
+    """
+    Add a regression head with one output unit and a projection layer to an existing model,
+    replacing the existing prediction layer and optionally the decoder layer.
+
+    :param model: The existing model
+    :param output_dim: The dimensionality of the output of the regression head.
+    :param freeze_features: Whether to freeze the layers of the base model or not.
+    :param pds: Whether to use a NormalizeLayer after the representation layer.
+    :param hidden_blocks: List of hidden layer sizes for the attention blocks.
+    :param attn_hidden_units: List of hidden layer sizes for the attention mechanism.
+    :param attn_hidden_activation: Activation function for the attention mechanism.
+    :param attn_dropout_rate: Dropout rate for the attention mechanism.
+    :param attn_norm: Type of normalization for the attention mechanism.
+    :param attn_residual: Whether to use residual connections in the attention mechanism.
+    :param attn_skipped_layers: Number of layers between residual connections in the attention mechanism.
+    :param skipped_blocks: Number of blocks between residual connections.
+    :param dropout_rate: Dropout rate for the model.
+    :param activation: Activation function for the model.
+    :param norm: Type of normalization for the model.
+    :param residual: Whether to use residual connections in the model.
+    :param sam_rho: Rho value for the SAM model.
+    :param name: Name of the model.
+
+    :return: The modified model with a projection layer and a regression head.
+    """
+
+    if hidden_blocks is None:
+        hiddens = [6]
+
+    print(f'Features are frozen: {freeze_features}')
+
+    # Determine the layer to be kept based on whether PDS representations are used
+    layer_to_keep = 'normalize_layer' if pds else 'repr_layer'
+
+    # Remove the last layer(s) to keep only the representation layer
+    new_base_model = Model(inputs=model.input, outputs=model.get_layer(layer_to_keep).output)
+
+    # If freeze_features is True, freeze the layers of the new base model
+    if freeze_features:
+        for layer in new_base_model.layers:
+            layer.trainable = False
+
+    # Count existing dropout layers to avoid naming conflicts
+    dropout_count = sum(1 for layer in model.layers if isinstance(layer, Dropout))
+
+    # Extract the output of the last layer of the new base model (representation layer)
+    repr_output = new_base_model.output
+
+    # Projection Layer(s)
+    x_proj = repr_output
+    skip_connection = None
+
+    # Process all hidden blocks
+    for i, block_output_dim in enumerate(hidden_blocks):
+        # Set attn_hidden_units to three layers, each of the size of the input to the block if not provided
+        if attn_hidden_units is None:
+            attn_hiddens = [x_proj.shape[-1]] * 3
+            print('attn')
+            print(attn_hidden_units)
+        else:
+            attn_hiddens = attn_hidden_units
+
+        # Create a TanhAttentiveBlock for each specified hidden block
+        block = TanhAttentiveBlock(
+            attn_hidden_units=attn_hiddens,
+            attn_hidden_activation=attn_hidden_activation,
+            attn_dropout_rate=attn_dropout_rate,
+            attn_norm=attn_norm,
+            attn_residual=attn_residual,
+            attn_skipped_layers=attn_skipped_layers,
+            output_dim=block_output_dim,
+            norm=norm,
+            dropout_rate=dropout_rate,
+            output_activation=activation
+        )
+
+        # Implement residual connections between blocks
+        if i % skipped_blocks == 0 and i > 0 and residual:
+            if skip_connection is not None:
+                if x_proj.shape[-1] != skip_connection.shape[-1]:
+                    skip_connection = Dense(x_proj.shape[-1], use_bias=False)(skip_connection)
+                x_proj = Add()([x_proj, skip_connection])
+            skip_connection = x_proj
+        else:
+            if i % skipped_blocks == 0 or skip_connection is None:
+                skip_connection = x_proj
+
+        x_proj = block(x_proj)['output']
+
+    if attn_hidden_units is None:
+        attn_hiddens = [x_proj.shape[-1]] * 3
+        print('attn')
+        print(attn_hidden_units)
+    else:
+        attn_hiddens = attn_hidden_units
+
+    output_block = TanhAttentiveBlock(
+        attn_hidden_units=attn_hiddens,
+        attn_hidden_activation=attn_hidden_activation,
+        attn_dropout_rate=attn_dropout_rate,
+        attn_norm=attn_norm,
+        attn_residual=attn_residual,
+        attn_skipped_layers=attn_skipped_layers,
+        output_dim=output_dim,
+        norm=norm,
+        dropout_rate=dropout_rate,
+        output_activation=activation
+    )
+    # output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+    output = output_block(x_proj)
+    # output_layer = output['output']
+    output_layer = tf.identity(output['output'], name='output_layer')
+    last_attention_scores = output['attention_scores']
+
+    # model_output = {
+    #     'repr': final_repr_output,
+    #     'output': output_layer,
+    #     'attention_scores': last_attention_scores
+    # }
+
+    model_output = [repr_output, output_layer]
+
+    if sam_rho > 0.0:
+        # create the new extended SAM model
+        extended_model = SAMModel(inputs=new_base_model.input, outputs=model_output, rho=sam_rho,
+                                  name=name)
+    else:
+        # Create the new extended model
+        extended_model = Model(inputs=new_base_model.input, outputs=model_output, name=name)
+
+    # If freeze_features is False, make all layers trainable
+    if not freeze_features:
+        for layer in extended_model.layers:
+            layer.trainable = True
+
+    return extended_model
