@@ -60,7 +60,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(2, 1, 0.1, 0)]:
+                    for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
                         for freeze in [False]:
                             for rho in [1e-3]:
                                 # PARAMS
@@ -69,7 +69,7 @@ def main():
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                                 lambda_ = 3.3  # LAMBDA
                                 # Construct the title
-                                title = f'MLP_pdsS2strat_amse{alpha_mse:.2f}_rho{rho:.2f}_lambda{lambda_}'
+                                title = f'MLP_pdsS2strat_amse{alpha_mse:.2f}_rho{rho:.2f}_lambda{lambda_}_asymSIG'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -81,6 +81,7 @@ def main():
                                 set_seed(seed)
                                 patience = PATIENCE  # higher patience
                                 learning_rate = START_LR_FT  # lower due to finetuning
+                                asym_type = 'sigmoid'
 
                                 reduce_lr_on_plateau = ReduceLROnPlateau(
                                     monitor=LR_CB_MONITOR,
@@ -149,6 +150,7 @@ def main():
                                     'ds_version': DS_VERSION,
                                     'mae_plus_th': mae_plus_threshold,
                                     'sam_rho': rho,
+                                    'asym_type': asym_type
 
                                 })
 
@@ -330,6 +332,7 @@ def main():
                                                 train_pcc_weight_dict=pcc_subtrain_weights_dict,
                                                 val_mse_weight_dict=mse_val_weights_dict,
                                                 val_pcc_weight_dict=pcc_val_weights_dict,
+                                                asym_type=asym_type
                                             )
                                         }
                                     )
@@ -414,6 +417,7 @@ def main():
                                             lambda_factor=lambda_,
                                             train_mse_weight_dict=mse_train_weights_dict,
                                             train_pcc_weight_dict=pcc_train_weights_dict,
+                                            asym_type=asym_type
                                         )
                                     },
                                 )  # Compile the model just like before

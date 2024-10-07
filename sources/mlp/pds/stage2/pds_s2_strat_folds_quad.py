@@ -22,7 +22,9 @@ from modules.training.ts_modeling import (
     filter_ds,
     stratified_4fold_split,
     plot_error_hist,
-    set_seed, stratified_batch_dataset)
+    set_seed, stratified_batch_dataset,
+    find_optimal_epoch_by_quadratic_fit
+    )
 from modules.training.utils import get_weight_path
 
 # Set the environment variable for CUDA (in case it is necessary)
@@ -56,11 +58,11 @@ def main():
     mb = ModelBuilder()
     pm = TrainingPhaseManager()
 
-    for seed in [1234]:
+    for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(2, 1, 0.1, 0)]:
+                    for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
                         for freeze in [False]:
                             for rho in [1e-3]:
                                 # PARAMS
@@ -69,7 +71,7 @@ def main():
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                                 lambda_ = 3.3  # LAMBDA
                                 # Construct the title
-                                title = f'MLP_pdsS2strat_amse{alpha_mse:.2f}_rho{rho:.2f}_lambda{lambda_}'
+                                title = f'MLP_pdsS2strat_amse{alpha_mse:.2f}_rho{rho:.2f}_lambda{lambda_}_Quad'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -361,7 +363,10 @@ def main():
                                     )
 
                                     # optimal epoch for fold
-                                    folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
+                                    # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
+                                    # Use the quadratic fit function to find the optimal epoch
+                                    optimal_epoch = find_optimal_epoch_by_quadratic_fit(history.history[ES_CB_MONITOR])
+                                    folds_optimal_epochs.append(optimal_epoch)
                                     # wandb log the fold's optimal
                                     print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
                                     wandb.log({f'fold_{fold_idx}_best_epoch': folds_optimal_epochs[-1]})
