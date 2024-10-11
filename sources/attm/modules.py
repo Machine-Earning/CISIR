@@ -417,6 +417,172 @@ class TanhAttentiveBlockV2(Layer):
         return self.dense_layer.get_weights()
 
 
+def create_attentive_model_dict(
+        input_dim: int = 25,
+        output_dim: int = 1,
+        hidden_blocks=None,
+        attn_hidden_units: Optional[List[int]] = None,
+        attn_hidden_activation: str = 'tanh',
+        attn_dropout_rate: float = -1,
+        attn_norm: Optional[str] = None,
+        attn_residual: bool = False,
+        attn_skipped_layers: int = 2,
+        skipped_blocks: int = 1,
+        repr_dim: int = 128,
+        dropout_rate: float = 0.0,
+        activation='leaky_relu',
+        pds: bool = False,
+        norm: str = None,
+        residual: bool = False,
+        sam_rho: float = 0.05,
+        name: str = 'attentive_mlp'
+) -> Model:
+    """
+    Create a model with stacked TanhAttentiveBlock layers, optional dropout, normalization, and residual connections.
+
+    Parameters:
+    - input_dim (int): The number of features in the input data.
+    - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
+    - hidden_blocks (List[int]): List where each entry is the output_dim of the block at that position.
+    - attn_hidden_units (List[int]): A list of integers where each integer is the number of units in a hidden layer of the attention block.
+    - attn_hidden_activation (str): Activation function to use in hidden layers of the attention block.
+    - attn_dropout_rate (float): The dropout rate to use in the attention layers. If 0.0, dropout is not used. If -1, use the same dropout rate as the model dropout rate.
+    - attn_norm (str): The type of normalization to use in the attention layers ('batch_norm' or 'layer_norm'). Default is None.
+    - attn_residual (bool): Whether to use residual connections in the attention layer. Default is False.
+    - attn_skipped_layers (int): Number of layers between residual connections in the attention layer. Default is 2.
+    - skipped_blocks (int): Number of blocks between residual connections. Default is 1.
+    - repr_dim (int): The number of features in the final representation vector.
+    - dropout_rate (float): The dropout rate to use in the model. Default is 0.0.
+    - activation: Optional activation function to use in the blocks. Default is LeakyReLU.
+    - pds (bool): If True, use a NormalizeLayer after the representation layer.
+    - norm (str): The type of normalization to use ('batch_norm' or 'layer_norm'). Default is None.
+    - residual (bool): If True, add residual connections for every 'skipped_blocks' hidden blocks. Default is False.
+    - sam_rho (float): Size of the neighborhood for perturbation in SAM. Default is 0.05. If 0.0, SAM is not used.
+    - name (str): Name of the model. Default is 'attentive_mlp'.
+
+    Returns:
+    - Model: A Keras model instance.
+    """
+
+    if hidden_blocks is None:
+        hidden_blocks = [50, 50]
+
+    input_layer = Input(shape=(input_dim,))
+    x = input_layer
+    skip_connection = None
+
+    # Process all hidden blocks
+    for i, block_output_dim in enumerate(hidden_blocks):
+        # Set attn_hidden_units to three layers, each of the size of the input to the block if not provided
+        if attn_hidden_units is None:
+            attn_hiddens = [x.shape[-1]] * 3
+            print('attn')
+            print(attn_hidden_units)
+        else:
+            attn_hiddens = attn_hidden_units
+
+        # Create a TanhAttentiveBlock for each specified hidden block
+        block = TanhAttentiveBlock(
+            attn_hidden_units=attn_hiddens,
+            attn_hidden_activation=attn_hidden_activation,
+            attn_dropout_rate=attn_dropout_rate,
+            attn_norm=attn_norm,
+            attn_residual=attn_residual,
+            attn_skipped_layers=attn_skipped_layers,
+            output_dim=block_output_dim,
+            norm=norm,
+            dropout_rate=dropout_rate,
+            output_activation=activation
+        )
+
+        # Implement residual connections between blocks
+        if i % skipped_blocks == 0 and i > 0 and residual:
+            if skip_connection is not None:
+                if x.shape[-1] != skip_connection.shape[-1]:
+                    skip_connection = Dense(x.shape[-1], use_bias=False)(skip_connection)
+                x = Add()([x, skip_connection])
+            skip_connection = x
+        else:
+            if i % skipped_blocks == 0 or skip_connection is None:
+                skip_connection = x
+
+        x = block(x)['output']
+
+    if attn_hidden_units is None:
+        attn_hiddens = [x.shape[-1]] * 3
+        print('attn')
+        print(attn_hidden_units)
+    else:
+        attn_hiddens = attn_hidden_units
+
+    # Add the final block with repr_dim output
+    final_block = TanhAttentiveBlock(
+        attn_hidden_units=attn_hiddens,
+        attn_hidden_activation=attn_hidden_activation,
+        attn_dropout_rate=attn_dropout_rate,
+        attn_norm=attn_norm,
+        attn_residual=attn_residual,
+        attn_skipped_layers=attn_skipped_layers,
+        output_dim=repr_dim,
+        norm=norm,
+        dropout_rate=dropout_rate,
+        output_activation=activation
+    )
+
+    final = final_block(x)
+    final_repr = final['output']
+    last_attention_scores = final['attention_scores']
+
+    if pds:
+        final_repr_output = NormalizeLayer(name='normalize_layer')(final_repr)
+    else:
+        final_repr_output = final_repr
+
+    # if output_dim > 0:
+    #     output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+    #     model_output = [final_repr_output, output_layer, last_attention_scores]
+    # else:
+    #     model_output = final_repr_output
+    if output_dim > 0:
+        output_block = TanhAttentiveBlock(
+            attn_hidden_units=attn_hiddens,
+            attn_hidden_activation=attn_hidden_activation,
+            attn_dropout_rate=attn_dropout_rate,
+            attn_norm=attn_norm,
+            attn_residual=attn_residual,
+            attn_skipped_layers=attn_skipped_layers,
+            output_dim=output_dim,
+            norm=norm,
+            dropout_rate=dropout_rate,
+            output_activation=activation
+        )
+        # output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+        output = output_block(final_repr_output)
+        output_layer = output['output']
+        last_attention_scores = output['attention_scores']
+
+        model_output = {
+            'repr': final_repr_output,
+            'output': output_layer,
+            'attention_scores': last_attention_scores
+        }
+
+        # model_output = [final_repr_output, output_layer]
+    else:
+        model_output = {
+            'repr': final_repr_output,
+            'attention_scores': last_attention_scores
+        }
+        # model_output = final_repr_output
+
+    if sam_rho > 0.0:
+        model = SAMModel(inputs=input_layer, outputs=model_output, rho=sam_rho, name=name)
+    else:
+        model = Model(inputs=input_layer, outputs=model_output, name=name)
+
+    return model
+
+
 def create_attentive_model(
         input_dim: int = 25,
         output_dim: int = 1,
@@ -713,17 +879,17 @@ def add_proj_head(
     )
     # output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
     output = output_block(x_proj)
-    # output_layer = output['output']
-    output_layer = tf.identity(output['output'], name='output_layer')
+    output_layer = output['output']
+    # output_layer = tf.identity(output['output'], name='output_layer')
     last_attention_scores = output['attention_scores']
 
-    # model_output = {
-    #     'repr': final_repr_output,
-    #     'output': output_layer,
-    #     'attention_scores': last_attention_scores
-    # }
+    model_output = {
+        'repr': repr_output,
+        'output': output_layer,
+        'attention_scores': last_attention_scores
+    }
 
-    model_output = [repr_output, output_layer]
+    # model_output = [repr_output, output_layer]
 
     if sam_rho > 0.0:
         # create the new extended SAM model

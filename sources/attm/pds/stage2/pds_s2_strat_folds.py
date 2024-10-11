@@ -19,7 +19,6 @@ from modules.training.ts_modeling import (
     mse_pcc,
     filter_ds,
     stratified_4fold_split,
-    plot_error_hist,
     set_seed, stratified_batch_dataset)
 from modules.training.utils import get_weight_path
 from sources.attm.modules import create_attentive_model, add_proj_head
@@ -341,7 +340,7 @@ def main():
                                             beta_1=momentum_beta1
                                         ),
                                         loss={
-                                            'tf.identity': lambda y_true, y_pred: mse_pcc(
+                                            'output': lambda y_true, y_pred: mse_pcc(
                                                 y_true, y_pred,
                                                 phase_manager=pm,
                                                 lambda_factor=lambda_,
@@ -360,8 +359,8 @@ def main():
                                         X_val, y_val, batch_size)
 
                                     # Map the subtraining dataset to return {'output': y} format
-                                    subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'tf.identity': y}))
-                                    val_ds = val_ds.map(lambda x, y: (x, {'tf.identity': y}))
+                                    subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'output': y}))
+                                    val_ds = val_ds.map(lambda x, y: (x, {'output': y}))
 
                                     # Train the model with the callback
                                     history = model_sep.fit(
@@ -439,7 +438,7 @@ def main():
                                         beta_1=momentum_beta1
                                     ),
                                     loss={
-                                        'tf.identity': lambda y_true, y_pred: mse_pcc(
+                                        'output': lambda y_true, y_pred: mse_pcc(
                                             y_true, y_pred,
                                             phase_manager=pm,
                                             lambda_factor=lambda_,
@@ -453,7 +452,7 @@ def main():
                                     X_train, y_train, batch_size)
 
                                 # Map the training dataset to return {'output': y} format
-                                train_ds = train_ds.map(lambda x, y: (x, {'tf.identity': y}))
+                                train_ds = train_ds.map(lambda x, y: (x, {'output': y}))
 
                                 # Train on the full dataset
                                 final_model_sep.fit(
@@ -476,22 +475,22 @@ def main():
 
                                 # TODO: put the battery of evaluation in a function since they always repeat
                                 # evaluate the model error on test set
-                                error_mae = evaluate_mae(final_model_sep, X_test, y_test)
+                                error_mae = evaluate_mae(final_model_sep, X_test, y_test, use_dict=True)
                                 print(f'mae error: {error_mae}')
                                 wandb.log({"mae": error_mae})
 
                                 # evaluate the model error on training set
-                                error_mae_train = evaluate_mae(final_model_sep, X_train, y_train)
+                                error_mae_train = evaluate_mae(final_model_sep, X_train, y_train, use_dict=True)
                                 print(f'mae error train: {error_mae_train}')
                                 wandb.log({"train_mae": error_mae_train})
 
                                 # evaluate the model correlation on test set
-                                error_pcc = evaluate_pcc(final_model_sep, X_test, y_test)
+                                error_pcc = evaluate_pcc(final_model_sep, X_test, y_test, use_dict=True)
                                 print(f'pcc error: {error_pcc}')
                                 wandb.log({"pcc": error_pcc})
 
                                 # evaluate the model correlation on training set
-                                error_pcc_train = evaluate_pcc(final_model_sep, X_train, y_train)
+                                error_pcc_train = evaluate_pcc(final_model_sep, X_train, y_train, use_dict=True)
                                 print(f'pcc error train: {error_pcc_train}')
                                 wandb.log({"train_pcc": error_pcc_train})
 
@@ -499,25 +498,25 @@ def main():
                                 above_threshold = mae_plus_threshold
                                 # evaluate the model error for rare samples on test set
                                 error_mae_cond = evaluate_mae(
-                                    final_model_sep, X_test, y_test, above_threshold=above_threshold)
+                                    final_model_sep, X_test, y_test, above_threshold=above_threshold, use_dict=True)
                                 print(f'mae error delta >= {above_threshold} test: {error_mae_cond}')
                                 wandb.log({"mae+": error_mae_cond})
 
                                 # evaluate the model error for rare samples on training set
                                 error_mae_cond_train = evaluate_mae(
-                                    final_model_sep, X_train, y_train, above_threshold=above_threshold)
+                                    final_model_sep, X_train, y_train, above_threshold=above_threshold, use_dict=True)
                                 print(f'mae error delta >= {above_threshold} train: {error_mae_cond_train}')
                                 wandb.log({"train_mae+": error_mae_cond_train})
 
                                 # evaluate the model correlation for rare samples on test set
                                 error_pcc_cond = evaluate_pcc(
-                                    final_model_sep, X_test, y_test, above_threshold=above_threshold)
+                                    final_model_sep, X_test, y_test, above_threshold=above_threshold, use_dict=True)
                                 print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
                                 wandb.log({"pcc+": error_pcc_cond})
 
                                 # evaluate the model correlation for rare samples on training set
                                 error_pcc_cond_train = evaluate_pcc(
-                                    final_model_sep, X_train, y_train, above_threshold=above_threshold)
+                                    final_model_sep, X_train, y_train, above_threshold=above_threshold, use_dict=True)
                                 print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
                                 wandb.log({"train_pcc+": error_pcc_cond_train})
 
@@ -532,7 +531,8 @@ def main():
                                     outputs_to_use=outputs_to_use,
                                     show_avsp=True,
                                     using_cme=True,
-                                    cme_speed_threshold=cme_speed_threshold)
+                                    cme_speed_threshold=cme_speed_threshold,
+                                    use_dict=True)
 
                                 # Log the plot to wandb
                                 for filename in filenames:
@@ -551,7 +551,8 @@ def main():
                                     show_avsp=True,
                                     prefix='training',
                                     using_cme=True,
-                                    cme_speed_threshold=cme_speed_threshold)
+                                    cme_speed_threshold=cme_speed_threshold,
+                                    use_dict=True)
 
                                 # Log the plot to wandb
                                 for filename in filenames:
@@ -563,7 +564,7 @@ def main():
                                     final_model_sep,
                                     X_train_filtered, y_train_filtered,
                                     title + "_training",
-                                    model_type='features_reg'
+                                    model_type='dict'
                                 )
                                 wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
                                 print('file_path: ' + file_path)
@@ -572,7 +573,7 @@ def main():
                                     final_model_sep,
                                     X_test_filtered, y_test_filtered,
                                     title + "_test",
-                                    model_type='features_reg'
+                                    model_type='dict'
                                 )
                                 wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
                                 print('file_path: ' + file_path)
@@ -583,7 +584,7 @@ def main():
                                     final_model_sep,
                                     X_train_filtered, y_train_filtered, title,
                                     'stage2_training',
-                                    model_type='features_reg',
+                                    model_type='dict',
                                     save_tag=current_time, seed=seed)
                                 wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
                                 print('stage1_file_path: ' + stage1_file_path)
@@ -593,26 +594,26 @@ def main():
                                     final_model_sep,
                                     X_test_filtered, y_test_filtered, title,
                                     'stage2_testing',
-                                    model_type='features_reg',
+                                    model_type='dict',
                                     save_tag=current_time, seed=seed)
                                 wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
                                 print('stage1_file_path: ' + stage1_file_path)
 
-                                filename = plot_error_hist(
-                                    final_model_sep,
-                                    X_train, y_train,
-                                    sample_weights=None,
-                                    title=title,
-                                    prefix='training')
-                                wandb.log({"training_error_hist": wandb.Image(filename)})
-
-                                filename = plot_error_hist(
-                                    final_model_sep,
-                                    X_test, y_test,
-                                    sample_weights=None,
-                                    title=title,
-                                    prefix='testing')
-                                wandb.log({"testing_error_hist": wandb.Image(filename)})
+                                # filename = plot_error_hist(
+                                #     final_model_sep,
+                                #     X_train, y_train,
+                                #     sample_weights=None,
+                                #     title=title,
+                                #     prefix='training')
+                                # wandb.log({"training_error_hist": wandb.Image(filename)})
+                                #
+                                # filename = plot_error_hist(
+                                #     final_model_sep,
+                                #     X_test, y_test,
+                                #     sample_weights=None,
+                                #     title=title,
+                                #     prefix='testing')
+                                # wandb.log({"testing_error_hist": wandb.Image(filename)})
 
                                 # Finish the wandb run
                                 wandb.finish()
