@@ -68,6 +68,8 @@ SAM_RHOS = [0.05, 0.5]  # Rho values for SAM
 # ATTM AREA
 BLOCKS_HIDDENS = [128 for _ in range(30)]
 ATTN_HIDDENS = [128 for _ in range(20)]
+# BLOCKS_HIDDENS = [128 for _ in range(1)]
+# ATTN_HIDDENS = [128 for _ in range(2)]
 ATTM_START_LR = 1e-4
 ATTM_ACTIVATION = 'leaky_relu'
 ATTN_SKIPPED_LAYERS = 1
