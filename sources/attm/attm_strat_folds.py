@@ -8,6 +8,7 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
+from modules.evaluate.utils import plot_tsne_delta, plot_repr_corr_dist
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
@@ -23,7 +24,7 @@ from modules.training.ts_modeling import (
     stratified_4fold_split,
     find_optimal_epoch_by_quadratic_fit
 )
-from sources.attm.modules import create_attentive_model
+from sources.attm.modules import create_attentive_model_dict
 
 
 # Set the environment variable for CUDA (in case it is necessary)
@@ -235,7 +236,7 @@ def main():
                                 print(f'validation set rebalanced.')
 
                                 # create the model
-                                model_sep = create_attentive_model(
+                                model_sep = create_attentive_model_dict(
                                     input_dim=n_features,
                                     output_dim=output_dim,
                                     hidden_blocks=blocks_hiddens,
@@ -321,7 +322,7 @@ def main():
                             print(f'optimal_epochs: {optimal_epochs}')
                             wandb.log({'optimal_epochs': optimal_epochs})
 
-                            final_model_sep = create_attentive_model(
+                            final_model_sep = create_attentive_model_dict(
                                 input_dim=n_features,
                                 output_dim=output_dim,
                                 hidden_blocks=blocks_hiddens,
@@ -468,45 +469,45 @@ def main():
                                 log_title = os.path.basename(filename)
                                 wandb.log({f'training_{log_title}': wandb.Image(filename)})
 
-                            # # Evaluate the model correlation with colored
-                            # file_path = plot_repr_corr_dist(
-                            #     final_model_sep,
-                            #     X_train_filtered, y_train_filtered,
-                            #     title + "_training",
-                            #     model_type='features_reg'
-                            # )
-                            # wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
-                            # print('file_path: ' + file_path)
-                            #
-                            # file_path = plot_repr_corr_dist(
-                            #     final_model_sep,
-                            #     X_test_filtered, y_test_filtered,
-                            #     title + "_test",
-                            #     model_type='features_reg'
-                            # )
-                            # wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
-                            # print('file_path: ' + file_path)
-                            #
-                            # # Log t-SNE plot
-                            # # Log the training t-SNE plot to wandb
-                            # stage1_file_path = plot_tsne_delta(
-                            #     final_model_sep,
-                            #     X_train_filtered, y_train_filtered, title,
-                            #     'stage2_training',
-                            #     model_type='features_reg',
-                            #     save_tag=current_time, seed=seed)
-                            # wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
-                            # print('stage1_file_path: ' + stage1_file_path)
-                            #
-                            # # Log the testing t-SNE plot to wandb
-                            # stage1_file_path = plot_tsne_delta(
-                            #     final_model_sep,
-                            #     X_test_filtered, y_test_filtered, title,
-                            #     'stage2_testing',
-                            #     model_type='features_reg',
-                            #     save_tag=current_time, seed=seed)
-                            # wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
-                            # print('stage1_file_path: ' + stage1_file_path)
+                            # Evaluate the model correlation with colored
+                            file_path = plot_repr_corr_dist(
+                                final_model_sep,
+                                X_train_filtered, y_train_filtered,
+                                title + "_training",
+                                model_type='dict'
+                            )
+                            wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
+                            print('file_path: ' + file_path)
+
+                            file_path = plot_repr_corr_dist(
+                                final_model_sep,
+                                X_test_filtered, y_test_filtered,
+                                title + "_test",
+                                model_type='dict'
+                            )
+                            wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
+                            print('file_path: ' + file_path)
+
+                            # Log t-SNE plot
+                            # Log the training t-SNE plot to wandb
+                            stage1_file_path = plot_tsne_delta(
+                                final_model_sep,
+                                X_train_filtered, y_train_filtered, title,
+                                'stage2_training',
+                                model_type='dict',
+                                save_tag=current_time, seed=seed)
+                            wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
+                            print('stage1_file_path: ' + stage1_file_path)
+
+                            # Log the testing t-SNE plot to wandb
+                            stage1_file_path = plot_tsne_delta(
+                                final_model_sep,
+                                X_test_filtered, y_test_filtered, title,
+                                'stage2_testing',
+                                model_type='dict',
+                                save_tag=current_time, seed=seed)
+                            wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
+                            print('stage1_file_path: ' + stage1_file_path)
                             #
                             # # Plot the error histograms
                             # filename = plot_error_hist(
