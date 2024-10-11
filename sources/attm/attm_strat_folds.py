@@ -23,7 +23,7 @@ from modules.training.ts_modeling import (
     stratified_4fold_split,
     find_optimal_epoch_by_quadratic_fit
 )
-from sources.attm.modules import create_attentive_model
+from sources.attm.modules import create_attentive_model_dict
 
 
 # Set the environment variable for CUDA (in case it is necessary)
@@ -235,7 +235,7 @@ def main():
                                 print(f'validation set rebalanced.')
 
                                 # create the model
-                                model_sep = create_attentive_model(
+                                model_sep = create_attentive_model_(
                                     input_dim=n_features,
                                     output_dim=output_dim,
                                     hidden_blocks=blocks_hiddens,
