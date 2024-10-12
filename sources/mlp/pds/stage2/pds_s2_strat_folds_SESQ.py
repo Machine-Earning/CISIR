@@ -116,7 +116,7 @@ def main():
                                 upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                                 smoothing_method = 'moving_average'
-                                window_size = 10  # allows margin of error of 10 epochs
+                                window_size = 50  # allows margin of error of 10 epochs
 
                                 # Initialize wandb
                                 wandb.init(project="Oct-Report", name=experiment_name, config={
