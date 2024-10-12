@@ -2,14 +2,14 @@ import os
 import random
 import traceback
 from collections import Counter
-from typing import Tuple, List, Optional, Union, Callable, Dict, Generator
+from typing import Tuple, List, Optional, Union, Callable, Dict, Generator, Any
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from matplotlib.lines import Line2D
-from numpy import ndarray
+from numpy import ndarray, dtype, signedinteger
 from scipy import stats
 from scipy.signal import correlate, correlation_lags
 from scipy.stats import pearsonr
@@ -3303,12 +3303,14 @@ def evaluate_lag_error(
     return threshold_lag, shift_lag, avg_lag
 
 
-def find_optimal_epoch_by_quadratic_fit(metric_history):
+def find_optimal_epoch_by_quadratic_fit(metric_history, plot=False):
     """
     Fits a quadratic function to the metric history and finds the epoch corresponding to the minimum of the quadratic fit.
+    Optionally plots the original metric history and the fitted quadratic curve.
 
     Parameters:
     - metric_history: List or array of metric values over epochs.
+    - plot: Boolean flag to indicate if the plot should be generated (default: False).
 
     Returns:
     - optimal_epoch: Epoch corresponding to the minimum of the quadratic fit (may be fractional).
@@ -3322,16 +3324,31 @@ def find_optimal_epoch_by_quadratic_fit(metric_history):
     coefficients = np.polyfit(epochs, y, deg=2)
     a, b, c = coefficients
 
+    # Calculate the fitted quadratic values
+    quadratic_fit = a * epochs**2 + b * epochs + c
+
     # Handle the case where 'a' is zero (linear function)
     if a == 0:
         optimal_epoch = epochs[np.argmin(y)]
     else:
-        optimal_epoch = int(-b / (2 * a))
+        optimal_epoch = -b / (2 * a)  # Keep this fractional for better accuracy
         # Ensure the optimal epoch is within the valid range
-        optimal_epoch = max(min(optimal_epoch, int(epochs[-1])), int(epochs[0]))
+        optimal_epoch = max(min(optimal_epoch, epochs[-1]), epochs[0])
+
+    # Plotting (if requested)
+    if plot:
+        plt.figure(figsize=(8, 6))
+        plt.plot(epochs, y, 'bo-', label='Original Metric History')
+        plt.plot(epochs, quadratic_fit, 'r--', label='Quadratic Fit')
+        plt.axvline(optimal_epoch, color='g', linestyle=':', label=f'Optimal Epoch ({optimal_epoch:.2f})')
+        plt.xlabel('Epoch')
+        plt.ylabel('Metric')
+        plt.title('Metric History and Quadratic Fit')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
 
     return optimal_epoch
-
 
 def asymmetric_weight_silu(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
     """
