@@ -3,8 +3,7 @@ from datetime import datetime
 
 import numpy as np
 import wandb
-
-from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
+from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
@@ -12,6 +11,7 @@ from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
+from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
     build_dataset,
     evaluate_mae,
@@ -24,7 +24,6 @@ from modules.training.ts_modeling import (
     create_mlp,
     plot_error_hist,
     stratified_4fold_split,
-    find_optimal_epoch_by_quadratic_fit
 )
 
 
@@ -41,10 +40,10 @@ def main():
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
 
-    for seed in [1234]:
+    for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1.5, 1, 0.1, 0)]:
+                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
                     for rho in [1e-3]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
@@ -53,7 +52,7 @@ def main():
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'MLP_{inputs_str}_amse{alpha_mse:.2f}_rho{rho}_strat_smollerQ'
+                            title = f'MLP_{inputs_str}_amse{alpha_mse:.2f}_rho{rho}_strat_smol'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
                             # Create a unique experiment name with a timestamp
@@ -72,11 +71,11 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=LR_CB_MIN_LR)
 
-                            weight_decay = WEIGHT_DECAY #1e-5 # higher weight decay
+                            weight_decay = WEIGHT_DECAY  # 1e-5 # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
-                            hiddens = MLP_HIDDENS  # hidden layers
+                            hiddens = MLP_HIDDENS_S  # hidden layers
 
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             bandwidth = BANDWIDTH
@@ -92,6 +91,8 @@ def main():
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
+                            smoothing_method = 'moving_average'
+                            window_size = 15  # allows margin of error of 10 epochs
 
                             # Initialize wandb
                             wandb.init(project="Oct-Report", name=experiment_name, config={
@@ -125,6 +126,8 @@ def main():
                                 'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
+                                'smoothing_method': smoothing_method,
+                                'window_size': window_size
                             })
 
                             # set the root directory
@@ -239,11 +242,13 @@ def main():
                                 model_sep.summary()
 
                                 # Define the EarlyStopping callback
-                                early_stopping = EarlyStopping(
+                                early_stopping = SmoothEarlyStopping(
                                     monitor=ES_CB_MONITOR,
                                     patience=patience,
                                     verbose=VERBOSE,
-                                    restore_best_weights=ES_CB_RESTORE_WEIGHTS)
+                                    restore_best_weights=ES_CB_RESTORE_WEIGHTS,
+                                    smoothing_method=smoothing_method,  # 'moving_average'
+                                    smoothing_parameters={'window_size': window_size})  # 10
 
                                 # Compile the model with the specified learning rate
                                 model_sep.compile(
@@ -293,8 +298,12 @@ def main():
 
                                 # optimal epoch for fold
                                 # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
-                                 # Use the quadratic fit function to find the optimal epoch
-                                optimal_epoch = find_optimal_epoch_by_quadratic_fit(history.history[ES_CB_MONITOR])
+                                # Use the quadratic fit function to find the optimal epoch
+                                optimal_epoch = find_optimal_epoch_by_smoothing(
+                                    history.history[ES_CB_MONITOR],
+                                    smoothing_method=smoothing_method,
+                                    smoothing_parameters={'window_size': window_size},
+                                    mode='min')
                                 folds_optimal_epochs.append(optimal_epoch)
                                 # wandb log the fold's optimal
                                 print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
