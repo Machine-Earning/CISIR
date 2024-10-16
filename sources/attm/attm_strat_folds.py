@@ -3,7 +3,6 @@ from datetime import datetime
 
 import numpy as np
 import wandb
-from keras.callbacks import EarlyStopping
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
@@ -12,6 +11,7 @@ from modules.evaluate.utils import plot_tsne_delta, plot_repr_corr_dist
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
+from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
     build_dataset,
     evaluate_mae,
@@ -22,7 +22,6 @@ from modules.training.ts_modeling import (
     mse_pcc,
     filter_ds,
     stratified_4fold_split,
-    find_optimal_epoch_by_quadratic_fit
 )
 from sources.attm.modules import create_attentive_model_dict
 
@@ -44,7 +43,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
-                    for rho in [1e-1]:  
+                    for rho in [1e-1]:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -52,7 +51,7 @@ def main():
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'ATTM_{inputs_str}_amse{alpha_mse:.2f}_rho{rho:.2f}_pccQuad'
+                            title = f'ATTM_{inputs_str}_amse{alpha_mse:.2f}_rho{rho:.2f}'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
                             # Create a unique experiment name with a timestamp
@@ -97,6 +96,8 @@ def main():
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
+                            smoothing_method = 'moving_average'
+                            window_size = 15  # allows margin of error of 10 epochs
 
                             # Initialize wandb
                             wandb.init(project="Attm-Oct-Report", name=experiment_name, config={
@@ -136,6 +137,8 @@ def main():
                                 'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
+                                'smoothing_method': smoothing_method,
+                                'window_size': window_size
                             })
 
                             # set the root directory
@@ -257,11 +260,13 @@ def main():
                                 model_sep.summary()
 
                                 # Define the EarlyStopping callback
-                                early_stopping = EarlyStopping(
+                                early_stopping = SmoothEarlyStopping(
                                     monitor=ES_CB_MONITOR,
                                     patience=patience,
                                     verbose=VERBOSE,
-                                    restore_best_weights=ES_CB_RESTORE_WEIGHTS)
+                                    restore_best_weights=ES_CB_RESTORE_WEIGHTS,
+                                    smoothing_method=smoothing_method,  # 'moving_average'
+                                    smoothing_parameters={'window_size': window_size})  # 10
 
                                 # Compile the model with the specified learning rate
                                 model_sep.compile(
@@ -311,7 +316,11 @@ def main():
 
                                 # optimal epoch for fold
                                 # Use the quadratic fit function to find the optimal epoch
-                                optimal_epoch = find_optimal_epoch_by_quadratic_fit(history.history[ES_CB_MONITOR])
+                                optimal_epoch = find_optimal_epoch_by_smoothing(
+                                    history.history[ES_CB_MONITOR],
+                                    smoothing_method=smoothing_method,
+                                    smoothing_parameters={'window_size': window_size},
+                                    mode='min')
                                 folds_optimal_epochs.append(optimal_epoch)
                                 # wandb log the fold's optimal
                                 print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
