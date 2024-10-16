@@ -18,12 +18,7 @@ MLP_HIDDENS = [
     512, 256, 512, 256, 256, 128, 256, 128,
     256, 128, 128, 128, 128, 128, 128, 128
 ]  # Hidden layers
-MLP_HIDDENS_S = [
-    # 2048, 1024, 2048, 1024, 1024, 512, 1024, 512,
-    # 512, 256, 512, 256, 256, 128, 256, 128,
-    # 256, 128, 256, 128, 256, 128, 
-    128, 128
-]  # Hidden layers
+MLP_HIDDENS_S = [256, 128]  # Hidden layers
 PROJ_HIDDENS = [64]  # Projection hidden layers
 LOSS_KEY = 'mse_pcc'  # Mean squared error regression loss
 LAMBDA = 3.3  # Lambda for the loss
@@ -78,7 +73,7 @@ ATTN_RESIDUAL = True
 ATTM_RESIDUAL = True
 ATTM_DROPOUT = 0
 ATTN_DROPOUT = 0
-ATTN_NORM = 'batch_norm'
+ATTN_NORM = None
 ATTM_NORM = 'batch_norm'
 ATTM_LR_CB_MIN_LR = 1e-6
 ATTM_WD = 1e-7
