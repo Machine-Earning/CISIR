@@ -12,7 +12,7 @@ from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.cme_modeling import ModelBuilder
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
-from modules.training.smooth_early_stopping import SmoothEarlyStopping
+from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
@@ -24,7 +24,6 @@ from modules.training.ts_modeling import (
     stratified_4fold_split,
     plot_error_hist,
     set_seed, stratified_batch_dataset,
-    find_optimal_epoch_by_quadratic_fit
 )
 from modules.training.utils import get_weight_path
 
@@ -72,7 +71,7 @@ def main():
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                                 lambda_ = 3.3  # LAMBDA
                                 # Construct the title
-                                title = f'MLP_pdsS2strat_amse{alpha_mse:.2f}_rho{rho:.2f}_lambda{lambda_}_SESQ'
+                                title = f'MLP_pdsS2strat_amse{alpha_mse:.2f}_rho{rho:.2f}_lambda{lambda_}_SES'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -116,7 +115,7 @@ def main():
                                 upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                                 smoothing_method = 'moving_average'
-                                window_size = 50  # allows margin of error of 10 epochs
+                                window_size = 15  # allows margin of error of 10 epochs
 
                                 # Initialize wandb
                                 wandb.init(project="Oct-Report", name=experiment_name, config={
@@ -377,7 +376,11 @@ def main():
                                     # optimal epoch for fold
                                     # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
                                     # Use the quadratic fit function to find the optimal epoch
-                                    optimal_epoch = find_optimal_epoch_by_quadratic_fit(history.history[ES_CB_MONITOR])
+                                    optimal_epoch = find_optimal_epoch_by_smoothing(
+                                        history.history[ES_CB_MONITOR],
+                                        smoothing_method=smoothing_method,
+                                        smoothing_parameters={'window_size': window_size},
+                                        mode='min')
                                     folds_optimal_epochs.append(optimal_epoch)
                                     # wandb log the fold's optimal
                                     print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
