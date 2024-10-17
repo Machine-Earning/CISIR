@@ -38,8 +38,8 @@ def main():
     """
     # Create the MirroredStrategy
     strategy = tf.distribute.MirroredStrategy()
-    num_devices = strategy.num_replicas_in_sync
-    print(f'Number of devices: {num_devices}')
+    num_replicas = strategy.num_replicas_in_sync
+    print(f'Number of devices: {num_replicas}')
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
 
@@ -76,8 +76,8 @@ def main():
 
                             weight_decay = ATTM_WD  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                            batch_size = 8192  # BATCH_SIZE  # higher batch size
-                            per_worker_batch_size = batch_size // num_devices
+                            per_replica_batch_size = 2048
+                            batch_size = per_replica_batch_size * num_replicas  # BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
                             attn_hiddens = ATTN_HIDDENS
                             blocks_hiddens = BLOCKS_HIDDENS
@@ -113,7 +113,7 @@ def main():
                                 "weight_decay": weight_decay,
                                 "momentum_beta1": momentum_beta1,
                                 "batch_size": batch_size,
-                                "per_worker_batch_size": per_worker_batch_size,
+                                "num_replicas": num_replicas,
                                 "epochs": epochs,
                                 # hidden in a more readable format  (wandb does not support lists)
                                 "attn_hiddens": att_hiddens_str,
@@ -297,9 +297,9 @@ def main():
 
                                 # Step 1: Create stratified dataset for the subtraining and validation set
                                 subtrain_ds, subtrain_steps = stratified_batch_dataset(
-                                    X_subtrain, y_subtrain, per_worker_batch_size)
+                                    X_subtrain, y_subtrain, per_replica_batch_size, num_replicas)
                                 val_ds, val_steps = stratified_batch_dataset(
-                                    X_val, y_val, per_worker_batch_size)
+                                    X_val, y_val, batch_size, per_replica_batch_size, num_replicas)
 
                                 # Map the subtraining dataset to return {'output': y} format
                                 subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'output': y}))
@@ -377,7 +377,7 @@ def main():
                                 )  # Compile the model with the specified learning rate
 
                             train_ds, train_steps = stratified_batch_dataset(
-                                X_train, y_train, per_worker_batch_size)
+                                X_train, y_train, per_replica_batch_size, num_replicas)
 
                             # Map the training dataset to return {'output': y} format
                             train_ds = train_ds.map(lambda x, y: (x, {'output': y}))
