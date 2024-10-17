@@ -301,13 +301,13 @@ def main():
                                 val_ds, val_steps = stratified_batch_dataset(
                                     X_val, y_val, batch_size)
 
-                                # setup distributed training
-                                subtrain_ds = strategy.experimental_distribute_dataset(subtrain_ds)
-                                val_ds = strategy.experimental_distribute_dataset(val_ds)
-
                                 # Map the subtraining dataset to return {'output': y} format
                                 subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'output': y}))
                                 val_ds = val_ds.map(lambda x, y: (x, {'output': y}))
+
+                                # setup distributed training
+                                subtrain_ds = strategy.experimental_distribute_dataset(subtrain_ds)
+                                val_ds = strategy.experimental_distribute_dataset(val_ds)
 
                                 # Train the model with the callback
                                 history = model_sep.fit(
@@ -383,11 +383,11 @@ def main():
                             train_ds, train_steps = stratified_batch_dataset(
                                 X_train, y_train, batch_size)
 
-                            # setup distributed training
-                            train_ds = strategy.experimental_distribute_dataset(train_ds)
-
                             # Map the training dataset to return {'output': y} format
                             train_ds = train_ds.map(lambda x, y: (x, {'output': y}))
+
+                            # setup distributed training
+                            train_ds = strategy.experimental_distribute_dataset(train_ds)
 
                             # Train on the full dataset
                             final_model_sep.fit(
