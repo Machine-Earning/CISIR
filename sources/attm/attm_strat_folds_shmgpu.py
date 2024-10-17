@@ -297,9 +297,9 @@ def main():
 
                                 # Step 1: Create stratified dataset for the subtraining and validation set
                                 subtrain_ds, subtrain_steps = stratified_batch_dataset(
-                                    X_subtrain, y_subtrain, per_replica_batch_size, num_replicas)
+                                    X_subtrain, y_subtrain, batch_size)
                                 val_ds, val_steps = stratified_batch_dataset(
-                                    X_val, y_val, batch_size, per_replica_batch_size, num_replicas)
+                                    X_val, y_val, batch_size)
 
                                 # setup distributed training
                                 subtrain_ds = strategy.experimental_distribute_dataset(subtrain_ds)
@@ -381,7 +381,7 @@ def main():
                                 )  # Compile the model with the specified learning rate
 
                             train_ds, train_steps = stratified_batch_dataset(
-                                X_train, y_train, per_replica_batch_size, num_replicas)
+                                X_train, y_train, batch_size)
 
                             # setup distributed training
                             train_ds = strategy.experimental_distribute_dataset(train_ds)
