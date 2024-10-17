@@ -76,7 +76,7 @@ def main():
 
                             weight_decay = ATTM_WD  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                            per_replica_batch_size = 2048
+                            per_replica_batch_size = 128
                             batch_size = per_replica_batch_size * num_replicas  # BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
                             attn_hiddens = ATTN_HIDDENS
