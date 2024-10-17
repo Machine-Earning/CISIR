@@ -301,6 +301,10 @@ def main():
                                 val_ds, val_steps = stratified_batch_dataset(
                                     X_val, y_val, batch_size, per_replica_batch_size, num_replicas)
 
+                                # setup distributed training
+                                subtrain_ds = strategy.experimental_distribute_dataset(subtrain_ds)
+                                val_ds = strategy.experimental_distribute_dataset(val_ds)
+
                                 # Map the subtraining dataset to return {'output': y} format
                                 subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'output': y}))
                                 val_ds = val_ds.map(lambda x, y: (x, {'output': y}))
@@ -378,6 +382,9 @@ def main():
 
                             train_ds, train_steps = stratified_batch_dataset(
                                 X_train, y_train, per_replica_batch_size, num_replicas)
+
+                            # setup distributed training
+                            train_ds = strategy.experimental_distribute_dataset(train_ds)
 
                             # Map the training dataset to return {'output': y} format
                             train_ds = train_ds.map(lambda x, y: (x, {'output': y}))
