@@ -58,7 +58,7 @@ def main():
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
                             patience = PATIENCE  # higher patience
-                            learning_rate = START_LR  # starting learning rate
+                            learning_rate = START_LR_FT  # START_LR  # starting learning rate
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
@@ -68,7 +68,7 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=LR_CB_MIN_LR)
 
-                            weight_decay = WEIGHT_DECAY  # 1e-5 # higher weight decay
+                            weight_decay = 1e-3  # WEIGHT_DECAY  # 1e-5 # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
@@ -78,7 +78,7 @@ def main():
                             bandwidth = BANDWIDTH
                             repr_dim = REPR_DIM
                             output_dim = len(outputs_to_use)
-                            dropout = DROPOUT
+                            dropout = 0.8  # DROPOUT
                             activation = ACTIVATION
                             norm = NORM
                             cme_speed_threshold = cme_speed_threshold
