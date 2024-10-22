@@ -71,7 +71,7 @@ def main():
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                                 lambda_ = 3.3  # LAMBDA
                                 # Construct the title
-                                title = f'MLP_pdsS2strat_amse{alpha_mse:.2f}_rho{rho:.2f}_lambda{lambda_}_SES'
+                                title = f'MLP_pdsS2_amse{alpha_mse:.2f}_SES'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -115,10 +115,10 @@ def main():
                                 upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                                 smoothing_method = 'moving_average'
-                                window_size = 15  # allows margin of error of 10 epochs
+                                window_size = 25  # allows margin of error of 10 epochs
 
                                 # Initialize wandb
-                                wandb.init(project="Oct-Report", name=experiment_name, config={
+                                wandb.init(project="Report-Test", name=experiment_name, config={
                                     "inputs_to_use": inputs_to_use,
                                     "add_slope": add_slope,
                                     "patience": patience,

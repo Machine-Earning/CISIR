@@ -69,7 +69,7 @@ def main():
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                                 lambda_ = 3.3  # LAMBDA
                                 # Construct the title
-                                title = f'MLP_pdsS2_amse{alpha_mse:.2f}_SES_cheat_D'
+                                title = f'MLP_pdsS2strat_amse{alpha_mse:.2f}_rho{rho:.2f}_lambda{lambda_}_ES_cheat'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -79,7 +79,7 @@ def main():
                                 experiment_name = f'{title}_{current_time}'
 
                                 set_seed(seed)
-                                patience = PATIENCE  # higher patience
+                                patience = 3000  # PATIENCE  # higher patience
                                 learning_rate = START_LR_FT  # lower due to finetuning
 
                                 reduce_lr_on_plateau = ReduceLROnPlateau(
@@ -90,7 +90,7 @@ def main():
                                     min_delta=LR_CB_MIN_DELTA,
                                     min_lr=LR_CB_MIN_LR)
 
-                                weight_decay = WEIGHT_DECAY  # higher weight decay
+                                weight_decay = 1e-3 # WEIGHT_DECAY  # higher weight decay
                                 momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                                 batch_size = BATCH_SIZE  # higher batch size
                                 epochs = EPOCHS  # higher epochs
@@ -100,7 +100,7 @@ def main():
                                 bandwidth = BANDWIDTH
                                 repr_dim = REPR_DIM
                                 output_dim = len(outputs_to_use)
-                                dropout = 0.8  # DROPOUT
+                                dropout = 0.9  # DROPOUT
                                 activation = ACTIVATION
                                 norm = NORM
                                 pds = True
@@ -113,7 +113,7 @@ def main():
                                 upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                                 smoothing_method = 'moving_average'
-                                window_size = 25  # allows margin of error of 10 epochs
+                                window_size = 15  # allows margin of error of 10 epochs
 
                                 # Initialize wandb
                                 wandb.init(project="Oct-Report", name=experiment_name, config={
@@ -284,19 +284,19 @@ def main():
                                 final_model_sep.summary()
 
                                 # Define the EarlyStopping callback
-                                # early_stopping = EarlyStopping(
-                                #     monitor=ES_CB_MONITOR,
-                                #     patience=patience,
-                                #     verbose=VERBOSE,
-                                #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
-
-                                early_stopping = SmoothEarlyStopping(
+                                early_stopping = EarlyStopping(
                                     monitor=ES_CB_MONITOR,
                                     patience=patience,
                                     verbose=VERBOSE,
-                                    restore_best_weights=ES_CB_RESTORE_WEIGHTS,
-                                    smoothing_method=smoothing_method,  # 'moving_average'
-                                    smoothing_parameters={'window_size': window_size})  # 10
+                                    restore_best_weights=ES_CB_RESTORE_WEIGHTS)
+
+                                # early_stopping = SmoothEarlyStopping(
+                                #     monitor=ES_CB_MONITOR,
+                                #     patience=patience,
+                                #     verbose=VERBOSE,
+                                #     restore_best_weights=ES_CB_RESTORE_WEIGHTS,
+                                #     smoothing_method=smoothing_method,  # 'moving_average'
+                                #     smoothing_parameters={'window_size': window_size})  # 10
 
                                 # Compile the model with the specified learning rate
                                 final_model_sep.compile(
