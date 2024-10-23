@@ -82,7 +82,7 @@ def main():
                             attn_hiddens = ATTN_HIDDENS
                             blocks_hiddens = BLOCKS_HIDDENS
 
-                            att_hiddens_str = (", ".join(map(str, attn_hiddens))).replace(', ', '_')
+                            attn_hiddens_str = (", ".join(map(str, attn_hiddens))).replace(', ', '_')
                             blocks_hiddens_str = (", ".join(map(str, blocks_hiddens))).replace(', ', '_')
                             bandwidth = BANDWIDTH
                             repr_dim = REPR_DIM
@@ -116,7 +116,7 @@ def main():
                                 "num_replicas": num_replicas,
                                 "epochs": epochs,
                                 # hidden in a more readable format  (wandb does not support lists)
-                                "attn_hiddens": att_hiddens_str,
+                                "attn_hiddens": attn_hiddens_str,
                                 "blocks_hiddens": blocks_hiddens_str,
                                 "loss": 'mse_pcc',
                                 "lambda": lambda_factor,

@@ -61,7 +61,7 @@ RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 SAM_RHOS = [0.05, 0.5]  # Rho values for SAM
 
 # ATTM AREA
-BLOCKS_HIDDENS = [128 for _ in range(30)]
+BLOCKS_HIDDENS = [128 for _ in range(20)]
 ATTN_HIDDENS = [128 for _ in range(20)]
 # BLOCKS_HIDDENS = [128 for _ in range(1)]
 # ATTN_HIDDENS = [128 for _ in range(2)]
@@ -80,3 +80,10 @@ ATTM_WD = 1e-7
 ATTM_LR_CB_FACTOR = 0.9
 ATTM_LR_CB_PATIENCE = 200
 ATTM_RHO = [0.1]
+
+# FF AREA
+FF_HIDDENS = [128, 512, 1024, 1024, 512, 128]
+FF_NORM = 'batch_norm'
+FF_DROPOUT = 0.1
+FF_ACTIVATION = 'leaky_relu'
+FF_SKIPPED_LAYERS = 1

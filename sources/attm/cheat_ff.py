@@ -21,7 +21,7 @@ from modules.training.ts_modeling import (
     mse_pcc,
     filter_ds,
 )
-from sources.attm.modules import create_attentive_model2_dict
+from sources.attm.modules import create_attentive_model3_dict
 
 
 # Set the environment variable for CUDA (in case it is necessary)
@@ -74,19 +74,24 @@ def main():
                             epochs = EPOCHS  # higher epochs
                             attn_hiddens = ATTN_HIDDENS
                             blocks_hiddens = BLOCKS_HIDDENS
+                            ff_hidden_units = FF_HIDDENS
 
-                            att_hiddens_str = (", ".join(map(str, attn_hiddens))).replace(', ', '_')
+                            attn_hiddens_str = (", ".join(map(str, attn_hiddens))).replace(', ', '_')
+                            ff_hidden_str = (", ".join(map(str, ff_hidden_units))).replace(', ', '_')
                             blocks_hiddens_str = (", ".join(map(str, blocks_hiddens))).replace(', ', '_')
                             bandwidth = BANDWIDTH
                             repr_dim = REPR_DIM
                             output_dim = len(outputs_to_use)
                             attn_dropout = DROPOUT
                             attm_dropout = DROPOUT
+                            ff_dropout = DROPOUT
                             activation = ATTM_ACTIVATION
                             attn_norm = ATTN_NORM
                             attm_norm = ATTM_NORM
+                            ff_norm = FF_NORM
                             attn_skipped_layers = ATTN_SKIPPED_LAYERS
                             attm_skipped_blocks = ATTM_SKIPPED_BLOCKS
+                            ff_skipped_layers = FF_SKIPPED_LAYERS
                             cme_speed_threshold = cme_speed_threshold
                             N = N_FILTERED  # number of samples to keep outside the threshold
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
@@ -106,7 +111,8 @@ def main():
                                 "batch_size": batch_size,
                                 "epochs": epochs,
                                 # hidden in a more readable format  (wandb does not support lists)
-                                "attn_hiddens": att_hiddens_str,
+                                "attn_hiddens": attn_hiddens_str,
+                                "ff_hidden_units": ff_hidden_str,
                                 "blocks_hiddens": blocks_hiddens_str,
                                 "loss": 'mse_pcc',
                                 "lambda": lambda_factor,
@@ -119,15 +125,18 @@ def main():
                                 "repr_dim": repr_dim,
                                 "attm_dropout": attm_dropout,
                                 "attn_dropout": attn_dropout,
+                                "ff_dropout": ff_dropout,
                                 "activation": 'LeakyReLU',
                                 "attn_norm": attn_norm,
                                 "attm_norm": attm_norm,
+                                "ff_norm": ff_norm,
                                 'optimizer': 'adamw',
                                 'output_dim': output_dim,
                                 'architecture': 'attm',
                                 'cme_speed_threshold': cme_speed_threshold,
                                 'attn_skipped_layers': attn_skipped_layers,
                                 'attm_skipped_blocks': attm_skipped_blocks,
+                                'ff_skipped_layers': ff_skipped_layers,
                                 'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
@@ -208,18 +217,22 @@ def main():
                             final_model_sep = create_attentive_model3_dict(
                                 input_dim=n_features,
                                 output_dim=output_dim,
+                                repr_dim=repr_dim,
+                                activation=activation,
+                                sam_rho=rho,
+                                norm=attm_norm,
+                                dropout=attm_dropout,
                                 hidden_blocks=blocks_hiddens,
                                 attn_hidden_units=attn_hiddens,
                                 attn_hidden_activation=activation,
                                 attn_skipped_layers=attn_skipped_layers,
-                                skipped_blocks=attm_skipped_blocks,
                                 attn_dropout=attn_dropout,
-                                dropout=attm_dropout,
                                 attn_norm=attn_norm,
-                                norm=attm_norm,
-                                repr_dim=repr_dim,
-                                activation=activation,
-                                sam_rho=rho
+                                ff_hidden_units=ff_hidden_units,
+                                ff_hidden_activation=activation,
+                                ff_dropout=ff_dropout,
+                                ff_norm=ff_norm,
+                                ff_skipped_layers=ff_skipped_layers,
                             )
                             final_model_sep.summary()
 
