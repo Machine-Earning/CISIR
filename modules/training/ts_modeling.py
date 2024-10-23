@@ -408,7 +408,7 @@ def create_mlp(
         repr_dim: int = 9,
         pds: bool = False,
         l2_reg: float = None,
-        dropout_rate: float = 0.0,
+        dropout: float = 0.0,
         activation=None,
         norm: str = None,
         residual: bool = False,
@@ -426,7 +426,7 @@ def create_mlp(
     - repr_dim (int): The number of features in the final representation vector.
     - pds (bool): If True, the model will use PDS and there will have its representations normalized.
     - l2_reg (float): L2 regularization factor. Default is None (no regularization).
-    - dropout_rate (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
+    - dropout (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
     - activation: Optional activation function to use. If None, defaults to LeakyReLU.
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None (no normalization).
     - skipped_layers (int): Number of layers between residual connections.
@@ -470,8 +470,8 @@ def create_mlp(
         else:
             x = LeakyReLU()(x)
 
-        if dropout_rate > 0.0:
-            x = Dropout(dropout_rate)(x)
+        if dropout > 0.0:
+            x = Dropout(dropout)(x)
 
     # Final representation layer
     dense = Dense(repr_dim)(x)
