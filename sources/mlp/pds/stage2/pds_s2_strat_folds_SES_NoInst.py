@@ -90,7 +90,7 @@ def main():
                                     min_delta=LR_CB_MIN_DELTA,
                                     min_lr=LR_CB_MIN_LR)
 
-                                weight_decay = WEIGHT_DECAY  # higher weight decay
+                                weight_decay = 1e-4  # WEIGHT_DECAY  # higher weight decay
                                 momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                                 batch_size = BATCH_SIZE  # higher batch size
                                 epochs = EPOCHS  # higher epochs
@@ -100,7 +100,7 @@ def main():
                                 bandwidth = BANDWIDTH
                                 repr_dim = REPR_DIM
                                 output_dim = len(outputs_to_use)
-                                dropout = 0.4  # DROPOUT
+                                dropout = 0.6  # DROPOUT
                                 activation = ACTIVATION
                                 norm = NORM
                                 pds = True
@@ -113,10 +113,10 @@ def main():
                                 upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                                 smoothing_method = 'moving_average'
-                                window_size = 25  # allows margin of error of 10 epochs
+                                window_size = 7  # allows margin of error of 10 epochs
 
                                 # Initialize wandb
-                                wandb.init(project="Report-Test", name=experiment_name, config={
+                                wandb.init(project="Oct-Report", name=experiment_name, config={
                                     "inputs_to_use": inputs_to_use,
                                     "add_slope": add_slope,
                                     "patience": patience,

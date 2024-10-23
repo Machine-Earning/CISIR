@@ -49,7 +49,7 @@ def main():
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'MLP_{inputs_str}_amse{alpha_mse:.2f}_rho{rho}_smol_cheat_SES'
+                            title = f'MLP_amse{alpha_mse:.2f}_cheat_SES'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
                             # Create a unique experiment name with a timestamp
@@ -68,17 +68,17 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=LR_CB_MIN_LR)
 
-                            weight_decay = 1e-3  # WEIGHT_DECAY  # 1e-5 # higher weight decay
+                            weight_decay = WEIGHT_DECAY  # 1e-5 # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
-                            hiddens = MLP_HIDDENS_S  # hidden layers
+                            hiddens = MLP_HIDDENS  # hidden layers
 
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             bandwidth = BANDWIDTH
                             repr_dim = REPR_DIM
                             output_dim = len(outputs_to_use)
-                            dropout = 0.9  # DROPOUT
+                            dropout = DROPOUT
                             activation = ACTIVATION
                             norm = NORM
                             cme_speed_threshold = cme_speed_threshold
@@ -89,10 +89,10 @@ def main():
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
                             smoothing_method = 'moving_average'
-                            window_size = 25  # allows margin of error of 10 epochs
+                            window_size = 3  # allows margin of error of 10 epochs
 
                             # Initialize wandb
-                            wandb.init(project="Oct-Report", name=experiment_name, config={
+                            wandb.init(project="Arch-test-mlp", name=experiment_name, config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
                                 "patience": patience,
