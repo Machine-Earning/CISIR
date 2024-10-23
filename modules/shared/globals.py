@@ -18,7 +18,7 @@ MLP_HIDDENS = [
     512, 256, 512, 256, 256, 128, 256, 128,
     256, 128, 128, 128, 128, 128, 128, 128
 ]  # Hidden layers
-MLP_HIDDENS_S = [256, 128]  # Hidden layers
+MLP_HIDDENS_S = [128, 128, 128]  # Hidden layers
 PROJ_HIDDENS = [64]  # Projection hidden layers
 LOSS_KEY = 'mse_pcc'  # Mean squared error regression loss
 LAMBDA = 3.3  # Lambda for the loss
@@ -28,7 +28,7 @@ DROPOUT = 0.1  # Dropout rate
 ACTIVATION = None  # No activation for regression
 NORM = 'batch_norm'  # Use batch normalization
 RESIDUAL = True  # Use residual connections
-SKIPPED_LAYERS = 2  # Number of layers to skip in residual connections
+SKIPPED_LAYERS = 1  # Number of layers to skip in residual connections
 N_FILTERED = 500  # Number of samples to keep outside the threshold
 LOWER_THRESHOLD = -0.5  # Lower threshold for delta_p
 UPPER_THRESHOLD = 0.5  # Upper threshold for delta_p

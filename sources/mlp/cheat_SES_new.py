@@ -72,7 +72,7 @@ def main():
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
-                            hiddens = MLP_HIDDENS  # hidden layers
+                            hiddens = MLP_HIDDENS_S  # hidden layers
 
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             bandwidth = BANDWIDTH
@@ -80,7 +80,7 @@ def main():
                             output_dim = len(outputs_to_use)
                             dropout = DROPOUT
                             activation = ACTIVATION
-                            norm = NORM
+                            norm = 'layer_norm'  # NORM
                             cme_speed_threshold = cme_speed_threshold
                             skip_repr = False
                             skipped_layers = SKIPPED_LAYERS

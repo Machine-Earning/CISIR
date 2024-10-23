@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 import wandb
-from tensorflow.keras.callbacks import ReduceLROnPlateau
+from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
@@ -21,7 +21,7 @@ from modules.training.ts_modeling import (
     mse_pcc,
     filter_ds,
 )
-from sources.attm.modules import create_attentive_model_dict
+from sources.attm.modules import create_attentive_model2_dict
 
 
 # Set the environment variable for CUDA (in case it is necessary)
@@ -37,11 +37,11 @@ def main():
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
 
-    for seed in [1234]:
+    for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
-                    for rho in [1e-1]:
+                    for rho in [1e-3]:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -49,7 +49,7 @@ def main():
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'ATTM_amse{alpha_mse:.2f}_SES_D'
+                            title = f'ATTMFF_amse{alpha_mse:.2f}_SES'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
                             # Create a unique experiment name with a timestamp
@@ -57,7 +57,7 @@ def main():
                             experiment_name = f'{title}_{current_time}'
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
-                            patience = 1000  # PATIENCE  # higher patience
+                            patience = 2000  # PATIENCE  # higher patience
                             learning_rate = ATTM_START_LR  # higher learning rate
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
@@ -68,7 +68,7 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=ATTM_LR_CB_MIN_LR)
 
-                            weight_decay = 1e-4  # ATTM_WD  # higher weight decay
+                            weight_decay = WEIGHT_DECAY
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
@@ -80,13 +80,11 @@ def main():
                             bandwidth = BANDWIDTH
                             repr_dim = REPR_DIM
                             output_dim = len(outputs_to_use)
-                            attn_dropout = 0.6  # ATTN_DROPOUT
-                            attm_dropout = 0.6  # ATTM_DROPOUT
+                            attn_dropout = DROPOUT
+                            attm_dropout = DROPOUT
                             activation = ATTM_ACTIVATION
                             attn_norm = ATTN_NORM
                             attm_norm = ATTM_NORM
-                            attn_residual = ATTN_RESIDUAL
-                            attm_residual = ATTM_RESIDUAL
                             attn_skipped_layers = ATTN_SKIPPED_LAYERS
                             attm_skipped_blocks = ATTM_SKIPPED_BLOCKS
                             cme_speed_threshold = cme_speed_threshold
@@ -94,11 +92,11 @@ def main():
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
-                            smoothing_method = 'moving_average'
-                            window_size = 25  # allows margin of error of 10 epochs
+                            # smoothing_method = 'moving_average'
+                            # window_size = 25  # allows margin of error of 10 epochs
 
                             # Initialize wandb
-                            wandb.init(project="Attm-Oct-Report", name=experiment_name, config={
+                            wandb.init(project="Arch-test-mlp", name=experiment_name, config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
                                 "patience": patience,
@@ -128,15 +126,13 @@ def main():
                                 'output_dim': output_dim,
                                 'architecture': 'attm',
                                 'cme_speed_threshold': cme_speed_threshold,
-                                'attn_residual': attn_residual,
-                                'attm_residual': attm_residual,
                                 'attn_skipped_layers': attn_skipped_layers,
                                 'attm_skipped_blocks': attm_skipped_blocks,
                                 'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
-                                'smoothing_method': smoothing_method,
-                                'window_size': window_size
+                                # 'smoothing_method': smoothing_method,
+                                # 'window_size': window_size
                             })
 
                             # set the root directory
@@ -209,7 +205,7 @@ def main():
                                 N=N, seed=seed)
 
                             # create the model
-                            final_model_sep = create_attentive_model_dict(
+                            final_model_sep = create_attentive_model3_dict(
                                 input_dim=n_features,
                                 output_dim=output_dim,
                                 hidden_blocks=blocks_hiddens,
@@ -217,8 +213,6 @@ def main():
                                 attn_hidden_activation=activation,
                                 attn_skipped_layers=attn_skipped_layers,
                                 skipped_blocks=attm_skipped_blocks,
-                                attn_residual=attn_residual,
-                                residual=attm_residual,
                                 attn_dropout=attn_dropout,
                                 dropout=attm_dropout,
                                 attn_norm=attn_norm,
@@ -230,13 +224,18 @@ def main():
                             final_model_sep.summary()
 
                             # Define the EarlyStopping callback
-                            early_stopping = SmoothEarlyStopping(
+                            early_stopping = EarlyStopping(
                                 monitor=ES_CB_MONITOR,
                                 patience=patience,
                                 verbose=VERBOSE,
-                                restore_best_weights=ES_CB_RESTORE_WEIGHTS,
-                                smoothing_method=smoothing_method,  # 'moving_average'
-                                smoothing_parameters={'window_size': window_size})  # 10
+                                restore_best_weights=ES_CB_RESTORE_WEIGHTS)
+                            # early_stopping = SmoothEarlyStopping(
+                            #     monitor=ES_CB_MONITOR,
+                            #     patience=patience,
+                            #     verbose=VERBOSE,
+                            #     restore_best_weights=ES_CB_RESTORE_WEIGHTS,
+                            #     smoothing_method=smoothing_method,  # 'moving_average'
+                            #     smoothing_parameters={'window_size': window_size})  # 10
 
                             # Compile the model with the specified learning rate
                             final_model_sep.compile(
