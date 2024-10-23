@@ -19,7 +19,7 @@ from modules.training.ts_modeling import (
     set_seed,
     mse_pcc,
     filter_ds,
-    create_mlp,
+    create_mlp2,
     plot_error_hist,
 )
 
@@ -49,7 +49,7 @@ def main():
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'MLP_amse{alpha_mse:.2f}_cheat_SES'
+                            title = f'MLP2_amse{alpha_mse:.2f}_cheat_SES'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
                             # Create a unique experiment name with a timestamp
@@ -82,7 +82,7 @@ def main():
                             activation = ACTIVATION
                             norm = NORM
                             cme_speed_threshold = cme_speed_threshold
-                            residual = RESIDUAL
+                            skip_repr = False
                             skipped_layers = SKIPPED_LAYERS
                             N = N_FILTERED  # number of samples to keep outside the threshold
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
@@ -119,7 +119,7 @@ def main():
                                 'output_dim': output_dim,
                                 'architecture': 'mlp',
                                 'cme_speed_threshold': cme_speed_threshold,
-                                'residual': residual,
+                                'skip_repr': skip_repr,
                                 'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
@@ -197,7 +197,7 @@ def main():
                                 N=N, seed=seed)
 
                             # create the model
-                            final_model_sep = create_mlp(
+                            final_model_sep = create_mlp2(
                                 input_dim=n_features,
                                 hiddens=hiddens,
                                 repr_dim=repr_dim,
@@ -205,7 +205,7 @@ def main():
                                 dropout=dropout,
                                 activation=activation,
                                 norm=norm,
-                                residual=residual,
+                                skip_repr=skip_repr,
                                 skipped_layers=skipped_layers,
                                 sam_rho=rho
                             )
