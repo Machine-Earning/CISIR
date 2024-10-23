@@ -81,7 +81,7 @@ def main():
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             pds = True
                             repr_dim = REPR_DIM
-                            dropout_rate = DROPOUT
+                            dropout = DROPOUT
                             activation = ACTIVATION
                             norm = NORM
 
@@ -117,7 +117,7 @@ def main():
                                 "seed": seed,
                                 "stage": 1,
                                 "reduce_lr_on_plateau": True,
-                                "dropout": dropout_rate,
+                                "dropout": dropout,
                                 "activation": "LeakyReLU",
                                 "norm": norm,
                                 "optimizer": "adamw",
@@ -213,7 +213,7 @@ def main():
                                 output_dim=0,
                                 pds=pds,
                                 repr_dim=repr_dim,
-                                dropout_rate=dropout_rate,
+                                dropout=dropout,
                                 activation=activation,
                                 norm=norm,
                                 residual=residual,

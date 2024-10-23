@@ -252,7 +252,7 @@ class ModelBuilder:
                       freeze_features: bool = True,
                       pds: bool = False,
                       l2_reg: float = None,
-                      dropout_rate: float = 0.0,
+                      dropout: float = 0.0,
                       activation=None,
                       norm: str = None,
                       residual: bool = False,
@@ -269,7 +269,7 @@ class ModelBuilder:
         :param hiddens: List of integers representing the hidden layers for the projection.
         :param pds: Whether to adapt the model for PDS representations.
         :param l2_reg: L2 regularization factor.
-        :param dropout_rate: Dropout rate for adding dropout layers.
+        :param dropout: Dropout rate for adding dropout layers.
         :param activation: Activation function to use. If None, defaults to LeakyReLU.
         :param norm: Type of normalization ('batch_norm' or 'layer_norm').
         :param residual: Whether to add residual connections for every 'skipped_layers' hidden layers.
@@ -336,8 +336,8 @@ class ModelBuilder:
             else:
                 x_proj = LeakyReLU(name=f"activation_{i + 1}")(x_proj)
 
-            if dropout_rate > 0.0:
-                x_proj = Dropout(dropout_rate, name=f"proj_dropout_{dropout_count + i + 1}")(x_proj)
+            if dropout > 0.0:
+                x_proj = Dropout(dropout, name=f"proj_dropout_{dropout_count + i + 1}")(x_proj)
 
         # Add a Dense layer with one output unit for regression
         output_layer = Dense(output_dim, activation='linear', name=f"forecast_head")(x_proj)

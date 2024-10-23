@@ -228,7 +228,7 @@ def main():
                             output_dim=0,
                             pds=pds,
                             repr_dim=repr_dim,
-                            dropout_rate=dropout,
+                            dropout=dropout,
                             activation=activation,
                             norm=norm
                         )
@@ -243,7 +243,7 @@ def main():
                             mlp_repr_dim=mlp_repr_dim,
                             final_hiddens=final_hiddens,
                             repr_dim=final_repr_dim,
-                            dropout_rate=dropout,
+                            dropout=dropout,
                             activation=activation,
                             norm=norm,
                             name='hybrid'
@@ -276,7 +276,7 @@ def main():
                             freeze_features=freeze,
                             pds=pds,
                             hiddens=proj_hiddens,
-                            dropout_rate=dropout,
+                            dropout=dropout,
                             activation=activation,
                             norm=norm,
                             name='hybrid'
@@ -356,7 +356,7 @@ def main():
                             output_dim=0,
                             pds=pds,
                             repr_dim=repr_dim,
-                            dropout_rate=dropout,
+                            dropout=dropout,
                             activation=activation,
                             norm=norm
                         )
@@ -370,7 +370,7 @@ def main():
                             mlp_repr_dim=mlp_repr_dim,
                             final_hiddens=final_hiddens,
                             repr_dim=final_repr_dim,
-                            dropout_rate=dropout,
+                            dropout=dropout,
                             activation=activation,
                             norm=norm,
                             name='hybrid'
@@ -385,7 +385,7 @@ def main():
                             freeze_features=freeze,
                             pds=pds,
                             hiddens=proj_hiddens,
-                            dropout_rate=dropout,
+                            dropout=dropout,
                             activation=activation,
                             norm=norm,
                             name='hybrid'

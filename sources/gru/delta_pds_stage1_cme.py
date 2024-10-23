@@ -78,7 +78,7 @@ def main():
                 pds = True
                 target_change = ('delta_p' in outputs_to_use)
                 repr_dim = 9
-                dropout_rate = 0.5
+                dropout = 0.5
                 activation = None
                 norm = 'batch_norm'
                 reduce_lr_on_plateau = ReduceLROnPlateau(
@@ -109,7 +109,7 @@ def main():
                     "seed": SEED,
                     "stage": 1,
                     "reduce_lr_on_plateau": True,
-                    "dropout": dropout_rate,
+                    "dropout": dropout,
                     "activation": "LeakyReLU",
                     "norm": norm,
                     "optimizer": "adamw",
@@ -176,7 +176,7 @@ def main():
                     gru_layers=gru_layers,
                     output_dim=0,
                     repr_dim=repr_dim,
-                    dropout_rate=dropout_rate,
+                    dropout=dropout,
                     activation=activation,
                     norm=norm
                 )
@@ -192,7 +192,7 @@ def main():
                     mlp_repr_dim=mlp_repr_dim,
                     final_hiddens=final_hiddens,
                     repr_dim=final_repr_dim,
-                    dropout_rate=dropout_rate,
+                    dropout=dropout,
                     activation=activation,
                     norm=norm,
                     name='hybrid'

@@ -77,7 +77,7 @@ def main():
             pds = True
             target_change = ('delta_p' in outputs_to_use)
             repr_dim = 9
-            dropout_rate = 0.5
+            dropout = 0.5
             activation = None
             norm = 'batch_norm'
             reduce_lr_on_plateau = ReduceLROnPlateau(
@@ -105,7 +105,7 @@ def main():
                 "seed": SEED,
                 "stage": 1,
                 "reduce_lr_on_plateau": True,
-                "dropout": dropout_rate,
+                "dropout": dropout,
                 "activation": "LeakyReLU",
                 "norm": norm,
                 "optimizer": "adamw",
@@ -165,7 +165,7 @@ def main():
                 output_dim=0,
                 pds=pds,
                 repr_dim=repr_dim,
-                dropout_rate=dropout_rate,
+                dropout=dropout,
                 activation=activation,
                 norm=norm
             )

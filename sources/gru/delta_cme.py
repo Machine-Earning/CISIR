@@ -215,7 +215,7 @@ def main():
                         gru_layers=gru_layers,
                         repr_dim=repr_dim,
                         output_dim=0,
-                        dropout_rate=dropout,
+                        dropout=dropout,
                         activation=activation,
                         norm=norm
                     )
@@ -230,7 +230,7 @@ def main():
                         mlp_repr_dim=mlp_repr_dim,
                         final_hiddens=final_hiddens,
                         repr_dim=final_repr_dim,
-                        dropout_rate=dropout,
+                        dropout=dropout,
                         activation=activation,
                         norm=norm,
                         name='hybrid'
@@ -312,7 +312,7 @@ def main():
                         gru_layers=gru_layers,
                         repr_dim=repr_dim,
                         output_dim=0,
-                        dropout_rate=dropout,
+                        dropout=dropout,
                         activation=activation,
                         norm=norm
                     )
@@ -326,7 +326,7 @@ def main():
                         mlp_repr_dim=mlp_repr_dim,
                         final_hiddens=final_hiddens,
                         repr_dim=final_repr_dim,
-                        dropout_rate=dropout,
+                        dropout=dropout,
                         activation=activation,
                         norm=norm,
                         name='hybrid'

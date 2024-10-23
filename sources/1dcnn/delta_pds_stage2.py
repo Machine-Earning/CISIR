@@ -210,7 +210,7 @@ def main():
                         output_dim=0,
                         pds=pds,
                         repr_dim=repr_dim,
-                        dropout_rate=dropout,
+                        dropout=dropout,
                         activation=activation,
                         norm=norm
                     )
@@ -242,7 +242,7 @@ def main():
                         freeze_features=freeze,
                         pds=pds,
                         hiddens=proj_hiddens,
-                        dropout_rate=dropout,
+                        dropout=dropout,
                         activation=activation,
                         norm=norm,
                         name='1dcnn'
@@ -322,7 +322,7 @@ def main():
                         output_dim=0,
                         pds=pds,
                         repr_dim=repr_dim,
-                        dropout_rate=dropout,
+                        dropout=dropout,
                         activation=activation,
                         norm=norm
                     )
@@ -335,7 +335,7 @@ def main():
                         freeze_features=freeze,
                         pds=pds,
                         hiddens=proj_hiddens,
-                        dropout_rate=dropout,
+                        dropout=dropout,
                         activation=activation,
                         norm=norm,
                         name='1dcnn'

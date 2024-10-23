@@ -205,7 +205,7 @@ def main():
                     hiddens=hiddens,
                     repr_dim=repr_dim,
                     output_dim=output_dim,
-                    dropout_rate=dropout,
+                    dropout=dropout,
                     activation=activation,
                     norm=norm
                 )
@@ -283,7 +283,7 @@ def main():
                     hiddens=hiddens,
                     repr_dim=repr_dim,
                     output_dim=output_dim,
-                    dropout_rate=dropout,
+                    dropout=dropout,
                     activation=activation,
                     norm=norm
                 )

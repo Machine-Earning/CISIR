@@ -66,7 +66,7 @@ def create_1dcnn(
         output_dim: int = 1,
         pds: bool = False,
         l2_reg: float = None,
-        dropout_rate: float = 0.0,
+        dropout: float = 0.0,
         activation=None,
         norm: str = None,
         name: str = '1dcnn'
@@ -112,8 +112,8 @@ def create_1dcnn(
 
             x = activation(x) if callable(activation) else LeakyReLU()(x)
 
-            if dropout_rate > 0.0:
-                x = Dropout(dropout_rate)(x)
+            if dropout > 0.0:
+                x = Dropout(dropout)(x)
 
             if pool_type == 'max':
                 x = MaxPooling1D(pool_size=pool_size)(x)
@@ -151,7 +151,7 @@ def create_gru_with_addition_skips(
         output_dim: int = 1,
         pds: bool = False,
         l2_reg: float = None,
-        dropout_rate: float = 0.0,
+        dropout: float = 0.0,
         activation=None,
         norm: str = None,
         skipped_layers: int = 2,  # New parameter for skip connections
@@ -196,8 +196,8 @@ def create_gru_with_addition_skips(
             else:
                 x = LeakyReLU()(x)  # Fallback if activation is not callable, for safety
 
-            if dropout_rate > 0.0:
-                x = Dropout(dropout_rate)(x)
+            if dropout > 0.0:
+                x = Dropout(dropout)(x)
 
             if layer % skipped_layers == 0 or skip_connection is None:
                 skip_connection = x  # Update skip connection after applying activation
@@ -237,7 +237,7 @@ def create_gru_with_concatenation_skips(
         output_dim: int = 1,
         pds: bool = False,
         l2_reg: float = None,
-        dropout_rate: float = 0.0,
+        dropout: float = 0.0,
         activation=None,
         norm: str = None,
         skipped_layers: int = 2,  # New parameter for skip connections
@@ -282,8 +282,8 @@ def create_gru_with_concatenation_skips(
             else:
                 x = LeakyReLU()(x)  # Fallback if activation is not callable, for safety
 
-            if dropout_rate > 0.0:
-                x = Dropout(dropout_rate)(x)
+            if dropout > 0.0:
+                x = Dropout(dropout)(x)
 
             if layer % skipped_layers == 0:
                 skip_connection = x  # Update skip connection to current x
@@ -323,7 +323,7 @@ def create_gru(
         output_dim: int = 1,
         pds: bool = False,
         l2_reg: float = None,
-        dropout_rate: float = 0.0,
+        dropout: float = 0.0,
         activation=None,
         norm: str = None,
         name: str = 'gru'
@@ -340,7 +340,7 @@ def create_gru(
     - rnn_layers (int): The number of RNN layers in each branch. Default is 2.
     - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
     - l2_reg (float): L2 regularization factor. Default is None (no regularization).
-    - dropout_rate (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
+    - dropout (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
     - activation: Optional activation function to use. If None, defaults to LeakyReLU.
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None (no normalization).
 
@@ -373,8 +373,8 @@ def create_gru(
 
             x = activation(x) if callable(activation) else LeakyReLU()(x)
 
-            if dropout_rate > 0.0:
-                x = Dropout(dropout_rate)(x)
+            if dropout > 0.0:
+                x = Dropout(dropout)(x)
 
         flattened = Flatten()(x)
         rnn_branches.append(flattened)
@@ -440,9 +440,6 @@ def create_mlp(
     if hiddens is None:
         hiddens = [50, 50]  # Default hidden layers configuration
 
-    if activation is None:
-        activation = LeakyReLU()
-
     input_layer = Input(shape=(input_dim,))
     x = input_layer
     residual_layer = None
@@ -499,6 +496,139 @@ def create_mlp(
     return model
 
 
+def create_mlp2(
+        input_dim: int = 25,
+        output_dim: int = 1,
+        hiddens=None,
+        skipped_layers: int = 2,
+        repr_dim: int = 9,
+        skip_repr: bool = False,
+        pds: bool = False,
+        activation=None,
+        norm: str = None,
+        sam_rho: float = 0.05,
+        name: str = 'mlp'
+) -> Model:
+    """
+    Create an MLP model with fully connected dense layers and configurable activation functions.
+    Residual connections are automatically added when skipped_layers > 0.
+
+    Parameters:
+    - input_dim (int): The number of features in the input data.
+    - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
+    - hiddens (list): A list of integers where each integer is the number of units in a hidden layer.
+    - skipped_layers (int): Number of layers between residual connections. If 0, no residual connections.
+                           Must be less than the total number of hidden layers.
+    - repr_dim (int): The number of features in the final representation vector.
+    - skip_repr (bool): If True and skipped_layers > 0, adds a residual connection to the representation layer.
+    - pds (bool): If True, the model will use PDS and normalize its representations.
+    - activation: Optional activation function to use. If None, defaults to LeakyReLU.
+    - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None.
+    - sam_rho (float): Size of the neighborhood for perturbation in SAM. Default is 0.05. If 0.0, SAM is not used.
+
+    Returns:
+    - Model: A Keras model instance.
+
+    Raises:
+    - ValueError: If skipped_layers is greater than or equal to the number of hidden layers.
+    """
+    # Set default hidden layers if none provided
+    if hiddens is None:
+        hiddens = [50, 50]
+
+    # Validate skipped_layers parameter
+    if skipped_layers >= len(hiddens):
+        raise ValueError(
+            f"skipped_layers ({skipped_layers}) must be less than the number of hidden layers ({len(hiddens)})"
+        )
+
+    # Create input layer
+    input_layer = Input(shape=(input_dim,))
+    has_residuals = skipped_layers > 0
+
+    # First block (special case to ensure proper skip from input)
+    x = Dense(hiddens[0])(input_layer)
+    if norm == 'batch_norm':
+        x = BatchNormalization()(x)
+    x = activation(x) if callable(activation) else LeakyReLU()(x)
+
+    # First skip connection (from input)
+    if has_residuals:
+        if x.shape[-1] != input_layer.shape[-1]:
+            residual_proj = Dense(x.shape[-1], use_bias=False)(input_layer)
+        else:
+            residual_proj = input_layer
+        x = Add()([x, residual_proj])
+        if norm == 'layer_norm':
+            x = LayerNormalization()(x)
+
+    residual_layer = x
+
+    # Remaining hidden layers
+    for i, units in enumerate(hiddens[1:], start=1):
+        # Dense + Norm + Activation block
+        x = Dense(units)(x)
+        if norm == 'batch_norm':
+            x = BatchNormalization()(x)
+        x = activation(x) if callable(activation) else LeakyReLU()(x)
+
+        # Add skip connection if at a skip point
+        if has_residuals and i % skipped_layers == 0:
+            # Project the residual layer if needed
+            if x.shape[-1] != residual_layer.shape[-1]:
+                residual_proj = Dense(x.shape[-1], use_bias=False)(residual_layer)
+            else:
+                residual_proj = residual_layer
+            x = Add()([x, residual_proj])
+            if norm == 'layer_norm':
+                x = LayerNormalization()(x)
+            residual_layer = x
+
+    # Create final representation layer
+    x = Dense(repr_dim)(x)
+    if norm == 'batch_norm':
+        x = BatchNormalization()(x)
+
+    # Apply activation with appropriate naming based on skip_repr
+    if skip_repr:  # if skip_repr, then the add down the line is the repr layer
+        x = activation(x) if callable(activation) else LeakyReLU()(x)
+    else:  # if no skip_repr, then the activation is repr layer
+        x = activation(x) if callable(activation) else LeakyReLU(name='repr_layer')(x)
+
+    # Add final skip connection if enabled
+    if skip_repr and has_residuals:
+        if x.shape[-1] != residual_layer.shape[-1]:
+            residual_proj = Dense(repr_dim, use_bias=False)(residual_layer)
+        else:
+            residual_proj = residual_layer
+        x = Add(name='repr_layer')([x, residual_proj])
+        if norm == 'layer_norm':
+            x = LayerNormalization()(x)
+    elif norm == 'layer_norm':
+        x = LayerNormalization()(x)
+
+    # Handle PDS normalization if needed
+    if pds:
+        final_repr_output = NormalizeLayer(name='normalize_layer')(x)
+    else:
+        final_repr_output = x
+
+    # Add output layer if output_dim > 0
+    if output_dim > 0:
+        output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+        model_output = [final_repr_output, output_layer]
+    else:
+        model_output = final_repr_output
+
+    # Create appropriate model type based on SAM parameter
+    if sam_rho > 0.0:
+        model = SAMModel(inputs=input_layer, outputs=model_output, rho=sam_rho, name=name)
+    else:
+        model = Model(inputs=input_layer, outputs=model_output, name=name)
+
+    return model
+
+
 def create_mlp_moe(
         input_dim: int = 25,
         output_dim: int = 1,
@@ -507,7 +637,7 @@ def create_mlp_moe(
         repr_dim: int = 9,
         pds: bool = False,
         l2_reg: float = None,
-        dropout_rate: float = 0.0,
+        dropout: float = 0.0,
         activation=None,
         norm: str = None,
         residual: bool = False,
@@ -530,7 +660,7 @@ def create_mlp_moe(
     - repr_dim (int): The number of features in the final representation vector.
     - pds (bool): If True, the model will use PDS and there will have its representations normalized.
     - l2_reg (float): L2 regularization factor. Default is None (no regularization).
-    - dropout_rate (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
+    - dropout (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
     - activation: Optional activation function to use. If None, defaults to LeakyReLU.
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None (no normalization).
     - skipped_layers (int): Number of layers between residual connections.
@@ -562,7 +692,7 @@ def create_mlp_moe(
         repr_dim=repr_dim,
         pds=pds,
         l2_reg=l2_reg,
-        dropout_rate=dropout_rate,
+        dropout=dropout,
         activation=activation,
         norm=norm,
         residual=residual,
@@ -577,7 +707,7 @@ def create_mlp_moe(
         repr_dim=repr_dim,
         pds=pds,
         l2_reg=l2_reg,
-        dropout_rate=dropout_rate,
+        dropout=dropout,
         activation=activation,
         norm=norm,
         residual=residual,
@@ -643,7 +773,7 @@ def create_hybrid_model(
         output_dim: int = 1,
         pds: bool = False,
         l2_reg: float = None,
-        dropout_rate: float = 0.0,
+        dropout: float = 0.0,
         activation=None,
         norm: str = None,
         name: str = 'hybrid'
@@ -662,7 +792,7 @@ def create_hybrid_model(
         - final_hiddens (List[int]): List of integers for the hidden layers after concatenation.
         - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
         - l2_reg (float): L2 regularization factor. Default is None (no regularization).
-        - dropout_rate (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
+        - dropout (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
         - activation: Optional activation function to use. If None, defaults to LeakyReLU.
         - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None (no normalization).
         - name (str): The name of the model. Default is 'hybrid'.
@@ -695,8 +825,8 @@ def create_hybrid_model(
         else:
             x_mlp = LeakyReLU()(x_mlp)
 
-        if dropout_rate > 0.0:
-            x_mlp = Dropout(dropout_rate)(x_mlp)
+        if dropout > 0.0:
+            x_mlp = Dropout(dropout)(x_mlp)
 
     x_mlp = Dense(mlp_repr_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x_mlp)
     mlp_repr = activation(x_mlp) if callable(activation) else LeakyReLU()(x_mlp)
@@ -719,8 +849,8 @@ def create_hybrid_model(
         else:
             x_combined = LeakyReLU()(x_combined)
 
-        if dropout_rate > 0.0:
-            x_combined = Dropout(dropout_rate)(x_combined)
+        if dropout > 0.0:
+            x_combined = Dropout(dropout)(x_combined)
 
     # Final representation layer
     final_repr = Dense(repr_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x_combined)
@@ -959,6 +1089,7 @@ def stratified_groups(y: np.ndarray, batch_size: int, debug: bool = False) -> np
 
     return padded_groups
 
+
 # def stratified_groups(y: np.ndarray, batch_size: int, debug: bool = False) -> np.ndarray:
 #     """
 #     Create stratified groups from the dataset by sorting it based on the labels.
@@ -1047,6 +1178,7 @@ def stratified_data_generator(
 
         # Yield the current batch
         yield batch_X, batch_y
+
 
 # def stratified_data_generator(
 #         X: np.ndarray,
@@ -1146,6 +1278,7 @@ def stratified_batch_dataset(
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
 
     return dataset, steps_per_epoch
+
 
 # def stratified_batch_dataset(
 #         X: np.ndarray,

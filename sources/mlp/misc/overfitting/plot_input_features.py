@@ -192,7 +192,7 @@ def main():
                         output_dim=0,
                         pds=pds,
                         repr_dim=repr_dim,
-                        dropout_rate=dropout,
+                        dropout=dropout,
                         activation=activation,
                         norm=norm,
                         residual=residual,

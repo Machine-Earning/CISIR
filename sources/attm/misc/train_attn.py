@@ -60,7 +60,7 @@ def main():
                             activation = 'leaky_relu'  # ACTIVATION
                             attn_skipped_layers = 1  # SKIPPED_LAYERS
                             attn_residual = False  # RESIDUAL
-                            attn_dropout_rate = 0  # DROPOUT
+                            attn_dropout = 0  # DROPOUT
                             dropout = 0  # DROPOUT
                             attn_norm = None  # NORM
                             norm = 'batch_norm'
@@ -233,11 +233,11 @@ def main():
                                 attn_hidden_activation=activation,
                                 attn_skipped_layers=attn_skipped_layers,
                                 attn_residual=attn_residual,
-                                attn_dropout_rate=attn_dropout_rate,
+                                attn_dropout=attn_dropout,
                                 attn_norm=attn_norm,
                                 skipped_blocks=skipped_blocks,
                                 repr_dim=repr_dim,
-                                dropout_rate=dropout,
+                                dropout=dropout,
                                 activation=activation,
                                 norm=norm,
                                 residual=residual,
@@ -290,11 +290,11 @@ def main():
                                 attn_hidden_activation=activation,
                                 attn_skipped_layers=attn_skipped_layers,
                                 attn_residual=attn_residual,
-                                attn_dropout_rate=attn_dropout_rate,
+                                attn_dropout=attn_dropout,
                                 attn_norm=attn_norm,
                                 skipped_blocks=skipped_blocks,
                                 repr_dim=repr_dim,
-                                dropout_rate=dropout,
+                                dropout=dropout,
                                 activation=activation,
                                 norm=norm,
                                 residual=residual,
