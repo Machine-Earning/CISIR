@@ -507,6 +507,7 @@ def create_mlp2(
         activation=None,
         norm: str = None,
         sam_rho: float = 0.05,
+        dropout: float = 0.1,
         name: str = 'mlp'
 ) -> Model:
     """
@@ -525,6 +526,7 @@ def create_mlp2(
     - activation: Optional activation function to use. If None, defaults to LeakyReLU.
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None.
     - sam_rho (float): Size of the neighborhood for perturbation in SAM. Default is 0.05. If 0.0, SAM is not used.
+    - dropout (float): Dropout rate to apply after activations or residual connections. If 0.0, no dropout is applied.
 
     Returns:
     - Model: A Keras model instance.
@@ -561,6 +563,11 @@ def create_mlp2(
         x = Add()([x, residual_proj])
         if norm == 'layer_norm':
             x = LayerNormalization()(x)
+        # Add dropout after residual connection if dropout > 0
+        if dropout > 0:
+            x = Dropout(dropout)(x)
+    elif dropout > 0:  # No residuals, add dropout after activation
+        x = Dropout(dropout)(x)
 
     residual_layer = x
 
@@ -582,7 +589,12 @@ def create_mlp2(
             x = Add()([x, residual_proj])
             if norm == 'layer_norm':
                 x = LayerNormalization()(x)
+            # Add dropout after residual connection if dropout > 0
+            if dropout > 0:
+                x = Dropout(dropout)(x)
             residual_layer = x
+        elif dropout > 0:  # No residuals, add dropout after activation
+            x = Dropout(dropout)(x)
 
     # Create final representation layer
     x = Dense(repr_dim)(x)
@@ -604,8 +616,14 @@ def create_mlp2(
         x = Add(name='repr_layer')([x, residual_proj])
         if norm == 'layer_norm':
             x = LayerNormalization()(x)
+        # Add dropout after final residual connection if dropout > 0
+        if dropout > 0:
+            x = Dropout(dropout)(x)
+    elif dropout > 0:  # No residuals, add dropout after activation
+        x = Dropout(dropout)(x)
     elif norm == 'layer_norm':
         x = LayerNormalization()(x)
+        x = Dropout(dropout)(x)
 
     # Handle PDS normalization if needed
     if pds:
