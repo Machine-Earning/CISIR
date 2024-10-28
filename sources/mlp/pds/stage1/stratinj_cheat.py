@@ -46,10 +46,10 @@ def main():
     mb = cme_modeling.ModelBuilder()  # Model builder
     pm = TrainingPhaseManager()  # Training phase manager
 
-    for seed in [456789]:
+    for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha, alphaV in [(0.1, 1)]:
+                for alpha, alphaV in [(0.5, 1)]:
                     for rho in [0]:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
@@ -102,7 +102,7 @@ def main():
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                             # Initialize wandb
-                            wandb.init(project="PDS-Oct-Report", name=experiment_name, config={
+                            wandb.init(project="repr-test", name=experiment_name, config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
                                 "patience": patience,
