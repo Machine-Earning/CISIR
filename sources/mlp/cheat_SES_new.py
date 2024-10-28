@@ -83,7 +83,7 @@ def main():
                             norm = NORM
                             cme_speed_threshold = cme_speed_threshold
                             skip_repr = SKIP_REPR
-                            skipped_layers = SKIPPED_LAYERS
+                            skipped_layers = SKIPPED_LAYERS_S
                             N = N_FILTERED  # number of samples to keep outside the threshold
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p

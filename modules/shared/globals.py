@@ -29,6 +29,7 @@ ACTIVATION = None  # No activation for regression
 NORM = 'batch_norm'  # Use batch normalization
 RESIDUAL = True  # Use residual connections
 SKIPPED_LAYERS = 2  # Number of layers to skip in residual connections
+SKIPPED_LAYERS_S = 1
 N_FILTERED = 500  # Number of samples to keep outside the threshold
 LOWER_THRESHOLD = -0.5  # Lower threshold for delta_p
 UPPER_THRESHOLD = 0.5  # Upper threshold for delta_p
