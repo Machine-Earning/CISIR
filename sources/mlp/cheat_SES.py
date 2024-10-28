@@ -49,7 +49,7 @@ def main():
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'MLP_amse{alpha_mse:.2f}_cheat_SES'
+                            title = f'MLP_amse{alpha_mse:.2f}_cheat'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
                             # Create a unique experiment name with a timestamp
@@ -92,7 +92,7 @@ def main():
                             # window_size = 3  # allows margin of error of 10 epochs
 
                             # Initialize wandb
-                            wandb.init(project="Arch-test-mlp", name=experiment_name, config={
+                            wandb.init(project="Nov-Exps", name=experiment_name, config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
                                 "patience": patience,
