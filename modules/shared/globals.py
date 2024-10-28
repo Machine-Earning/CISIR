@@ -18,7 +18,7 @@ MLP_HIDDENS = [
     512, 256, 512, 256, 256, 128, 256, 128,
     256, 128, 128, 128, 128, 128, 128, 128
 ]  # Hidden layers
-MLP_HIDDENS_S = [128, 128, 128]  # Hidden layers
+MLP_HIDDENS_S = [512, 512, 256, 256, 128, 128]  # Hidden layers
 PROJ_HIDDENS = [64]  # Projection hidden layers
 LOSS_KEY = 'mse_pcc'  # Mean squared error regression loss
 LAMBDA = 3.3  # Lambda for the loss
@@ -59,6 +59,7 @@ ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 WANDB_SAVE_MODEL = False  # Save model to wandb
 RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 SAM_RHOS = [0.05, 0.5]  # Rho values for SAM
+SKIP_REPR = True  # residual representation
 
 # ATTM AREA
 BLOCKS_HIDDENS = [128 for _ in range(20)]

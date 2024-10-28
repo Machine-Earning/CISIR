@@ -5,7 +5,7 @@ import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
-from modules.training.smooth_early_stopping import SmoothEarlyStopping
+
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
@@ -49,7 +49,7 @@ def main():
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'MLP2_amse{alpha_mse:.2f}_cheat_SES'
+                            title = f'MLP2_amse{alpha_mse:.2f}_cheat'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
                             # Create a unique experiment name with a timestamp
@@ -80,9 +80,9 @@ def main():
                             output_dim = len(outputs_to_use)
                             dropout = DROPOUT
                             activation = ACTIVATION
-                            norm = 'layer_norm'  # NORM
+                            norm = NORM
                             cme_speed_threshold = cme_speed_threshold
-                            skip_repr = False
+                            skip_repr = SKIP_REPR
                             skipped_layers = SKIPPED_LAYERS
                             N = N_FILTERED  # number of samples to keep outside the threshold
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
@@ -117,7 +117,7 @@ def main():
                                 "norm": norm,
                                 'optimizer': 'adamw',
                                 'output_dim': output_dim,
-                                'architecture': 'mlp',
+                                'architecture': 'mlp_res_repr',
                                 'cme_speed_threshold': cme_speed_threshold,
                                 'skip_repr': skip_repr,
                                 'ds_version': DS_VERSION,
