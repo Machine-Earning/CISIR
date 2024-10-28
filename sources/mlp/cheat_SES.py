@@ -72,7 +72,7 @@ def main():
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
-                            hiddens = MLP_HIDDENS_S  # hidden layers
+                            hiddens = MLP_HIDDENS  # hidden layers
 
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             bandwidth = BANDWIDTH
@@ -92,7 +92,7 @@ def main():
                             # window_size = 3  # allows margin of error of 10 epochs
 
                             # Initialize wandb
-                            wandb.init(project="Nov-Exps", name=experiment_name, config={
+                            wandb.init(project="Arch-test-mlp", name=experiment_name, config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
                                 "patience": patience,
