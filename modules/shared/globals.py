@@ -18,7 +18,7 @@ MLP_HIDDENS = [
     512, 256, 512, 256, 256, 128, 256, 128,
     256, 128, 128, 128, 128, 128, 128, 128
 ]  # Hidden layers
-MLP_HIDDENS_S = [512, 512, 256, 256, 128, 128]  # Hidden layers
+MLP_HIDDENS_S = [128 for _ in range(14)]  # Hidden layers
 PROJ_HIDDENS = [64]  # Projection hidden layers
 LOSS_KEY = 'mse_pcc'  # Mean squared error regression loss
 LAMBDA = 3.3  # Lambda for the loss
@@ -41,7 +41,7 @@ WEIGHT_DECAY = 1e-5  # Higher weight decay
 WEIGHT_DECAY_PDS = 1e-5  # Higher weight decay for projection layers
 MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 BANDWIDTH = 4.42e-2  # Bandwidth for rebalancing
-PATIENCE = int(3e3)  # Higher patience
+PATIENCE = int(5e3)  # Higher patience
 PDS_PATIENCE = int(2e3)  # Higher patience
 LR_CB_FACTOR = 0.9  # factor for reducing learning rate
 LR_CB_PATIENCE = 100  # patience for reducing learning rate
@@ -61,6 +61,8 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 SAM_RHOS = [0.05, 0.5]  # Rho values for SAM
 SKIP_REPR = True  # residual representation
+SMOOTHING_METHOD = 'moving_average'
+WINDOW_SIZE = 25
 
 # ATTM AREA
 BLOCKS_HIDDENS = [128 for _ in range(20)]

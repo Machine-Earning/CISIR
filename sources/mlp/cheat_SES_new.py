@@ -88,8 +88,8 @@ def main():
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
-                            # smoothing_method = 'moving_average'
-                            # window_size = 3  # allows margin of error of 10 epochs
+                            smoothing_method = SMOOTHING_METHOD
+                            window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
 
                             # Initialize wandb
                             wandb.init(project="Arch-test-mlp", name=experiment_name, config={
@@ -123,8 +123,8 @@ def main():
                                 'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
-                                # 'smoothing_method': smoothing_method,
-                                # 'window_size': window_size
+                                'smoothing_method': smoothing_method,
+                                'window_size': window_size
                             })
 
                             # set the root directory
@@ -212,20 +212,20 @@ def main():
                             final_model_sep.summary()
 
                             # Define the EarlyStopping callback
-                            early_stopping = EarlyStopping(
-                                monitor=ES_CB_MONITOR,
-                                patience=patience,
-                                verbose=VERBOSE,
-                                restore_best_weights=ES_CB_RESTORE_WEIGHTS)
-
-                            # Define the EarlyStopping callback
-                            # early_stopping = SmoothEarlyStopping(
+                            # early_stopping = EarlyStopping(
                             #     monitor=ES_CB_MONITOR,
                             #     patience=patience,
                             #     verbose=VERBOSE,
-                            #     restore_best_weights=ES_CB_RESTORE_WEIGHTS,
-                            #     smoothing_method=smoothing_method,  # 'moving_average'
-                            #     smoothing_parameters={'window_size': window_size})  # 10
+                            #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
+
+                            # Define the EarlyStopping callback
+                            early_stopping = SmoothEarlyStopping(
+                                monitor=ES_CB_MONITOR,
+                                patience=patience,
+                                verbose=VERBOSE,
+                                restore_best_weights=ES_CB_RESTORE_WEIGHTS,
+                                smoothing_method=smoothing_method,  # 'moving_average'
+                                smoothing_parameters={'window_size': window_size})  # 10
 
                             # Compile the model with the specified learning rate
                             final_model_sep.compile(
