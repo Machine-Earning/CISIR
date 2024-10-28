@@ -82,7 +82,7 @@ ATTM_LR_CB_PATIENCE = 200
 ATTM_RHO = [0.1]
 
 # FF AREA
-FF_HIDDENS = [128, 512, 1024, 1024, 512, 128]
+FF_HIDDENS = [128 for _ in range(10)]
 FF_NORM = 'batch_norm'
 FF_DROPOUT = 0.1
 FF_ACTIVATION = 'leaky_relu'

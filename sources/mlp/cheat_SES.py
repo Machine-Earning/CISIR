@@ -30,7 +30,7 @@ from modules.training.ts_modeling import (
 
 def main():
     """
-    Main function to run the E-MLP model
+    Main function to run the training
     :return:
     """
 
