@@ -21,7 +21,7 @@ from modules.training.ts_modeling import (
     process_sep_events,
     mse_pcc,
     filter_ds,
-    stratified_4fold_split,
+    load_stratified_folds,
     plot_error_hist,
     set_seed, stratified_batch_dataset,
 )
@@ -114,8 +114,8 @@ def main():
                                 lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                                 upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                                 mae_plus_threshold = MAE_PLUS_THRESHOLD
-                                smoothing_method = 'moving_average'
-                                window_size = 25  # allows margin of error of 10 epochs
+                                smoothing_method = SMOOTHING_METHOD
+                                window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
 
                                 # Initialize wandb
                                 wandb.init(project="Report-Test", name=experiment_name, config={
@@ -213,7 +213,15 @@ def main():
                                 # 4-fold cross-validation
                                 folds_optimal_epochs = []
                                 for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
-                                        stratified_4fold_split(X_train, y_train, seed=seed, shuffle=True)):
+                                    load_stratified_folds(
+                                        root_dir,
+                                        inputs_to_use=inputs_to_use,
+                                        add_slope=add_slope,
+                                        outputs_to_use=outputs_to_use,
+                                        cme_speed_threshold=cme_speed_threshold,
+                                        seed=seed, shuffle=True
+                                    )
+                                ):
                                     print(f'Fold: {fold_idx}')
                                     # print all cme_files shapes
                                     print(f'X_subtrain.shape: {X_subtrain.shape}, y_subtrain.shape: {y_subtrain.shape}')

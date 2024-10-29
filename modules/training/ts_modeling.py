@@ -2,7 +2,9 @@ import os
 import random
 import traceback
 from collections import Counter
-from typing import Tuple, List, Optional, Union, Callable, Dict, Generator
+from pathlib import Path
+from typing import Generator, Tuple, Optional
+from typing import List, Union, Callable, Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -1344,6 +1346,103 @@ def stratified_batch_dataset(
 #     dataset = dataset.prefetch(tf.data.AUTOTUNE)
 #
 #     return dataset, steps_per_epoch
+
+
+def load_stratified_folds(
+        fold_dir_path: str,
+        inputs_to_use: list,
+        add_slope: bool,
+        outputs_to_use: list,
+        cme_speed_threshold: int,
+        shuffle: bool = True,
+        seed: Optional[int] = None,
+        debug: bool = False
+) -> Generator[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], None, None]:
+    """
+    Loads pre-split stratified folds from a directory structure using build_dataset function
+    and yields one fold at a time. Each fold directory should contain 'subtraining' and
+    'validation' subdirectories with CSV files.
+
+    Directory structure expected:
+    fold_dir_path/
+        fold0/
+            subtraining/
+                *.csv files
+            validation/
+                *.csv files
+        fold1/
+            ...
+        fold2/
+            ...
+        fold3/
+            ...
+
+    Parameters:
+        fold_dir_path (str): Path to the directory containing the fold directories
+        inputs_to_use (list): List of input features to use from the CSV files
+        add_slope (bool): Whether to add slope features
+        outputs_to_use (list): List of output variables to use from the CSV files
+        cme_speed_threshold (int): Threshold for CME speed filtering
+        shuffle (bool): Whether to shuffle the data after loading. Default is True.
+        seed (Optional[int]): Random seed for reproducibility. Default is None.
+        debug (bool): Whether to enable debug features. Default is False.
+
+    Yields:
+        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Split feature and label matrices:
+            - X_subtrain: Features for the subtraining set
+            - y_subtrain: Labels for the subtraining set
+            - X_val: Features for the validation set
+            - y_val: Labels for the validation set
+
+    Raises:
+        FileNotFoundError: If any expected fold directory is missing
+    """
+    # Set random seed if provided
+    if seed is not None:
+        np.random.seed(seed)
+
+    fold_dir = Path(fold_dir_path)
+
+    # Verify directory structure
+    if not fold_dir.exists():
+        raise FileNotFoundError(f"Fold directory not found: {fold_dir}")
+
+    # Process each fold
+    for fold_idx in range(4):
+        current_fold = fold_dir / f"fold{fold_idx}"
+
+        if not current_fold.exists():
+            raise FileNotFoundError(f"Missing fold directory: {current_fold}")
+
+        # Load subtraining data using build_dataset
+        subtrain_dir = str(current_fold / "subtraining")
+        X_subtrain, y_subtrain = build_dataset(
+            subtrain_dir,
+            inputs_to_use=inputs_to_use,
+            add_slope=add_slope,
+            outputs_to_use=outputs_to_use,
+            cme_speed_threshold=cme_speed_threshold,
+            shuffle_data=shuffle
+        )
+
+        # Load validation data using build_dataset
+        val_dir = str(current_fold / "validation")
+        X_val, y_val = build_dataset(
+            val_dir,
+            inputs_to_use=inputs_to_use,
+            add_slope=add_slope,
+            outputs_to_use=outputs_to_use,
+            cme_speed_threshold=cme_speed_threshold,
+            shuffle_data=shuffle
+        )
+
+        if debug:
+            print(f"Fold {fold_idx}:")
+            print(f"Subtraining shapes: X={X_subtrain.shape}, y={y_subtrain.shape}")
+            print(f"Validation shapes: X={X_val.shape}, y={y_val.shape}")
+            # Could add distribution plots or other debug info here if needed
+
+        yield X_subtrain, y_subtrain, X_val, y_val
 
 
 def stratified_4fold_split(
