@@ -235,7 +235,7 @@ def main():
                                     weight_decay=weight_decay,
                                     beta_1=momentum_beta1
                                 ),
-                                loss=lambda y_true, y_pred: mb.pds_loss_vec(
+                                loss=lambda y_true, y_pred: mb.pdc_loss_vec(
                                     y_true, y_pred,
                                     phase_manager=pm,
                                     train_sample_weights=train_weights_dict,
