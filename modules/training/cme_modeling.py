@@ -1944,6 +1944,96 @@ class ModelBuilder:
 
         return squared_difference
 
+    def pdc_loss_vec_mem(
+            self,
+            y_true: tf.Tensor,
+            z_pred: tf.Tensor,
+            phase_manager: TrainingPhaseManager,
+            train_sample_weights: Optional[Dict[float, float]] = None,
+            val_sample_weights: Optional[Dict[float, float]] = None,
+            reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
+    ) -> tf.Tensor:
+        """
+        Computes the PDC (Pairwise Distance Correlation) loss for a batch of predicted features and their labels,
+        without using masking operations.
+
+        The loss is calculated as 1 minus the (weighted) Pearson Correlation Coefficient (PCC) between
+        the pairwise squared distances in representation space and the pairwise squared differences in label space,
+        considering all elements in the pairwise matrices.
+
+        :param y_true: A batch of true label values, shape of [batch_size, 1].
+        :param z_pred: A batch of predicted feature vectors, shape of [batch_size, n_features].
+        :param phase_manager: Manager that tracks whether we are in training or validation phase.
+        :param train_sample_weights: A dictionary mapping label values to their corresponding weights during training.
+        :param val_sample_weights: A dictionary mapping label values to their corresponding weights during validation.
+        :param reduction: The type of reduction to apply to the loss. (Note: loss is scalar, reduction has no effect.)
+        :return: The PDC loss value as a scalar tensor.
+        """
+        batch_size = tf.shape(y_true)[0]
+
+        # Compute pairwise squared differences in label space (Dy)
+        y_true_diff = y_true - tf.transpose(y_true)  # Shape: [batch_size, batch_size]
+        y_diff_squared = tf.square(y_true_diff)  # Shape: [batch_size, batch_size]
+
+        # Compute pairwise squared distances in representation space (Dz)
+        z_pred_diff = z_pred[:, tf.newaxis, :] - z_pred[tf.newaxis, :, :]  # Shape: [batch_size, batch_size, n_features]
+        z_diff_squared = tf.reduce_sum(tf.square(z_pred_diff), axis=-1)  # Shape: [batch_size, batch_size]
+
+        # Cast y_diff_squared to match the data type of z_diff_squared
+        y_diff_squared = tf.cast(y_diff_squared, dtype=z_diff_squared.dtype)
+
+        # Select the appropriate sample weights based on the mode (training or validation)
+        sample_weights = train_sample_weights if phase_manager.is_training_phase() else val_sample_weights
+
+        if sample_weights is not None:
+            # Compute weights for y_true
+            weights = create_weight_tensor_fast(y_true, sample_weights)  # Shape: [batch_size]
+
+            # Compute weights for pairs as the outer product of sample weights
+            weights_matrix = weights[:, None] * weights[None, :]  # Shape: [batch_size, batch_size]
+
+            # Cast weights_matrix to match dtype
+            weights_matrix = tf.cast(weights_matrix, dtype=z_diff_squared.dtype)
+        else:
+            # If no sample weights provided, use weights of 1
+            weights_matrix = tf.ones_like(z_diff_squared)
+
+        # Exclude diagonal elements by setting them to zero (optional)
+        mask_off_diagonal = tf.ones_like(y_diff_squared) - tf.linalg.diag(
+            tf.ones([batch_size], dtype=y_diff_squared.dtype))
+        y_diff_squared *= mask_off_diagonal
+        z_diff_squared *= mask_off_diagonal
+        weights_matrix *= mask_off_diagonal
+
+        # Compute sums and means
+        sum_weights = tf.reduce_sum(weights_matrix)
+        mean_Dy = tf.reduce_sum(weights_matrix * y_diff_squared) / sum_weights
+        mean_Dz = tf.reduce_sum(weights_matrix * z_diff_squared) / sum_weights
+
+        # Compute centered variables
+        Dy_centered = y_diff_squared - mean_Dy
+        Dz_centered = z_diff_squared - mean_Dz
+
+        # Compute weighted covariance and variances
+        cov_Dy_Dz = tf.reduce_sum(weights_matrix * Dy_centered * Dz_centered) / sum_weights
+        var_Dy = tf.reduce_sum(weights_matrix * tf.square(Dy_centered)) / sum_weights
+        var_Dz = tf.reduce_sum(weights_matrix * tf.square(Dz_centered)) / sum_weights
+
+        # Compute standard deviations
+        std_Dy = tf.sqrt(var_Dy)
+        std_Dz = tf.sqrt(var_Dz)
+
+        # Add epsilon to denominators to avoid division by zero
+        epsilon = tf.keras.backend.epsilon()
+
+        # Compute Pearson Correlation Coefficient
+        pcc = cov_Dy_Dz / (std_Dy * std_Dz + epsilon)
+
+        # Compute loss as 1 - PCC
+        loss = 1.0 - pcc
+
+        return loss
+
     def pdc_loss_vec(
             self,
             y_true: tf.Tensor,
