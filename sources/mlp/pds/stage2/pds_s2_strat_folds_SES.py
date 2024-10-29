@@ -94,7 +94,7 @@ def main():
 
                                 weight_decay = WEIGHT_DECAY  # higher weight decay
                                 momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                                batch_size = BATCH_SIZE  # higher batch size
+                                batch_size = 3600  # BATCH_SIZE  # higher batch size
                                 epochs = EPOCHS  # higher epochs
                                 hiddens = MLP_HIDDENS
                                 proj_hiddens = PROJ_HIDDENS
