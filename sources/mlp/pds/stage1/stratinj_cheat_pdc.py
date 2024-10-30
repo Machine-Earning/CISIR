@@ -54,14 +54,14 @@ def main():
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
-                            batch_size = PDS_BATCH_SIZE  # full dataset used
+                            batch_size =  PDS_BATCH_SIZE  # full dataset used
                             print(f'batch size : {batch_size}')
 
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'MLP_PDSstratinj_bs{batch_size}_alpha{alpha:.2f}_rho{rho:.2f}_cheat'
+                            title = f'MLP_PDSstratinj_bs{batch_size}_alpha{alpha:.2f}_rho{rho:.2f}_cheat_pdc'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -235,7 +235,7 @@ def main():
                                     weight_decay=weight_decay,
                                     beta_1=momentum_beta1
                                 ),
-                                loss=lambda y_true, y_pred: mb.pdc_loss_vec(
+                                loss=lambda y_true, y_pred: mb.pdc_loss_vec_mem(
                                     y_true, y_pred,
                                     phase_manager=pm,
                                     train_sample_weights=train_weights_dict,

@@ -4082,7 +4082,7 @@ def set_seed(seed: int) -> None:
     os.environ['PYTHONHASHSEED'] = str(seed)
 
     # Set TensorFlow to use deterministic operations
-    os.environ['TF_DETERMINISTIC_OPS'] = '1'
+    os.environ['TF_DETERMINISTIC_OPS'] = '0'
 
 
 class TrainingPhaseManager:
