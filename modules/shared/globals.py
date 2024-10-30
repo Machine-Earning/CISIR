@@ -18,13 +18,13 @@ MLP_HIDDENS = [
     512, 256, 512, 256, 256, 128, 256, 128,
     256, 128, 128, 128, 128, 128, 128, 128
 ]  # Hidden layers
-MLP_HIDDENS_S = [256 for _ in range(8)]  # Hidden layers
+MLP_HIDDENS_S = [512, 256, 128, 256, 512, 256, 128]  # Hidden layers
 PROJ_HIDDENS = [64]  # Projection hidden layers
 LOSS_KEY = 'mse_pcc'  # Mean squared error regression loss
 LAMBDA = 3.3  # Lambda for the loss
 REPR_DIM = 128  # Representation dimension
 OUTPUT_DIM = len(OUTPUTS_TO_USE)  # Number of outputs
-DROPOUT = 0.1  # Dropout rate
+DROPOUT = 0.2  # Dropout rate
 ACTIVATION = None  # No activation for regression
 NORM = 'batch_norm'  # Use batch normalization
 RESIDUAL = True  # Use residual connections
@@ -35,16 +35,16 @@ LOWER_THRESHOLD = -0.5  # Lower threshold for delta_p
 UPPER_THRESHOLD = 0.5  # Upper threshold for delta_p
 MAE_PLUS_THRESHOLD = 0.5  # Threshold for measuring raising edges in delta
 START_LR_FT = 3e-3  # Lower due to fine-tuning
-START_LR = 1e-2  # starting learning rate
+START_LR = 1e-5  # starting learning rate
 START_LR_PDS = 1e-2  # starting learning rate
-WEIGHT_DECAY = 1e-5  # Higher weight decay
+WEIGHT_DECAY = 1e-4  # Higher weight decay
 WEIGHT_DECAY_PDS = 1e-5  # Higher weight decay for projection layers
 MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 BANDWIDTH = 4.42e-2  # Bandwidth for rebalancing
 PATIENCE = int(2e3)  # Higher patience
 PDS_PATIENCE = int(1.2e3)  # Higher patience
 LR_CB_FACTOR = 0.9  # factor for reducing learning rate
-LR_CB_PATIENCE = 100  # patience for reducing learning rate
+LR_CB_PATIENCE = 200  # patience for reducing learning rate
 LR_CB_MIN_LR = 1e-6  # minimum learning rate
 VERBOSE = 1  # Verbose
 SAVE_BEST = False  # Save best model
@@ -63,6 +63,9 @@ SAM_RHOS = [0.05, 0.5]  # Rho values for SAM
 SKIP_REPR = True  # residual representation
 SMOOTHING_METHOD = 'moving_average'
 WINDOW_SIZE = 11
+RHO = [1e-1]
+REWEIGHTS = [(1.5, 0.75, 0.1, 0)]
+LAMBDA_FACTOR = 3.3
 
 # ATTM AREA
 BLOCKS_HIDDENS = [128 for _ in range(20)]

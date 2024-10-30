@@ -21,7 +21,7 @@ from modules.training.ts_modeling import (
     set_seed,
     mse_pcc,
     filter_ds,
-    create_mlp,
+    create_mlp2,
     plot_error_hist,
     load_stratified_folds,
 )
@@ -75,7 +75,7 @@ def main():
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
-                            hiddens = MLP_HIDDENS  # hidden layers
+                            hiddens = MLP_HIDDENS_S  # hidden layers
 
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             bandwidth = BANDWIDTH
@@ -85,8 +85,8 @@ def main():
                             activation = ACTIVATION
                             norm = NORM
                             cme_speed_threshold = cme_speed_threshold
-                            residual = RESIDUAL
-                            skipped_layers = SKIPPED_LAYERS
+                            skip_repr = SKIP_REPR
+                            skipped_layers = SKIPPED_LAYERS_S
                             N = N_FILTERED  # number of samples to keep outside the threshold
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
@@ -120,9 +120,9 @@ def main():
                                 "norm": norm,
                                 'optimizer': 'adamw',
                                 'output_dim': output_dim,
-                                'architecture': 'mlp',
+                                'architecture': 'mlp_res_repr',
+                                'skip_repr': skip_repr,
                                 'cme_speed_threshold': cme_speed_threshold,
-                                'residual': residual,
                                 'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
@@ -235,7 +235,7 @@ def main():
                                 print(f'validation set rebalanced.')
 
                                 # create the model
-                                model_sep = create_mlp(
+                                model_sep =  create_mlp2(
                                     input_dim=n_features,
                                     hiddens=hiddens,
                                     repr_dim=repr_dim,
@@ -243,7 +243,7 @@ def main():
                                     dropout=dropout,
                                     activation=activation,
                                     norm=norm,
-                                    residual=residual,
+                                    skip_repr=skip_repr,
                                     skipped_layers=skipped_layers,
                                     sam_rho=rho
                                 )
@@ -322,7 +322,7 @@ def main():
                             print(f'optimal_epochs: {optimal_epochs}')
                             wandb.log({'optimal_epochs': optimal_epochs})
 
-                            final_model_sep = create_mlp(
+                            final_model_sep = create_mlp2(
                                 input_dim=n_features,
                                 hiddens=hiddens,
                                 repr_dim=repr_dim,
@@ -330,7 +330,7 @@ def main():
                                 dropout=dropout,
                                 activation=activation,
                                 norm=norm,
-                                residual=residual,
+                                skip_repr=skip_repr,
                                 skipped_layers=skipped_layers,
                                 sam_rho=rho
                             )
