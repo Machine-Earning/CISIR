@@ -39,19 +39,19 @@ def main():
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
 
-    for seed in [1234]:
+    for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
-                    for rho in [1e-1]:
+                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS:
+                    for rho in RHO:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
-                            lambda_factor = 3.3  # lambda for the loss
+                            lambda_factor = LAMBDA_FACTOR  # lambda for the loss
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'ATTM_{inputs_str}_amse{alpha_mse:.2f}_rho{rho:.2f}_SES'
+                            title = f'ATTM_amse{alpha_mse:.2f}_InstF'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
                             # Create a unique experiment name with a timestamp
@@ -60,7 +60,7 @@ def main():
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
                             patience = PATIENCE  # higher patience
-                            learning_rate = ATTM_START_LR  # higher learning rate
+                            learning_rate = START_LR  # higher learning rate
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
@@ -70,7 +70,7 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=ATTM_LR_CB_MIN_LR)
 
-                            weight_decay = ATTM_WD  # higher weight decay
+                            weight_decay = WEIGHT_DECAY  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
@@ -82,13 +82,11 @@ def main():
                             bandwidth = BANDWIDTH
                             repr_dim = REPR_DIM
                             output_dim = len(outputs_to_use)
-                            attn_dropout = ATTN_DROPOUT
-                            attm_dropout = ATTM_DROPOUT
+                            attn_dropout = DROPOUT
+                            attm_dropout = DROPOUT
                             activation = ATTM_ACTIVATION
                             attn_norm = ATTN_NORM
                             attm_norm = ATTM_NORM
-                            attn_residual = ATTN_RESIDUAL
-                            attm_residual = ATTM_RESIDUAL
                             attn_skipped_layers = ATTN_SKIPPED_LAYERS
                             attm_skipped_blocks = ATTM_SKIPPED_BLOCKS
                             cme_speed_threshold = cme_speed_threshold
@@ -96,11 +94,11 @@ def main():
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
-                            smoothing_method = 'moving_average'
-                            window_size = 15  # allows margin of error of 10 epochs
+                            smoothing_method = SMOOTHING_METHOD
+                            window_size = WINDOW_SIZE # allows margin of error of 10 epochs
 
                             # Initialize wandb
-                            wandb.init(project="Attm-Oct-Report", name=experiment_name, config={
+                            wandb.init(project="Arch-test-mlp", name=experiment_name, config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
                                 "patience": patience,
@@ -130,8 +128,6 @@ def main():
                                 'output_dim': output_dim,
                                 'architecture': 'attm',
                                 'cme_speed_threshold': cme_speed_threshold,
-                                'attn_residual': attn_residual,
-                                'attm_residual': attm_residual,
                                 'attn_skipped_layers': attn_skipped_layers,
                                 'attm_skipped_blocks': attm_skipped_blocks,
                                 'ds_version': DS_VERSION,
@@ -247,8 +243,6 @@ def main():
                                     attn_hidden_activation=activation,
                                     attn_skipped_layers=attn_skipped_layers,
                                     skipped_blocks=attm_skipped_blocks,
-                                    attn_residual=attn_residual,
-                                    residual=attm_residual,
                                     attn_dropout=attn_dropout,
                                     dropout=attm_dropout,
                                     attn_norm=attn_norm,
@@ -339,8 +333,6 @@ def main():
                                 attn_hidden_activation=activation,
                                 attn_skipped_layers=attn_skipped_layers,
                                 skipped_blocks=attm_skipped_blocks,
-                                attn_residual=attn_residual,
-                                residual=attm_residual,
                                 attn_dropout=attn_dropout,
                                 dropout=attm_dropout,
                                 attn_norm=attn_norm,
@@ -349,6 +341,7 @@ def main():
                                 activation=activation,
                                 sam_rho=rho
                             )
+
                             final_model_sep.summary()
                             # Recreate the model architecture
                             final_model_sep.compile(
