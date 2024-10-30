@@ -40,8 +40,8 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
-                    for rho in [1e-2]:  # SAM_RHOS:
+                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1.5, 1, 0.1, 0)]:
+                    for rho in [5e-3]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -49,7 +49,7 @@ def main():
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'MLP_amse{alpha_mse:.2f}_cheat'
+                            title = f'MLP_amse{alpha_mse:.2f}_cheat_NS'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
                             # Create a unique experiment name with a timestamp
@@ -123,8 +123,8 @@ def main():
                                 'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
-                                'smoothing_method': smoothing_method,
-                                'window_size': window_size
+                                # 'smoothing_method': smoothing_method,
+                                # 'window_size': window_size
                             })
 
                             # set the root directory
@@ -212,20 +212,20 @@ def main():
                             final_model_sep.summary()
 
                             # Define the EarlyStopping callback
-                            # early_stopping = EarlyStopping(
-                            #     monitor=ES_CB_MONITOR,
-                            #     patience=patience,
-                            #     verbose=VERBOSE,
-                            #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
-
-                            # Define the EarlyStopping callback
-                            early_stopping = SmoothEarlyStopping(
+                            early_stopping = EarlyStopping(
                                 monitor=ES_CB_MONITOR,
                                 patience=patience,
                                 verbose=VERBOSE,
-                                restore_best_weights=ES_CB_RESTORE_WEIGHTS,
-                                smoothing_method=smoothing_method,  # 'moving_average'
-                                smoothing_parameters={'window_size': window_size})  # 10
+                                restore_best_weights=ES_CB_RESTORE_WEIGHTS)
+
+                            # Define the EarlyStopping callback
+                            # early_stopping = SmoothEarlyStopping(
+                            #     monitor=ES_CB_MONITOR,
+                            #     patience=patience,
+                            #     verbose=VERBOSE,
+                            #     restore_best_weights=ES_CB_RESTORE_WEIGHTS,
+                            #     smoothing_method=smoothing_method,  # 'moving_average'
+                            #     smoothing_parameters={'window_size': window_size})  # 10
 
                             # Compile the model with the specified learning rate
                             final_model_sep.compile(

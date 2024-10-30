@@ -9,7 +9,7 @@ CME_SPEED_THRESHOLD = [0]  # CME speed threshold
 # ALPHAS = [0, 0.3, 0.2, 0.1, 0.4]  # Alpha values for the loss
 ALPHAS = [1.0, 0.7, 0.5]  # Alpha values for the loss
 ADD_SLOPE = [False]  # Add slope to the inputs
-BATCH_SIZE = 4096  # Batch size
+BATCH_SIZE = 3600  # Batch size
 PDS_BATCH_SIZE = 1268
 # ATTM_PDS_BS = 512
 EPOCHS = int(1e6)  # Number of epochs
@@ -62,7 +62,7 @@ RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 SAM_RHOS = [0.05, 0.5]  # Rho values for SAM
 SKIP_REPR = True  # residual representation
 SMOOTHING_METHOD = 'moving_average'
-WINDOW_SIZE = 5
+WINDOW_SIZE = 11
 
 # ATTM AREA
 BLOCKS_HIDDENS = [128 for _ in range(20)]

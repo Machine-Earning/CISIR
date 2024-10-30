@@ -23,7 +23,7 @@ from modules.training.ts_modeling import (
     filter_ds,
     create_mlp,
     plot_error_hist,
-    stratified_4fold_split,
+    load_stratified_folds,
 )
 
 
@@ -43,8 +43,8 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
-                    for rho in [1e-3]:  # SAM_RHOS:
+                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1.5, 1, 0.1, 0)]:
+                    for rho in [5e-3]:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -52,7 +52,7 @@ def main():
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'MLP_{inputs_str}_amse{alpha_mse:.2f}_rho{rho}_strat_smol'
+                            title = f'MLP_amse{alpha_mse:.2f}_EventF'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
                             # Create a unique experiment name with a timestamp
@@ -75,7 +75,7 @@ def main():
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
-                            hiddens = MLP_HIDDENS_S  # hidden layers
+                            hiddens = MLP_HIDDENS  # hidden layers
 
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             bandwidth = BANDWIDTH
@@ -91,11 +91,11 @@ def main():
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
-                            smoothing_method = 'moving_average'
-                            window_size = 15  # allows margin of error of 10 epochs
+                            smoothing_method = SMOOTHING_METHOD
+                            window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
 
                             # Initialize wandb
-                            wandb.init(project="Oct-Report", name=experiment_name, config={
+                            wandb.init(project="Arch-test-mlp", name=experiment_name, config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
                                 "patience": patience,
@@ -186,7 +186,15 @@ def main():
                             # 4-fold cross-validation
                             folds_optimal_epochs = []
                             for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
-                                    stratified_4fold_split(X_train, y_train, seed=seed, shuffle=True)):
+                                load_stratified_folds(
+                                    root_dir,
+                                    inputs_to_use=inputs_to_use,
+                                    add_slope=add_slope,
+                                    outputs_to_use=outputs_to_use,
+                                    cme_speed_threshold=cme_speed_threshold,
+                                    seed=seed, shuffle=True
+                                )
+                            ):
                                 print(f'Fold: {fold_idx}')
                                 # print all cme_files shapes
                                 print(f'X_subtrain.shape: {X_subtrain.shape}, y_subtrain.shape: {y_subtrain.shape}')
