@@ -1999,6 +1999,8 @@ class ModelBuilder:
 
         if sample_weights := (train_sample_weights if phase_manager.is_training_phase() else val_sample_weights):
             weights = create_weight_tensor_fast(y_true, sample_weights)
+            # Ensure weights is a 1D tensor
+            weights = tf.squeeze(weights)
             weights_matrix = tf.cast(weights[:, None] * weights[None, :], z_diff_squared.dtype)
 
         # print weights_matrix
@@ -2056,7 +2058,6 @@ class ModelBuilder:
 
         # Cast y_diff_squared to match the data type of z_diff_squared
         y_diff_squared = tf.cast(y_diff_squared, dtype=z_diff_squared.dtype)
-
 
         # print y_diff_squared, z_diff_squared
         # print(f"y_diff_squared:\n {y_diff_squared},\n z_diff_squared:\n {z_diff_squared}")
