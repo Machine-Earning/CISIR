@@ -1989,10 +1989,10 @@ class ModelBuilder:
         Dz_centered = z_diff_squared - Dz_mean
 
         # print Dy_mean, Dz_mean
-        print(f"Dy_mean: {Dy_mean}, Dz_mean: {Dz_mean}")
+        # print(f"Dy_mean: {Dy_mean}, Dz_mean: {Dz_mean}")
 
         # print Dy_centered, Dz_centered
-        print(f"Dy_centered: {Dy_centered}, Dz_centered: {Dz_centered}")
+        # print(f"Dy_centered: {Dy_centered}, Dz_centered: {Dz_centered}")
 
         # Create weights matrix
         weights_matrix = tf.ones((batch_size, batch_size), dtype=z_diff_squared.dtype)
@@ -2017,11 +2017,11 @@ class ModelBuilder:
         var_Dz = tf.reduce_sum(weights_matrix * tf.square(Dz_centered))
 
         # print cov_Dy_Dz, var_Dy, var_Dz
-        print(f"cov_Dy_Dz: {cov_Dy_Dz}, var_Dy: {var_Dy}, var_Dz: {var_Dz}")
+        # print(f"cov_Dy_Dz: {cov_Dy_Dz}, var_Dy: {var_Dy}, var_Dz: {var_Dz}")
 
         pcc = cov_Dy_Dz / tf.sqrt((var_Dy * var_Dz) + tf.keras.backend.epsilon())
         # print pcc
-        print(f"pcc: {pcc}")
+        # print(f"pcc: {pcc}")
 
         # Compute correlation
         return 1.0 - pcc
@@ -2125,18 +2125,18 @@ class ModelBuilder:
             var_Dz = tf.reduce_sum(tf.square(Dz_centered))
 
         # print mean_Dy, mean_Dz
-        print(f"mean_Dy: {mean_Dy}, mean_Dz: {mean_Dz}")
+        # print(f"mean_Dy: {mean_Dy}, mean_Dz: {mean_Dz}")
 
         # print Dy_centered, Dz_centered
-        print(f"Dy_centered: {Dy_centered}, Dz_centered: {Dz_centered}")
+        # print(f"Dy_centered: {Dy_centered}, Dz_centered: {Dz_centered}")
 
         # print(cov_Dy_Dz, var_Dy, var_Dz)
-        print(f"cov_Dy_Dz: {cov_Dy_Dz}, var_Dy: {var_Dy}, var_Dz: {var_Dz}")
+        # print(f"cov_Dy_Dz: {cov_Dy_Dz}, var_Dy: {var_Dy}, var_Dz: {var_Dz}")
 
         # Compute Pearson Correlation Coefficient
         pcc = cov_Dy_Dz / (tf.sqrt(var_Dz * var_Dy) + tf.keras.backend.epsilon())
         # print pcc
-        print(f"pcc: {pcc}")
+        # print(f"pcc: {pcc}")
 
         # Compute loss as 1 - PCC
         loss = 1.0 - pcc
