@@ -1,7 +1,6 @@
 # import os
 from datetime import datetime
 
-import numpy as np
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
@@ -25,7 +24,6 @@ from modules.training.ts_modeling import (
     create_mlp,
     filter_ds,
     set_seed,
-    stratified_4fold_split,
     stratified_batch_dataset
 )
 
@@ -49,12 +47,12 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha, alphaV in [(0.5, 1)]:
-                    for rho in [1e-3]:
+                for alpha, alphaV in [(0, 0)]:
+                    for rho in RHO:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
-                            batch_size =  PDS_BATCH_SIZE  # full dataset used
+                            batch_size = PDS_BATCH_SIZE  # full dataset used
                             print(f'batch size : {batch_size}')
 
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -73,8 +71,8 @@ def main():
                             set_seed(seed)
                             epochs = EPOCHS
                             patience = PDS_PATIENCE
-                            learning_rate = START_LR_PDS
-                            weight_decay = WEIGHT_DECAY_PDS
+                            learning_rate = START_LR
+                            weight_decay = WEIGHT_DECAY
                             momentum_beta1 = MOMENTUM_BETA1
 
                             hiddens = MLP_HIDDENS
@@ -235,11 +233,11 @@ def main():
                                     weight_decay=weight_decay,
                                     beta_1=momentum_beta1
                                 ),
-                                loss=lambda y_true, y_pred: mb.pdc_loss_vec_mem(
+                                loss=lambda y_true, y_pred: mb.pdc_loss_vec(
                                     y_true, y_pred,
                                     phase_manager=pm,
-                                    train_sample_weights=train_weights_dict,
-                                    val_sample_weights=test_weights_dict,
+                                    train_sample_weights=None,  # train_weights_dict,
+                                    val_sample_weights=None,  # test_weights_dict,
                                 )
                             )
 
