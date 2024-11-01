@@ -2009,7 +2009,7 @@ class ModelBuilder:
         # Zero out diagonal
         weights_matrix = tf.linalg.set_diag(weights_matrix, tf.zeros(batch_size))
 
-        print(weights_matrix)
+        # print(weights_matrix)
 
         # Compute moments
         cov_Dy_Dz = tf.reduce_sum(weights_matrix * Dy_centered * Dz_centered)
@@ -2058,13 +2058,13 @@ class ModelBuilder:
         fup_z_squared = tf.reduce_sum(
             tf.square(z_pred[:-1] - z_pred[1:]), axis=-1
         )
-        fup_y = tf.squeeze(y_true[:-1] - y_true[1:])
+        fup_y = y_true[:-1] - y_true[1:]
 
         # Remaining differences from first element
         rem_z_squared = tf.reduce_sum(
             tf.square(z_pred[0:1] - z_pred[2:]), axis=-1
         )
-        rem_y = tf.squeeze(y_true[0:1] - y_true[2:])
+        rem_y = y_true[0:1] - y_true[2:]
 
         # Concatenate all differences
         z_squared = tf.concat([fup_z_squared, rem_z_squared], axis=0)  # Shape: [2N-3]
@@ -2105,7 +2105,7 @@ class ModelBuilder:
         # print weights_matrix
         # print(weights_matrix)
 
-        print(weights)
+        # print(weights)
 
         # Compute moments
         cov_Dy_Dz = tf.reduce_sum(weights * Dy_centered * Dz_centered)
@@ -2324,13 +2324,13 @@ class ModelBuilder:
         fup_z_squared = tf.reduce_sum(
             tf.square(z_pred[:-1] - z_pred[1:]), axis=-1
         )
-        fup_y = tf.squeeze(y_true[:-1] - y_true[1:])
+        fup_y = y_true[:-1] - y_true[1:]
 
         # Remaining differences from first element
         rem_z_squared = tf.reduce_sum(
             tf.square(z_pred[0:1] - z_pred[2:]), axis=-1
         )
-        rem_y = tf.squeeze(y_true[0:1] - y_true[2:])
+        rem_y = y_true[0:1] - y_true[2:]
 
         # Concatenate all differences
         z_squared = tf.concat([fup_z_squared, rem_z_squared], axis=0)  # Shape: [2N-3]
