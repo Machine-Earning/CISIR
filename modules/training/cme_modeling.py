@@ -2026,7 +2026,103 @@ class ModelBuilder:
         # Compute correlation
         return 1.0 - pcc
 
-    def pdc_loss_vec_old(
+    def pdc_loss_linear_vec(
+            self,
+            y_true: tf.Tensor,
+            z_pred: tf.Tensor,
+            phase_manager: TrainingPhaseManager,
+            train_sample_weights: Optional[Dict[float, float]] = None,
+            val_sample_weights: Optional[Dict[float, float]] = None,
+            reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
+    ) -> tf.Tensor:
+        """
+        Computes the PDC (Pairwise Distance Correlation) loss with diagonal terms excluded.
+
+        Args:
+            y_true: A batch of true label values, shape of [batch_size, 1]
+            z_pred: A batch of predicted feature vectors, shape of [batch_size, n_features]
+            phase_manager: Manager that tracks training/validation phase
+            train_sample_weights: Dictionary mapping label values to weights during training
+            val_sample_weights: Dictionary mapping label values to weights during validation
+            reduction: Type of reduction to apply (Note: loss is scalar, reduction has no effect)
+
+        Returns:
+            The PDC loss value as a scalar tensor
+        """
+        batch_size = tf.shape(y_true)[0]
+        dtype = z_pred.dtype
+        y_true = tf.cast(y_true, dtype)
+
+        # First upper diagonal differences (avoid tf.norm to save computation)
+        # Compute sum of squared differences directly
+        fup_z_squared = tf.reduce_sum(
+            tf.square(z_pred[:-1] - z_pred[1:]), axis=-1
+        )
+        fup_y = tf.squeeze(y_true[:-1] - y_true[1:])
+
+        # Remaining differences from first element
+        rem_z_squared = tf.reduce_sum(
+            tf.square(z_pred[0:1] - z_pred[2:]), axis=-1
+        )
+        rem_y = tf.squeeze(y_true[0:1] - y_true[2:])
+
+        # Concatenate all differences
+        z_squared = tf.concat([fup_z_squared, rem_z_squared], axis=0)  # Shape: [2N-3]
+        y_squared = tf.concat([tf.square(fup_y), tf.square(rem_y)], axis=0)  # Shape: [2N-3]
+
+        # print y_diff_squared, z_diff_squared
+        # print(f"y_diff_squared:\n {y_diff_squared},\n z_diff_squared:\n {z_diff_squared}")
+
+        # means
+        Dy_mean = tf.reduce_mean(y_squared)
+        Dz_mean = tf.reduce_mean(z_squared)
+
+        # Center the variables
+        Dy_centered = y_squared - Dy_mean
+        Dz_centered = z_squared - Dz_mean
+
+        # print Dy_mean, Dz_mean
+        # print(f"Dy_mean: {Dy_mean}, Dz_mean: {Dz_mean}")
+
+        # print Dy_centered, Dz_centered
+        # print(f"Dy_centered: {Dy_centered}, Dz_centered: {Dz_centered}")
+
+        # Create weights matrix
+        weights = tf.ones((2 * batch_size - 3,), dtype=dtype)
+
+        if sample_weights := (train_sample_weights if phase_manager.is_training_phase() else val_sample_weights):
+            weights = tf.concat(
+                [
+                    create_weight_tensor_fast(y_true[:-1], sample_weights)
+                    * create_weight_tensor_fast(y_true[1:], sample_weights),
+                    create_weight_tensor_fast(y_true[0:1], sample_weights)
+                    * create_weight_tensor_fast(y_true[2:], sample_weights),
+                ],
+                axis=0,
+            )
+            weights = tf.cast(weights, dtype=dtype)
+
+        # print weights_matrix
+        # print(weights_matrix)
+
+        print(weights)
+
+        # Compute moments
+        cov_Dy_Dz = tf.reduce_sum(weights * Dy_centered * Dz_centered)
+        var_Dy = tf.reduce_sum(weights * tf.square(Dy_centered))
+        var_Dz = tf.reduce_sum(weights * tf.square(Dz_centered))
+
+        # print cov_Dy_Dz, var_Dy, var_Dz
+        # print(f"cov_Dy_Dz: {cov_Dy_Dz}, var_Dy: {var_Dy}, var_Dz: {var_Dz}")
+
+        pcc = cov_Dy_Dz / tf.sqrt((var_Dy * var_Dz) + tf.keras.backend.epsilon())
+        # print pcc
+        # print(f"pcc: {pcc}")
+
+        # Compute correlation
+        return 1.0 - pcc
+
+    def pdc_loss_vec_slow(
             self,
             y_true: tf.Tensor,
             z_pred: tf.Tensor,
@@ -2200,6 +2296,74 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
+    def pds_loss_linear_vec(
+        self,
+        y_true: tf.Tensor, z_pred: tf.Tensor,
+        phase_manager: TrainingPhaseManager,
+        train_sample_weights: dict = None,
+        val_sample_weights: dict = None,
+        reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
+    ) -> tf.Tensor:
+        """
+        Optimized version of PDS loss computation for d-dimensional vectors.
+
+        :param y_true: A batch of true label values, shape of [batch_size, 1].
+        :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
+        :param phase_manager: Manager that tracks whether we are in training or validation phase.
+        :param train_sample_weights: A dictionary mapping label values to their corresponding reweight during training.
+        :param val_sample_weights: A dictionary mapping label values to their corresponding reweight during validation.
+        :param reduction: The type of reduction to apply to the loss.
+        :return: The weighted average error for the unique combinations of samples in the batch.
+        """
+        batch_size = tf.shape(y_true)[0]
+        dtype = z_pred.dtype
+        y_true = tf.cast(y_true, dtype)
+
+        # First upper diagonal differences (avoid tf.norm to save computation)
+        # Compute sum of squared differences directly
+        fup_z_squared = tf.reduce_sum(
+            tf.square(z_pred[:-1] - z_pred[1:]), axis=-1
+        )
+        fup_y = tf.squeeze(y_true[:-1] - y_true[1:])
+
+        # Remaining differences from first element
+        rem_z_squared = tf.reduce_sum(
+            tf.square(z_pred[0:1] - z_pred[2:]), axis=-1
+        )
+        rem_y = tf.squeeze(y_true[0:1] - y_true[2:])
+
+        # Concatenate all differences
+        z_squared = tf.concat([fup_z_squared, rem_z_squared], axis=0)  # Shape: [2N-3]
+        y_squared = tf.concat([tf.square(fup_y), tf.square(rem_y)], axis=0)  # Shape: [2N-3]
+
+        # Compute the loss
+        pairwise_loss = tf.square(z_squared - y_squared)
+
+        # Apply sample weights if provided
+        sample_weights = (
+            train_sample_weights if phase_manager.is_training_phase() else val_sample_weights
+        )
+        if sample_weights:
+            weights = tf.concat(
+                [
+                    create_weight_tensor_fast(y_true[:-1], sample_weights)
+                    * create_weight_tensor_fast(y_true[1:], sample_weights),
+                    create_weight_tensor_fast(y_true[0:1], sample_weights)
+                    * create_weight_tensor_fast(y_true[2:], sample_weights),
+                ],
+                axis=0,
+            )
+            pairwise_loss *= tf.cast(weights, dtype=dtype)
+
+        total_error = tf.reduce_sum(pairwise_loss)
+
+        if reduction == tf.keras.losses.Reduction.SUM:
+            return total_error
+        elif reduction == tf.keras.losses.Reduction.NONE:
+            return total_error / tf.cast(batch_size * (batch_size - 1), dtype=dtype)
+        else:
+            raise ValueError(f"Unsupported reduction type: {reduction}.")
+
     def update_pair_counts(self, label1, label2):
         label1 = label1[0]
         label2 = label2[0]
@@ -2257,51 +2421,7 @@ class ModelBuilder:
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
-    def pds_olin_loss(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
-        """
-        Computes the loss for a batch of predicted features and their labels using a specific pairing strategy.
-
-        :param y_true: A batch of true label values, shape of [batch_size, 1].
-        :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
-        :param reduction: The type of reduction to apply to the loss.
-        :return: The average error for the specified combinations of the samples in the batch.
-        """
-        int_batch_size = tf.shape(y_true)[0]
-        total_error = tf.constant(0.0, dtype=tf.float32)  # Initialize
-
-        # Shape invariant for total_error to ensure it remains a scalar
-        # total_error = tf.autograph.experimental.set_loop_options(shape_invariants=tf.constant(0.0, dtype=tf.float32))
-
-        # Loop through the first three points to create initial pairs
-        for i in tf.range(3):
-            for j in tf.range(i + 1, 3):
-                # Calculate the error for each pair
-                err = error(z_pred[i], z_pred[j], y_true[i], y_true[j])
-                total_error += tf.cast(err, dtype=tf.float32)
-
-        # Loop through the rest of the points
-        for i in tf.range(3, int_batch_size):
-            # Pair with the previous point
-            err = error(z_pred[i], z_pred[i - 1], y_true[i], y_true[i - 1])
-            total_error += tf.cast(err, dtype=tf.float32)
-
-            # Pair with the point before the previous point
-            err = error(z_pred[i], z_pred[i - 2], y_true[i], y_true[i - 2])
-            total_error += tf.cast(err, dtype=tf.float32)
-
-        # total_error = total_error / 2
-        # Calculate the number of pairs
-        num_pairs = tf.cast(2 * int_batch_size - 3, dtype=tf.float32)
-
-        # Apply reduction
-        if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error  # total loss
-        elif reduction == tf.keras.losses.Reduction.NONE:
-            return total_error / num_pairs  # average loss
-        else:
-            raise ValueError(f"Unsupported reduction type: {reduction}.")
-
-    def pds_loss_vec_distr(
+    def pds_loss_vec_mgpu(
             self,
             y_true,
             z_pred,
@@ -2311,6 +2431,7 @@ class ModelBuilder:
     ):
         """
         NOTE: only support 4 GPUs like in AI Panthers
+        TODO: needs to be fixed and support arbitrary number of even GPUs
         Vectorized computation of the loss for a batch of predicted features and their labels.
         :param y_true: A batch of true label values, shape of [batch_size, 1].
         :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
@@ -2404,64 +2525,6 @@ class ModelBuilder:
             return total_error * 0.5  # upper triangle only
         elif reduction == tf.keras.losses.Reduction.NONE:
             return total_error / num_comparisons
-        else:
-            raise ValueError(f"Unsupported reduction type: {reduction}.")
-
-    def pds_loss_unit_vec(self, y_true, z_pred, reduction=tf.keras.losses.Reduction.NONE):
-        """
-        Vectorized computation of the loss for a batch of predicted features and their labels,
-        optimized for unit vectors.
-        :param y_true: A batch of true label values, shape of [batch_size, 1].
-        :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
-        :param reduction: The type of reduction to apply to the loss.
-        :return: The average error for all unique combinations of the samples in the batch.
-        """
-        # Compute pairwise differences for y_true using broadcasting
-        y_true_diff = y_true - tf.transpose(y_true)  # labels are not normalized
-
-        # Compute pairwise dot products
-        # z_pred has shape [batch_size, d]
-        # tf.linalg.matmul(z_pred, z_pred, transpose_b=True) performs matrix multiplication of z_pred with its transpose
-        # This results in a shape of [batch_size, batch_size],
-        # where each element (i, j) is the dot product of z_pred[i] and z_pred[j]
-        # slower because of matmul
-        pairwise_dotprod = tf.linalg.matmul(z_pred, z_pred, transpose_b=True)
-
-        # Compute pairwise squared distances using the optimized formula
-        # The squared L2 distance between vectors u and v can be computed as:
-        # ||u - v||^2 = ||u||^2 + ||v||^2 - 2 * (u . v)
-        # Since ||u||^2 and ||v||^2 are both 1 for normalized vectors, this simplifies to:
-        # ||u - v||^2 = 2 - 2 * (u . v)
-        # Therefore, the pairwise squared distances can be calculated as:
-        # z_diff_squared = 2 - 2 * pairwise_dotprod
-        # This gives a shape of [batch_size, batch_size],
-        # where each element (i, j) is the squared L2 distance between z_pred[i] and z_pred[j]
-        z_diff_squared = 2 - 2 * pairwise_dotprod
-
-        # Calculate squared differences for y_true
-        y_diff_squared = tf.square(y_true_diff)
-
-        # Compute the loss for each pair
-        pairwise_loss = tf.square(z_diff_squared - y_diff_squared)
-
-        # Mask to exclude self-comparisons (where i == j)
-        batch_size = tf.shape(y_true)[0]
-        mask = 1 - tf.eye(batch_size, dtype=tf.float32)
-
-        # Apply mask to exclude self-comparisons from the loss calculation
-        pairwise_loss_masked = pairwise_loss * mask
-
-        # Sum over all unique pairs
-        total_error = 0.5 * tf.reduce_sum(pairwise_loss_masked)
-
-        # Number of unique comparisons, excluding self-pairs
-        num_comparisons = tf.cast(batch_size * (batch_size - 1) / 2, dtype=tf.float32)
-
-        if reduction == tf.keras.losses.Reduction.SUM:
-            return total_error  # upper triangle only
-        elif reduction == tf.keras.losses.Reduction.NONE:
-            # Avoid division by zero
-            return total_error / num_comparisons  # average over all elements
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
