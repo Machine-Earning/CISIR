@@ -1967,6 +1967,10 @@ class ModelBuilder:
         Returns:
             The PDC loss value as a scalar tensor
         """
+        # Cast tensors to float64 for higher precision
+        y_true = tf.cast(y_true, tf.float64)
+        z_pred = tf.cast(z_pred, tf.float64)
+
         # Compute distance matrices
         y_diff_squared = tf.square(y_true - tf.transpose(y_true))
         z_diff_squared = tf.reduce_sum(
@@ -1979,7 +1983,9 @@ class ModelBuilder:
         # print(f"y_diff_squared:\n {y_diff_squared},\n z_diff_squared:\n {z_diff_squared}")
 
         batch_size = tf.shape(y_true)[0]
+        # print(f'batch_size: {batch_size}')
         off_diag_size = tf.cast(batch_size * (batch_size - 1), dtype=z_diff_squared.dtype)
+        # print(f"off_diag_size: {off_diag_size}")
         # means
         Dy_mean = tf.reduce_sum(y_diff_squared) / off_diag_size
         Dz_mean = tf.reduce_sum(z_diff_squared) / off_diag_size
@@ -2007,7 +2013,7 @@ class ModelBuilder:
         # print(weights_matrix)
 
         # Zero out diagonal
-        weights_matrix = tf.linalg.set_diag(weights_matrix, tf.zeros(batch_size))
+        weights_matrix = tf.linalg.set_diag(weights_matrix, tf.zeros(batch_size, dtype=z_diff_squared.dtype))
 
         # print(weights_matrix)
 
@@ -2070,8 +2076,11 @@ class ModelBuilder:
         z_squared = tf.concat([fup_z_squared, rem_z_squared], axis=0)  # Shape: [2N-3]
         y_squared = tf.concat([tf.square(fup_y), tf.square(rem_y)], axis=0)  # Shape: [2N-3]
 
+        # Ensure y_squared is 1D to match z_squared
+        y_squared = tf.squeeze(y_squared, axis=1)
+
         # print y_diff_squared, z_diff_squared
-        # print(f"y_diff_squared:\n {y_diff_squared},\n z_diff_squared:\n {z_diff_squared}")
+        # print(f"y_diff_squared:\n {y_squared},\n z_diff_squared:\n {z_squared}")
 
         # means
         Dy_mean = tf.reduce_mean(y_squared)
@@ -2103,7 +2112,7 @@ class ModelBuilder:
             weights = tf.cast(weights, dtype=dtype)
 
         # print weights_matrix
-        # print(weights_matrix)
+        # print(weights)
 
         # print(weights)
 
@@ -2297,12 +2306,12 @@ class ModelBuilder:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
     def pds_loss_linear_vec(
-        self,
-        y_true: tf.Tensor, z_pred: tf.Tensor,
-        phase_manager: TrainingPhaseManager,
-        train_sample_weights: dict = None,
-        val_sample_weights: dict = None,
-        reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
+            self,
+            y_true: tf.Tensor, z_pred: tf.Tensor,
+            phase_manager: TrainingPhaseManager,
+            train_sample_weights: dict = None,
+            val_sample_weights: dict = None,
+            reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
     ) -> tf.Tensor:
         """
         Optimized version of PDS loss computation for d-dimensional vectors.
@@ -2336,6 +2345,11 @@ class ModelBuilder:
         z_squared = tf.concat([fup_z_squared, rem_z_squared], axis=0)  # Shape: [2N-3]
         y_squared = tf.concat([tf.square(fup_y), tf.square(rem_y)], axis=0)  # Shape: [2N-3]
 
+        # Ensure y_squared is 1D to match z_squared
+        y_squared = tf.squeeze(y_squared, axis=1)
+
+        # print(f'z_squared:\n {z_squared},\n y_squared:\n {y_squared}')
+
         # Compute the loss
         pairwise_loss = tf.square(z_squared - y_squared)
 
@@ -2360,7 +2374,8 @@ class ModelBuilder:
         if reduction == tf.keras.losses.Reduction.SUM:
             return total_error
         elif reduction == tf.keras.losses.Reduction.NONE:
-            return total_error / tf.cast(batch_size * (batch_size - 1), dtype=dtype)
+            batch_size = tf.cast(batch_size, dtype=dtype)
+            return total_error / (2.0 * batch_size - 3.0)
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
