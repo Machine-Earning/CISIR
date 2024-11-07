@@ -1944,7 +1944,7 @@ class ModelBuilder:
 
         return squared_difference
 
-    def pdc_loss_vec(
+    def pdc_loss_sq_vec(
             self,
             y_true: tf.Tensor,
             z_pred: tf.Tensor,
@@ -1954,7 +1954,7 @@ class ModelBuilder:
             reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
     ) -> tf.Tensor:
         """
-        Computes the PDC (Pairwise Distance Correlation) loss with diagonal terms excluded.
+        Computes the PDC (Pairwise Distance Correlation) loss with diagonal terms excluded based on square distance
 
         Args:
             y_true: A batch of true label values, shape of [batch_size, 1]
@@ -2032,6 +2032,78 @@ class ModelBuilder:
         # Compute correlation
         return 1.0 - pcc
 
+    def pdc_loss_vec(
+            self,
+            y_true: tf.Tensor,
+            z_pred: tf.Tensor,
+            phase_manager: TrainingPhaseManager,
+            train_sample_weights: Optional[Dict[float, float]] = None,
+            val_sample_weights: Optional[Dict[float, float]] = None,
+            reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
+    ) -> tf.Tensor:
+        """
+        Computes the PDC (Pairwise Distance Correlation) loss with diagonal terms excluded,
+        using absolute differences for labels and L2 norm for representations.
+
+        Args:
+            y_true: A batch of true label values, shape of [batch_size, 1]
+            z_pred: A batch of predicted feature vectors, shape of [batch_size, n_features]
+            phase_manager: Manager that tracks training/validation phase
+            train_sample_weights: Dictionary mapping label values to weights during training
+            val_sample_weights: Dictionary mapping label values to weights during validation
+            reduction: Type of reduction to apply (Note: loss is scalar, reduction has no effect)
+
+        Returns:
+            The PDC loss value as a scalar tensor
+        """
+        # Cast tensors to float64 for higher precision
+        y_true = tf.cast(y_true, tf.float64)
+        z_pred = tf.cast(z_pred, tf.float64)
+
+        # Compute distance matrices
+        # For labels: absolute difference instead of squared difference
+        y_diff = tf.abs(y_true - tf.transpose(y_true))
+
+        # For representations: L2 norm instead of squared difference
+        z_diff = tf.norm(
+            z_pred[:, tf.newaxis, :] - z_pred[tf.newaxis, :, :],
+            ord=2,  # L2 norm
+            axis=-1
+        )
+        y_diff = tf.cast(y_diff, z_diff.dtype)
+
+        batch_size = tf.shape(y_true)[0]
+        off_diag_size = tf.cast(batch_size * (batch_size - 1), dtype=z_diff.dtype)
+
+        # Compute means excluding diagonal terms
+        Dy_mean = tf.reduce_sum(y_diff) / off_diag_size
+        Dz_mean = tf.reduce_sum(z_diff) / off_diag_size
+
+        # Center the variables
+        Dy_centered = y_diff - Dy_mean
+        Dz_centered = z_diff - Dz_mean
+
+        # Create weights matrix
+        weights_matrix = tf.ones((batch_size, batch_size), dtype=z_diff.dtype)
+
+        if sample_weights := (train_sample_weights if phase_manager.is_training_phase() else val_sample_weights):
+            weights = create_weight_tensor_fast(y_true, sample_weights)
+            weights = tf.squeeze(weights)
+            weights_matrix = tf.cast(weights[:, None] * weights[None, :], z_diff.dtype)
+
+        # Zero out diagonal
+        weights_matrix = tf.linalg.set_diag(weights_matrix, tf.zeros(batch_size, dtype=z_diff.dtype))
+
+        # Compute moments
+        cov_Dy_Dz = tf.reduce_sum(weights_matrix * Dy_centered * Dz_centered)
+        var_Dy = tf.reduce_sum(weights_matrix * tf.square(Dy_centered))
+        var_Dz = tf.reduce_sum(weights_matrix * tf.square(Dz_centered))
+
+        # Compute correlation
+        pcc = cov_Dy_Dz / tf.sqrt((var_Dy * var_Dz) + tf.keras.backend.epsilon())
+
+        return 1.0 - pcc
+
     def pdc_loss_linear_vec(
             self,
             y_true: tf.Tensor,
@@ -2042,7 +2114,86 @@ class ModelBuilder:
             reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
     ) -> tf.Tensor:
         """
-        Computes the PDC (Pairwise Distance Correlation) loss with diagonal terms excluded.
+        Computes the PDC (Pairwise Distance Correlation) loss with diagonal terms excluded,
+        using absolute differences for labels and L2 norm for representations.
+
+        Args:
+            y_true: A batch of true label values, shape of [batch_size, 1]
+            z_pred: A batch of predicted feature vectors, shape of [batch_size, n_features]
+            phase_manager: Manager that tracks training/validation phase
+            train_sample_weights: Dictionary mapping label values to weights during training
+            val_sample_weights: Dictionary mapping label values to weights during validation
+            reduction: Type of reduction to apply (Note: loss is scalar, reduction has no effect)
+
+        Returns:
+            The PDC loss value as a scalar tensor
+        """
+        batch_size = tf.shape(y_true)[0]
+        dtype = z_pred.dtype
+        y_true = tf.cast(y_true, dtype)
+
+        # First upper diagonal differences
+        # Compute L2 norm for z differences
+        fup_z = tf.norm(z_pred[:-1] - z_pred[1:], ord=2, axis=-1)
+        # Absolute differences for labels
+        fup_y = tf.abs(y_true[:-1] - y_true[1:])
+
+        # Remaining differences from first element
+        rem_z = tf.norm(z_pred[0:1] - z_pred[2:], ord=2, axis=-1)
+        rem_y = tf.abs(y_true[0:1] - y_true[2:])
+
+        # Concatenate all differences
+        z_diff = tf.concat([fup_z, rem_z], axis=0)  # Shape: [2N-3]
+        y_diff = tf.concat([fup_y, rem_y], axis=0)  # Shape: [2N-3]
+
+        # Ensure y_diff is 1D to match z_diff
+        y_diff = tf.squeeze(y_diff, axis=1)
+
+        # Compute means
+        Dy_mean = tf.reduce_mean(y_diff)
+        Dz_mean = tf.reduce_mean(z_diff)
+
+        # Center the variables
+        Dy_centered = y_diff - Dy_mean
+        Dz_centered = z_diff - Dz_mean
+
+        # Create weights
+        weights = tf.ones((2 * batch_size - 3,), dtype=dtype)
+
+        if sample_weights := (train_sample_weights if phase_manager.is_training_phase() else val_sample_weights):
+            weights = tf.concat(
+                [
+                    create_weight_tensor_fast(y_true[:-1], sample_weights)
+                    * create_weight_tensor_fast(y_true[1:], sample_weights),
+                    create_weight_tensor_fast(y_true[0:1], sample_weights)
+                    * create_weight_tensor_fast(y_true[2:], sample_weights),
+                ],
+                axis=0,
+            )
+            weights = tf.cast(weights, dtype=dtype)
+
+        # Compute moments
+        cov_Dy_Dz = tf.reduce_sum(weights * Dy_centered * Dz_centered)
+        var_Dy = tf.reduce_sum(weights * tf.square(Dy_centered))
+        var_Dz = tf.reduce_sum(weights * tf.square(Dz_centered))
+
+        # Compute correlation
+        pcc = cov_Dy_Dz / tf.sqrt((var_Dy * var_Dz) + tf.keras.backend.epsilon())
+
+        return 1.0 - pcc
+
+    def pdc_loss_sq_linear_vec(
+            self,
+            y_true: tf.Tensor,
+            z_pred: tf.Tensor,
+            phase_manager: TrainingPhaseManager,
+            train_sample_weights: Optional[Dict[float, float]] = None,
+            val_sample_weights: Optional[Dict[float, float]] = None,
+            reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
+    ) -> tf.Tensor:
+        """
+        Computes the PDC (Pairwise Distance Correlation) loss with diagonal terms excluded. Based on
+        square distance for z and y
 
         Args:
             y_true: A batch of true label values, shape of [batch_size, 1]
