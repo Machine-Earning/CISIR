@@ -2408,6 +2408,71 @@ class ModelBuilder:
             reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
     ) -> tf.Tensor:
         """
+        Computes the weighted loss for a batch of predicted features and their labels,
+        using absolute differences for labels and L2 norm for representations.
+
+        :param y_true: A batch of true label values, shape of [batch_size, 1].
+        :param z_pred: A batch of predicted Z values, shape of [batch_size, 2].
+        :param phase_manager: Manager that tracks whether we are in training or validation phase.
+        :param train_sample_weights: A dictionary mapping label values to their corresponding reweight during training.
+        :param val_sample_weights: A dictionary mapping label values to their corresponding reweight during validation.
+        :param reduction: The type of reduction to apply to the loss.
+        :return: The weighted average error for all unique combinations of the samples in the batch.
+        """
+        batch_size = tf.shape(y_true)[0]
+
+        # Compute pairwise differences for z_pred and y_true using broadcasting
+        y_true_diff = y_true - tf.transpose(y_true)
+        z_pred_diff = z_pred[:, tf.newaxis, :] - z_pred[tf.newaxis, :, :]
+
+        # Calculate L2 norm for z_pred differences (no square)
+        z_diff = tf.norm(z_pred_diff, ord=2, axis=-1)
+
+        # Calculate absolute differences for y_true (no square)
+        y_diff = tf.abs(y_true_diff)
+
+        # Cast y_diff to match the data type of z_diff
+        y_diff = tf.cast(y_diff, dtype=z_diff.dtype)
+
+        # Compute the loss for each pair
+        # Now comparing absolute differences directly
+        pairwise_loss = tf.square(z_diff - y_diff)
+
+        # Select the appropriate weight dictionary based on the mode
+        sample_weights = train_sample_weights if phase_manager.is_training_phase() else val_sample_weights
+
+        # Apply sample weights if provided
+        if sample_weights is not None:
+            # Use create_weight_tensor to get the weights for y_true
+            weights = create_weight_tensor_fast(y_true, sample_weights)
+            weights_matrix = weights[:, None] * weights[None, :]
+            # Cast weights_matrix to the same data type as z_diff
+            weights_matrix = tf.cast(weights_matrix, dtype=z_diff.dtype)
+            # Apply the weights to the pairwise loss
+            pairwise_loss *= weights_matrix
+
+        # Get the total error
+        total_error = tf.reduce_sum(pairwise_loss)
+        # Number of unique comparisons, excluding self-pairs
+        num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype=z_diff.dtype)
+
+        if reduction == tf.keras.losses.Reduction.SUM:
+            return total_error * 0.5  # Consider only the upper triangle
+        elif reduction == tf.keras.losses.Reduction.NONE:
+            # Avoid division by zero
+            return total_error / num_comparisons
+        else:
+            raise ValueError(f"Unsupported reduction type: {reduction}.")
+
+    def pds_loss_sq_vec(
+            self,
+            y_true: tf.Tensor, z_pred: tf.Tensor,
+            phase_manager: TrainingPhaseManager,
+            train_sample_weights: dict = None,
+            val_sample_weights: dict = None,
+            reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
+    ) -> tf.Tensor:
+        """
         Computes the weighted loss for a batch of predicted features and their labels.
 
         :param y_true: A batch of true label values, shape of [batch_size, 1].
@@ -2457,6 +2522,76 @@ class ModelBuilder:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
     def pds_loss_linear_vec(
+            self,
+            y_true: tf.Tensor, z_pred: tf.Tensor,
+            phase_manager: TrainingPhaseManager,
+            train_sample_weights: dict = None,
+            val_sample_weights: dict = None,
+            reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
+    ) -> tf.Tensor:
+        """
+        Optimized version of PDS loss computation for d-dimensional vectors,
+        using absolute differences for labels and L2 norm for representations.
+
+        :param y_true: A batch of true label values, shape of [batch_size, 1].
+        :param z_pred: A batch of predicted Z values, shape of [batch_size, d].
+        :param phase_manager: Manager that tracks whether we are in training or validation phase.
+        :param train_sample_weights: A dictionary mapping label values to their corresponding reweight during training.
+        :param val_sample_weights: A dictionary mapping label values to their corresponding reweight during validation.
+        :param reduction: The type of reduction to apply to the loss.
+        :return: The weighted average error for the unique combinations of samples in the batch.
+        """
+        batch_size = tf.shape(y_true)[0]
+        dtype = z_pred.dtype
+        y_true = tf.cast(y_true, dtype)
+
+        # First upper diagonal differences
+        # Compute L2 norm directly for z differences
+        fup_z = tf.norm(z_pred[:-1] - z_pred[1:], ord=2, axis=-1)
+        # Absolute differences for labels
+        fup_y = tf.abs(y_true[:-1] - y_true[1:])
+
+        # Remaining differences from first element
+        rem_z = tf.norm(z_pred[0:1] - z_pred[2:], ord=2, axis=-1)
+        rem_y = tf.abs(y_true[0:1] - y_true[2:])
+
+        # Concatenate all differences
+        z_diff = tf.concat([fup_z, rem_z], axis=0)  # Shape: [2N-3]
+        y_diff = tf.concat([fup_y, rem_y], axis=0)  # Shape: [2N-3]
+
+        # Ensure y_diff is 1D to match z_diff
+        y_diff = tf.squeeze(y_diff, axis=1)
+
+        # Compute the loss directly on the differences
+        pairwise_loss = tf.square(z_diff - y_diff)
+
+        # Apply sample weights if provided
+        sample_weights = (
+            train_sample_weights if phase_manager.is_training_phase() else val_sample_weights
+        )
+        if sample_weights:
+            weights = tf.concat(
+                [
+                    create_weight_tensor_fast(y_true[:-1], sample_weights)
+                    * create_weight_tensor_fast(y_true[1:], sample_weights),
+                    create_weight_tensor_fast(y_true[0:1], sample_weights)
+                    * create_weight_tensor_fast(y_true[2:], sample_weights),
+                ],
+                axis=0,
+            )
+            pairwise_loss *= tf.cast(weights, dtype=dtype)
+
+        total_error = tf.reduce_sum(pairwise_loss)
+
+        if reduction == tf.keras.losses.Reduction.SUM:
+            return total_error
+        elif reduction == tf.keras.losses.Reduction.NONE:
+            batch_size = tf.cast(batch_size, dtype=dtype)
+            return total_error / (2.0 * batch_size - 3.0)
+        else:
+            raise ValueError(f"Unsupported reduction type: {reduction}.")
+
+    def pds_loss_linear_sq_vec(
             self,
             y_true: tf.Tensor, z_pred: tf.Tensor,
             phase_manager: TrainingPhaseManager,
