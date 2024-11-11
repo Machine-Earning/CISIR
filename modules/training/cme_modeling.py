@@ -1953,7 +1953,7 @@ class ModelBuilder:
         """
         # Cast tensors to float64 for higher precision
         batch_size = tf.shape(y_true)[0]
-        dtype = tf.float64  # Use high precision for stability
+        dtype = tf.float32  # Use high precision for stability
         y_true = tf.cast(y_true, dtype)
         z_pred = tf.cast(z_pred, dtype)
         epsilon = tf.keras.backend.epsilon()
