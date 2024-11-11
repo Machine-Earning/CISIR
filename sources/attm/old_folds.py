@@ -70,7 +70,7 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=ATTM_LR_CB_MIN_LR)
 
-                            weight_decay = WEIGHT_DECAY  # higher weight decay
+                            weight_decay = ATTM_WD  # higher weight decay
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs

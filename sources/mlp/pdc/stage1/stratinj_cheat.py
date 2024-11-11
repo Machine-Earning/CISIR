@@ -1,7 +1,6 @@
 # import os
 from datetime import datetime
 
-import numpy as np
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
@@ -25,7 +24,6 @@ from modules.training.ts_modeling import (
     create_mlp,
     filter_ds,
     set_seed,
-    stratified_4fold_split,
     stratified_batch_dataset
 )
 
@@ -61,7 +59,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'MLP_PDSstratinj_bs{batch_size}_alpha{alpha:.2f}_cheat'
+                            title = f'MLP_PDCstratinj_bs{batch_size}_alpha{alpha:.2f}_cheatNoPDS'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -79,7 +77,7 @@ def main():
 
                             hiddens = MLP_HIDDENS
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-                            pds = True
+                            pds = False
                             repr_dim = REPR_DIM
                             dropout = DROPOUT
                             activation = ACTIVATION
@@ -235,10 +233,10 @@ def main():
                                     weight_decay=weight_decay,
                                     beta_1=momentum_beta1
                                 ),
-                                loss=lambda y_true, y_pred: mb.pds_loss_vec(
+                                loss=lambda y_true, y_pred: mb.pdc_loss_vec(
                                     y_true, y_pred,
                                     phase_manager=pm,
-                                    train_sample_weights=train_weights_dict,
+                                    train_sample_weights= train_weights_dict,
                                     val_sample_weights=test_weights_dict,
                                 )
                             )

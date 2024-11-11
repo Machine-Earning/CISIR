@@ -59,12 +59,12 @@ ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
 ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 WANDB_SAVE_MODEL = False  # Save model to wandb
 RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
-SAM_RHOS = [0.05, 0.5]  # Rho values for SAM
 SKIP_REPR = True  # residual representation
 SMOOTHING_METHOD = 'moving_average'
 WINDOW_SIZE = 11
 RHO = [1e-1]
 REWEIGHTS = [(1.5, 0.75, 0.1, 0)]
+PDS_REWEIGHTS = [(0, 0)]
 LAMBDA_FACTOR = 3.3
 
 # ATTM AREA

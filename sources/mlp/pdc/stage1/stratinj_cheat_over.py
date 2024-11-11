@@ -44,7 +44,7 @@ def main():
     mb = cme_modeling.ModelBuilder()  # Model builder
     pm = TrainingPhaseManager()  # Training phase manager
 
-    for seed in SEEDS:
+    for seed in [456789]:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha, alphaV in [(0, 0)]:
@@ -59,7 +59,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'MLP_PDSstratinj_bs{batch_size}_alpha{alpha:.2f}_rho{rho:.2f}_cheat_pdc'
+                            title = f'MLP_PDCstratinj_bs{batch_size}_alpha{alpha:.2f}_cheatOF'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -69,8 +69,8 @@ def main():
                             experiment_name = f'{title}_{current_time}'
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
-                            epochs = EPOCHS
-                            patience = PDS_PATIENCE
+                            epochs = 1000 # EPOCHS
+                            patience = 3500
                             learning_rate = START_LR
                             weight_decay = WEIGHT_DECAY
                             momentum_beta1 = MOMENTUM_BETA1
@@ -225,7 +225,7 @@ def main():
                                 monitor=ES_CB_MONITOR,
                                 patience=patience,
                                 verbose=VERBOSE,
-                                restore_best_weights=ES_CB_RESTORE_WEIGHTS)
+                                restore_best_weights=False)
 
                             final_model_sep.compile(
                                 optimizer=AdamW(
@@ -236,8 +236,8 @@ def main():
                                 loss=lambda y_true, y_pred: mb.pdc_loss_vec(
                                     y_true, y_pred,
                                     phase_manager=pm,
-                                    train_sample_weights=None,  # train_weights_dict,
-                                    val_sample_weights=None,  # test_weights_dict,
+                                    train_sample_weights= train_weights_dict,
+                                    val_sample_weights=test_weights_dict,
                                 )
                             )
 
@@ -255,7 +255,7 @@ def main():
                                 batch_size=batch_size,
                                 callbacks=[
                                     reduce_lr_on_plateau,
-                                    early_stopping,
+                                    # early_stopping,
                                     WandbCallback(save_model=WANDB_SAVE_MODEL),
                                     IsTraining(pm)
                                 ],
