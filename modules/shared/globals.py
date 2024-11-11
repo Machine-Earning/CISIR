@@ -62,14 +62,8 @@ RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 SKIP_REPR = True  # residual representation
 SMOOTHING_METHOD = 'moving_average'
 WINDOW_SIZE = 11
-<<<<<<< HEAD
-RHO = [1e-1]
-REWEIGHTS = [(1.5, 0.75, 0.1, 0)]
-PDS_REWEIGHTS = [(0, 0)]
-=======
 RHO = [3e-2]
 REWEIGHTS = [(1.2, 0.6, 0.1, 0)]
->>>>>>> adf69e54071b4fdbdc541020d1eefd844ec3a69b
 LAMBDA_FACTOR = 3.3
 
 # ATTM AREA
