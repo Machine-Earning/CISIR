@@ -64,7 +64,7 @@ SKIP_REPR = True  # residual representation
 SMOOTHING_METHOD = 'moving_average'
 WINDOW_SIZE = 11
 RHO = [3e-2]
-REWEIGHTS = [(1., 0.7, 0.1, 0)]
+REWEIGHTS = [(1.2, 0.6, 0.1, 0)]
 LAMBDA_FACTOR = 3.3
 
 # ATTM AREA
