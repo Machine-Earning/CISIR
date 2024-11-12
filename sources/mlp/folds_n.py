@@ -186,14 +186,14 @@ def main():
                             # 4-fold cross-validation
                             folds_optimal_epochs = []
                             for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
-                                    load_stratified_folds(
-                                        root_dir,
-                                        inputs_to_use=inputs_to_use,
-                                        add_slope=add_slope,
-                                        outputs_to_use=outputs_to_use,
-                                        cme_speed_threshold=cme_speed_threshold,
-                                        seed=seed, shuffle=True
-                                    )
+                                load_stratified_folds(
+                                    root_dir,
+                                    inputs_to_use=inputs_to_use,
+                                    add_slope=add_slope,
+                                    outputs_to_use=outputs_to_use,
+                                    cme_speed_threshold=cme_speed_threshold,
+                                    seed=seed, shuffle=True
+                                )
                             ):
                                 print(f'Fold: {fold_idx}')
                                 # print all cme_files shapes

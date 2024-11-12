@@ -41,13 +41,7 @@ weight_paths = {
     # (False,
     #  0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-030006MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_alpha0.20_CME0_features_all.h5',
     # # inj min 
-    (False,
-     0):
-    # '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240731-084027MLP_strat_e0_5_e4_4_p6_1_p_slopeFalse_PDSinj_bs4096_alpha0.50_CME0_features_inj.h5'
-    # '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240803-153026MLP_strat_e0_5_e4_4_p6_1_p_PDSinj_bs4096_alpha2.50_rho0.00_features_inj.h5'
-        '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240803-214949MLP_strat_e0_5_e4_4_p6_1_p_PDSinj_bs4096_alpha5.00_rho0.00_features_inj.h5'
-    ,
-
+    (False, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp_pdsStratInj_bs3600_rho0.10_20241111-223107.h5',
 }
 
 
@@ -72,7 +66,7 @@ def main():
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                                 lambda_ = LAMBDA_FACTOR  # LAMBDA
                                 # Construct the title
-                                title = f'mlp_pdsS2_amse{alpha_mse:.2f}'
+                                title = f'mlp2_pdsS2_amse{alpha_mse:.2f}'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
