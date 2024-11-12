@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 
+import numpy as np
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
@@ -14,14 +15,16 @@ from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
     build_dataset,
-    create_mlp,
     evaluate_mae,
     evaluate_pcc,
     process_sep_events,
     mse_pcc,
     filter_ds,
     plot_error_hist,
-    set_seed, stratified_batch_dataset,
+    set_seed,
+    stratified_batch_dataset,
+    load_stratified_folds,
+    create_mlp2,
 )
 from modules.training.utils import get_weight_path
 
@@ -60,16 +63,16 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.5, 1, 0.1, 0)]:
+                    for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS:
                         for freeze in [False]:
-                            for rho in [1e-3]:
+                            for rho in RHO:
                                 # PARAMS
                                 outputs_to_use = OUTPUTS_TO_USE
                                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
-                                lambda_ = 3.3  # LAMBDA
+                                lambda_ = LAMBDA_FACTOR  # LAMBDA
                                 # Construct the title
-                                title = f'MLP_pdsS2_amse{alpha_mse:.2f}_SES_NoInst'
+                                title = f'mlp_pdcS2_amse{alpha_mse:.2f}'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -80,7 +83,7 @@ def main():
 
                                 set_seed(seed)
                                 patience = PATIENCE  # higher patience
-                                learning_rate = START_LR_FT  # lower due to finetuning
+                                learning_rate = START_LR  # lower due to finetuning
 
                                 reduce_lr_on_plateau = ReduceLROnPlateau(
                                     monitor=LR_CB_MONITOR,
@@ -90,33 +93,33 @@ def main():
                                     min_delta=LR_CB_MIN_DELTA,
                                     min_lr=LR_CB_MIN_LR)
 
-                                weight_decay = 1e-4  # WEIGHT_DECAY  # higher weight decay
+                                weight_decay = WEIGHT_DECAY  # higher weight decay
                                 momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                                 batch_size = BATCH_SIZE  # higher batch size
                                 epochs = EPOCHS  # higher epochs
-                                hiddens = MLP_HIDDENS
+                                hiddens = MLP_HIDDENS_S
                                 proj_hiddens = PROJ_HIDDENS
                                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                                 bandwidth = BANDWIDTH
                                 repr_dim = REPR_DIM
                                 output_dim = len(outputs_to_use)
-                                dropout = 0.6  # DROPOUT
+                                dropout = DROPOUT
                                 activation = ACTIVATION
                                 norm = NORM
                                 pds = True
                                 cme_speed_threshold = cme_speed_threshold
                                 weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
-                                residual = RESIDUAL
-                                skipped_layers = SKIPPED_LAYERS
+                                skip_repr = SKIP_REPR
+                                skipped_layers = SKIPPED_LAYERS_S
                                 N = N_FILTERED  # number of samples to keep outside the threshold
                                 lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                                 upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                                 mae_plus_threshold = MAE_PLUS_THRESHOLD
-                                smoothing_method = 'moving_average'
-                                window_size = 7  # allows margin of error of 10 epochs
+                                smoothing_method = SMOOTHING_METHOD
+                                window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
 
                                 # Initialize wandb
-                                wandb.init(project="Oct-Report", name=experiment_name, config={
+                                wandb.init(project="Jan-Report", name=experiment_name, config={
                                     "inputs_to_use": inputs_to_use,
                                     "add_slope": add_slope,
                                     "patience": patience,
@@ -146,7 +149,7 @@ def main():
                                     "stage": 2,
                                     "stage1_weights": weight_path,
                                     "cme_speed_threshold": cme_speed_threshold,
-                                    "residual": residual,
+                                    "skip_repr": skip_repr,
                                     "skipped_layers": skipped_layers,
                                     'ds_version': DS_VERSION,
                                     'mae_plus_th': mae_plus_threshold,
@@ -209,208 +212,195 @@ def main():
                                     N=N, seed=seed)
 
                                 # 4-fold cross-validation
-                                # folds_optimal_epochs = []
-                                # for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
-                                #         stratified_4fold_split(X_train, y_train, seed=seed, shuffle=True)):
-                                #     print(f'Fold: {fold_idx}')
-
-                                # build subtraining and validation from paths
-                                X_subtrain, y_subtrain = build_dataset(
-                                    root_dir + '/subtraining',
-                                    inputs_to_use=inputs_to_use,
-                                    add_slope=add_slope,
-                                    outputs_to_use=outputs_to_use,
-                                    cme_speed_threshold=cme_speed_threshold,
-                                    shuffle_data=True)
-
-                                X_val, y_val = build_dataset(
-                                    root_dir + '/validation',
-                                    inputs_to_use=inputs_to_use,
-                                    add_slope=add_slope,
-                                    outputs_to_use=outputs_to_use,
-                                    cme_speed_threshold=cme_speed_threshold)
-
-                                # print all cme_files shapes
-                                print(f'X_subtrain.shape: {X_subtrain.shape}, y_subtrain.shape: {y_subtrain.shape}')
-                                print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val.shape}')
-
-                                # Compute the sample weights for subtraining
-                                delta_subtrain = y_subtrain[:, 0]
-                                print(f'delta_subtrain.shape: {delta_subtrain.shape}')
-                                print(f'rebalancing the subtraining set...')
-                                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
-                                mse_subtrain_weights_dict = exDenseReweightsD(
-                                    X_subtrain, delta_subtrain,
-                                    alpha=alpha_mse, bw=bandwidth,
-                                    min_norm_weight=min_norm_weight,
-                                    debug=False).label_reweight_dict
-                                pcc_subtrain_weights_dict = exDenseReweightsD(
-                                    X_subtrain, delta_subtrain,
-                                    alpha=alpha_pcc, bw=bandwidth,
-                                    min_norm_weight=min_norm_weight,
-                                    debug=False).label_reweight_dict
-                                print(f'subtraining set rebalanced.')
-
-                                # Compute the sample weights for validation
-                                delta_val = y_val[:, 0]
-                                print(f'delta_val.shape: {delta_val.shape}')
-                                print(f'rebalancing the validation set...')
-                                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
-                                mse_val_weights_dict = exDenseReweightsD(
-                                    X_val, delta_val,
-                                    alpha=alphaV_mse, bw=bandwidth,
-                                    min_norm_weight=min_norm_weight,
-                                    debug=False).label_reweight_dict
-                                pcc_val_weights_dict = exDenseReweightsD(
-                                    X_val, delta_val,
-                                    alpha=alphaV_pcc, bw=bandwidth,
-                                    min_norm_weight=min_norm_weight,
-                                    debug=False).label_reweight_dict
-                                print(f'validation set rebalanced.')
-
-                                # create the model
-                                model_sep_stage1 = create_mlp(
-                                    input_dim=n_features,
-                                    hiddens=hiddens,
-                                    output_dim=0,
-                                    pds=pds,
-                                    repr_dim=repr_dim,
-                                    dropout=dropout,
-                                    activation=activation,
-                                    norm=norm,
-                                    residual=residual,
-                                    skipped_layers=skipped_layers
-                                )
-                                model_sep_stage1.summary()
-
-                                # load the weights from the first stage
-                                print(f'weights loading from: {weight_path}')
-                                model_sep_stage1.load_weights(weight_path)
-                                # print the save
-                                print(f'weights loaded successfully from: {weight_path}')
-
-                                # Log t-SNE plot for training
-                                # Log the training t-SNE plot to wandb
-                                stage1_file_path = plot_tsne_delta(
-                                    model_sep_stage1,
-                                    X_train_filtered, y_train_filtered, title,
-                                    'stage1_training',
-                                    model_type='features',
-                                    save_tag=current_time, seed=seed)
-                                wandb.log({'stage1_tsne_training_plot': wandb.Image(stage1_file_path)})
-                                print('stage1_file_path: ' + stage1_file_path)
-
-                                # Log t-SNE plot for testing
-                                # Log the testing t-SNE plot to wandb
-                                stage1_file_path = plot_tsne_delta(
-                                    model_sep_stage1,
-                                    X_test_filtered, y_test_filtered, title,
-                                    'stage1_testing',
-                                    model_type='features',
-                                    save_tag=current_time, seed=seed)
-                                wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
-                                print('stage1_file_path: ' + stage1_file_path)
-
-                                model_sep = mb.add_proj_head(
-                                    model_sep_stage1,
-                                    output_dim=output_dim,
-                                    freeze_features=freeze,
-                                    pds=pds,
-                                    hiddens=proj_hiddens,
-                                    dropout=dropout,
-                                    activation=activation,
-                                    norm=norm,
-                                    residual=residual,
-                                    skipped_layers=skipped_layers,
-                                    name='mlp',
-                                    sam_rho=rho
-                                )
-                                model_sep.summary()
-
-                                # Define the EarlyStopping callback
-                                # early_stopping = EarlyStopping(
-                                #     monitor=ES_CB_MONITOR,
-                                #     patience=patience,
-                                #     verbose=VERBOSE,
-                                #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
-
-                                early_stopping = SmoothEarlyStopping(
-                                    monitor=ES_CB_MONITOR,
-                                    patience=patience,
-                                    verbose=VERBOSE,
-                                    restore_best_weights=ES_CB_RESTORE_WEIGHTS,
-                                    smoothing_method=smoothing_method,  # 'moving_average'
-                                    smoothing_parameters={'window_size': window_size})  # 10
-
-                                # Compile the model with the specified learning rate
-                                model_sep.compile(
-                                    optimizer=AdamW(
-                                        learning_rate=learning_rate,
-                                        weight_decay=weight_decay,
-                                        beta_1=momentum_beta1
-                                    ),
-                                    loss={
-                                        'forecast_head': lambda y_true, y_pred: mse_pcc(
-                                            y_true, y_pred,
-                                            phase_manager=pm,
-                                            lambda_factor=lambda_,
-                                            train_mse_weight_dict=mse_subtrain_weights_dict,
-                                            train_pcc_weight_dict=pcc_subtrain_weights_dict,
-                                            val_mse_weight_dict=mse_val_weights_dict,
-                                            val_pcc_weight_dict=pcc_val_weights_dict,
+                                folds_optimal_epochs = []
+                                for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
+                                        load_stratified_folds(
+                                            root_dir,
+                                            inputs_to_use=inputs_to_use,
+                                            add_slope=add_slope,
+                                            outputs_to_use=outputs_to_use,
+                                            cme_speed_threshold=cme_speed_threshold,
+                                            seed=seed, shuffle=True
                                         )
-                                    }
-                                )
+                                ):
+                                    print(f'Fold: {fold_idx}')
+                                    # print all cme_files shapes
+                                    print(f'X_subtrain.shape: {X_subtrain.shape}, y_subtrain.shape: {y_subtrain.shape}')
+                                    print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val.shape}')
 
-                                # Step 1: Create stratified dataset for the subtraining and validation set
-                                subtrain_ds, subtrain_steps = stratified_batch_dataset(
-                                    X_subtrain, y_subtrain, batch_size)
-                                val_ds, val_steps = stratified_batch_dataset(
-                                    X_val, y_val, batch_size)
+                                    # Compute the sample weights for subtraining
+                                    delta_subtrain = y_subtrain[:, 0]
+                                    print(f'delta_subtrain.shape: {delta_subtrain.shape}')
+                                    print(f'rebalancing the subtraining set...')
+                                    min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
+                                    mse_subtrain_weights_dict = exDenseReweightsD(
+                                        X_subtrain, delta_subtrain,
+                                        alpha=alpha_mse, bw=bandwidth,
+                                        min_norm_weight=min_norm_weight,
+                                        debug=False).label_reweight_dict
+                                    pcc_subtrain_weights_dict = exDenseReweightsD(
+                                        X_subtrain, delta_subtrain,
+                                        alpha=alpha_pcc, bw=bandwidth,
+                                        min_norm_weight=min_norm_weight,
+                                        debug=False).label_reweight_dict
+                                    print(f'subtraining set rebalanced.')
 
-                                # Map the subtraining dataset to return {'output': y} format
-                                subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'forecast_head': y}))
-                                val_ds = val_ds.map(lambda x, y: (x, {'forecast_head': y}))
+                                    # Compute the sample weights for validation
+                                    delta_val = y_val[:, 0]
+                                    print(f'delta_val.shape: {delta_val.shape}')
+                                    print(f'rebalancing the validation set...')
+                                    min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
+                                    mse_val_weights_dict = exDenseReweightsD(
+                                        X_val, delta_val,
+                                        alpha=alphaV_mse, bw=bandwidth,
+                                        min_norm_weight=min_norm_weight,
+                                        debug=False).label_reweight_dict
+                                    pcc_val_weights_dict = exDenseReweightsD(
+                                        X_val, delta_val,
+                                        alpha=alphaV_pcc, bw=bandwidth,
+                                        min_norm_weight=min_norm_weight,
+                                        debug=False).label_reweight_dict
+                                    print(f'validation set rebalanced.')
 
-                                # Train the model with the callback
-                                history = model_sep.fit(
-                                    subtrain_ds,
-                                    steps_per_epoch=subtrain_steps,
-                                    epochs=epochs, batch_size=batch_size,
-                                    validation_data=val_ds,
-                                    validation_steps=val_steps,
-                                    callbacks=[
-                                        early_stopping,
-                                        reduce_lr_on_plateau,
-                                        WandbCallback(save_model=WANDB_SAVE_MODEL),
-                                        IsTraining(pm)
-                                    ],
-                                    verbose=VERBOSE
-                                )
+                                    # create the model
+                                    model_sep_stage1 = create_mlp2(
+                                        input_dim=n_features,
+                                        hiddens=hiddens,
+                                        output_dim=0,
+                                        pds=pds,
+                                        repr_dim=repr_dim,
+                                        dropout=dropout,
+                                        activation=activation,
+                                        norm=norm,
+                                        skip_repr=skip_repr,
+                                        skipped_layers=skipped_layers
+                                    )
+                                    model_sep_stage1.summary()
 
-                                # optimal epoch for fold
-                                # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
-                                # Use the quadratic fit function to find the optimal epoch
-                                optimal_epoch = find_optimal_epoch_by_smoothing(
-                                    history.history[ES_CB_MONITOR],
-                                    smoothing_method=smoothing_method,
-                                    smoothing_parameters={'window_size': window_size},
-                                    mode='min')
+                                    # load the weights from the first stage
+                                    print(f'weights loading from: {weight_path}')
+                                    model_sep_stage1.load_weights(weight_path)
+                                    # print the save
+                                    print(f'weights loaded successfully from: {weight_path}')
 
-                                # folds_optimal_epochs.append(optimal_epoch)
-                                # wandb log the fold's optimal
-                                # print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
-                                # wandb.log({f'fold_{fold_idx}_best_epoch': folds_optimal_epochs[-1]})
-                                print(f'optimal_epoch: {optimal_epoch}')
-                                wandb.log({'optimal_epoch': optimal_epoch})
+                                    # Log t-SNE plot for training
+                                    # Log the training t-SNE plot to wandb
+                                    stage1_file_path = plot_tsne_delta(
+                                        model_sep_stage1,
+                                        X_train_filtered, y_train_filtered, title,
+                                        'stage1_training',
+                                        model_type='features',
+                                        save_tag=current_time, seed=seed)
+                                    wandb.log({'stage1_tsne_training_plot': wandb.Image(stage1_file_path)})
+                                    print('stage1_file_path: ' + stage1_file_path)
+
+                                    # Log t-SNE plot for testing
+                                    # Log the testing t-SNE plot to wandb
+                                    stage1_file_path = plot_tsne_delta(
+                                        model_sep_stage1,
+                                        X_test_filtered, y_test_filtered, title,
+                                        'stage1_testing',
+                                        model_type='features',
+                                        save_tag=current_time, seed=seed)
+                                    wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
+                                    print('stage1_file_path: ' + stage1_file_path)
+
+                                    model_sep = mb.add_proj_head(
+                                        model_sep_stage1,
+                                        output_dim=output_dim,
+                                        freeze_features=freeze,
+                                        pds=pds,
+                                        hiddens=proj_hiddens,
+                                        dropout=dropout,
+                                        activation=activation,
+                                        norm=norm,
+                                        skipped_layers=skipped_layers,
+                                        name='mlp',
+                                        sam_rho=rho
+                                    )
+                                    model_sep.summary()
+
+                                    # Define the EarlyStopping callback
+                                    # early_stopping = EarlyStopping(
+                                    #     monitor=ES_CB_MONITOR,
+                                    #     patience=patience,
+                                    #     verbose=VERBOSE,
+                                    #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
+
+                                    early_stopping = SmoothEarlyStopping(
+                                        monitor=ES_CB_MONITOR,
+                                        patience=patience,
+                                        verbose=VERBOSE,
+                                        restore_best_weights=ES_CB_RESTORE_WEIGHTS,
+                                        smoothing_method=smoothing_method,  # 'moving_average'
+                                        smoothing_parameters={'window_size': window_size})  # 10
+
+                                    # Compile the model with the specified learning rate
+                                    model_sep.compile(
+                                        optimizer=AdamW(
+                                            learning_rate=learning_rate,
+                                            weight_decay=weight_decay,
+                                            beta_1=momentum_beta1
+                                        ),
+                                        loss={
+                                            'forecast_head': lambda y_true, y_pred: mse_pcc(
+                                                y_true, y_pred,
+                                                phase_manager=pm,
+                                                lambda_factor=lambda_,
+                                                train_mse_weight_dict=mse_subtrain_weights_dict,
+                                                train_pcc_weight_dict=pcc_subtrain_weights_dict,
+                                                val_mse_weight_dict=mse_val_weights_dict,
+                                                val_pcc_weight_dict=pcc_val_weights_dict,
+                                            )
+                                        }
+                                    )
+
+                                    # Step 1: Create stratified dataset for the subtraining and validation set
+                                    subtrain_ds, subtrain_steps = stratified_batch_dataset(
+                                        X_subtrain, y_subtrain, batch_size)
+                                    val_ds, val_steps = stratified_batch_dataset(
+                                        X_val, y_val, batch_size)
+
+                                    # Map the subtraining dataset to return {'output': y} format
+                                    subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'forecast_head': y}))
+                                    val_ds = val_ds.map(lambda x, y: (x, {'forecast_head': y}))
+
+                                    # Train the model with the callback
+                                    history = model_sep.fit(
+                                        subtrain_ds,
+                                        steps_per_epoch=subtrain_steps,
+                                        epochs=epochs, batch_size=batch_size,
+                                        validation_data=val_ds,
+                                        validation_steps=val_steps,
+                                        callbacks=[
+                                            early_stopping,
+                                            reduce_lr_on_plateau,
+                                            WandbCallback(save_model=WANDB_SAVE_MODEL),
+                                            IsTraining(pm)
+                                        ],
+                                        verbose=VERBOSE
+                                    )
+
+                                    # optimal epoch for fold
+                                    # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
+                                    # Use the quadratic fit function to find the optimal epoch
+                                    optimal_epoch = find_optimal_epoch_by_smoothing(
+                                        history.history[ES_CB_MONITOR],
+                                        smoothing_method=smoothing_method,
+                                        smoothing_parameters={'window_size': window_size},
+                                        mode='min')
+
+                                    folds_optimal_epochs.append(optimal_epoch)
+                                    # wandb log the fold's optimal
+                                    print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
+                                    wandb.log({f'fold_{fold_idx}_best_epoch': folds_optimal_epochs[-1]})
 
                                 # determine the optimal number of epochs from the folds
-                                # optimal_epochs = int(np.mean(folds_optimal_epochs))
-                                optimal_epochs = int(optimal_epoch)
+                                optimal_epochs = int(np.mean(folds_optimal_epochs))
                                 print(f'optimal_epochs: {optimal_epochs}')
                                 wandb.log({'optimal_epochs': optimal_epochs})
 
-                                final_model_sep_stage1 = create_mlp(
+                                final_model_sep_stage1 = create_mlp2(
                                     input_dim=n_features,
                                     hiddens=hiddens,
                                     output_dim=0,
@@ -419,7 +409,7 @@ def main():
                                     dropout=dropout,
                                     activation=activation,
                                     norm=norm,
-                                    residual=residual,
+                                    skip_repr=skip_repr,
                                     skipped_layers=skipped_layers
                                 )
                                 final_model_sep_stage1.load_weights(weight_path)
@@ -434,7 +424,6 @@ def main():
                                     dropout=dropout,
                                     activation=activation,
                                     norm=norm,
-                                    residual=residual,
                                     skipped_layers=skipped_layers,
                                     name='mlp',
                                     sam_rho=rho

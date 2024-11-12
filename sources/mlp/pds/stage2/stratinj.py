@@ -15,15 +15,16 @@ from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
     build_dataset,
-    create_mlp,
     evaluate_mae,
     evaluate_pcc,
     process_sep_events,
     mse_pcc,
     filter_ds,
-    load_stratified_folds,
     plot_error_hist,
-    set_seed, stratified_batch_dataset,
+    set_seed,
+    stratified_batch_dataset,
+    load_stratified_folds,
+    create_mlp2,
 )
 from modules.training.utils import get_weight_path
 
@@ -62,16 +63,16 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1.5, 1, 0.1, 0)]:
+                    for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS:
                         for freeze in [False]:
-                            for rho in [1e-3]:
+                            for rho in RHO:
                                 # PARAMS
                                 outputs_to_use = OUTPUTS_TO_USE
                                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
-                                lambda_ = 3.3  # LAMBDA
+                                lambda_ = LAMBDA_FACTOR  # LAMBDA
                                 # Construct the title
-                                title = f'MLP_pdsS2_amse{alpha_mse:.2f}_SES'
+                                title = f'mlp_pdsS2_amse{alpha_mse:.2f}'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -82,7 +83,7 @@ def main():
 
                                 set_seed(seed)
                                 patience = PATIENCE  # higher patience
-                                learning_rate = START_LR_FT  # lower due to finetuning
+                                learning_rate = START_LR  # lower due to finetuning
 
                                 reduce_lr_on_plateau = ReduceLROnPlateau(
                                     monitor=LR_CB_MONITOR,
@@ -94,9 +95,9 @@ def main():
 
                                 weight_decay = WEIGHT_DECAY  # higher weight decay
                                 momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                                batch_size = 3600  # BATCH_SIZE  # higher batch size
+                                batch_size = BATCH_SIZE  # higher batch size
                                 epochs = EPOCHS  # higher epochs
-                                hiddens = MLP_HIDDENS
+                                hiddens = MLP_HIDDENS_S
                                 proj_hiddens = PROJ_HIDDENS
                                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                                 bandwidth = BANDWIDTH
@@ -108,8 +109,8 @@ def main():
                                 pds = True
                                 cme_speed_threshold = cme_speed_threshold
                                 weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
-                                residual = RESIDUAL
-                                skipped_layers = SKIPPED_LAYERS
+                                skip_repr = SKIP_REPR
+                                skipped_layers = SKIPPED_LAYERS_S
                                 N = N_FILTERED  # number of samples to keep outside the threshold
                                 lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                                 upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
@@ -118,7 +119,7 @@ def main():
                                 window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
 
                                 # Initialize wandb
-                                wandb.init(project="Report-Test", name=experiment_name, config={
+                                wandb.init(project="Jan-Report", name=experiment_name, config={
                                     "inputs_to_use": inputs_to_use,
                                     "add_slope": add_slope,
                                     "patience": patience,
@@ -148,7 +149,7 @@ def main():
                                     "stage": 2,
                                     "stage1_weights": weight_path,
                                     "cme_speed_threshold": cme_speed_threshold,
-                                    "residual": residual,
+                                    "skip_repr": skip_repr,
                                     "skipped_layers": skipped_layers,
                                     'ds_version': DS_VERSION,
                                     'mae_plus_th': mae_plus_threshold,
@@ -213,14 +214,14 @@ def main():
                                 # 4-fold cross-validation
                                 folds_optimal_epochs = []
                                 for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
-                                    load_stratified_folds(
-                                        root_dir,
-                                        inputs_to_use=inputs_to_use,
-                                        add_slope=add_slope,
-                                        outputs_to_use=outputs_to_use,
-                                        cme_speed_threshold=cme_speed_threshold,
-                                        seed=seed, shuffle=True
-                                    )
+                                        load_stratified_folds(
+                                            root_dir,
+                                            inputs_to_use=inputs_to_use,
+                                            add_slope=add_slope,
+                                            outputs_to_use=outputs_to_use,
+                                            cme_speed_threshold=cme_speed_threshold,
+                                            seed=seed, shuffle=True
+                                        )
                                 ):
                                     print(f'Fold: {fold_idx}')
                                     # print all cme_files shapes
@@ -262,7 +263,7 @@ def main():
                                     print(f'validation set rebalanced.')
 
                                     # create the model
-                                    model_sep_stage1 = create_mlp(
+                                    model_sep_stage1 = create_mlp2(
                                         input_dim=n_features,
                                         hiddens=hiddens,
                                         output_dim=0,
@@ -271,7 +272,7 @@ def main():
                                         dropout=dropout,
                                         activation=activation,
                                         norm=norm,
-                                        residual=residual,
+                                        skip_repr=skip_repr,
                                         skipped_layers=skipped_layers
                                     )
                                     model_sep_stage1.summary()
@@ -313,7 +314,6 @@ def main():
                                         dropout=dropout,
                                         activation=activation,
                                         norm=norm,
-                                        residual=residual,
                                         skipped_layers=skipped_layers,
                                         name='mlp',
                                         sam_rho=rho
@@ -389,6 +389,7 @@ def main():
                                         smoothing_method=smoothing_method,
                                         smoothing_parameters={'window_size': window_size},
                                         mode='min')
+
                                     folds_optimal_epochs.append(optimal_epoch)
                                     # wandb log the fold's optimal
                                     print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
@@ -399,7 +400,7 @@ def main():
                                 print(f'optimal_epochs: {optimal_epochs}')
                                 wandb.log({'optimal_epochs': optimal_epochs})
 
-                                final_model_sep_stage1 = create_mlp(
+                                final_model_sep_stage1 = create_mlp2(
                                     input_dim=n_features,
                                     hiddens=hiddens,
                                     output_dim=0,
@@ -408,7 +409,7 @@ def main():
                                     dropout=dropout,
                                     activation=activation,
                                     norm=norm,
-                                    residual=residual,
+                                    skip_repr=skip_repr,
                                     skipped_layers=skipped_layers
                                 )
                                 final_model_sep_stage1.load_weights(weight_path)
@@ -423,7 +424,6 @@ def main():
                                     dropout=dropout,
                                     activation=activation,
                                     norm=norm,
-                                    residual=residual,
                                     skipped_layers=skipped_layers,
                                     name='mlp',
                                     sam_rho=rho

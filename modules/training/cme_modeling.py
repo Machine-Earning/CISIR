@@ -255,7 +255,6 @@ class ModelBuilder:
                       dropout: float = 0.0,
                       activation=None,
                       norm: str = None,
-                      residual: bool = False,
                       skipped_layers: int = 2,
                       name: str = 'mlp',
                       sam_rho: float = 0.05) -> Model:
@@ -272,7 +271,6 @@ class ModelBuilder:
         :param dropout: Dropout rate for adding dropout layers.
         :param activation: Activation function to use. If None, defaults to LeakyReLU.
         :param norm: Type of normalization ('batch_norm' or 'layer_norm').
-        :param residual: Whether to add residual connections for every 'skipped_layers' hidden layers.
         :param skipped_layers: Number of layers between residual connections.
         :param name: Name of the model.
         :param sam_rho: Rho value for sharpness-aware minimization (SAM). Default is 0.05. if 0.0, SAM is not used.
@@ -284,6 +282,8 @@ class ModelBuilder:
 
         if activation is None:
             activation = LeakyReLU()
+
+        residual = True if skipped_layers > 0 else False
 
         print(f'Features are frozen: {freeze_features}')
 
