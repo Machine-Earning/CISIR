@@ -63,7 +63,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'mlp2ae_pdcStratInj_bs{batch_size}_rho{rho:.2f}'
+                            title = f'mlp2ae_pdcStratInj_bs{batch_size}_rho{rho:.2f}_OF'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -202,152 +202,6 @@ def main():
                                 high_threshold=upper_threshold,
                                 N=N, seed=seed)
 
-                            # 4-fold cross-validation
-                            folds_optimal_epochs = []
-                            for fold_idx, (X_subtrain, y_subtrain_norm, X_val, y_val_norm) in enumerate(
-                                    load_stratified_folds(
-                                        root_dir,
-                                        inputs_to_use=inputs_to_use,
-                                        add_slope=add_slope,
-                                        outputs_to_use=outputs_to_use,
-                                        cme_speed_threshold=cme_speed_threshold,
-                                        seed=seed, shuffle=True
-                                    )
-                            ):
-                                print(f'Fold: {fold_idx}')
-                                # print all cme_files shapes
-                                print(
-                                    f'X_subtrain.shape: {X_subtrain.shape}, y_subtrain.shape: {y_subtrain_norm.shape}')
-                                print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val_norm.shape}')
-
-                                # Compute the sample weights for subtraining
-                                delta_subtrain = y_subtrain_norm[:, 0]
-                                print(f'delta_subtrain.shape: {delta_subtrain.shape}')
-                                print(f'rebalancing the subtraining set...')
-                                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
-                                subtrain_weights_dict = exDenseReweightsD(
-                                    X_subtrain, delta_subtrain,
-                                    alpha=alpha, bw=bandwidth,
-                                    min_norm_weight=min_norm_weight,
-                                    debug=False).label_reweight_dict
-                                print(f'subtraining set rebalanced.')
-
-                                # Compute the sample weights for validation
-                                delta_val = y_val_norm[:, 0]
-                                print(f'delta_val.shape: {delta_val.shape}')
-                                print(f'rebalancing the validation set...')
-                                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
-                                val_weights_dict = exDenseReweightsD(
-                                    X_val, delta_val,
-                                    alpha=alphaV, bw=bandwidth,
-                                    min_norm_weight=min_norm_weight,
-                                    debug=False).label_reweight_dict
-                                print(f'validation set rebalanced.')
-
-                                # create the model
-                                encoder_model = create_mlp2(
-                                    input_dim=n_features,
-                                    hiddens=hiddens,
-                                    output_dim=0,
-                                    pds=pds,
-                                    repr_dim=repr_dim,
-                                    dropout=dropout,
-                                    activation=activation,
-                                    norm=norm,
-                                    skip_repr=skip_repr,
-                                    skipped_layers=skipped_layers,
-                                    sam_rho=rho,
-                                )
-
-                                # Add decoder to create the autoencoder model
-                                model_sep = add_decoder(
-                                    encoder_model=encoder_model,
-                                    hiddens=hiddens,
-                                    activation=activation,
-                                    norm=norm,
-                                    dropout=dropout,
-                                    skip_connections=(skipped_layers > 0)
-                                )
-
-                                model_sep.summary()
-
-                                # Define the EarlyStopping callback
-                                # early_stopping = EarlyStopping(
-                                #     monitor=ES_CB_MONITOR,
-                                #     patience=patience,
-                                #     verbose=VERBOSE,
-                                #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
-                                early_stopping = SmoothEarlyStopping(
-                                    monitor=ES_CB_MONITOR,
-                                    patience=patience,
-                                    verbose=VERBOSE,
-                                    restore_best_weights=ES_CB_RESTORE_WEIGHTS,
-                                    smoothing_method=smoothing_method,  # 'moving_average'
-                                    smoothing_parameters={'window_size': window_size})  # 10
-
-                                model_sep.compile(
-                                    optimizer=AdamW(
-                                        learning_rate=learning_rate,
-                                        weight_decay=weight_decay,
-                                        beta_1=momentum_beta1
-                                    ),
-                                    loss=[
-                                        lambda y_true, y_pred: mb.pdc_loss_linear_vec(
-                                            y_true, y_pred,
-                                            phase_manager=pm,
-                                            train_sample_weights=train_weights_dict,
-                                        ),
-                                        'mse'  # Reconstruction loss
-                                    ],
-                                    loss_weights=[
-                                        1.0,
-                                        reconstruction_loss_weight
-                                    ]
-                                )
-
-                                subtrain_ds, subtrain_steps = stratified_batch_dataset(
-                                    X_subtrain, y_subtrain_norm, batch_size)
-                                val_ds, val_steps = stratified_batch_dataset(
-                                    X_val, y_val_norm, batch_size)
-
-                                # Adjust the dataset to include both y_train and X_train for reconstruction
-                                subtrain_ds = subtrain_ds.map(lambda x, y: (x, (y, x)))
-                                val_ds = val_ds.map(lambda x, y: (x, (y, x)))
-
-                                history = model_sep.fit(
-                                    subtrain_ds,
-                                    steps_per_epoch=subtrain_steps,
-                                    epochs=epochs,
-                                    validation_data=val_ds,
-                                    validation_steps=val_steps,
-                                    batch_size=batch_size,
-                                    callbacks=[
-                                        reduce_lr_on_plateau,
-                                        early_stopping,
-                                        WandbCallback(save_model=WANDB_SAVE_MODEL),
-                                        IsTraining(pm)
-                                    ],
-                                    verbose=VERBOSE
-                                )
-
-                                # optimal epoch for fold
-                                # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
-                                # Use the quadratic fit function to find the optimal epoch
-                                optimal_epoch = find_optimal_epoch_by_smoothing(
-                                    history.history[ES_CB_MONITOR],
-                                    smoothing_method=smoothing_method,
-                                    smoothing_parameters={'window_size': window_size},
-                                    mode='min')
-                                folds_optimal_epochs.append(optimal_epoch)
-                                # wandb log the fold's optimal
-                                print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
-                                wandb.log({f'fold_{fold_idx}_best_epoch': folds_optimal_epochs[-1]})
-
-                            # determine the optimal number of epochs from the folds
-                            optimal_epochs = int(np.mean(folds_optimal_epochs))
-                            print(f'optimal_epochs: {optimal_epochs}')
-                            wandb.log({'optimal_epochs': optimal_epochs})
-
                             # create the model
                             final_encoder = create_mlp2(
                                 input_dim=n_features,
@@ -402,7 +256,7 @@ def main():
                             final_model_sep.fit(
                                 train_ds,
                                 steps_per_epoch=train_steps,
-                                epochs=optimal_epochs,
+                                epochs=5000,
                                 batch_size=batch_size,
                                 callbacks=[
                                     reduce_lr_on_plateau,
