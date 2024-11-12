@@ -66,6 +66,7 @@ RHO = [1e-1]
 REWEIGHTS = [(0.5, 0.75, 0.1, 0)]
 PDS_RW = [(0.5, 0.75)]
 LAMBDA_FACTOR = 3.3
+AE_LAMBDA = 1
 
 # ATTM AREA
 BLOCKS_HIDDENS = [128 for _ in range(20)]

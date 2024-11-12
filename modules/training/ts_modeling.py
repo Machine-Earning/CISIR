@@ -649,6 +649,69 @@ def create_mlp2(
     return model
 
 
+def add_decoder(encoder_model, hiddens, activation=None, norm=None, dropout=0.0, skip_connections=False):
+    """
+    Adds a decoder to the given encoder model, reversing the encoder architecture.
+
+    Parameters:
+    - encoder_model: The encoder model (created by create_mlp2).
+    - hiddens: The list of hidden layer sizes used in the encoder.
+    - activation: Activation function to use in the decoder.
+    - norm (str): Normalization type to use ('batch_norm' or 'layer_norm').
+    - dropout (float): Dropout rate to apply in the decoder.
+    - skip_connections (bool): Whether to include skip connections in the decoder.
+
+    Returns:
+    - autoencoder_model: A new model that includes both the encoder and the decoder.
+    """
+
+    # Get the input and representation (latent space) from the encoder
+    encoder_input = encoder_model.input
+    try:
+        representation = encoder_model.get_layer('repr_layer').output
+    except ValueError:
+        # If 'repr_layer' is not found, use the last layer's output
+        representation = encoder_model.layers[-1].output
+
+    x = representation
+    residual_layer = x
+    has_residuals = skip_connections
+    skipped_layers = encoder_model.skipped_layers if hasattr(encoder_model, 'skipped_layers') else 0
+
+    # Reverse the hiddens list for the decoder
+    decoder_hiddens = hiddens[::-1]
+
+    # Build the decoder
+    for i, units in enumerate(decoder_hiddens):
+        x = Dense(units)(x)
+        if norm == 'batch_norm':
+            x = BatchNormalization()(x)
+        x = activation(x) if callable(activation) else LeakyReLU()(x)
+
+        # Add skip connections if enabled
+        if has_residuals and skipped_layers > 0 and i % skipped_layers == 0 and i > 0:
+            if x.shape[-1] != residual_layer.shape[-1]:
+                residual_proj = Dense(x.shape[-1], use_bias=False)(residual_layer)
+            else:
+                residual_proj = residual_layer
+            x = Add()([x, residual_proj])
+            if norm == 'layer_norm':
+                x = LayerNormalization()(x)
+            if dropout > 0:
+                x = Dropout(dropout)(x)
+            residual_layer = x
+        elif dropout > 0:
+            x = Dropout(dropout)(x)
+
+    # Output layer to reconstruct the input
+    reconstructed = Dense(encoder_input.shape[-1], name='reconstructed')(x)
+
+    # Create the autoencoder model
+    autoencoder_model = Model(inputs=encoder_input, outputs=[representation, reconstructed])
+
+    return autoencoder_model
+
+
 def create_mlp_moe(
         input_dim: int = 25,
         output_dim: int = 1,
