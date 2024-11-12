@@ -62,7 +62,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'mlp_pdsStratInj_bs{batch_size}_rho{rho:.2f}'
+                            title = f'mlp_pdcStratInj_bs{batch_size}_rho{rho:.2f}'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -277,7 +277,7 @@ def main():
                                         weight_decay=weight_decay,
                                         beta_1=momentum_beta1
                                     ),
-                                    loss=lambda y_true, y_pred: mb.pds_loss_linear_vec(
+                                    loss=lambda y_true, y_pred: mb.pdc_loss_linear_vec(
                                         y_true, y_pred,
                                         phase_manager=pm,
                                         train_sample_weights=subtrain_weights_dict,
@@ -345,7 +345,7 @@ def main():
                                     weight_decay=weight_decay,
                                     beta_1=momentum_beta1
                                 ),
-                                loss=lambda y_true, y_pred: mb.pds_loss_linear_vec(
+                                loss=lambda y_true, y_pred: mb.pdc_loss_linear_vec(
                                     y_true, y_pred,
                                     phase_manager=pm,
                                     train_sample_weights=train_weights_dict,
