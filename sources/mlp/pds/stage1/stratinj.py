@@ -25,7 +25,6 @@ from modules.training.ts_modeling import (
     create_mlp,
     filter_ds,
     set_seed,
-    stratified_4fold_split,
     stratified_batch_dataset
 )
 

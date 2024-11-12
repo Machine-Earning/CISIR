@@ -18,7 +18,7 @@ MLP_HIDDENS = [
     512, 256, 512, 256, 256, 128, 256, 128,
     256, 128, 128, 128, 128, 128, 128, 128
 ]  # Hidden layers
-MLP_HIDDENS_S = [512, 256, 128, 64, 256, 512, 256, 128]  # Hidden layers
+MLP_HIDDENS_S = [512, 512, 256, 256, 128, 128, 64, 64, 256, 256, 128]  # Hidden layers
 PROJ_HIDDENS = [64]  # Projection hidden layers
 LOSS_KEY = 'mse_pcc'  # Mean squared error regression loss
 LAMBDA = 3.3  # Lambda for the loss
@@ -37,7 +37,7 @@ MAE_PLUS_THRESHOLD = 0.5  # Threshold for measuring raising edges in delta
 START_LR_FT = 3e-3  # Lower due to fine-tuning
 START_LR = 3e-5  # starting learning rate
 START_LR_PDS = 1e-4  # starting learning rate
-WEIGHT_DECAY = 1e-4  # Higher weight decay
+WEIGHT_DECAY = 5e-5  # Higher weight decay
 WEIGHT_DECAY_PDS = 1e-5  # Higher weight decay for projection layers
 MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 BANDWIDTH = 4.42e-2  # Bandwidth for rebalancing
@@ -61,9 +61,9 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 SKIP_REPR = True  # residual representation
 SMOOTHING_METHOD = 'moving_average'
-WINDOW_SIZE = 11
-RHO = [3e-2]
-REWEIGHTS = [(1.2, 0.6, 0.1, 0)]
+WINDOW_SIZE = 7
+RHO = [1e-1]
+REWEIGHTS = [(0.5, 0.75, 0.1, 0)]
 LAMBDA_FACTOR = 3.3
 
 # ATTM AREA
