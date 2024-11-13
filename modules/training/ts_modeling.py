@@ -318,7 +318,7 @@ def create_gru_with_concatenation_skips(
 
 
 def create_gru(
-        input_channels_num: int = 3,  # Number of channels/variables
+        input_dim: int = 3,  # Number of features
         gru_units: int = 30,
         gru_layers: int = 1,
         repr_dim: int = 128,
@@ -330,10 +330,10 @@ def create_gru(
         name: str = 'gru'
 ) -> Model:
     """
-    Create a GRU model that processes multivariate time series data.
+    Create a GRU model that processes time series data.
 
     Parameters:
-    - input_channels_num (int): Number of variables/channels in the input time series. Default is 3.
+    - input_dim (int): Number of features in the input data. Default is 3.
     - gru_units (int): The number of units in each GRU layer. Default is 30.
     - gru_layers (int): The number of GRU layers. Default is 1.
     - repr_dim (int): The number of units in the fully connected layer. Default is 128.
@@ -343,17 +343,15 @@ def create_gru(
     - activation: Optional activation function to use. If None, defaults to LeakyReLU.
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None.
 
-    Input shape: (batch_size, sequence_length, input_channels_num)
+    Input shape: (batch_size, input_dim)
         - batch_size: Number of samples in the batch
-        - sequence_length: Variable length time sequence (None)
-        - input_channels_num: Number of features/channels at each timestep
+        - input_dim: Number of features
 
     Returns:
     - Model: A Keras model instance.
     """
     
-    # Using None for sequence_length allows for variable length sequences
-    input_layer = Input(shape=(None, input_channels_num), name='input_series')
+    input_layer = Input(shape=(input_dim,), name='input_series')
     x = input_layer
 
     for layer in range(gru_layers):
@@ -3303,7 +3301,7 @@ def prepare_seq_inputs(
         data: np.ndarray,
         seq_input_dims: List[int] = None,
         with_slope: bool = False,
-        use_ch: bool = True) -> Tuple:
+        use_ch: bool = True) -> Union[Tuple, ndarray]:
     """
     Prepares CNN inputs for the time series data, including regular and slope inputs if with_slope is True.
 
@@ -3372,7 +3370,7 @@ def prepare_seq_inputs(
         if all(seq_input.shape == seq_inputs[0].shape for seq_input in seq_inputs):
             # All inputs have the same shape, concatenate them along the second axis
             concatenate_seq_inputs = np.concatenate(seq_inputs, axis=-1)
-            return (concatenate_seq_inputs,)
+            return concatenate_seq_inputs
         else:
             # The inputs do not all have the same shape, return the tuple of original inputs
             return tuple(seq_inputs)

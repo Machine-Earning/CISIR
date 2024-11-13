@@ -184,19 +184,27 @@ def main():
                                 n_features = [25] * len(inputs_to_use)
                             print(f'n_features: {n_features}')
 
-                            X_train = reshape_X(
-                                X_train,
-                                n_features,
-                                inputs_to_use,
-                                add_slope,
-                                'gru')
+                            # X_train = reshape_X(
+                            #     X_train,
+                            #     n_features,
+                            #     inputs_to_use,
+                            #     add_slope,
+                            #     'gru')
 
-                            X_test = reshape_X(
-                                X_test,
-                                n_features,
-                                inputs_to_use,
-                                add_slope,
-                                'gru')
+                            # X_test = reshape_X(
+                            #     X_test,
+                            #     n_features,
+                            #     inputs_to_use,
+                            #     add_slope,
+                            #     'gru')
+                            # # print the reshaped training set shapes
+                            # # print(f'X_train.shape: {X_train.shape}, y_train.shape: {y_train.shape}')
+                            # print(f'X_test: {X_test.shape}')
+                            # print the size of the test tuple
+                            # print(f'X_test len: {len(X_test)}')
+                            # # for each element in the test tuple get the shape
+                            # for i in range(len(X_test)):
+                            #     print(f'X_test_{i} shape: {X_test[i].shape}')
 
                             # 4-fold cross-validation
                             folds_optimal_epochs = []
@@ -253,7 +261,7 @@ def main():
 
                                 # create the model
                                 model_sep = create_gru(
-                                    input_channels_num=len(inputs_to_use),  # Using first feature dimension since all are same
+                                    input_dim=n_features,  # Using first feature dimension since all are same
                                     gru_units=gru_units,
                                     gru_layers=gru_layers,
                                     repr_dim=repr_dim,
@@ -263,20 +271,20 @@ def main():
                                     norm=norm
                                 )
                                 model_sep.summary()
+                                # Reshape input for model
+                                # print('Reshaping input for model')
+                                # X_subtrain = reshape_X(
+                                #     X_subtrain, n_features,
+                                #     inputs_to_use,
+                                #     add_slope,
+                                #     'gru')
 
-                                print('Reshaping input for model')
-                                X_subtrain = reshape_X(
-                                    X_subtrain, n_features,
-                                    inputs_to_use,
-                                    add_slope,
-                                    'gru')
-
-                                X_val = reshape_X(
-                                    X_val,
-                                    n_features,
-                                    inputs_to_use,
-                                    add_slope,
-                                    'gru')
+                                # X_val = reshape_X(
+                                #     X_val,
+                                #     n_features,
+                                #     inputs_to_use,
+                                #     add_slope,
+                                #     'gru')
 
                                 
 
