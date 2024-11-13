@@ -178,10 +178,11 @@ def main():
                                 N=N, seed=seed)
                             
                             # get the number of features
-                            if add_slope:
-                                n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
-                            else:
-                                n_features = [25] * len(inputs_to_use)
+                            # if add_slope:
+                            #     n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
+                            # else:
+                            #     n_features = [25] * len(inputs_to_use)
+                            n_features = 100
                             print(f'n_features: {n_features}')
 
                             # X_train = reshape_X(
@@ -361,15 +362,14 @@ def main():
                             wandb.log({'optimal_epochs': optimal_epochs})
 
                             final_model_sep = create_gru(
-                                input_dims=n_features,
+                                input_dim=n_features,  # Using first feature dimension since all are same
                                 gru_units=gru_units,
                                 gru_layers=gru_layers,
                                 repr_dim=repr_dim,
                                 output_dim=output_dim,
                                 dropout=dropout,
                                 activation=activation,
-                                norm=norm,
-                                sam_rho=rho
+                                norm=norm
                             )
 
                             final_model_sep.compile(
