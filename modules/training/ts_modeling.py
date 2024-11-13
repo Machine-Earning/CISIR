@@ -353,7 +353,7 @@ def create_gru(
     - Model: A Keras model instance.
     """
     # Input shape should be (batch_size, input_dim, 1)
-    input_layer = Input(shape=(input_dim, 1), name='input_series')
+    input_layer = Input(shape=(None, input_dim, 1))
 
     # First squeeze out the last dimension from (batch_size, 100, 1) to (batch_size, 100)
     x = Lambda(lambda x: K.squeeze(x, axis=-1))(input_layer)
