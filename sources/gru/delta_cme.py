@@ -1,420 +1,353 @@
 import os
 from datetime import datetime
 
-# Set the environment variable for CUDA (in case it is necessary)
-# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
-
-import matplotlib.pyplot as plt
-import numpy as np
-import tensorflow as tf
 import wandb
-from tensorflow.keras.activations import tanh
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
 from tensorflow_addons.optimizers import AdamW
-from wandb.keras import WandbCallback
-
-from modules.training.DenseReweights import exDenseReweights
+from wandb.integration.keras import WandbCallback
+from modules.training.smooth_early_stopping import SmoothEarlyStopping
+from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
+from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.shared.globals import *
+from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.ts_modeling import (
     build_dataset,
-    create_mlp,
-    create_hybrid_model,
-    create_gru,
     evaluate_mae,
-    evaluate_model_cond,
+    evaluate_pcc,
     process_sep_events,
-    get_loss,
-    reshape_X)
+    stratified_batch_dataset,
+    set_seed,
+    mse_pcc,
+    filter_ds,
+    create_gru,
+    plot_error_hist,
+    reshape_X
+)
+
+
+# Set the environment variable for CUDA (in case it is necessary)
+# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 
 def main():
     """
-    Main function to run the E-MLP model
+    Main function to run the training
     :return:
     """
 
-    for inputs_to_use in [['e0.5', 'e1.8', 'p']]:
-        for add_slope in [True, False]:
-            for alpha in np.arange(0.1, 1.6, 0.25):
-                for cme_speed_threshold in [0, 500]:
-                    # PARAMS
-                    # inputs_to_use = ['e0.5']
-                    # add_slope = True
-                    outputs_to_use = ['delta_p']
+    # set the training phase manager - necessary for mse + pcc loss
+    pm = TrainingPhaseManager()
 
-                    # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
-                    inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
+    for seed in SEEDS:
+        for inputs_to_use in INPUTS_TO_USE:
+            for cme_speed_threshold in CME_SPEED_THRESHOLD:
+                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS:
+                    for rho in RHO:  # SAM_RHOS:
+                        for add_slope in ADD_SLOPE:
+                            # PARAMS
+                            outputs_to_use = OUTPUTS_TO_USE
+                            lambda_factor = LAMBDA_FACTOR  # lambda for the loss
+                            # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
+                            inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
+                            # Construct the title
+                            title = f'gru_amse{alpha_mse:.2f}_cheat_NS'
+                            # Replace any other characters that are not suitable for filenames (if any)
+                            title = title.replace(' ', '_').replace(':', '_')
+                            # Create a unique experiment name with a timestamp
+                            current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+                            experiment_name = f'{title}_{current_time}'
+                            # Set the early stopping patience and learning rate as variables
+                            set_seed(seed)
+                            patience = PATIENCE  # higher patience
+                            learning_rate = START_LR  # starting learning rate
 
-                    # Construct the title
-                    title = f'GRU_{inputs_str}_alpha{alpha:.2f}'
+                            reduce_lr_on_plateau = ReduceLROnPlateau(
+                                monitor=LR_CB_MONITOR,
+                                factor=LR_CB_FACTOR,
+                                patience=LR_CB_PATIENCE,
+                                verbose=VERBOSE,
+                                min_delta=LR_CB_MIN_DELTA,
+                                min_lr=LR_CB_MIN_LR)
 
-                    # Replace any other characters that are not suitable for filenames (if any)
-                    title = title.replace(' ', '_').replace(':', '_')
+                            weight_decay = WEIGHT_DECAY  # higher weight decay
+                            momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
+                            batch_size = BATCH_SIZE  # higher batch size
+                            epochs = EPOCHS  # higher epochs
+                            
+                            # GRU specific parameters
+                            gru_units = 30
+                            gru_layers = 1
+                            hiddens_str = f'{gru_units}units_{gru_layers}layers'
+                            
+                            bandwidth = BANDWIDTH
+                            repr_dim = REPR_DIM
+                            output_dim = len(outputs_to_use)
+                            dropout = DROPOUT
+                            activation = ACTIVATION
+                            norm = NORM
+                            cme_speed_threshold = cme_speed_threshold
+                            residual = RESIDUAL
+                            skipped_layers = SKIPPED_LAYERS
+                            N = N_FILTERED  # number of samples to keep outside the threshold
+                            lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
+                            upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
+                            mae_plus_threshold = MAE_PLUS_THRESHOLD
+                            smoothing_method = SMOOTHING_METHOD
+                            window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
 
-                    # Create a unique experiment name with a timestamp
-                    current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-                    experiment_name = f'{title}_{current_time}'
+                            # Initialize wandb
+                            wandb.init(project="Arch-test-gru", name=experiment_name, config={
+                                "inputs_to_use": inputs_to_use,
+                                "add_slope": add_slope,
+                                "patience": patience,
+                                "learning_rate": learning_rate,
+                                "weight_decay": weight_decay,
+                                "momentum_beta1": momentum_beta1,
+                                "batch_size": batch_size,
+                                "epochs": epochs,
+                                "hiddens": hiddens_str,
+                                "loss": 'mse_pcc',
+                                "lambda": lambda_factor,
+                                "seed": seed,
+                                "alpha_mse": alpha_mse,
+                                "alphaV_mse": alphaV_mse,
+                                "alpha_pcc": alpha_pcc,
+                                "alphaV_pcc": alphaV_pcc,
+                                "bandwidth": bandwidth,
+                                "repr_dim": repr_dim,
+                                "dropout": dropout,
+                                "activation": 'LeakyReLU',
+                                "norm": norm,
+                                'optimizer': 'adamw',
+                                'output_dim': output_dim,
+                                'architecture': 'gru',
+                                'cme_speed_threshold': cme_speed_threshold,
+                                'residual': residual,
+                                'ds_version': DS_VERSION,
+                                'mae_plus_th': mae_plus_threshold,
+                                'sam_rho': rho,
+                            })
 
-                    # Set the early stopping patience and learning rate as variables
-                    seed = 456789
-                    tf.random.set_seed(seed)
-                    np.random.seed(seed)
-                    patience = 5000  # higher patience
-                    learning_rate = 5e-3  # og learning rate
-                    # initial_learning_rate = 3e-3
-                    # final_learning_rate = 3e-7
-                    # learning_rate_decay_factor = (final_learning_rate / initial_learning_rate) ** (1 / 3000)
-                    # steps_per_epoch = int(20000 / 8)
+                            # set the root directory
+                            root_dir = DS_PATH
+                            # build the dataset
+                            X_train, y_train = build_dataset(
+                                root_dir + '/training',
+                                inputs_to_use=inputs_to_use,
+                                add_slope=add_slope,
+                                outputs_to_use=outputs_to_use,
+                                cme_speed_threshold=cme_speed_threshold)
 
-                    # learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
-                    #     initial_learning_rate=initial_learning_rate,
-                    #     decay_steps=steps_per_epoch,
-                    #     decay_rate=learning_rate_decay_factor,
-                    #     staircase=True)
+                            X_test, y_test = build_dataset(
+                                root_dir + '/testing',
+                                inputs_to_use=inputs_to_use,
+                                add_slope=add_slope,
+                                outputs_to_use=outputs_to_use,
+                                cme_speed_threshold=cme_speed_threshold)
 
-                    reduce_lr_on_plateau = ReduceLROnPlateau(
-                        monitor='loss',
-                        factor=0.5,
-                        patience=300,
-                        verbose=1,
-                        min_delta=1e-5,
-                        min_lr=1e-10)
+                            # Filter datasets
+                            X_train_filtered, y_train_filtered = filter_ds(X_train, y_train, N)
+                            X_test_filtered, y_test_filtered = filter_ds(X_test, y_test, N)
 
-                    weight_decay = 1e-6  # higher weight decay
-                    momentum_beta1 = 0.9  # higher momentum beta1
-                    batch_size = 4096
-                    epochs = 50000  # higher epochs
-                    gru_units = 200
-                    gru_layers = 7
-                    hiddens_str = f'{gru_units}units_{gru_layers}layers'
-                    loss_key = 'mse'
-                    target_change = ('delta_p' in outputs_to_use)
-                    # print_batch_mse_cb = PrintBatchMSE()
-                    rebalacing = True
-                    alpha_rw = alpha
-                    bandwidth = 0.099
-                    repr_dim = 9
-                    output_dim = len(outputs_to_use)
-                    dropout = 0.5
-                    activation = None
-                    norm = 'layer_norm'
-                    cme_speed_threshold = cme_speed_threshold
+                            # Create stratified batch datasets
+                            train_ds = stratified_batch_dataset(
+                                X_train, y_train,
+                                batch_size=batch_size,
+                                lower_threshold=lower_threshold,
+                                upper_threshold=upper_threshold)
 
-                    mlp_hiddens = [128, 64, 32]
-                    mlp_repr_dim = 9
-                    final_hiddens = [36, 18]
-                    final_repr_dim = 9
+                            test_ds = stratified_batch_dataset(
+                                X_test, y_test,
+                                batch_size=batch_size,
+                                lower_threshold=lower_threshold,
+                                upper_threshold=upper_threshold)
 
-                    # Initialize wandb
-                    wandb.init(project="nasa-ts-delta", name=experiment_name, config={
-                        "inputs_to_use": inputs_to_use,
-                        "add_slope": add_slope,
-                        "patience": patience,
-                        "learning_rate": learning_rate,
-                        "weight_decay": weight_decay,
-                        "momentum_beta1": momentum_beta1,
-                        "batch_size": batch_size,
-                        "epochs": epochs,
-                        # hidden in a more readable format  (wandb does not support lists)
-                        "hiddens": hiddens_str,
-                        "loss": loss_key,
-                        "target_change": target_change,
-                        "printing_batch_mse": False,
-                        "seed": seed,
-                        "rebalancing": rebalacing,
-                        "alpha_rw": alpha_rw,
-                        "bandwidth": bandwidth,
-                        "reciprocal_reweight": True,
-                        "repr_dim": repr_dim,
-                        "dropout": dropout,
-                        "activation": 'LeakyReLU',
-                        "norm": norm,
-                        'optimizer': 'adamw',
-                        'output_dim': output_dim,
-                        'architecture': 'gru',
-                        'cme_speed_threshold': cme_speed_threshold
-                    })
+                            # Calculate number of features
+                            if add_slope:
+                                n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
+                            else:
+                                n_features = [25] * len(inputs_to_use)
 
-                    # set the root directory
-                    root_dir = 'data/electron_cme_data_split'
-                    # build the dataset
-                    X_train, y_train = build_dataset(root_dir + '/training',
-                                                     inputs_to_use=inputs_to_use,
-                                                     add_slope=add_slope,
-                                                     outputs_to_use=outputs_to_use,
-                                                     cme_speed_threshold=cme_speed_threshold)
-                    X_subtrain, y_subtrain = build_dataset(root_dir + '/subtraining',
-                                                           inputs_to_use=inputs_to_use,
-                                                           add_slope=add_slope,
-                                                           outputs_to_use=outputs_to_use,
-                                                           cme_speed_threshold=cme_speed_threshold)
-                    X_test, y_test = build_dataset(root_dir + '/testing',
-                                                   inputs_to_use=inputs_to_use,
-                                                   add_slope=add_slope,
-                                                   outputs_to_use=outputs_to_use,
-                                                   cme_speed_threshold=cme_speed_threshold)
-                    X_val, y_val = build_dataset(root_dir + '/validation',
-                                                 inputs_to_use=inputs_to_use,
-                                                 add_slope=add_slope,
-                                                 outputs_to_use=outputs_to_use,
-                                                 cme_speed_threshold=cme_speed_threshold)
+                            # Create GRU model
+                            model_sep = create_gru(
+                                input_dims=n_features,
+                                gru_units=gru_units,
+                                gru_layers=gru_layers,
+                                repr_dim=repr_dim,
+                                output_dim=output_dim,
+                                dropout=dropout,
+                                activation=activation,
+                                norm=norm
+                            )
 
-                    # print all cme_files shapes
-                    print(f'X_train.shape: {X_train.shape}')
-                    print(f'y_train.shape: {y_train.shape}')
-                    print(f'X_subtrain.shape: {X_subtrain.shape}')
-                    print(f'y_subtrain.shape: {y_subtrain.shape}')
-                    print(f'X_test.shape: {X_test.shape}')
-                    print(f'y_test.shape: {y_test.shape}')
-                    print(f'X_val.shape: {X_val.shape}')
-                    print(f'y_val.shape: {y_val.shape}')
+                            # Compile model
+                            model_sep.compile(
+                                optimizer=AdamW(
+                                    learning_rate=learning_rate,
+                                    weight_decay=weight_decay,
+                                    beta_1=momentum_beta1
+                                ),
+                                loss=mse_pcc(lambda_factor, pm)
+                            )
 
-                    # Compute the sample weights
-                    delta_train = y_train[:, 0]
-                    delta_subtrain = y_subtrain[:, 0]
-                    print(f'delta_train.shape: {delta_train.shape}')
-                    print(f'delta_subtrain.shape: {delta_subtrain.shape}')
+                            # Reshape inputs
+                            X_train = reshape_X(X_train, n_features, inputs_to_use, add_slope, 'gru')
+                            X_test = reshape_X(X_test, n_features, inputs_to_use, add_slope, 'gru')
 
-                    print(f'rebalancing the training set...')
-                    min_norm_weight = 0.01 / len(delta_train)
-                    y_train_weights = exDenseReweights(
-                        X_train, delta_train,
-                        alpha=alpha_rw, bw=bandwidth,
-                        min_norm_weight=min_norm_weight,
-                        debug=False).reweights
-                    print(f'training set rebalanced.')
+                            # Create callbacks
+                            smooth_early_stopping = SmoothEarlyStopping(
+                                monitor='val_loss',
+                                patience=patience,
+                                smoothing_method=smoothing_method,
+                                window_size=window_size,
+                                verbose=VERBOSE,
+                                restore_best_weights=True
+                            )
 
-                    print(f'rebalancing the subtraining set...')
-                    min_norm_weight = 0.01 / len(delta_subtrain)
-                    y_subtrain_weights = exDenseReweights(
-                        X_subtrain, delta_subtrain,
-                        alpha=alpha_rw, bw=bandwidth,
-                        min_norm_weight=min_norm_weight,
-                        debug=False).reweights
-                    print(f'subtraining set rebalanced.')
+                            callbacks = [
+                                smooth_early_stopping,
+                                reduce_lr_on_plateau,
+                                WandbCallback(save_model=False)
+                            ]
 
-                    # print a sample of the training cme_files
-                    # print(f'X_train[0]: {X_train[0]}')
-                    # print(f'y_train[0]: {y_train[0]}')
+                            # Train model
+                            history = model_sep.fit(
+                                train_ds,
+                                epochs=epochs,
+                                validation_data=test_ds,
+                                callbacks=callbacks,
+                                verbose=VERBOSE
+                            )
 
-                    # get the number of features
-                    # get the number of features
-                    if add_slope:
-                        # n_features = [25] * len(inputs_to_use) * 2
-                        n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
-                    else:
-                        n_features = [25] * len(inputs_to_use)
-                    print(f'n_features: {n_features}')
+                            # Get final model
+                            final_model_sep = model_sep
 
-                    # calculating number of cme features
-                    n_cme_features = 20 + len(inputs_to_use)
+                            # Evaluate model
+                            error_mae = evaluate_mae(final_model_sep, X_test, y_test)
+                            print(f'mae error: {error_mae}')
+                            wandb.log({"mae": error_mae})
 
-                    # create the model extractor
-                    extractor_model_sep = create_gru(
-                        input_dims=n_features,
-                        gru_units=gru_units,
-                        gru_layers=gru_layers,
-                        repr_dim=repr_dim,
-                        output_dim=0,
-                        dropout=dropout,
-                        activation=activation,
-                        norm=norm
-                    )
-                    extractor_model_sep.summary()
+                            error_mae_train = evaluate_mae(final_model_sep, X_train, y_train)
+                            print(f'mae error train: {error_mae_train}')
+                            wandb.log({"train_mae": error_mae_train})
 
-                    # creating the hybrid model
-                    mlp_model_sep = create_hybrid_model(
-                        tsf_extractor=extractor_model_sep,
-                        mlp_input_dim=n_cme_features,
-                        output_dim=output_dim,
-                        mlp_hiddens=mlp_hiddens,
-                        mlp_repr_dim=mlp_repr_dim,
-                        final_hiddens=final_hiddens,
-                        repr_dim=final_repr_dim,
-                        dropout=dropout,
-                        activation=activation,
-                        norm=norm,
-                        name='hybrid'
-                    )
-                    mlp_model_sep.summary()
+                            error_pcc = evaluate_pcc(final_model_sep, X_test, y_test)
+                            print(f'pcc error: {error_pcc}')
+                            wandb.log({"pcc": error_pcc})
 
-                    print('Reshaping input for model')
-                    X_subtrain = reshape_X(
-                        X_subtrain,
-                        n_features,
-                        inputs_to_use,
-                        add_slope,
-                        'hybrid')
+                            error_pcc_train = evaluate_pcc(final_model_sep, X_train, y_train)
+                            print(f'pcc error train: {error_pcc_train}')
+                            wandb.log({"train_pcc": error_pcc_train})
 
-                    X_val = reshape_X(
-                        X_val,
-                        n_features,
-                        inputs_to_use,
-                        add_slope,
-                        'hybrid')
+                            # Evaluate conditional metrics
+                            above_threshold = mae_plus_threshold
+                            error_mae_cond = evaluate_mae(
+                                final_model_sep, X_test, y_test, above_threshold=above_threshold)
+                            print(f'mae error delta >= {above_threshold} test: {error_mae_cond}')
+                            wandb.log({"mae+": error_mae_cond})
 
-                    X_train = reshape_X(
-                        X_train,
-                        n_features,
-                        inputs_to_use,
-                        add_slope,
-                        'hybrid')
+                            error_mae_cond_train = evaluate_mae(
+                                final_model_sep, X_train, y_train, above_threshold=above_threshold)
+                            print(f'mae error delta >= {above_threshold} train: {error_mae_cond_train}')
+                            wandb.log({"train_mae+": error_mae_cond_train})
 
-                    X_test = reshape_X(
-                        X_test,
-                        n_features,
-                        inputs_to_use,
-                        add_slope,
-                        'hybrid')
+                            error_pcc_cond = evaluate_pcc(
+                                final_model_sep, X_test, y_test, above_threshold=above_threshold)
+                            print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
+                            wandb.log({"pcc+": error_pcc_cond})
 
-                    # Define the EarlyStopping callback
-                    early_stopping = EarlyStopping(
-                        monitor='val_loss',
-                        patience=patience,
-                        verbose=1,
-                        restore_best_weights=True)
+                            error_pcc_cond_train = evaluate_pcc(
+                                final_model_sep, X_train, y_train, above_threshold=above_threshold)
+                            print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
+                            wandb.log({"train_pcc+": error_pcc_cond_train})
 
-                    # Compile the model with the specified learning rate
-                    mlp_model_sep.compile(optimizer=AdamW(learning_rate=learning_rate,
-                                                          weight_decay=weight_decay,
-                                                          beta_1=momentum_beta1),
-                                          loss={'forecast_head': get_loss(loss_key)})
+                            # Process and plot SEP events
+                            test_directory = root_dir + '/testing'
+                            filenames = process_sep_events(
+                                test_directory,
+                                final_model_sep,
+                                title=title,
+                                inputs_to_use=inputs_to_use,
+                                add_slope=add_slope,
+                                outputs_to_use=outputs_to_use,
+                                show_avsp=True,
+                                using_cme=True,
+                                cme_speed_threshold=cme_speed_threshold)
 
-                    # Train the model with the callback
-                    history = mlp_model_sep.fit(X_subtrain,
-                                                {'forecast_head': y_subtrain},
-                                                sample_weight=y_subtrain_weights,
-                                                epochs=epochs, batch_size=batch_size,
-                                                validation_data=(X_val, {'forecast_head': y_val}),
-                                                callbacks=[
-                                                    early_stopping,
-                                                    reduce_lr_on_plateau,
-                                                    WandbCallback(save_model=False)
-                                                ])
+                            for filename in filenames:
+                                log_title = os.path.basename(filename)
+                                wandb.log({f'testing_{log_title}': wandb.Image(filename)})
 
-                    # Plot the training and validation loss
-                    plt.figure(figsize=(12, 6))
-                    plt.plot(history.history['loss'], label='Training Loss')
-                    plt.plot(history.history['val_loss'], label='Validation Loss')
-                    plt.title('Training and Validation Loss')
-                    plt.xlabel('Epochs')
-                    plt.ylabel('Loss')
-                    plt.legend()
-                    # save the plot
-                    plt.savefig(f'gru_loss_{title}.png')
+                            test_directory = root_dir + '/training'
+                            filenames = process_sep_events(
+                                test_directory,
+                                final_model_sep,
+                                title=title,
+                                inputs_to_use=inputs_to_use,
+                                add_slope=add_slope,
+                                outputs_to_use=outputs_to_use,
+                                show_avsp=True,
+                                prefix='training',
+                                using_cme=True,
+                                cme_speed_threshold=cme_speed_threshold)
 
-                    # Determine the optimal number of epochs from early stopping
-                    optimal_epochs = early_stopping.stopped_epoch  + 1  # Adjust for the offset
+                            for filename in filenames:
+                                log_title = os.path.basename(filename)
+                                wandb.log({f'training_{log_title}': wandb.Image(filename)})
 
-                    # create the model extractor
-                    final_extractor_model_sep = create_gru(
-                        input_dims=n_features,
-                        gru_units=gru_units,
-                        gru_layers=gru_layers,
-                        repr_dim=repr_dim,
-                        output_dim=0,
-                        dropout=dropout,
-                        activation=activation,
-                        norm=norm
-                    )
+                            # Plot correlation distributions
+                            file_path = plot_repr_corr_dist(
+                                final_model_sep,
+                                X_train_filtered, y_train_filtered,
+                                title + "_training",
+                                model_type='features_reg'
+                            )
+                            wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
 
-                    # creating the hybrid model
-                    final_mlp_model_sep = create_hybrid_model(
-                        tsf_extractor=final_extractor_model_sep,
-                        mlp_input_dim=n_cme_features,
-                        output_dim=output_dim,
-                        mlp_hiddens=mlp_hiddens,
-                        mlp_repr_dim=mlp_repr_dim,
-                        final_hiddens=final_hiddens,
-                        repr_dim=final_repr_dim,
-                        dropout=dropout,
-                        activation=activation,
-                        norm=norm,
-                        name='hybrid'
-                    )
+                            file_path = plot_repr_corr_dist(
+                                final_model_sep,
+                                X_test_filtered, y_test_filtered,
+                                title + "_test",
+                                model_type='features_reg'
+                            )
+                            wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
 
-                    # Recreate the model architecture
-                    final_mlp_model_sep.compile(
-                        optimizer=AdamW(learning_rate=learning_rate,
-                                        weight_decay=weight_decay,
-                                        beta_1=momentum_beta1),
-                        loss={'forecast_head': get_loss(loss_key)})  # Compile the model just like before
-                    # Train on the full dataset
-                    final_mlp_model_sep.fit(
-                        X_train,
-                        {'forecast_head': y_train},
-                        sample_weight=y_train_weights,
-                        epochs=optimal_epochs,
-                        batch_size=batch_size,
-                        callbacks=[reduce_lr_on_plateau, WandbCallback(save_model=False)],
-                        verbose=1)
+                            # Plot t-SNE
+                            stage1_file_path = plot_tsne_delta(
+                                final_model_sep,
+                                X_train_filtered, y_train_filtered, title,
+                                'stage2_training',
+                                model_type='features_reg',
+                                save_tag=current_time, seed=seed)
+                            wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
 
-                    # evaluate the model on test cme_files
-                    error_mae = evaluate_mae(final_mlp_model_sep, X_test, y_test)
-                    print(f'mae error: {error_mae}')
-                    # Log the MAE error to wandb
-                    wandb.log({"mae_error": error_mae})
+                            stage1_file_path = plot_tsne_delta(
+                                final_model_sep,
+                                X_test_filtered, y_test_filtered, title,
+                                'stage2_testing',
+                                model_type='features_reg',
+                                save_tag=current_time, seed=seed)
+                            wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
 
-                    # evaluate the model on training cme_files
-                    error_mae = evaluate_mae(final_mlp_model_sep, X_train, y_train)
-                    print(f'training mae error: {error_mae}')
-                    # Log the MAE error to wandb
-                    wandb.log({"train_mae_error": error_mae})
+                            # Plot error histograms
+                            filename = plot_error_hist(
+                                final_model_sep,
+                                X_train, y_train,
+                                sample_weights=None,
+                                title=title,
+                                prefix='training')
+                            wandb.log({"training_error_hist": wandb.Image(filename)})
 
-                    # Process SEP event files in the specified directory
-                    test_directory = root_dir + '/testing'
-                    filenames = process_sep_events(
-                        test_directory,
-                        final_mlp_model_sep,
-                        title=title,
-                        inputs_to_use=inputs_to_use,
-                        add_slope=add_slope,
-                        outputs_to_use=outputs_to_use,
-                        show_avsp=True,
-                        using_cme=True,
-                        cme_speed_threshold=cme_speed_threshold)
+                            filename = plot_error_hist(
+                                final_model_sep,
+                                X_test, y_test,
+                                sample_weights=None,
+                                title=title,
+                                prefix='testing')
+                            wandb.log({"testing_error_hist": wandb.Image(filename)})
 
-                    # Log the plot to wandb
-                    for filename in filenames:
-                        log_title = os.path.basename(filename)
-                        wandb.log({f'testing_{log_title}': wandb.Image(filename)})
-
-                    # Process SEP event files in the specified directory
-                    test_directory = root_dir + '/training'
-                    filenames = process_sep_events(
-                        test_directory,
-                        final_mlp_model_sep,
-                        title=title,
-                        inputs_to_use=inputs_to_use,
-                        add_slope=add_slope,
-                        outputs_to_use=outputs_to_use,
-                        show_avsp=True,
-                        using_cme=True,
-                        prefix='training',
-                        cme_speed_threshold=cme_speed_threshold)
-
-                    # Log the plot to wandb
-                    for filename in filenames:
-                        log_title = os.path.basename(filename)
-                        wandb.log({f'training_{log_title}': wandb.Image(filename)})
-
-                    # evaluate the model on test cme_files
-                    above_threshold = 0.1
-                    error_mae_cond = evaluate_model_cond(
-                        final_mlp_model_sep, X_test, y_test, above_threshold=above_threshold)
-
-                    print(f'mae error delta >= 0.1 test: {error_mae_cond}')
-                    # Log the MAE error to wandb
-                    wandb.log({"mae_error_cond_test": error_mae_cond})
-
-                    # evaluate the model on training cme_files
-                    error_mae_cond_train = evaluate_model_cond(
-                        final_mlp_model_sep, X_train, y_train, above_threshold=above_threshold)
-
-                    print(f'mae error delta >= 0.1 train: {error_mae_cond_train}')
-                    # Log the MAE error to wandb
-
-                    # Finish the wandb run
-                    wandb.finish()
+                            # Finish wandb run
+                            wandb.finish()
 
 
 if __name__ == '__main__':
