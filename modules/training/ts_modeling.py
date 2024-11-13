@@ -2223,10 +2223,6 @@ def plot_and_evaluate_sep_event(
         cme_features = preprocess_cme_features(df, inputs_to_use)
         X_reshaped = np.concatenate([X, cme_features.values], axis=1)
     else:
-        # Reshape X accordingly
-        # The '-1' in reshape indicates that the number of samples is automatically determined
-        # 'num_features' is the actual number of features in X
-        # '1' is for the third dimension, typically used for weights expecting 3D input (like CNNs)
         X_reshaped = X.reshape(-1, n_features, 1)
 
     if add_slope:
@@ -2235,7 +2231,7 @@ def plot_and_evaluate_sep_event(
     else:
         n_features_list = [25] * len(inputs_to_use)
 
-    X_reshaped = reshape_X(X_reshaped, n_features_list, inputs_to_use, add_slope, model.name)
+    X_reshaped = reshape_X(X_reshaped, n_features_list, inputs_to_use, add_slope, 'mlp')
 
     # Evaluate the model
     if use_dict:
@@ -2423,7 +2419,7 @@ def plot_avsp_delta(
     else:
         n_features_list = [25] * len(inputs_to_use)
 
-    X_reshaped = reshape_X(X_reshaped, n_features_list, inputs_to_use, add_slope, model.name)
+    X_reshaped = reshape_X(X_reshaped, n_features_list, inputs_to_use, add_slope, 'mlp')
 
     # Evaluate the model
     if use_dict:
