@@ -318,7 +318,7 @@ def create_gru_with_concatenation_skips(
 
 
 def create_gru(
-        input_dim: int = 3,  # Number of channels/variables
+        input_channels_num: int = 3,  # Number of channels/variables
         gru_units: int = 30,
         gru_layers: int = 1,
         repr_dim: int = 128,
@@ -333,7 +333,7 @@ def create_gru(
     Create a GRU model that processes multivariate time series data.
 
     Parameters:
-    - input_dim (int): Number of variables/channels in the input time series. Default is 3.
+    - input_channels_num (int): Number of variables/channels in the input time series. Default is 3.
     - gru_units (int): The number of units in each GRU layer. Default is 30.
     - gru_layers (int): The number of GRU layers. Default is 1.
     - repr_dim (int): The number of units in the fully connected layer. Default is 128.
@@ -343,17 +343,17 @@ def create_gru(
     - activation: Optional activation function to use. If None, defaults to LeakyReLU.
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None.
 
-    Input shape: (batch_size, sequence_length, input_dim)
+    Input shape: (batch_size, sequence_length, input_channels_num)
         - batch_size: Number of samples in the batch
         - sequence_length: Variable length time sequence (None)
-        - input_dim: Number of features/channels at each timestep
+        - input_channels_num: Number of features/channels at each timestep
 
     Returns:
     - Model: A Keras model instance.
     """
     
     # Using None for sequence_length allows for variable length sequences
-    input_layer = Input(shape=(None, input_dim), name='input_series')
+    input_layer = Input(shape=(None, input_channels_num), name='input_series')
     x = input_layer
 
     for layer in range(gru_layers):

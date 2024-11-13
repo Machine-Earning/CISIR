@@ -24,6 +24,7 @@ from modules.training.ts_modeling import (
     create_gru,
     plot_error_hist,
     load_stratified_folds,
+    reshape_X
 )
 
 
@@ -175,6 +176,27 @@ def main():
                                 low_threshold=lower_threshold,
                                 high_threshold=upper_threshold,
                                 N=N, seed=seed)
+                            
+                            # get the number of features
+                            if add_slope:
+                                n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
+                            else:
+                                n_features = [25] * len(inputs_to_use)
+                            print(f'n_features: {n_features}')
+
+                            X_train = reshape_X(
+                                X_train,
+                                n_features,
+                                inputs_to_use,
+                                add_slope,
+                                'gru')
+
+                            X_test = reshape_X(
+                                X_test,
+                                n_features,
+                                inputs_to_use,
+                                add_slope,
+                                'gru')
 
                             # 4-fold cross-validation
                             folds_optimal_epochs = []
@@ -227,16 +249,11 @@ def main():
                                     debug=False).label_reweight_dict
                                 print(f'validation set rebalanced.')
 
-                                # get the number of features
-                                if add_slope:
-                                    n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
-                                else:
-                                    n_features = [25] * len(inputs_to_use)
-                                print(f'n_features: {n_features}')
+                                
 
                                 # create the model
                                 model_sep = create_gru(
-                                    input_dims=n_features,
+                                    input_channels_num=len(inputs_to_use),  # Using first feature dimension since all are same
                                     gru_units=gru_units,
                                     gru_layers=gru_layers,
                                     repr_dim=repr_dim,
@@ -247,14 +264,31 @@ def main():
                                 )
                                 model_sep.summary()
 
+                                print('Reshaping input for model')
+                                X_subtrain = reshape_X(
+                                    X_subtrain, n_features,
+                                    inputs_to_use,
+                                    add_slope,
+                                    'gru')
+
+                                X_val = reshape_X(
+                                    X_val,
+                                    n_features,
+                                    inputs_to_use,
+                                    add_slope,
+                                    'gru')
+
+                                
+
                                 # Define the EarlyStopping callback
                                 early_stopping = SmoothEarlyStopping(
-                                    monitor=ES_CB_MONITOR,
+                                    monitor=CVRG_METRIC,
                                     patience=patience,
                                     verbose=VERBOSE,
                                     restore_best_weights=ES_CB_RESTORE_WEIGHTS,
                                     smoothing_method=smoothing_method,  # 'moving_average'
-                                    smoothing_parameters={'window_size': window_size})  # 10
+                                    smoothing_parameters={'window_size': window_size},
+                                    min_delta=CVRG_MIN_DELTA)  # Add min_delta for convergence case
 
                                 # Compile the model with the specified learning rate
                                 model_sep.compile(
