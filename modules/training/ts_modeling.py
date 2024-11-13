@@ -332,6 +332,29 @@ def create_gru(
 ) -> Model:
     """
     Create a GRU model that processes time series data.
+
+    Args:
+        input_dim (int): Dimension of the input features. Default is 100.
+        gru_units (int): Number of units in each GRU layer. Default is 30.
+        gru_layers (int): Number of GRU layers to stack. Default is 1.
+        repr_dim (int): Dimension of the representation layer. Default is 128.
+        output_dim (int): Dimension of the output layer. If 0, only returns representation. Default is 1.
+        pds (bool): Whether to apply normalization to representation layer. Default is False.
+        dropout (float): Dropout rate to apply after each GRU layer. Default is 0.0.
+        activation: Activation function to use. If None, uses LeakyReLU. Default is None.
+        norm (str): Type of normalization to use ('batch_norm' or 'layer_norm'). Default is None.
+        name (str): Name of the model. Default is 'gru'.
+
+    Returns:
+        Model: A Keras Model instance with the specified GRU architecture.
+
+    The model architecture consists of:
+    1. An input layer accepting a sequence of shape (input_dim,)
+    2. Reshaping to (timesteps, features) for GRU processing
+    3. One or more GRU layers with optional normalization and dropout
+    4. A dense representation layer
+    5. Optional normalization of the representation
+    6. Optional output layer
     """
     # Input shape should be (input_dim,)
     input_layer = Input(shape=(input_dim,))
