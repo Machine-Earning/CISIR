@@ -356,7 +356,7 @@ def create_gru(
     input_layer = Input(shape=(None, input_dim, 1))
 
     # First squeeze out the last dimension from (batch_size, 100, 1) to (batch_size, 100)
-    x = Lambda(lambda x: K.squeeze(x, axis=-1))(input_layer)
+    # x = Lambda(lambda x: K.squeeze(x, axis=-1))(input_layer)
     
     # Then reshape to (batch_size, 25, 4)
     timesteps = 25
