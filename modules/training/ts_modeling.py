@@ -318,73 +318,60 @@ def create_gru_with_concatenation_skips(
 
 
 def create_gru(
-        input_dims: list = None,
-        gru_units: int = 64,
-        gru_layers: int = 2,
-        repr_dim: int = 50,
+        input_dim: int = 3,  # Number of channels/variables
+        gru_units: int = 30,
+        gru_layers: int = 1,
+        repr_dim: int = 128,
         output_dim: int = 1,
         pds: bool = False,
-        l2_reg: float = None,
         dropout: float = 0.0,
         activation=None,
         norm: str = None,
         name: str = 'gru'
 ) -> Model:
     """
-    Create a model with multiple RNN (GRU) branches, each processing a different input dimension.
-    The outputs of these branches are concatenated before being passed to dense layers.
+    Create a GRU model that processes multivariate time series data.
 
     Parameters:
-    - input_dims (list): List of input dimensions, one for each RNN branch. Default is [25, 25, 25].
-    - gru_units (int): The number of units in each GRU layer. Default is 64.
-    - repr_dim (int): The number of units in the fully connected layer. Default is 50.
+    - input_dim (int): Number of variables/channels in the input time series. Default is 3.
+    - gru_units (int): The number of units in each GRU layer. Default is 30.
+    - gru_layers (int): The number of GRU layers. Default is 1.
+    - repr_dim (int): The number of units in the fully connected layer. Default is 128.
     - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
-    - rnn_layers (int): The number of RNN layers in each branch. Default is 2.
-    - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
-    - l2_reg (float): L2 regularization factor. Default is None (no regularization).
+    - pds (bool): If True, the model will use PDS and have its representations normalized.
     - dropout (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
     - activation: Optional activation function to use. If None, defaults to LeakyReLU.
-    - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None (no normalization).
+    - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None.
 
-    Note: inputs for RNNs is sequence: A 3D tensor, with shape [batch, timesteps, feature].
-    In this context, features is like channels, number of variables per timesteps
+    Input shape: (batch_size, sequence_length, input_dim)
+        - batch_size: Number of samples in the batch
+        - sequence_length: Variable length time sequence (None)
+        - input_dim: Number of features/channels at each timestep
+
     Returns:
     - Model: A Keras model instance.
     """
+    
+    # Using None for sequence_length allows for variable length sequences
+    input_layer = Input(shape=(None, input_dim), name='input_series')
+    x = input_layer
 
-    if input_dims is None:
-        input_dims = [25, 25, 25]
+    for layer in range(gru_layers):
+        x = GRU(units=gru_units,
+                return_sequences=True if layer < gru_layers - 1 else False)(x)
 
-    dim_counts = Counter(input_dims)
-    rnn_branches = []
-    gru_inputs = []
+        if norm == 'batch_norm':
+            x = BatchNormalization()(x)
+        elif norm == 'layer_norm':
+            x = LayerNormalization()(x)
 
-    for dim, count in dim_counts.items():
-        input_layer = Input(shape=(None, count), name=f'input_{dim}x{count}')
-        x = input_layer
+        x = activation(x) if callable(activation) else LeakyReLU()(x)
 
-        for layer in range(gru_layers):
-            x = GRU(units=gru_units,
-                    return_sequences=True if layer < gru_layers - 1 else False,
-                    kernel_regularizer=l2(l2_reg) if l2_reg else None)(x)
+        if dropout > 0.0:
+            x = Dropout(dropout)(x)
 
-            if norm == 'batch_norm':
-                x = BatchNormalization()(x)
-            elif norm == 'layer_norm':
-                x = LayerNormalization()(x)
-
-            x = activation(x) if callable(activation) else LeakyReLU()(x)
-
-            if dropout > 0.0:
-                x = Dropout(dropout)(x)
-
-        flattened = Flatten()(x)
-        rnn_branches.append(flattened)
-        gru_inputs.append(input_layer)
-
-    concatenated = Concatenate()(rnn_branches) if len(rnn_branches) > 1 else rnn_branches[0]
-
-    dense = Dense(repr_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(concatenated)
+    flattened = Flatten()(x)
+    dense = Dense(repr_dim)(flattened)
     final_repr_output = activation(dense) if callable(activation) else LeakyReLU()(dense)
 
     if pds:
@@ -398,7 +385,7 @@ def create_gru(
     else:
         model_output = final_repr_output
 
-    model = Model(inputs=gru_inputs, outputs=model_output, name=name)
+    model = Model(inputs=input_layer, outputs=model_output, name=name)
     return model
 
 
