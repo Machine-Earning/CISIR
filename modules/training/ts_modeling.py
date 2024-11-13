@@ -361,7 +361,7 @@ def create_gru(
     # Then reshape to (batch_size, 25, 4)
     timesteps = 25
     features = input_dim // timesteps  # Should be 4 when input_dim is 100
-    x = Reshape((timesteps, features), name='reshape_layer')(x)
+    x = Reshape((timesteps, features), name='reshape_layer')(input_layer)
 
     for layer in range(gru_layers):
         x = GRU(units=gru_units,
