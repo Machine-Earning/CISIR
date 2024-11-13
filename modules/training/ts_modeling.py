@@ -334,7 +334,7 @@ def create_gru(
     Create a GRU model that processes time series data.
 
     Parameters:
-    - input_dim (int): Number of features in the input data. Default is 3.
+    - input_dim (int): Number of features in the input data. Default is 100.
     - gru_units (int): The number of units in each GRU layer. Default is 30.
     - gru_layers (int): The number of GRU layers. Default is 1.
     - repr_dim (int): The number of units in the fully connected layer. Default is 128.
@@ -344,23 +344,24 @@ def create_gru(
     - activation: Optional activation function to use. If None, defaults to LeakyReLU.
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None.
 
-    Input shape: (batch_size, input_dim)
+    Input shape: (batch_size, input_dim, 1)
         - batch_size: Number of samples in the batch
         - input_dim: Number of features
+        - 1: Single channel
 
     Returns:
     - Model: A Keras model instance.
-     
-    Input shape: (batch_size, input_dim) -> Reshaped to (batch_size, timesteps, features)
-    where timesteps = 25 and features = input_dim // timesteps
     """
+    # Input shape should be (batch_size, input_dim, 1)
+    input_layer = Input(shape=(input_dim, 1), name='input_series')
 
-    input_layer = Input(shape=(input_dim,), name='input_series')
-
-    # Reshape layer to convert (batch_size, 100) to (batch_size, 25, 4)
+    # First squeeze out the last dimension from (batch_size, 100, 1) to (batch_size, 100)
+    x = Lambda(lambda x: K.squeeze(x, axis=-1))(input_layer)
+    
+    # Then reshape to (batch_size, 25, 4)
     timesteps = 25
     features = input_dim // timesteps  # Should be 4 when input_dim is 100
-    x = Reshape((timesteps, features), name='reshape_layer')(input_layer)
+    x = Reshape((timesteps, features), name='reshape_layer')(x)
 
     for layer in range(gru_layers):
         x = GRU(units=gru_units,
@@ -373,11 +374,10 @@ def create_gru(
 
         x = activation(x) if callable(activation) else LeakyReLU()(x)
 
-        # if dropout > 0.0:
-        #     x = Dropout(dropout)(x)
+        if dropout > 0.0:
+            x = Dropout(dropout)(x)
 
-    # Flatten is no longer needed if last GRU layer has return_sequences=False
-    # as the output will already be (batch_size, gru_units)
+    # Dense layer for representation
     dense = Dense(repr_dim)(x)
     final_repr_output = activation(dense) if callable(activation) else LeakyReLU()(dense)
 
