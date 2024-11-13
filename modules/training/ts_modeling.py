@@ -332,33 +332,11 @@ def create_gru(
 ) -> Model:
     """
     Create a GRU model that processes time series data.
-
-    Parameters:
-    - input_dim (int): Number of features in the input data. Default is 100.
-    - gru_units (int): The number of units in each GRU layer. Default is 30.
-    - gru_layers (int): The number of GRU layers. Default is 1.
-    - repr_dim (int): The number of units in the fully connected layer. Default is 128.
-    - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
-    - pds (bool): If True, the model will use PDS and have its representations normalized.
-    - dropout (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
-    - activation: Optional activation function to use. If None, defaults to LeakyReLU.
-    - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None.
-
-    Input shape: (batch_size, input_dim, 1)
-        - batch_size: Number of samples in the batch
-        - input_dim: Number of features
-        - 1: Single channel
-
-    Returns:
-    - Model: A Keras model instance.
     """
-    # Input shape should be (batch_size, input_dim, 1)
-    input_layer = Input(shape=(None, input_dim, 1))
-
-    # First squeeze out the last dimension from (batch_size, 100, 1) to (batch_size, 100)
-    # x = Lambda(lambda x: K.squeeze(x, axis=-1))(input_layer)
+    # Input shape should be (input_dim,)
+    input_layer = Input(shape=(input_dim,))
     
-    # Then reshape to (batch_size, 25, 4)
+    # Reshape to (timesteps, features)
     timesteps = 25
     features = input_dim // timesteps  # Should be 4 when input_dim is 100
     x = Reshape((timesteps, features), name='reshape_layer')(input_layer)
@@ -377,6 +355,7 @@ def create_gru(
         if dropout > 0.0:
             x = Dropout(dropout)(x)
 
+
     # Dense layer for representation
     dense = Dense(repr_dim)(x)
     final_repr_output = activation(dense) if callable(activation) else LeakyReLU()(dense)
@@ -393,6 +372,7 @@ def create_gru(
 
     model = Model(inputs=input_layer, outputs=model_output, name=name)
     return model
+
 
 
 def create_mlp(
@@ -1340,6 +1320,11 @@ def stratified_batch_dataset(
     """
     # Generate the stratified groups once
     groups = stratified_groups(y, batch_size)
+    
+    # Reshape X to remove the extra dimension if it exists
+    if len(X.shape) == 3:
+        X = X.reshape(X.shape[0], -1)
+        
     # Use from_generator to create a dataset from the stratified_data_generator
     dataset = tf.data.Dataset.from_generator(
         lambda: stratified_data_generator(X, y, groups, shuffle=shuffle),
