@@ -43,7 +43,7 @@ def main():
 
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
-            for cme_speed_threshold in CME_SPEED_THRESHOLD:
+            for cme_speed_threshold in [-1]:
                 for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS:
                     for rho in RHO:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:

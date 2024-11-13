@@ -19,7 +19,7 @@ MLP_HIDDENS = [
     256, 128, 128, 128, 128, 128, 128, 128
 ]  # Hidden layers
 MLP_HIDDENS_S = [512, 256, 128, 64, 256, 128]  # Hidden layers
-MLP_HIDDENS_S2 = [128, 64, 32, 64]
+MLP_HIDDENS_S2 = [256, 128, 64, 128]
 MLP_HIDDENS_S = [512, 512, 256, 256, 128, 128, 64, 64, 256, 256, 128]  # Hidden layers
 PROJ_HIDDENS = [64]  # Projection hidden layers
 LOSS_KEY = 'mse_pcc'  # Mean squared error regression loss
@@ -45,8 +45,8 @@ MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 BANDWIDTH = 4.42e-2  # Bandwidth for rebalancing
 PATIENCE = int(2e3)  # Higher patience
 PDS_PATIENCE = int(2e3)  # Higher patience
-LR_CB_FACTOR = 0.9  # factor for reducing learning rate
-LR_CB_PATIENCE = 200  # patience for reducing learning rate
+LR_CB_FACTOR = 0.8  # factor for reducing learning rate
+LR_CB_PATIENCE = 300  # patience for reducing learning rate
 LR_CB_MIN_LR = 1e-4  # minimum learning rate
 VERBOSE = 1  # Verbose
 SAVE_BEST = False  # Save best model
@@ -56,7 +56,6 @@ DS_VERSION = 7  # Dataset version
 DS_PATH = 'data/electron_cme_data_split_v7'  # Path to the dataset
 # VAL_SPLIT = 0.25  # Validation split
 TARGET_MIN_NORM_WEIGHT = 0.01  # Minimum weight for the target normalization
-COMMON_VAL_ALPHA = 1  # Common validation alpha
 ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
 ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 WANDB_SAVE_MODEL = False  # Save model to wandb
@@ -64,13 +63,13 @@ RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 SKIP_REPR = True  # residual representation
 SMOOTHING_METHOD = 'moving_average'
 WINDOW_SIZE = 11
-RHO = [1e-3]
+RHO = [1e-1]
 REWEIGHTS = [(0.5, 0.75, 0.1, 0)]
 PDS_RW = [(0.5, 0.75)]
 # PDS_RW = [(0, 0)]
 LAMBDA_FACTOR = 3.3
 AE_LAMBDA = 1
-CVRG_MIN_DELTA = 1e-4
+CVRG_MIN_DELTA = 1e-5
 CVRG_METRIC = 'loss'
 
 # ATTM AREA
