@@ -68,7 +68,7 @@ def main():
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                                 lambda_ = LAMBDA_FACTOR  # LAMBDA
                                 # Construct the title
-                                title = f'mlp2_pdcS2_amse{alpha_mse:.2f}'
+                                title = f'mlp2_pdcS2_amse{alpha_mse:.2f}_cvrg'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -324,7 +324,8 @@ def main():
                                     #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
 
                                     early_stopping = SmoothEarlyStopping(
-                                        monitor=ES_CB_MONITOR,
+                                        monitor=CVRG_METRIC,
+                                        min_delta=CVRG_MIN_DELTA,
                                         patience=patience,
                                         verbose=VERBOSE,
                                         restore_best_weights=ES_CB_RESTORE_WEIGHTS,

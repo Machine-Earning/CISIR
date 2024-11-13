@@ -278,7 +278,8 @@ def main():
                                 #     verbose=VERBOSE,
                                 #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
                                 early_stopping = SmoothEarlyStopping(
-                                    monitor=ES_CB_MONITOR,
+                                    monitor=CVRG_METRIC,
+                                    min_delta=CVRG_MIN_DELTA,
                                     patience=patience,
                                     verbose=VERBOSE,
                                     restore_best_weights=ES_CB_RESTORE_WEIGHTS,
@@ -295,7 +296,8 @@ def main():
                                         lambda y_true, y_pred: mb.pdc_loss_linear_vec(
                                             y_true, y_pred,
                                             phase_manager=pm,
-                                            train_sample_weights=train_weights_dict,
+                                            # train_sample_weights=subtrain_weights_dict,
+                                            # val_sample_weights=val_weights_dict,
                                         ),
                                         'mse'  # Reconstruction loss
                                     ],
@@ -383,7 +385,7 @@ def main():
                                     lambda y_true, y_pred: mb.pdc_loss_linear_vec(
                                         y_true, y_pred,
                                         phase_manager=pm,
-                                        train_sample_weights=train_weights_dict,
+                                        # train_sample_weights=train_weights_dict,
                                     ),
                                     'mse'  # Reconstruction loss
                                 ],

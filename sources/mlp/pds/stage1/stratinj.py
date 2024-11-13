@@ -264,7 +264,8 @@ def main():
                                 #     verbose=VERBOSE,
                                 #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
                                 early_stopping = SmoothEarlyStopping(
-                                    monitor=ES_CB_MONITOR,
+                                    monitor=CVRG_METRIC,
+                                    min_delta=CVRG_MIN_DELTA,
                                     patience=patience,
                                     verbose=VERBOSE,
                                     restore_best_weights=ES_CB_RESTORE_WEIGHTS,

@@ -41,9 +41,7 @@ weight_paths = {
     # (False,
     #  0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-030006MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_alpha0.20_CME0_features_all.h5',
     # # inj min 
-    (False, 0):
-        '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp_pdcStratInj_bs3600_rho0.10_20241111-223111.h5'
-    ,
+    (False, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp_pdsStratInj_bs3600_rho0.10_20241111-223107.h5',
 }
 
 
@@ -68,7 +66,7 @@ def main():
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                                 lambda_ = LAMBDA_FACTOR  # LAMBDA
                                 # Construct the title
-                                title = f'mlp2_pdcS2_amse{alpha_mse:.2f}'
+                                title = f'mlp2_pdsS2_amse{alpha_mse:.2f}_cvrg'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -210,14 +208,14 @@ def main():
                                 # 4-fold cross-validation
                                 folds_optimal_epochs = []
                                 for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
-                                    load_stratified_folds(
-                                        root_dir,
-                                        inputs_to_use=inputs_to_use,
-                                        add_slope=add_slope,
-                                        outputs_to_use=outputs_to_use,
-                                        cme_speed_threshold=cme_speed_threshold,
-                                        seed=seed, shuffle=True
-                                    )
+                                        load_stratified_folds(
+                                            root_dir,
+                                            inputs_to_use=inputs_to_use,
+                                            add_slope=add_slope,
+                                            outputs_to_use=outputs_to_use,
+                                            cme_speed_threshold=cme_speed_threshold,
+                                            seed=seed, shuffle=True
+                                        )
                                 ):
                                     print(f'Fold: {fold_idx}')
                                     # print all cme_files shapes
@@ -324,7 +322,8 @@ def main():
                                     #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
 
                                     early_stopping = SmoothEarlyStopping(
-                                        monitor=ES_CB_MONITOR,
+                                        monitor=CVRG_METRIC,
+                                        min_delta=CVRG_MIN_DELTA,
                                         patience=patience,
                                         verbose=VERBOSE,
                                         restore_best_weights=ES_CB_RESTORE_WEIGHTS,

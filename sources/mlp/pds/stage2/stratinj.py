@@ -77,7 +77,7 @@ def main():
 
                                 set_seed(seed)
                                 patience = PATIENCE  # higher patience
-                                learning_rate = START_LR  # lower due to finetuning
+                                learning_rate = START_LR_PDS  # lower due to finetuning
 
                                 reduce_lr_on_plateau = ReduceLROnPlateau(
                                     monitor=LR_CB_MONITOR,
@@ -322,7 +322,8 @@ def main():
                                     #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
 
                                     early_stopping = SmoothEarlyStopping(
-                                        monitor=ES_CB_MONITOR,
+                                        monitor=CVRG_METRIC,
+                                        min_delta=CVRG_MIN_DELTA,
                                         patience=patience,
                                         verbose=VERBOSE,
                                         restore_best_weights=ES_CB_RESTORE_WEIGHTS,
