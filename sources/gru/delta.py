@@ -23,8 +23,7 @@ from modules.training.ts_modeling import (
     filter_ds,
     create_gru,
     plot_error_hist,
-    load_stratified_folds,
-    reshape_X
+    load_stratified_folds
 )
 
 
@@ -176,7 +175,7 @@ def main():
                                 low_threshold=lower_threshold,
                                 high_threshold=upper_threshold,
                                 N=N, seed=seed)
-                            
+
                             # get the number of features
                             # if add_slope:
                             #     n_features = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
@@ -258,8 +257,6 @@ def main():
                                     debug=False).label_reweight_dict
                                 print(f'validation set rebalanced.')
 
-                                
-
                                 # create the model
                                 model_sep = create_gru(
                                     input_dim=n_features,  # Using first feature dimension since all are same
@@ -286,8 +283,6 @@ def main():
                                 #     inputs_to_use,
                                 #     add_slope,
                                 #     'gru')
-
-                                
 
                                 # Define the EarlyStopping callback
                                 early_stopping = SmoothEarlyStopping(

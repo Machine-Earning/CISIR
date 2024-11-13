@@ -35,7 +35,8 @@ from tensorflow.keras.layers import (
     Add,
     Softmax,
     Multiply,
-    Lambda
+    Lambda,
+    Reshape
 )
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Optimizer
@@ -318,7 +319,7 @@ def create_gru_with_concatenation_skips(
 
 
 def create_gru(
-        input_dim: int = 3,  # Number of features
+        input_dim: int = 100,  # Number of features
         gru_units: int = 30,
         gru_layers: int = 1,
         repr_dim: int = 128,
@@ -349,10 +350,17 @@ def create_gru(
 
     Returns:
     - Model: A Keras model instance.
+     
+    Input shape: (batch_size, input_dim) -> Reshaped to (batch_size, timesteps, features)
+    where timesteps = 25 and features = input_dim // timesteps
     """
-    
+
     input_layer = Input(shape=(input_dim,), name='input_series')
-    x = input_layer
+
+    # Reshape layer to convert (batch_size, 100) to (batch_size, 25, 4)
+    timesteps = 25
+    features = input_dim // timesteps  # Should be 4 when input_dim is 100
+    x = Reshape((timesteps, features), name='reshape_layer')(input_layer)
 
     for layer in range(gru_layers):
         x = GRU(units=gru_units,
@@ -365,15 +373,15 @@ def create_gru(
 
         x = activation(x) if callable(activation) else LeakyReLU()(x)
 
-        if dropout > 0.0:
-            x = Dropout(dropout)(x)
+        # if dropout > 0.0:
+        #     x = Dropout(dropout)(x)
 
-    flattened = Flatten()(x)
-    dense = Dense(repr_dim)(flattened)
+    # Flatten is no longer needed if last GRU layer has return_sequences=False
+    # as the output will already be (batch_size, gru_units)
+    dense = Dense(repr_dim)(x)
     final_repr_output = activation(dense) if callable(activation) else LeakyReLU()(dense)
 
     if pds:
-        # Assuming NormalizeLayer is defined elsewhere
         normalized_repr_layer = NormalizeLayer(name='normalize_layer')(final_repr_output)
         final_repr_output = normalized_repr_layer
 
