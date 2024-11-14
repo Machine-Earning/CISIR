@@ -24,6 +24,7 @@ weight_path = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_
 def main():
     """
     Main function to load and evaluate the E-MLP model
+    
     :return:
     """
 

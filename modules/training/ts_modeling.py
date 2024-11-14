@@ -2569,6 +2569,9 @@ def process_sep_events(
                 # Extract event ID from filename
                 event_id = file_name.split('_')[2]
 
+                # save a copy of the dataframe to use for showing the actual vs predicted plot
+                df_for_avsp = df.copy()
+
                 # Plot and evaluate the SEP event
                 mae_loss, plotname = plot_and_evaluate_sep_event(
                     df, cme_start_times, event_id, model,
@@ -2582,7 +2585,7 @@ def process_sep_events(
 
                 if show_avsp:
                     actual_ch, predicted_ch, actual_ln_intensity, predicted_ln_intensity = plot_avsp_delta(
-                        df, model, input_columns, using_cme=using_cme,
+                        df_for_avsp, model, input_columns, using_cme=using_cme,
                         inputs_to_use=inputs_to_use, add_slope=add_slope,
                         outputs_to_use=outputs_to_use, use_dict=use_dict)
 
