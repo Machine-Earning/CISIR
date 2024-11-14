@@ -27,7 +27,7 @@ def main():
     :return:
     """
 
-    for seed in SEEDS:
+    for seed in [456789]:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS:
