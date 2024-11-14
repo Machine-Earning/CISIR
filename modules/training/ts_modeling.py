@@ -2373,39 +2373,42 @@ def plot_avsp_delta(
         add_slope: bool = True,
         outputs_to_use: List[str] = None,
         use_dict: bool = False
-) -> [float, str]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Plots theactual delta (x) vs predicted delta (y) with a diagonal dotted line indicating perfect prediction.
-    Different colors are used for different events
+    Computes actual vs predicted delta values and ln intensities.
 
     Parameters:
-    - df (pd.DataFrame): The DataFrame containing the SEP event cme_files with normalized values.
-    - cme_start_times (List[pd.Timestamp]): A list of CME start times for vertical markers.
-    - event_id (str): The event ID to be displayed in the plot title.
+    - df (pd.DataFrame): The DataFrame containing the SEP event data with normalized values.
     - model (tf.keras.Model): The trained model to be evaluated.
     - input_columns (List[str]): The list of input columns for the model.
-    - cme_columns (List[str]): The list of CME feature columns.
     - using_cme (bool): Whether to use CME features. Default is False.
-    - title (str): The title of the plot. Default is None.
     - inputs_to_use (List[str]): The list of input types to use. Default is None.
     - add_slope (bool): Whether to add slope features. Default is True.
     - outputs_to_use (List[str]): The list of output types to use. Default is None.
     - use_dict (bool): Whether to use the dictionary for the model. Default is False.
 
     Returns:
-    - Tuple[float, str]: A tuple containing the MAE loss and the plot title.
+    - Tuple containing:
+        - actual_changes (np.ndarray): Actual delta values.
+        - predicted_changes (np.ndarray): Predicted delta values.
+        - actual_ln_intensity (np.ndarray): Actual ln intensity values.
+        - predicted_ln_intensity (np.ndarray): Predicted ln intensity values.
     """
-    global actual_changes, predicted_changes
+    if inputs_to_use is None:
+        inputs_to_use = ['e0.5', 'e4.4', 'p6.1', 'p']
+
+    if outputs_to_use is None:
+        outputs_to_use = ['delta_p', 'p']
 
     if add_slope:
         n_features = len(inputs_to_use) * (25 + 24)
-        # n_features = len(inputs_to_use) * 25 * 2
     else:
         n_features = len(inputs_to_use) * 25
 
     # Normalize the flux intensities
     df_norm = normalize_flux(df, input_columns, apply_log=True)
-    # X = df_norm[input_columns].values
+
+    # Add slope columns if required
     added_columns = []
     if add_slope:
         added_columns = generate_slope_column_names(inputs_to_use)
@@ -2415,36 +2418,37 @@ def plot_avsp_delta(
             for slope_column, slope_index in zip(slope_column_names, range(slope_values.shape[1])):
                 df_norm[slope_column] = slope_values[:, slope_index]
 
+    # Prepare input data
     X = df_norm[input_columns + added_columns].values
 
+    # Prepare target columns
     target_columns = []
     if 'delta_p' in outputs_to_use:
         target_columns.append('delta_log_Intensity')
     if 'p' in outputs_to_use:
         target_columns.append('Proton Intensity')
-        # log the intensity but not delta
-        df['Proton Intensity'] = np.log1p(df['Proton Intensity'])
 
+    # Apply ln transformation to 'Proton Intensity'
+    df['Proton Intensity'] = np.log1p(df['Proton Intensity'])
+    actual_ln_intensity = df['Proton Intensity'].values
+
+    # Handle CME features if used
     if using_cme:
-        # process cme features
         cme_features = preprocess_cme_features(df, inputs_to_use)
         X_reshaped = np.concatenate([X, cme_features.values], axis=1)
     else:
-        # Reshape X accordingly
-        # The '-1' in reshape indicates that the number of samples is automatically determined
-        # 'num_features' is the actual number of features in X
-        # '1' is for the third dimension, typically used for weights expecting 3D input (like CNNs)
         X_reshaped = X.reshape(-1, n_features, 1)
 
+    # Define feature lengths for reshaping
     if add_slope:
-        # n_features_list = [25] * len(inputs_to_use) * 2
         n_features_list = [25] * len(inputs_to_use) + [24] * len(inputs_to_use)
     else:
         n_features_list = [25] * len(inputs_to_use)
 
+    # Reshape input data
     X_reshaped = reshape_X(X_reshaped, n_features_list, inputs_to_use, add_slope, 'mlp')
 
-    # Evaluate the model
+    # Make predictions using the model
     if use_dict:
         res = model.predict(X_reshaped)
         predictions = res['output']
@@ -2453,17 +2457,16 @@ def plot_avsp_delta(
 
     predictions = process_predictions(predictions)
 
-    print("Using target change approach")
+    # Extract actual delta values
     actual_changes = df['delta_log_Intensity'].values
     predicted_changes = predictions
 
-    #     print type of actual_changes and predicted_changes and their shapes
-    # print(f"Type of actual_changes: {type(actual_changes)}")
-    # print(f"Type of predicted_changes: {type(predicted_changes)}")
-    # print(f"Shape of actual_changes: {actual_changes.shape}")
-    # print(f"Shape of predicted_changes: {predicted_changes.shape}")
+    # Compute predicted ln intensity by adding predicted delta to p_t_log
+    p_t = df['p_t'].values
+    p_t_log = np.log1p(p_t)
+    predicted_ln_intensity = p_t_log + predicted_changes
 
-    return actual_changes, predicted_changes
+    return actual_changes, predicted_changes, actual_ln_intensity, predicted_ln_intensity
 
 
 def process_sep_events(
@@ -2489,9 +2492,9 @@ def process_sep_events(
     - model (tf.keras.Model): The trained machine learning model for predicting proton intensity.
     - using_cme (bool): Whether to use CME features. Default is False.
     - title (str): The title of the plot. Default is None.
-    - inputs_to_use (List[str]): List of input types to include in the dataset. Default is ['e0.5', 'e1.8', 'p'].
+    - inputs_to_use (List[str]): List of input types to include in the dataset.
     - add_slope (bool): If True, adds slope features to the dataset.
-    - outputs_to_use (List[str]): List of output types to include in the dataset. Default is ['p'].
+    - outputs_to_use (List[str]): List of output types to include in the dataset.
     - cme_speed_threshold (float): The threshold for CME speed. CMEs with speeds below this threshold will be excluded.
     - show_avsp (bool): Whether to show the Actual vs Predicted delta plot. Default is False.
     - show_error_hist (bool): Whether to show the error histogram. Default is True.
@@ -2499,27 +2502,25 @@ def process_sep_events(
     - use_dict (bool): Whether to use the dictionary for the model. Default is False.
 
     Returns:
-    - str: The name of the plot file.
+    - List[str]: A list containing the names of the plot files.
 
     The function assumes that the SEP event files are named in the format 'sep_event_X_filled_ie.csv',
     where 'X' is the event ID. It skips files where the proton intensity is -9999.
     Each file will be processed to plot actual vs predicted proton intensity and electron intensity.
     A MAE score will be printed for each file.
     """
-
     if inputs_to_use is None:
         inputs_to_use = ['e0.5', 'e4.4', 'p6.1', 'p']
 
     if outputs_to_use is None:
         outputs_to_use = ['delta_p', 'p']
 
-        # Generate input columns based on inputs_to_use and add slope columns if add_slope is True
+    # Generate input columns based on inputs_to_use and add slope columns if add_slope is True
     input_columns = []
     for input_type in inputs_to_use:
         input_columns += [f'{input_type}_tminus{i}' for i in range(24, 0, -1)] + [f'{input_type}_t']
 
     target_column = 'Proton Intensity'
-    # additional_columns = ['Timestamp', 'cme_donki_time']
 
     plot_names = []
 
@@ -2530,8 +2531,9 @@ def process_sep_events(
         'solar_wind_speed', 'diffusive_shock', 'half_richardson_value'
     ]
 
-    # Initialize a list to hold data for plotting
-    avsp_data = []
+    # Initialize lists to hold data for plotting
+    avsp_data_delta = []
+    avsp_data_intensity = []
 
     # Iterate over files in the directory
     for file_name in os.listdir(directory):
@@ -2539,7 +2541,7 @@ def process_sep_events(
             try:
                 file_path = os.path.join(directory, file_name)
 
-                # Read the SEP event cme_files
+                # Read the SEP event data
                 df = read_sep_data(file_path)
 
                 # Skip files where proton intensity is -9999
@@ -2548,16 +2550,10 @@ def process_sep_events(
 
                 df = zero_out_cme_below_threshold(df, cme_speed_threshold, cme_columns_to_zero_out)
 
-                # # Apply time offset to align the proton and electron intensities
-                # offset = pd.Timedelta(minutes=30)
-                # df = apply_time_offset(df, offset)
                 # Extract CME start times
                 cme_start_times = extract_cme_start_times(df)
                 # Extract event ID from filename
                 event_id = file_name.split('_')[2]
-
-                # Select only the input columns for the model
-                # model_inputs = df[input_columns]
 
                 # Plot and evaluate the SEP event
                 mae_loss, plotname = plot_and_evaluate_sep_event(
@@ -2571,32 +2567,60 @@ def process_sep_events(
                 plot_names.append(plotname)
 
                 if show_avsp:
-                    actual_ch, predicted_ch = plot_avsp_delta(
+                    actual_ch, predicted_ch, actual_ln_intensity, predicted_ln_intensity = plot_avsp_delta(
                         df, model, input_columns, using_cme=using_cme,
                         inputs_to_use=inputs_to_use, add_slope=add_slope,
                         outputs_to_use=outputs_to_use, use_dict=use_dict)
 
-                    avsp_data.append((event_id, actual_ch, predicted_ch))
+                    # Collect data for delta plot
+                    avsp_data_delta.append((event_id, actual_ch, predicted_ch))
+                    # Collect data for ln intensity plot
+                    avsp_data_intensity.append((event_id, actual_ln_intensity, predicted_ln_intensity))
+
             except Exception as e:
                 print(f"Error processing file: {file_name}")
                 print(e)
                 traceback.print_exc()
                 continue
 
-    if show_avsp and avsp_data:
-        plot_file_location = plot_actual_vs_predicted(avsp_data, title, prefix)
-        print(f"Saved plot to: {plot_file_location}")
-        plot_names.append(plot_file_location)
+    if show_avsp:
+        # Plot delta-based actual vs predicted
+        if avsp_data_delta:
+            plot_file_location_delta = plot_actual_vs_predicted(
+                avsp_data_delta, title + ' Delta', prefix + '_delta')
+            print(f"Saved delta plot to: {plot_file_location_delta}")
+            plot_names.append(plot_file_location_delta)
 
-        if show_error_hist:
-            histogram_path = plot_error_dist(avsp_data, f"{title} Error Distribution", prefix)
-            print(f"Saved histogram plot to: {histogram_path}")
-            plot_names.append(histogram_path)
+            if show_error_hist:
+                histogram_path = plot_error_dist(
+                    avsp_data_delta, f"{title} Delta Error Distribution", prefix + '_delta')
+                print(f"Saved delta histogram plot to: {histogram_path}")
+                plot_names.append(histogram_path)
 
-        if show_error_concentration:
-            concentration_path = plot_error_concentration(avsp_data, f"{title} Error Concentration", prefix)
-            print(f"Saved concentration plot to: {concentration_path}")
-            plot_names.append(concentration_path)
+            if show_error_concentration:
+                concentration_path = plot_error_concentration(
+                    avsp_data_delta, f"{title} Delta Error Concentration", prefix + '_delta')
+                print(f"Saved delta concentration plot to: {concentration_path}")
+                plot_names.append(concentration_path)
+
+        # Plot ln intensity-based actual vs predicted
+        if avsp_data_intensity:
+            plot_file_location_intensity = plot_actual_vs_predicted(
+                avsp_data_intensity, title + ' Ln Intensity', prefix + '_ln_intensity')
+            print(f"Saved ln intensity plot to: {plot_file_location_intensity}")
+            plot_names.append(plot_file_location_intensity)
+
+            if show_error_hist:
+                histogram_path = plot_error_dist(
+                    avsp_data_intensity, f"{title} Ln Intensity Error Distribution", prefix + '_ln_intensity')
+                print(f"Saved ln intensity histogram plot to: {histogram_path}")
+                plot_names.append(histogram_path)
+
+            if show_error_concentration:
+                concentration_path = plot_error_concentration(
+                    avsp_data_intensity, f"{title} Ln Intensity Error Concentration", prefix + '_ln_intensity')
+                print(f"Saved ln intensity concentration plot to: {concentration_path}")
+                plot_names.append(concentration_path)
 
     return plot_names
 
