@@ -1988,8 +1988,9 @@ class ModelBuilder:
             weights = tf.squeeze(weights)
             weights_matrix = tf.cast(weights[:, None] * weights[None, :], z_diff.dtype)
 
-        # Zero out diagonal
-        weights_matrix = tf.linalg.set_diag(weights_matrix, tf.zeros(batch_size, dtype=z_diff.dtype))
+        # Reshape diagonal zeros to match weights_matrix shape
+        diag_zeros = tf.zeros([batch_size, 1], dtype=dtype)
+        weights_matrix = tf.linalg.set_diag(weights_matrix, diag_zeros)
 
         # Compute moments
         cov_Dy_Dz = tf.reduce_sum(weights_matrix * Dy_centered * Dz_centered)
@@ -2128,9 +2129,17 @@ class ModelBuilder:
         if sample_weights is not None:
             # Create weight matrix based on sample weights
             weights = create_weight_tensor_fast(y_true, sample_weights)
+
+            # print(f"weights: {weights}")
+            # print(f"shape of weights: {weights.shape}")
             weights_matrix = tf.cast(weights[:, None] * weights[None, :], dtype)
-            # Zero out the diagonal for weights
-            weights_matrix = tf.linalg.set_diag(weights_matrix, tf.zeros(batch_size, dtype=dtype))
+            # print(f"weights_matrix: {weights_matrix}")
+            # print(f"shape of weights_matrix: {weights_matrix.shape}")
+            
+            # Reshape diagonal zeros to match weights_matrix shape
+            diag_zeros = tf.zeros([batch_size, 1], dtype=dtype)
+            weights_matrix = tf.linalg.set_diag(weights_matrix, diag_zeros)
+            
             # Apply the weights to the pairwise loss
             pairwise_loss *= weights_matrix
 
