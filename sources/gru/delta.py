@@ -75,7 +75,7 @@ def main():
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE
                             epochs = EPOCHS  # higher epochs
-                            gru_units = 30
+                            gru_units = 128
                             gru_layers = 1
                             hiddens_str = f'{gru_units}units_{gru_layers}layers'
                             bandwidth = BANDWIDTH

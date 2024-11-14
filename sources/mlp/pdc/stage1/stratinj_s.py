@@ -50,7 +50,7 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha, alphaV in PDS_RW:
+                for alpha, alphaV in PDS_RW_S:
                     for rho in RHO:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
@@ -62,7 +62,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'mlp_pdcStratInj_bs{batch_size}_rho{rho:.2f}'
+                            title = f'mlp_pdcStratInj_bs{batch_size}_rho{rho:.2f}_s'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -74,11 +74,11 @@ def main():
                             set_seed(seed)
                             epochs = EPOCHS
                             patience = PDS_PATIENCE
-                            learning_rate = START_LR_PDS
+                            learning_rate = START_LR_PDS_S
                             weight_decay = WEIGHT_DECAY_PDS
                             momentum_beta1 = MOMENTUM_BETA1
 
-                            hiddens = MLP_HIDDENS_S
+                            hiddens = MLP_HIDDENS_S2
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             pds = True
                             repr_dim = REPR_DIM
@@ -103,7 +103,7 @@ def main():
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
                             smoothing_method = SMOOTHING_METHOD
-                            window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
+                            window_size = WINDOW_SIZE_S  # allows margin of error of 10 epochs
 
                             # Initialize wandb
                             wandb.init(project="Repr-Jan-Report", name=experiment_name, config={

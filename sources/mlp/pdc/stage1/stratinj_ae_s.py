@@ -4,7 +4,7 @@ from datetime import datetime
 import numpy as np
 import tensorflow as tf
 import wandb
-from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
+from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
@@ -23,11 +23,12 @@ from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
     build_dataset,
-    create_mlp,
     filter_ds,
     set_seed,
     load_stratified_folds,
-    stratified_batch_dataset, create_mlp2
+    stratified_batch_dataset,
+    create_mlp2,
+    add_decoder
 )
 
 
@@ -50,7 +51,7 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha, alphaV in PDS_RW:
+                for alpha, alphaV in PDS_RW_S:
                     for rho in RHO:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
@@ -62,7 +63,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'mlp_pdcStratInj_bs{batch_size}_rho{rho:.2f}'
+                            title = f'mlp2ae_pdcStratInj_bs{batch_size}_rho{rho:.2f}_s'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -74,11 +75,11 @@ def main():
                             set_seed(seed)
                             epochs = EPOCHS
                             patience = PDS_PATIENCE
-                            learning_rate = START_LR_PDS
+                            learning_rate = START_LR_PDS_S
                             weight_decay = WEIGHT_DECAY_PDS
                             momentum_beta1 = MOMENTUM_BETA1
 
-                            hiddens = MLP_HIDDENS_S
+                            hiddens = MLP_HIDDENS_S2
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             pds = True
                             repr_dim = REPR_DIM
@@ -103,7 +104,9 @@ def main():
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
                             smoothing_method = SMOOTHING_METHOD
-                            window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
+                            window_size = WINDOW_SIZE_S  # allows margin of error of 10 epochs
+                            # Set the reconstruction loss weight
+                            reconstruction_loss_weight = AE_LAMBDA  # Adjust as needed
 
                             # Initialize wandb
                             wandb.init(project="Repr-Jan-Report", name=experiment_name, config={
@@ -202,14 +205,14 @@ def main():
                             # 4-fold cross-validation
                             folds_optimal_epochs = []
                             for fold_idx, (X_subtrain, y_subtrain_norm, X_val, y_val_norm) in enumerate(
-                                load_stratified_folds(
-                                    root_dir,
-                                    inputs_to_use=inputs_to_use,
-                                    add_slope=add_slope,
-                                    outputs_to_use=outputs_to_use,
-                                    cme_speed_threshold=cme_speed_threshold,
-                                    seed=seed, shuffle=True
-                                )
+                                    load_stratified_folds(
+                                        root_dir,
+                                        inputs_to_use=inputs_to_use,
+                                        add_slope=add_slope,
+                                        outputs_to_use=outputs_to_use,
+                                        cme_speed_threshold=cme_speed_threshold,
+                                        seed=seed, shuffle=True
+                                    )
                             ):
                                 print(f'Fold: {fold_idx}')
                                 # print all cme_files shapes
@@ -242,7 +245,7 @@ def main():
                                 print(f'validation set rebalanced.')
 
                                 # create the model
-                                model_sep = create_mlp2(
+                                encoder_model = create_mlp2(
                                     input_dim=n_features,
                                     hiddens=hiddens,
                                     output_dim=0,
@@ -255,6 +258,17 @@ def main():
                                     skipped_layers=skipped_layers,
                                     sam_rho=rho,
                                 )
+
+                                # Add decoder to create the autoencoder model
+                                model_sep = add_decoder(
+                                    encoder_model=encoder_model,
+                                    hiddens=hiddens,
+                                    activation=activation,
+                                    norm=norm,
+                                    dropout=dropout,
+                                    skip_connections=(skipped_layers > 0)
+                                )
+
                                 model_sep.summary()
 
                                 # Define the EarlyStopping callback
@@ -278,18 +292,29 @@ def main():
                                         weight_decay=weight_decay,
                                         beta_1=momentum_beta1
                                     ),
-                                    loss=lambda y_true, y_pred: mb.pdc_loss_linear_vec(
-                                        y_true, y_pred,
-                                        phase_manager=pm,
-                                        train_sample_weights=subtrain_weights_dict,
-                                        val_sample_weights=val_weights_dict,
-                                    )
+                                    loss=[
+                                        lambda y_true, y_pred: mb.pdc_loss_linear_vec(
+                                            y_true, y_pred,
+                                            phase_manager=pm,
+                                            train_sample_weights=subtrain_weights_dict,
+                                            val_sample_weights=val_weights_dict,
+                                        ),
+                                        'mse'  # Reconstruction loss
+                                    ],
+                                    loss_weights=[
+                                        1.0,
+                                        reconstruction_loss_weight
+                                    ]
                                 )
 
                                 subtrain_ds, subtrain_steps = stratified_batch_dataset(
                                     X_subtrain, y_subtrain_norm, batch_size)
                                 val_ds, val_steps = stratified_batch_dataset(
                                     X_val, y_val_norm, batch_size)
+
+                                # Adjust the dataset to include both y_train and X_train for reconstruction
+                                subtrain_ds = subtrain_ds.map(lambda x, y: (x, (y, x)))
+                                val_ds = val_ds.map(lambda x, y: (x, (y, x)))
 
                                 history = model_sep.fit(
                                     subtrain_ds,
@@ -326,7 +351,7 @@ def main():
                             wandb.log({'optimal_epochs': optimal_epochs})
 
                             # create the model
-                            final_model_sep = create_mlp2(
+                            final_encoder = create_mlp2(
                                 input_dim=n_features,
                                 hiddens=hiddens,
                                 output_dim=0,
@@ -340,21 +365,41 @@ def main():
                                 sam_rho=rho,
                             )
 
+                            # Add decoder to create the autoencoder model
+                            final_model_sep = add_decoder(
+                                encoder_model=final_encoder,
+                                hiddens=hiddens,
+                                activation=activation,
+                                norm=norm,
+                                dropout=dropout,
+                                skip_connections=(skipped_layers > 0)
+                            )
+
                             final_model_sep.compile(
                                 optimizer=AdamW(
                                     learning_rate=learning_rate,
                                     weight_decay=weight_decay,
                                     beta_1=momentum_beta1
                                 ),
-                                loss=lambda y_true, y_pred: mb.pdc_loss_linear_vec(
-                                    y_true, y_pred,
-                                    phase_manager=pm,
-                                    train_sample_weights=train_weights_dict,
-                                )
+                                loss=[
+                                    lambda y_true, y_pred: mb.pdc_loss_linear_vec(
+                                        y_true, y_pred,
+                                        phase_manager=pm,
+                                        train_sample_weights=train_weights_dict,
+                                    ),
+                                    'mse'  # Reconstruction loss
+                                ],
+                                loss_weights=[
+                                    1.0,
+                                    reconstruction_loss_weight
+                                ]
                             )
 
                             train_ds, train_steps = stratified_batch_dataset(
                                 X_train, y_train, batch_size)
+
+                            # Adjust the dataset to include both y_train and X_train for reconstruction
+                            train_ds = train_ds.map(lambda x, y: (x, (y, x)))
 
                             final_model_sep.fit(
                                 train_ds,
@@ -370,36 +415,36 @@ def main():
                             )
 
                             # Save the final model
-                            final_model_sep.save_weights(f"final_model_weights_{str(experiment_name)}.h5")
+                            final_encoder.save_weights(f"final_model_weights_{str(experiment_name)}.h5")
                             # print where the model weights are saved
                             print(f"Model weights are saved in final_model_weights_{str(experiment_name)}.h5")
 
                             above_threshold = norm_upper_t
                             # evaluate pcc+ on the test set
                             error_pcc_cond = evaluate_pcc_repr(
-                                final_model_sep, X_test, y_test_norm, i_above_threshold=above_threshold)
+                                final_encoder, X_test, y_test_norm, i_above_threshold=above_threshold)
                             print(f'pcc error delta i>= {above_threshold} test: {error_pcc_cond}')
                             wandb.log({"jpcc+": error_pcc_cond})
 
                             # evaluate pcc+ on the training set
                             error_pcc_cond_train = evaluate_pcc_repr(
-                                final_model_sep, X_train, y_train_norm, i_above_threshold=above_threshold)
+                                final_encoder, X_train, y_train_norm, i_above_threshold=above_threshold)
                             print(f'pcc error delta i>= {above_threshold} train: {error_pcc_cond_train}')
                             wandb.log({"train_jpcc+": error_pcc_cond_train})
 
                             # Evaluate the model correlation on the test set
-                            error_pcc = evaluate_pcc_repr(final_model_sep, X_test, y_test_norm)
+                            error_pcc = evaluate_pcc_repr(final_encoder, X_test, y_test_norm)
                             print(f'pcc error delta test: {error_pcc}')
                             wandb.log({"jpcc": error_pcc})
 
                             # Evaluate the model correlation on the training set
-                            error_pcc_train = evaluate_pcc_repr(final_model_sep, X_train, y_train_norm)
+                            error_pcc_train = evaluate_pcc_repr(final_encoder, X_train, y_train_norm)
                             print(f'pcc error delta train: {error_pcc_train}')
                             wandb.log({"train_jpcc": error_pcc_train})
 
                             # Evaluate the model correlation with colored
                             file_path = plot_repr_corr_dist(
-                                final_model_sep,
+                                final_encoder,
                                 X_train_filtered, y_train_filtered,
                                 title + "_training"
                             )
@@ -407,7 +452,7 @@ def main():
                             print('file_path: ' + file_path)
 
                             file_path = plot_repr_corr_dist(
-                                final_model_sep,
+                                final_encoder,
                                 X_test_filtered, y_test_filtered,
                                 title + "_test"
                             )
@@ -417,7 +462,7 @@ def main():
                             # Log t-SNE plot
                             # Log the training t-SNE plot to wandb
                             stage1_file_path = plot_tsne_delta(
-                                final_model_sep,
+                                final_encoder,
                                 X_train_filtered, y_train_filtered, title,
                                 'stage1_training',
                                 model_type='features',
@@ -427,7 +472,7 @@ def main():
 
                             # Log the testing t-SNE plot to wandb
                             stage1_file_path = plot_tsne_delta(
-                                final_model_sep,
+                                final_encoder,
                                 X_test_filtered, y_test_filtered, title,
                                 'stage1_testing',
                                 model_type='features',
@@ -437,7 +482,7 @@ def main():
 
                             # Evaluate the model correlation
                             file_path = plot_repr_correlation(
-                                final_model_sep,
+                                final_encoder,
                                 X_train_filtered, y_train_filtered,
                                 title + "_training"
                             )
@@ -445,7 +490,7 @@ def main():
                             print('file_path: ' + file_path)
 
                             file_path = plot_repr_correlation(
-                                final_model_sep,
+                                final_encoder,
                                 X_test_filtered, y_test_filtered,
                                 title + "_test"
                             )
@@ -454,7 +499,7 @@ def main():
 
                             # Evaluate the model correlation density
                             file_path = plot_repr_corr_density(
-                                final_model_sep,
+                                final_encoder,
                                 X_train_filtered, y_train_filtered,
                                 title + "_training"
                             )
@@ -462,7 +507,7 @@ def main():
                             print('file_path: ' + file_path)
 
                             file_path = plot_repr_corr_density(
-                                final_model_sep,
+                                final_encoder,
                                 X_test_filtered, y_test_filtered,
                                 title + "_test"
                             )
