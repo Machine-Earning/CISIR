@@ -1345,8 +1345,8 @@ def stratified_batch_dataset(
     groups = stratified_groups(y, batch_size)
     
     # Reshape X to remove the extra dimension if it exists
-    if len(X.shape) == 3:
-        X = X.reshape(X.shape[0], -1)
+    # if len(X.shape) == 3:
+    #     X = X.reshape(X.shape[0], -1)
         
     # Use from_generator to create a dataset from the stratified_data_generator
     dataset = tf.data.Dataset.from_generator(
