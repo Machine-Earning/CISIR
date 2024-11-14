@@ -56,14 +56,14 @@ def main():
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
-                            batch_size = 1200 # PDS_BATCH_SIZE  # full dataset used
+                            batch_size = PDS_BATCH_SIZE  # full dataset used
                             print(f'batch size : {batch_size}')
 
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'mlp_pdsOGStratInj_bs{batch_size}_rho{rho:.2f}'
+                            title = f'mlp2_pdsStratInj_bs{batch_size}_rho{rho:.2f}'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -94,7 +94,7 @@ def main():
                                 patience=LR_CB_PATIENCE,
                                 verbose=VERBOSE,
                                 min_delta=LR_CB_MIN_DELTA,
-                                min_lr=LR_CB_MIN_LR)
+                                min_lr=LR_CB_MIN_LR_PDS)
 
                             bandwidth = BANDWIDTH
                             residual = RESIDUAL
@@ -279,7 +279,7 @@ def main():
                                         weight_decay=weight_decay,
                                         beta_1=momentum_beta1
                                     ),
-                                    loss=lambda y_true, y_pred: mb.pds_loss_vec(
+                                    loss=lambda y_true, y_pred: mb.pds_loss_linear_vec(
                                         y_true, y_pred,
                                         phase_manager=pm,
                                         train_sample_weights=subtrain_weights_dict,
@@ -347,7 +347,7 @@ def main():
                                     weight_decay=weight_decay,
                                     beta_1=momentum_beta1
                                 ),
-                                loss=lambda y_true, y_pred: mb.pds_loss_vec(
+                                loss=lambda y_true, y_pred: mb.pds_loss_linear_vec(
                                     y_true, y_pred,
                                     phase_manager=pm,
                                     train_sample_weights=train_weights_dict,

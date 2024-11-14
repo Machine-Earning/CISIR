@@ -94,7 +94,7 @@ def main():
                                 patience=LR_CB_PATIENCE,
                                 verbose=VERBOSE,
                                 min_delta=LR_CB_MIN_DELTA,
-                                min_lr=LR_CB_MIN_LR)
+                                min_lr=LR_CB_MIN_LR_PDS)
 
                             bandwidth = BANDWIDTH
                             residual = RESIDUAL
