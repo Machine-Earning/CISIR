@@ -2162,7 +2162,7 @@ def plot_and_evaluate_sep_event(
         show_persistent: bool = True,
         show_changes: bool = True,
         prefix: str = 'testing',
-        use_dict: bool = False) -> [float, str]:
+        use_dict: bool = False) -> Tuple[float, str]:
     """
     Plots the SEP event cme_files with actual and predicted proton intensities, electron intensity,
     and evaluates the model's performance using MAE.
