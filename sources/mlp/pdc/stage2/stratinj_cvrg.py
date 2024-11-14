@@ -42,7 +42,7 @@ weight_paths = {
     #  0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-030006MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_alpha0.20_CME0_features_all.h5',
     # # inj min 
     (False, 0):
-        '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp_pdcStratInj_bs3600_rho0.10_20241111-223111.h5'
+        '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp_pdcStratInj_bs3600_rho0.10_20241114-091846.h5'
     ,
 }
 
