@@ -2400,6 +2400,8 @@ def plot_avsp_delta(
     else:
         n_features = len(inputs_to_use) * 25
 
+    p_t_log = np.log1p(df['p_t'])  # Using log1p for numerical stability
+
     # Normalize the flux intensities
     df_norm = normalize_flux(df, input_columns, apply_log=True)
 
@@ -2424,7 +2426,7 @@ def plot_avsp_delta(
         target_columns.append('Proton Intensity')
 
     # Apply ln transformation to 'Proton Intensity'
-    actual_ln_intensity = np.log1p(df['Proton Intensity'].values)
+    actual_ln_intensity = np.log1p(df['Proton Intensity'])
 
     # Handle CME features if used
     if using_cme:
@@ -2456,8 +2458,7 @@ def plot_avsp_delta(
     predicted_changes = predictions
 
     # Compute predicted ln intensity by adding predicted delta to p_t_log
-    p_t = df['p_t'].values
-    predicted_ln_intensity = p_t + predicted_changes
+    predicted_ln_intensity = p_t_log + predicted_changes
 
     # Print shapes and first 5 elements of each array
     print("\nArray shapes:")
