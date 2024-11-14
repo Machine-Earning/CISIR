@@ -2394,11 +2394,6 @@ def plot_avsp_delta(
         - actual_ln_intensity (np.ndarray): Actual ln intensity values.
         - predicted_ln_intensity (np.ndarray): Predicted ln intensity values.
     """
-    if inputs_to_use is None:
-        inputs_to_use = ['e0.5', 'e4.4', 'p6.1', 'p']
-
-    if outputs_to_use is None:
-        outputs_to_use = ['delta_p', 'p']
 
     if add_slope:
         n_features = len(inputs_to_use) * (25 + 24)
@@ -2429,8 +2424,7 @@ def plot_avsp_delta(
         target_columns.append('Proton Intensity')
 
     # Apply ln transformation to 'Proton Intensity'
-    df['Proton Intensity'] = np.log1p(df['Proton Intensity'])
-    actual_ln_intensity = df['Proton Intensity'].values
+    actual_ln_intensity = np.log1p(df['Proton Intensity'].values)
 
     # Handle CME features if used
     if using_cme:
@@ -2463,8 +2457,27 @@ def plot_avsp_delta(
 
     # Compute predicted ln intensity by adding predicted delta to p_t_log
     p_t = df['p_t'].values
-    p_t_log = np.log1p(p_t)
-    predicted_ln_intensity = p_t_log + predicted_changes
+    predicted_ln_intensity = p_t + predicted_changes
+
+    # Print shapes and first 5 elements of each array
+    print("\nArray shapes:")
+    print(f"actual_changes shape: {actual_changes.shape}")
+    print(f"predicted_changes shape: {predicted_changes.shape}")
+    print(f"actual_ln_intensity shape: {actual_ln_intensity.shape}")
+    print(f"predicted_ln_intensity shape: {predicted_ln_intensity.shape}")
+    
+    print("\nFirst 5 elements of each array:")
+    print("Row | actual_changes | predicted_changes | actual_ln_int | predicted_ln_int")
+    print("-" * 65)
+    for i in range(5):
+        print(f"{i:3d} | {actual_changes[i]:13.6f} | {predicted_changes[i]:16.6f} | "
+              f"{actual_ln_intensity[i]:11.6f} | {predicted_ln_intensity[i]:14.6f}")
+              
+    print("\nValue ranges:")
+    print(f"actual_changes: min={actual_changes.min():.6f}, max={actual_changes.max():.6f}")
+    print(f"predicted_changes: min={predicted_changes.min():.6f}, max={predicted_changes.max():.6f}")
+    print(f"actual_ln_intensity: min={actual_ln_intensity.min():.6f}, max={actual_ln_intensity.max():.6f}")
+    print(f"predicted_ln_intensity: min={predicted_ln_intensity.min():.6f}, max={predicted_ln_intensity.max():.6f}")
 
     return actual_changes, predicted_changes, actual_ln_intensity, predicted_ln_intensity
 
@@ -2755,13 +2768,13 @@ def plot_actual_vs_predicted_intensity(avsp_data: List[tuple], title: str, prefi
     - prefix (str): Prefix for the plot file names.
     """
     plt.figure(figsize=(10, 7))  # Adjust size as needed
-    norm = plt.Normalize(0, 10)  # Adjusted range for intensity values
+    norm = plt.Normalize(0, 7)  # Adjusted range for intensity values
     cmap = plt.cm.viridis
 
     for event_id, actual, predicted in avsp_data:
         plt.scatter(actual, predicted, c=actual, cmap=cmap, norm=norm, label=f'{event_id}', alpha=0.7, s=12)
 
-    plt.plot([0, 10], [0, 10], 'k--', label='Perfect Prediction')  # Adjusted range for intensity values
+    plt.plot([0, 7], [0, 7], 'k--', label='Perfect Prediction')  # Adjusted range for intensity values
     plt.xlabel('Actual ln(Intensity)')
     plt.ylabel('Predicted ln(Intensity)')
     plt.title(f"{title}\n{prefix}_Actual_vs_Predicted_Intensity")
