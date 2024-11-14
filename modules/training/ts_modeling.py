@@ -2713,7 +2713,7 @@ def plot_error_concentration(avsp_data: List[Tuple[str, np.ndarray, np.ndarray]]
     return os.path.abspath(plot_filename)
 
 
-def plot_actual_vs_predicted(avsp_data: List[tuple], title: str, prefix: str):
+def plot_actual_vs_predicted(avsp_data: List[tuple], title: str, prefix: str, plot_type: str = 'delta'):
     """
     Plots actual vs predicted values for SEP events.
 
@@ -2721,25 +2721,60 @@ def plot_actual_vs_predicted(avsp_data: List[tuple], title: str, prefix: str):
     - avsp_data (List[tuple]): List of tuples containing event_id, actual data, and predicted data.
     - title (str): The title of the plot.
     - prefix (str): Prefix for the plot file names.
+    - plot_type (str): Type of plot ('delta' or 'ln_intensity').
+
+    Returns:
+    - str: Path to the saved plot file.
     """
+
     plt.figure(figsize=(10, 7))  # Adjust size as needed
-    norm = plt.Normalize(-2.5, 2.5)
+
+    # Determine color mapping and labels based on plot type
+    if plot_type == 'delta':
+        # For delta plots, we can use a fixed color normalization range
+        norm = plt.Normalize(-2.5, 2.5)
+        xlabel = 'Actual Δ ln(Intensity)'
+        ylabel = 'Predicted Δ ln(Intensity)'
+        color_label = 'Actual Δ ln(Intensity)'
+        plot_filename = f"{title}_{prefix}_actual_vs_predicted_delta.png"
+    elif plot_type == 'ln_intensity':
+        # For ln intensity plots, set normalization based on data range
+        # Collect all actual values to determine the data range
+        all_actual = np.concatenate([actual for _, actual, _ in avsp_data])
+        norm = plt.Normalize(all_actual.min(), all_actual.max())
+        xlabel = 'Actual Proton ln(Intensity)'
+        ylabel = 'Predicted Proton ln(Intensity)'
+        color_label = 'Actual ln(Intensity)'
+        plot_filename = f"{title}_{prefix}_actual_vs_predicted_ln_intensity.png"
+    else:
+        raise ValueError("plot_type must be 'delta' or 'ln_intensity'")
+
     cmap = plt.cm.viridis
 
+    # Plot data for each event
     for event_id, actual, predicted in avsp_data:
-        plt.scatter(actual, predicted, c=actual, cmap=cmap, norm=norm, label=f'{event_id}', alpha=0.7, s=12)
+        plt.scatter(actual, predicted, c=actual, cmap=cmap, norm=norm, label=f'Event {event_id}', alpha=0.7, s=12)
 
-    plt.plot([-2.5, 2.5], [-2.5, 2.5], 'k--', label='Perfect Prediction')
-    plt.xlabel('Actual Changes')
-    plt.ylabel('Predicted Changes')
-    plt.title(f"{title}\n{prefix}_Actual_vs_Predicted_Changes")
+    # Determine min and max values from all actual and predicted data
+    all_values = np.concatenate([np.concatenate([actual, predicted]) for _, actual, predicted in avsp_data])
+    min_val = all_values.min()
+    max_val = all_values.max()
 
+    # Add diagonal line representing perfect prediction
+    plt.plot([min_val, max_val], [min_val, max_val], 'k--', label='Perfect Prediction')
+
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(f"{title}\n{prefix}_Actual_vs_Predicted")
+    plt.legend()
+
+    # Create colorbar
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
-    plt.colorbar(sm, label='Actual Value', extend='both')
+    plt.colorbar(sm, label=color_label, extend='both')
     plt.grid(True)
 
-    plot_filename = f"{title}_{prefix}_actual_vs_predicted_changes.png"
+    # Save the plot to a file
     plt.savefig(plot_filename)
     plt.close()
 
