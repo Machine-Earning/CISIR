@@ -2162,7 +2162,7 @@ def plot_and_evaluate_sep_event(
         show_persistent: bool = True,
         show_changes: bool = True,
         prefix: str = 'testing',
-        use_dict: bool = False) -> [float, str]:
+        use_dict: bool = False) -> Tuple[float, str]:
     """
     Plots the SEP event cme_files with actual and predicted proton intensities, electron intensity,
     and evaluates the model's performance using MAE.
@@ -2461,24 +2461,24 @@ def plot_avsp_delta(
     predicted_ln_intensity = p_t_log + predicted_changes
 
     # Print shapes and first 5 elements of each array
-    print("\nArray shapes:")
-    print(f"actual_changes shape: {actual_changes.shape}")
-    print(f"predicted_changes shape: {predicted_changes.shape}")
-    print(f"actual_ln_intensity shape: {actual_ln_intensity.shape}")
-    print(f"predicted_ln_intensity shape: {predicted_ln_intensity.shape}")
+    # print("\nArray shapes:")
+    # print(f"actual_changes shape: {actual_changes.shape}")
+    # print(f"predicted_changes shape: {predicted_changes.shape}")
+    # print(f"actual_ln_intensity shape: {actual_ln_intensity.shape}")
+    # print(f"predicted_ln_intensity shape: {predicted_ln_intensity.shape}")
     
-    print("\nFirst 5 elements of each array:")
-    print("Row | actual_changes | predicted_changes | actual_ln_int | predicted_ln_int")
-    print("-" * 65)
-    for i in range(5):
-        print(f"{i:3d} | {actual_changes[i]:13.6f} | {predicted_changes[i]:16.6f} | "
-              f"{actual_ln_intensity[i]:11.6f} | {predicted_ln_intensity[i]:14.6f}")
+    # print("\nFirst 5 elements of each array:")
+    # print("Row | actual_changes | predicted_changes | actual_ln_int | predicted_ln_int")
+    # print("-" * 65)
+    # for i in range(5):
+    #     print(f"{i:3d} | {actual_changes[i]:13.6f} | {predicted_changes[i]:16.6f} | "
+    #           f"{actual_ln_intensity[i]:11.6f} | {predicted_ln_intensity[i]:14.6f}")
               
-    print("\nValue ranges:")
-    print(f"actual_changes: min={actual_changes.min():.6f}, max={actual_changes.max():.6f}")
-    print(f"predicted_changes: min={predicted_changes.min():.6f}, max={predicted_changes.max():.6f}")
-    print(f"actual_ln_intensity: min={actual_ln_intensity.min():.6f}, max={actual_ln_intensity.max():.6f}")
-    print(f"predicted_ln_intensity: min={predicted_ln_intensity.min():.6f}, max={predicted_ln_intensity.max():.6f}")
+    # print("\nValue ranges:")
+    # print(f"actual_changes: min={actual_changes.min():.6f}, max={actual_changes.max():.6f}")
+    # print(f"predicted_changes: min={predicted_changes.min():.6f}, max={predicted_changes.max():.6f}")
+    # print(f"actual_ln_intensity: min={actual_ln_intensity.min():.6f}, max={actual_ln_intensity.max():.6f}")
+    # print(f"predicted_ln_intensity: min={predicted_ln_intensity.min():.6f}, max={predicted_ln_intensity.max():.6f}")
 
     return actual_changes, predicted_changes, actual_ln_intensity, predicted_ln_intensity
 
@@ -2771,14 +2771,16 @@ def plot_actual_vs_predicted_intensity(avsp_data: List[tuple], title: str, prefi
     - title (str): The title of the plot.
     - prefix (str): Prefix for the plot file names.
     """
+
+
     plt.figure(figsize=(10, 7))  # Adjust size as needed
-    norm = plt.Normalize(0, 7)  # Adjusted range for intensity values
+    norm = plt.Normalize(0, 6)  # Adjusted range for intensity values
     cmap = plt.cm.viridis
 
     for event_id, actual, predicted in avsp_data:
         plt.scatter(actual, predicted, c=actual, cmap=cmap, norm=norm, label=f'{event_id}', alpha=0.7, s=12)
 
-    plt.plot([0, 7], [0, 7], 'k--', label='Perfect Prediction')  # Adjusted range for intensity values
+    plt.plot([0, 6], [0, 6], 'k--', label='Perfect Prediction')  # Adjusted range for intensity values
     plt.xlabel('Actual ln(Intensity)')
     plt.ylabel('Predicted ln(Intensity)')
     plt.title(f"{title}\n{prefix}_Actual_vs_Predicted_Intensity")
