@@ -2587,7 +2587,7 @@ def process_sep_events(
         # Plot delta-based actual vs predicted
         if avsp_data_delta:
             plot_file_location_delta = plot_actual_vs_predicted(
-                avsp_data_delta, title + ' Delta', prefix + '_delta')
+                avsp_data_delta, title + ' Delta', prefix + '_delta', plot_type='delta')
             print(f"Saved delta plot to: {plot_file_location_delta}")
             plot_names.append(plot_file_location_delta)
 
@@ -2606,7 +2606,7 @@ def process_sep_events(
         # Plot ln intensity-based actual vs predicted
         if avsp_data_intensity:
             plot_file_location_intensity = plot_actual_vs_predicted(
-                avsp_data_intensity, title + ' Ln Intensity', prefix + '_ln_intensity')
+                avsp_data_intensity, title + ' Ln Intensity', prefix + '_ln_intensity', plot_type='ln_intensity')
             print(f"Saved ln intensity plot to: {plot_file_location_intensity}")
             plot_names.append(plot_file_location_intensity)
 
