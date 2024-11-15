@@ -1,6 +1,6 @@
 # Global configurations
 # SEEDS = [456789]
-SEEDS = [456789, 42, 1234]  # Seeds for reproducibility
+SEEDS = [456789, 42, 1234, 0, 9999]  # Seeds for reproducibility
 # SEEDS = [0, 100, 9999]  # Seeds for reproducibility
 INPUTS_TO_USE = [['e0.5', 'e4.4', 'p6.1', 'p']]  # Inputs to use
 # INPUTS_TO_USE = [['e0.5', 'e1.8', 'p']]  # Inputs to use
@@ -9,8 +9,8 @@ CME_SPEED_THRESHOLD = [0]  # CME speed threshold
 # ALPHAS = [0, 0.3, 0.2, 0.1, 0.4]  # Alpha values for the loss
 ALPHAS = [1.0, 0.7, 0.5]  # Alpha values for the loss
 ADD_SLOPE = [False]  # Add slope to the inputs
-BATCH_SIZE = 3600  # Batch size
-PDS_BATCH_SIZE = 3600  # Batch size for PDS
+BATCH_SIZE = 2048  # 3600  # Batch size
+PDS_BATCH_SIZE = 2048  # 3600  # Batch size for PDS
 # ATTM_PDS_BS = 512
 EPOCHS = int(1e6)  # Number of epochs
 MLP_HIDDENS = [
@@ -47,7 +47,7 @@ PATIENCE = int(2e3)  # Higher patience
 PDS_PATIENCE = int(2e3)  # Higher patience
 LR_CB_FACTOR = 0.8  # factor for reducing learning rate
 LR_CB_PATIENCE = 200  # patience for reducing learning rate
-LR_CB_MIN_LR = 1e-4  # minimum learning rate
+LR_CB_MIN_LR = 1e-6 # 1e-4 # minimum learning rate
 LR_CB_MIN_LR_PDS = 1e-6  # Minimum delta for reducing learning rate
 VERBOSE = 1  # Verbose
 SAVE_BEST = False  # Save best model

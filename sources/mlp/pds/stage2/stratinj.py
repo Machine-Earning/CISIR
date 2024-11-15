@@ -41,7 +41,7 @@ weight_paths = {
     # (False,
     #  0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-030006MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_alpha0.20_CME0_features_all.h5',
     # # inj min 
-    (False, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp_pdsStratInj_bs3600_rho0.10_20241111-223107.h5',
+    (False, 0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp_pdsStratInj_bs3600_rho0.10_20241114-092942.h5',
 }
 
 
@@ -58,7 +58,7 @@ def main():
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
                     for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS:
-                        for freeze in [False]:
+                        for freeze in [False, True]:
                             for rho in RHO:
                                 # PARAMS
                                 outputs_to_use = OUTPUTS_TO_USE
@@ -66,7 +66,7 @@ def main():
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                                 lambda_ = LAMBDA_FACTOR  # LAMBDA
                                 # Construct the title
-                                title = f'mlp2_pdsS2_amse{alpha_mse:.2f}'
+                                title = f'mlp2_pdsS2_amse{alpha_mse:.2f}_fr{freeze}'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -77,7 +77,7 @@ def main():
 
                                 set_seed(seed)
                                 patience = PATIENCE  # higher patience
-                                learning_rate = START_LR_PDS  # lower due to finetuning
+                                learning_rate = START_LR  # lower due to finetuning
 
                                 reduce_lr_on_plateau = ReduceLROnPlateau(
                                     monitor=LR_CB_MONITOR,

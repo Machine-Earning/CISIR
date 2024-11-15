@@ -42,7 +42,7 @@ weight_paths = {
     #  0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-030006MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_alpha0.20_CME0_features_all.h5',
     # # inj min 
     (False, 0):
-        '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241112-102006.h5'
+        '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5'
     ,
 }
 
@@ -60,7 +60,7 @@ def main():
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
                     for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS:
-                        for freeze in [False]:
+                        for freeze in [False, True]:
                             for rho in RHO:
                                 # PARAMS
                                 outputs_to_use = OUTPUTS_TO_USE
@@ -68,7 +68,7 @@ def main():
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                                 lambda_ = LAMBDA_FACTOR  # LAMBDA
                                 # Construct the title
-                                title = f'mlp2_pdcaeS2_amse{alpha_mse:.2f}'
+                                title = f'mlp2_pdcaeS2_amse{alpha_mse:.2f}_fr{freeze}'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -324,7 +324,8 @@ def main():
                                     #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
 
                                     early_stopping = SmoothEarlyStopping(
-                                        monitor=ES_CB_MONITOR,
+                                        monitor=CVRG_METRIC,
+                                        min_delta=CVRG_MIN_DELTA,
                                         patience=patience,
                                         verbose=VERBOSE,
                                         restore_best_weights=ES_CB_RESTORE_WEIGHTS,
