@@ -960,7 +960,7 @@ def load_file_data(
         add_slope: bool = True,
         outputs_to_use: Optional[List[str]] = None,
         cme_speed_threshold: float = -1
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Processes data from a single file.
 
@@ -969,12 +969,12 @@ def load_file_data(
         - apply_log (bool): Whether to apply a logarithmic transformation before normalization.
         - inputs_to_use (Optional[List[str]]): List of input types to include in the dataset.
         - add_slope (bool): If True, adds slope features to the dataset.
-        - outputs_to_use (Optional[List[str]]): List of output types to include in the dataset. default is both ['p'] and ['delta_p'].
+        - outputs_to_use (Optional[List[str]]): List of output types to include in the dataset. default is both ['p'] and ['delta_p']. Deprecated.
         - cme_speed_threshold (float): The threshold for CME speed. CMEs with speeds below (<) this threshold will be excluded. -1
         for no cmes
 
     Returns:
-    - Tuple[np.ndarray, np.ndarray]: Processed input data (X) and target data (y) as numpy arrays.
+    - Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Processed input data (X), target delta data (y), log proton intensity (logI), and log of p_t (logI_prev) as numpy arrays.
     """
     # Initialization and file reading
     if inputs_to_use is None:
@@ -1008,6 +1008,9 @@ def load_file_data(
         # Zero out CME columns for CMEs with speeds below the threshold
         data = zero_out_cme_below_threshold(data, cme_speed_threshold, cme_columns_to_zero_out)
 
+    # Store log of p_t before any normalization
+    logI_prev = np.log1p(data['p_t']) if apply_log else data['p_t']
+
     # Apply transformations and normalizations
     # Apply logarithmic transformation (if specified)
     if apply_log:
@@ -1034,8 +1037,11 @@ def load_file_data(
     #     print(col)
     # order - e0.5, e1.8, p, e0.5 slope, e1.8 slope, p slope
 
-    # Normalize targets between 0 and 1
-    target_data = data[target_column]
+    # Get log proton intensity
+    logI = data['Proton Intensity'].values
+
+    # Get delta log intensity target
+    y = data['delta_log_Intensity'].values
 
     if cme_speed_threshold > -1:
         # Process and append CME features
@@ -1045,16 +1051,8 @@ def load_file_data(
     else:
         X = input_data_normalized.values.reshape((input_data_normalized.shape[0], -1, 1))
 
-    # print shape of X along with the file name
-    # print(f'X.shape: {X.shape} for {file_path}')
-
-    y = target_data.values
-
-    # print shape of y along with the file name
-    # print(f'y.shape: {y.shape} for {file_path}')
-
-    # Return processed X and y
-    return X, y
+    # Return processed X, y, logI and logI_prev
+    return X, y, logI, logI_prev
 
 
 def stratified_split(
@@ -1628,7 +1626,7 @@ def build_dataset(
         add_slope: bool = True,
         outputs_to_use: Optional[List[str]] = None,
         cme_speed_threshold: float = -1
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Builds a dataset by processing files in a given directory.
 
@@ -1646,14 +1644,14 @@ def build_dataset(
         - cme_speed_threshold (float): The threshold for CME speed. CMEs with speeds below (<) this threshold will be excluded. -1
 
     Returns:
-    - Tuple[np.ndarray, np.ndarray]: A tuple containing the combined input data (X) and target data (y).
+    - Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: A tuple containing the combined input data (X), target data (y), log proton intensity (logI), and previous log proton intensity (logI_prev).
     """
-    all_inputs, all_targets = [], []
+    all_inputs, all_targets, all_logI, all_logI_prev = [], [], [], []
 
     for file_name in os.listdir(directory_path):
         if file_name.endswith('_ie_trim.csv'):
             file_path = os.path.join(directory_path, file_name)
-            X, y = load_file_data(
+            X, y, logI, logI_prev = load_file_data(
                 file_path,
                 apply_log,
                 inputs_to_use,
@@ -1662,14 +1660,18 @@ def build_dataset(
                 cme_speed_threshold)
             all_inputs.append(X)
             all_targets.append(y)
+            all_logI.append(logI)
+            all_logI_prev.append(logI_prev)
 
     X_combined = np.vstack(all_inputs)
     y_combined = np.concatenate(all_targets)
+    logI_combined = np.concatenate(all_logI)
+    logI_prev_combined = np.concatenate(all_logI_prev)
 
     if shuffle_data:
-        X_combined, y_combined = shuffle(X_combined, y_combined, random_state=seed_value)
+        X_combined, y_combined, logI_combined, logI_prev_combined = shuffle(X_combined, y_combined, logI_combined, logI_prev_combined, random_state=seed_value)
 
-    return X_combined, y_combined
+    return X_combined, y_combined, logI_combined, logI_prev_combined
 
 
 def locate_high_deltas(
@@ -2981,7 +2983,7 @@ def plot_error_hist(
 
 def evaluate_mae(
         model: tf.keras.Model,
-        X_test: np.ndarray or List[np.ndarray],
+        X_test: Union[np.ndarray, List[np.ndarray]],
         y_test: np.ndarray,
         below_threshold: float = None,
         above_threshold: float = None,
@@ -3033,8 +3035,10 @@ def evaluate_mae(
 
 def evaluate_pcc(
         model: tf.keras.Model,
-        X_test: np.ndarray or List[np.ndarray],
+        X_test: Union[np.ndarray, List[np.ndarray]],
         y_test: np.ndarray,
+        logI_test: np.ndarray = None,
+        logI_prev_test: np.ndarray = None,
         below_threshold: float = None,
         above_threshold: float = None,
         use_dict: bool = False) -> float:
@@ -3046,6 +3050,9 @@ def evaluate_pcc(
     - model (tf.keras.Model): The trained model to evaluate.
     - X_test (np.ndarray): Test features.
     - y_test (np.ndarray): True target values for the test set.
+    - logI_test (np.ndarray, optional): True log intensity values. If provided along with logI_prev_test,
+      PCC will be calculated between true and predicted log intensities instead of deltas.
+    - logI_prev_test (np.ndarray, optional): Previous log intensity values. Required if logI_test is provided.
     - below_threshold (float, optional): The lower bound threshold for y_test to be included in PCC calculation.
     - above_threshold (float, optional): The upper bound threshold for y_test to be included in PCC calculation.
     - use_dict (bool, optional): Whether the model returns a dictionary with output names. Default is False.
@@ -3075,12 +3082,21 @@ def evaluate_pcc(
 
         filtered_predictions = predictions[mask]
         filtered_y_test = y_test[mask]
+        if logI_test is not None:
+            logI_test = logI_test[mask]
+            logI_prev_test = logI_prev_test[mask]
     else:
         filtered_predictions = predictions
         filtered_y_test = y_test
 
-    # Calculate PCC
-    pcc, _ = pearsonr(filtered_y_test.flatten(), filtered_predictions.flatten())
+    # Calculate PCC based on logI if provided, otherwise use deltas
+    if logI_test is not None and logI_prev_test is not None:
+        # Calculate predicted logI by adding predicted delta to previous logI
+        predicted_logI = logI_prev_test + filtered_predictions
+        pcc, _ = pearsonr(logI_test.flatten(), predicted_logI.flatten())
+    else:
+        pcc, _ = pearsonr(filtered_y_test.flatten(), filtered_predictions.flatten())
+    
     return pcc
 
 

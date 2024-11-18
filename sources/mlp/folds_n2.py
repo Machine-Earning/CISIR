@@ -399,6 +399,8 @@ def main():
                             print(f'pcc error train: {error_pcc_train}')
                             wandb.log({"train_pcc": error_pcc_train})
 
+                            
+
                             # evaluate the model on test cme_files
                             above_threshold = mae_plus_threshold
                             # evaluate the model error for rare samples on test set

@@ -78,7 +78,7 @@ def main():
                             # set the root directory
                             root_dir = DS_PATH
                             # build the dataset
-                            X_train, y_train = build_dataset(
+                            X_train, y_train, logI_train, logI_prev_train = build_dataset(
                                 root_dir + '/training',
                                 inputs_to_use=inputs_to_use,
                                 add_slope=add_slope,
@@ -90,7 +90,7 @@ def main():
                             n_features = X_train.shape[1]
                             print(f'n_features: {n_features}')
 
-                            X_test, y_test = build_dataset(
+                            X_test, y_test, logI_test, logI_prev_test = build_dataset(
                                 root_dir + '/testing',
                                 inputs_to_use=inputs_to_use,
                                 add_slope=add_slope,
@@ -143,6 +143,16 @@ def main():
                             print(f'pcc error: {error_pcc}')
                             wandb.log({"pcc": error_pcc})
 
+                            # evaluate the model correlation on test set based on logI and logI_prev
+                            error_pcc_logI = evaluate_pcc(model, X_test, y_test, logI_test, logI_prev_test)
+                            print(f'pcc error logI: {error_pcc_logI}')
+                            wandb.log({"pcc_I": error_pcc_logI})
+
+                            # evaluate the model correlation on training set based on logI and logI_prev
+                            error_pcc_logI_train = evaluate_pcc(model, X_train, y_train, logI_train, logI_prev_train)
+                            print(f'pcc error logI train: {error_pcc_logI_train}')
+                            wandb.log({"train_pcc_I": error_pcc_logI_train})
+
                             # evaluate the model correlation on training set
                             error_pcc_train = evaluate_pcc(model, X_train, y_train)
                             print(f'pcc error train: {error_pcc_train}')
@@ -168,11 +178,23 @@ def main():
                             print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
                             wandb.log({"pcc+": error_pcc_cond})
 
+                            # evaluate the model correlation for rare samples on test set based on logI and logI_prev
+                            error_pcc_cond_logI = evaluate_pcc(
+                                model, X_test, y_test, logI_test, logI_prev_test, above_threshold=above_threshold)
+                            print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond_logI}')
+                            wandb.log({"pcc+_I": error_pcc_cond_logI})
+
                             # evaluate the model correlation for rare samples on training set
                             error_pcc_cond_train = evaluate_pcc(
                                 model, X_train, y_train, above_threshold=above_threshold)
                             print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
                             wandb.log({"train_pcc+": error_pcc_cond_train})
+
+                            # evaluate the model correlation for rare samples on training set based on logI and logI_prev
+                            error_pcc_cond_logI_train = evaluate_pcc(
+                                model, X_train, y_train, logI_train, logI_prev_train, above_threshold=above_threshold)
+                            print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_logI_train}')
+                            wandb.log({"train_pcc+_I": error_pcc_cond_logI_train})
 
                             # Process SEP event files in the specified directory
                             test_directory = root_dir + '/testing'
