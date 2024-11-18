@@ -75,7 +75,7 @@ def main():
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
-                            hiddens = MLP_HIDDENS_S  # hidden layers
+                            hiddens = MLP_HIDDENS  # hidden layers
 
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             bandwidth = BANDWIDTH
