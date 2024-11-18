@@ -56,7 +56,7 @@ def main():
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                             # Initialize wandb
-                            wandb.init(project="Jan-Report", name=experiment_name + "_eval", config={
+                            wandb.init(project="Jan-Report-Evals", name=experiment_name + "_eval", config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
                                 "hiddens": hiddens_str,
