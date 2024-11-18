@@ -1036,12 +1036,13 @@ def load_file_data(
     # for col in input_data_normalized.columns:
     #     print(col)
     # order - e0.5, e1.8, p, e0.5 slope, e1.8 slope, p slope
+    target_data = data[target_column]
 
     # Get log proton intensity
     logI = data['Proton Intensity'].values
 
     # Get delta log intensity target
-    y = data['delta_log_Intensity'].values
+    y = target_data.values
 
     if cme_speed_threshold > -1:
         # Process and append CME features
@@ -1669,7 +1670,10 @@ def build_dataset(
     logI_prev_combined = np.concatenate(all_logI_prev)
 
     if shuffle_data:
-        X_combined, y_combined, logI_combined, logI_prev_combined = shuffle(X_combined, y_combined, logI_combined, logI_prev_combined, random_state=seed_value)
+        X_combined, y_combined, logI_combined, logI_prev_combined = shuffle(
+            X_combined, y_combined, logI_combined, logI_prev_combined, 
+            random_state=seed_value
+        )
 
     return X_combined, y_combined, logI_combined, logI_prev_combined
 
