@@ -1479,7 +1479,7 @@ def load_stratified_folds(
 
         # Load subtraining data using build_dataset
         subtrain_dir = str(current_fold / "subtraining")
-        X_subtrain, y_subtrain = build_dataset(
+        X_subtrain, y_subtrain, _, _ = build_dataset(
             subtrain_dir,
             inputs_to_use=inputs_to_use,
             add_slope=add_slope,
@@ -1490,7 +1490,7 @@ def load_stratified_folds(
 
         # Load validation data using build_dataset
         val_dir = str(current_fold / "validation")
-        X_val, y_val = build_dataset(
+        X_val, y_val, _, _ = build_dataset(
             val_dir,
             inputs_to_use=inputs_to_use,
             add_slope=add_slope,
