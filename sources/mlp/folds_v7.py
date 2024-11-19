@@ -450,7 +450,7 @@ def main():
                                 final_model_sep, X_train, y_train, logI_train, logI_prev_train, above_threshold=above_threshold)
                             print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_logI_train}')
                             wandb.log({"train_pcc+_I": error_pcc_cond_logI_train})
-s
+
                             # Process SEP event files in the specified directory
                             test_directory = root_dir + '/testing'
                             filenames = process_sep_events(
