@@ -10,7 +10,7 @@ CME_SPEED_THRESHOLD = [0]  # CME speed threshold
 ALPHAS = [1.0, 0.7, 0.5]  # Alpha values for the loss
 ADD_SLOPE = [False]  # Add slope to the inputs
 BATCH_SIZE = 2500  # 3600  # Batch size
-PDS_BATCH_SIZE = 2500  # 3600  # Batch size for PDS
+PDS_BATCH_SIZE = 5000  # 3600  # Batch size for PDS
 # ATTM_PDS_BS = 512
 EPOCHS = int(1e6)  # Number of epochs
 MLP_HIDDENS = [
@@ -68,7 +68,7 @@ VAL_WINDOW_SIZE = 101 # NOTE: must be odd
 WINDOW_SIZE = 101 # NOTE: must be odd
 RHO = [1e-2] # 1e-4 and 1e-3 are not good enough
 # REWEIGHTS = [(1.5, 0.5, 0.1, 0)]
-REWEIGHTS_S = [(0.8, 0.3, 0.1, 0)]
+REWEIGHTS_S = [(0.9, 0.3, 0.1, 0)]
 # PDS_RW_S = [(0.5, 0.5)]
 PDS_RW = [(2, 0.5)]
 # PDS_RW = [(0, 0)]
@@ -76,7 +76,7 @@ LAMBDA_FACTOR = 8
 AE_LAMBDA = 1
 CVRG_MIN_DELTA = 1e-5
 CVRG_METRIC = 'loss'
-ASYM_TYPE = 'silu'
+ASYM_TYPE = None  # 'sigmoid'
 
 # ATTM AREA
 BLOCKS_HIDDENS = [128 for _ in range(20)]
