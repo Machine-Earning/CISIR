@@ -17,7 +17,7 @@ from modules.training.ts_modeling import (
     process_sep_events,
     stratified_batch_dataset,
     set_seed,
-    mse_pcc,
+    cmse,
     filter_ds,
     create_gru,
     plot_error_hist,
@@ -187,7 +187,7 @@ def main():
                                     weight_decay=weight_decay,
                                     beta_1=momentum_beta1
                                 ),
-                                loss=mse_pcc(lambda_factor, pm)
+                                loss=cmse(lambda_factor, pm)
                             )
 
                             # Reshape inputs

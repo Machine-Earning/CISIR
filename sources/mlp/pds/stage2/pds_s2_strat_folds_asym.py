@@ -18,7 +18,7 @@ from modules.training.ts_modeling import (
     evaluate_mae,
     evaluate_pcc,
     process_sep_events,
-    mse_pcc,
+    cmse,
     filter_ds,
     stratified_4fold_split,
     plot_error_hist,
@@ -324,7 +324,7 @@ def main():
                                             beta_1=momentum_beta1
                                         ),
                                         loss={
-                                            'forecast_head': lambda y_true, y_pred: mse_pcc(
+                                            'forecast_head': lambda y_true, y_pred: cmse(
                                                 y_true, y_pred,
                                                 phase_manager=pm,
                                                 lambda_factor=lambda_,
@@ -411,7 +411,7 @@ def main():
                                         beta_1=momentum_beta1
                                     ),
                                     loss={
-                                        'forecast_head': lambda y_true, y_pred: mse_pcc(
+                                        'forecast_head': lambda y_true, y_pred: cmse(
                                             y_true, y_pred,
                                             phase_manager=pm,
                                             lambda_factor=lambda_,

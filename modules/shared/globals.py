@@ -76,6 +76,7 @@ LAMBDA_FACTOR = 8
 AE_LAMBDA = 1
 CVRG_MIN_DELTA = 1e-5
 CVRG_METRIC = 'loss'
+ASYM_TYPE = 'silu'
 
 # ATTM AREA
 BLOCKS_HIDDENS = [128 for _ in range(20)]

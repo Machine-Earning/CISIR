@@ -3877,7 +3877,7 @@ def asymmetric_weight_sigmoid(y_true: tf.Tensor, y_pred: tf.Tensor, eta: float =
     return 2 * (1 - eta) * sigmoid + eta
 
 
-def mse_pcc(
+def cmse(
         y_true: tf.Tensor, y_pred: tf.Tensor,
         lambda_factor: float,
         phase_manager: 'TrainingPhaseManager',

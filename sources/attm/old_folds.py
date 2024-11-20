@@ -19,7 +19,7 @@ from modules.training.ts_modeling import (
     process_sep_events,
     stratified_batch_dataset,
     set_seed,
-    mse_pcc,
+    cmse,
     filter_ds,
     stratified_4fold_split,
 )
@@ -270,7 +270,7 @@ def main():
                                         beta_1=momentum_beta1
                                     ),
                                     loss={
-                                        'output': lambda y_true, y_pred: mse_pcc(
+                                        'output': lambda y_true, y_pred: cmse(
                                             y_true, y_pred,
                                             phase_manager=pm,
                                             lambda_factor=lambda_factor,
@@ -351,7 +351,7 @@ def main():
                                     beta_1=momentum_beta1
                                 ),
                                 loss={
-                                    'output': lambda y_true, y_pred: mse_pcc(
+                                    'output': lambda y_true, y_pred: cmse(
                                         y_true, y_pred,
                                         phase_manager=pm,
                                         lambda_factor=lambda_factor,

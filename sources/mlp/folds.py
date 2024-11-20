@@ -19,7 +19,7 @@ from modules.training.ts_modeling import (
     process_sep_events,
     stratified_batch_dataset,
     set_seed,
-    mse_pcc,
+    cmse,
     filter_ds,
     create_mlp2,
     plot_error_hist,
@@ -62,6 +62,7 @@ def main():
                             set_seed(seed)
                             patience = PATIENCE  # higher patience
                             learning_rate = START_LR  # starting learning rate
+                            asym_type = ASYM_TYPE
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
                                 monitor=LR_CB_MONITOR,
@@ -132,7 +133,8 @@ def main():
                                 'smoothing_method': smoothing_method,
                                 'window_size': window_size,
                                 'val_window_size': val_window_size,
-                                'skip_repr': skip_repr
+                                'skip_repr': skip_repr,
+                                'asym_type': asym_type
                             })
 
                             # set the root directory
@@ -272,7 +274,7 @@ def main():
                                         beta_1=momentum_beta1
                                     ),
                                     loss={
-                                        'forecast_head': lambda y_true, y_pred: mse_pcc(
+                                        'forecast_head': lambda y_true, y_pred: cmse(
                                             y_true, y_pred,
                                             phase_manager=pm,
                                             lambda_factor=lambda_factor,
@@ -280,6 +282,7 @@ def main():
                                             train_pcc_weight_dict=pcc_subtrain_weights_dict,
                                             val_mse_weight_dict=mse_val_weights_dict,
                                             val_pcc_weight_dict=pcc_val_weights_dict,
+                                            asym_type=asym_type
                                         )
                                     }
                                 )
@@ -349,12 +352,13 @@ def main():
                                     beta_1=momentum_beta1
                                 ),
                                 loss={
-                                    'forecast_head': lambda y_true, y_pred: mse_pcc(
+                                    'forecast_head': lambda y_true, y_pred: cmse(
                                         y_true, y_pred,
                                         phase_manager=pm,
                                         lambda_factor=lambda_factor,
                                         train_mse_weight_dict=mse_train_weights_dict,
                                         train_pcc_weight_dict=pcc_train_weights_dict,
+                                        asym_type=asym_type
                                     )
                                 },
                             )  # Compile the model just like before
