@@ -287,22 +287,23 @@ def main():
                                     }
                                 )
 
-                                # Step 1: Create stratified dataset for the subtraining set only
+                                # Step 1: Create stratified dataset for the subtraining and validation set
                                 subtrain_ds, subtrain_steps = stratified_batch_dataset(
                                     X_subtrain, y_subtrain, batch_size)
+                                val_ds, val_steps = stratified_batch_dataset(
+                                    X_val, y_val, batch_size)
 
                                 # Map the subtraining dataset to return {'output': y} format
                                 subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'forecast_head': y}))
-                                
-                                # Prepare validation data without batching
-                                val_data = (X_val, {'forecast_head': y_val})
+                                val_ds = val_ds.map(lambda x, y: (x, {'forecast_head': y}))
 
                                 # Train the model with the callback
                                 history = model_sep.fit(
                                     subtrain_ds,
                                     steps_per_epoch=subtrain_steps,
                                     epochs=epochs, batch_size=batch_size,
-                                    validation_data=val_data,
+                                    validation_data=val_ds,
+                                    validation_steps=val_steps,
                                     callbacks=[
                                         early_stopping,
                                         reduce_lr_on_plateau,
