@@ -19,7 +19,7 @@ MLP_HIDDENS = [
     256, 128, 128, 128, 128, 128, 128, 128
 ]  # Hidden layers
 MLP_HIDDENS_S = [2048, 128, 1024, 128, 512, 128, 256, 128]  # Hidden layers
-MLP_HIDDENS_S2 = [256, 128] # [256, 128, 64, 128]
+MLP_HIDDENS_S2 = [256, 128] 
 PROJ_HIDDENS = [64]  # Projection hidden layers
 LOSS_KEY = 'mse_pcc'  # Mean squared error regression loss
 LAMBDA = 3.3  # Lambda for the loss
@@ -79,29 +79,29 @@ ASYM_TYPE = None  # 'sigmoid'
 
 # ATTM AREA
 BLOCKS_HIDDENS = [128 for _ in range(20)]
-ATTN_HIDDENS = [128 for _ in range(20)]
+ATTN_HIDDENS = MLP_HIDDENS_S2 # this acchitecture is good enough to predict on its own
 # BLOCKS_HIDDENS = [128 for _ in range(1)]
 # ATTN_HIDDENS = [128 for _ in range(2)]
-ATTM_START_LR = 1e-4
+ATTM_START_LR = 1e-3
 ATTM_ACTIVATION = 'leaky_relu'
 ATTN_SKIPPED_LAYERS = 1
 ATTM_SKIPPED_BLOCKS = 1
 ATTN_RESIDUAL = True
 ATTM_RESIDUAL = True
-ATTM_DROPOUT = 0
-ATTN_DROPOUT = 0
+ATTM_DROPOUT = 0.1
+ATTN_DROPOUT = 0.2
 ATTN_NORM = 'batch_norm'
 ATTM_NORM = 'batch_norm'
-ATTM_LR_CB_MIN_LR = 1e-6
-ATTM_WD = 1e-7
+ATTM_LR_CB_MIN_LR = 1e-5
+ATTM_WD = 1e-5
 ATTM_LR_CB_FACTOR = 0.9
-ATTM_LR_CB_PATIENCE = 200
-ATTM_RHO = [0.1]
+ATTM_LR_CB_PATIENCE = 100
+ATTM_RHO = [1e-2]
 
 # FF AREA
-FF_HIDDENS = [128 for _ in range(10)]
+FF_HIDDENS = [128, 256, 128]
 FF_NORM = 'batch_norm'
-FF_DROPOUT = 0.1
+FF_DROPOUT = 0.2
 FF_ACTIVATION = 'leaky_relu'
 FF_SKIPPED_LAYERS = 1
 
