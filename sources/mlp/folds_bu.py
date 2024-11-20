@@ -76,7 +76,7 @@ def main():
                             momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                             batch_size = BATCH_SIZE  # higher batch size
                             epochs = EPOCHS  # higher epochs
-                            hiddens = MLP_HIDDENS_S  # hidden layers
+                            hiddens = MLP_HIDDENS_S2  # hidden layers
 
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             bandwidth = BANDWIDTH
@@ -287,23 +287,22 @@ def main():
                                     }
                                 )
 
-                                # Step 1: Create stratified dataset for the subtraining and validation set
+                                # Step 1: Create stratified dataset for the subtraining set only
                                 subtrain_ds, subtrain_steps = stratified_batch_dataset(
                                     X_subtrain, y_subtrain, batch_size)
-                                val_ds, val_steps = stratified_batch_dataset(
-                                    X_val, y_val, batch_size)
 
                                 # Map the subtraining dataset to return {'output': y} format
                                 subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'forecast_head': y}))
-                                val_ds = val_ds.map(lambda x, y: (x, {'forecast_head': y}))
+                                
+                                # Prepare validation data without batching
+                                val_data = (X_val, {'forecast_head': y_val})
 
                                 # Train the model with the callback
                                 history = model_sep.fit(
                                     subtrain_ds,
                                     steps_per_epoch=subtrain_steps,
                                     epochs=epochs, batch_size=batch_size,
-                                    validation_data=val_ds,
-                                    validation_steps=val_steps,
+                                    validation_data=val_data,
                                     callbacks=[
                                         early_stopping,
                                         reduce_lr_on_plateau,
