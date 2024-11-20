@@ -44,7 +44,7 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
                 for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_S:
-                    for rho in RHO:
+                    for rho in ATTM_RHO:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -61,7 +61,7 @@ def main():
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
                             patience = PATIENCE  # higher patience
-                            learning_rate = START_LR  # higher learning rate
+                            learning_rate = ATTM_START_LR  # higher learning rate
                             asym_type = ASYM_TYPE
 
                             reduce_lr_on_plateau = ReduceLROnPlateau(
