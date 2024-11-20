@@ -37,19 +37,19 @@ def main():
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
 
-    for seed in SEEDS:
+    for seed in [456789]:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS:
+                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1, 0.75, 0.1, 0)]:
                     for rho in RHO:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
-                            lambda_factor = LAMBDA_FACTOR  # lambda for the loss
+                            lambda_factor = 8 # LAMBDA_FACTOR  # lambda for the loss
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                             # Construct the title
-                            title = f'MLP2_amse{alpha_mse:.2f}_cheatS'
+                            title = f'mlp2_amse{alpha_mse:.2f}_v8_cheat'
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
                             # Create a unique experiment name with a timestamp
@@ -90,13 +90,15 @@ def main():
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
                             smoothing_method = SMOOTHING_METHOD
                             window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
+                            val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
 
                             # Initialize wandb
-                            wandb.init(project="Arch-test-mlp", name=experiment_name, config={
+                            wandb.init(project="Jan-Report", name=experiment_name, config={
                                 "inputs_to_use": inputs_to_use,
                                 "add_slope": add_slope,
                                 "patience": patience,
                                 "learning_rate": learning_rate,
+                                'min_lr': LR_CB_MIN_LR,
                                 "weight_decay": weight_decay,
                                 "momentum_beta1": momentum_beta1,
                                 "batch_size": batch_size,
@@ -120,17 +122,18 @@ def main():
                                 'architecture': 'mlp_res_repr',
                                 'cme_speed_threshold': cme_speed_threshold,
                                 'skip_repr': skip_repr,
-                                'ds_version': DS_VERSION,
+                                'ds_version': DS_VERSION2,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
                                 'smoothing_method': smoothing_method,
-                                'window_size': window_size
+                                'window_size': window_size,
+                                'val_window_size': val_window_size
                             })
 
                             # set the root directory
-                            root_dir = DS_PATH
+                            root_dir = DS_PATH2
                             # build the dataset
-                            X_train, y_train = build_dataset(
+                            X_train, y_train, logI_train, logI_prev_train = build_dataset(
                                 root_dir + '/training',
                                 inputs_to_use=inputs_to_use,
                                 add_slope=add_slope,
@@ -159,7 +162,7 @@ def main():
                             n_features = X_train.shape[1]
                             print(f'n_features: {n_features}')
 
-                            X_test, y_test = build_dataset(
+                            X_test, y_test, logI_test, logI_prev_test = build_dataset(
                                 root_dir + '/testing',
                                 inputs_to_use=inputs_to_use,
                                 add_slope=add_slope,
@@ -212,15 +215,9 @@ def main():
                             final_model_sep.summary()
 
                             # Define the EarlyStopping callback
-                            # early_stopping = EarlyStopping(
-                            #     monitor=ES_CB_MONITOR,
-                            #     patience=patience,
-                            #     verbose=VERBOSE,
-                            #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
-
-                            # Define the EarlyStopping callback
                             early_stopping = SmoothEarlyStopping(
-                                monitor=ES_CB_MONITOR,
+                                monitor=CVRG_METRIC,
+                                min_delta=CVRG_MIN_DELTA,
                                 patience=patience,
                                 verbose=VERBOSE,
                                 restore_best_weights=ES_CB_RESTORE_WEIGHTS,
@@ -298,6 +295,16 @@ def main():
                             print(f'pcc error train: {error_pcc_train}')
                             wandb.log({"train_pcc": error_pcc_train})
 
+                            # evaluate the model correlation on test set based on logI and logI_prev
+                            error_pcc_logI = evaluate_pcc(final_model_sep, X_test, y_test, logI_test, logI_prev_test)
+                            print(f'pcc error logI: {error_pcc_logI}')
+                            wandb.log({"pcc_I": error_pcc_logI})
+
+                            # evaluate the model correlation on training set based on logI and logI_prev
+                            error_pcc_logI_train = evaluate_pcc(final_model_sep, X_train, y_train, logI_train, logI_prev_train)
+                            print(f'pcc error logI train: {error_pcc_logI_train}')
+                            wandb.log({"train_pcc_I": error_pcc_logI_train})
+
                             # evaluate the model on test cme_files
                             above_threshold = mae_plus_threshold
                             # evaluate the model error for rare samples on test set
@@ -323,6 +330,18 @@ def main():
                                 final_model_sep, X_train, y_train, above_threshold=above_threshold)
                             print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
                             wandb.log({"train_pcc+": error_pcc_cond_train})
+
+                            # evaluate the model correlation for rare samples on test set based on logI and logI_prev
+                            error_pcc_cond_logI = evaluate_pcc(
+                                final_model_sep, X_test, y_test, logI_test, logI_prev_test, above_threshold=above_threshold)
+                            print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond_logI}')
+                            wandb.log({"pcc+_I": error_pcc_cond_logI})
+
+                            # evaluate the model correlation for rare samples on training set based on logI and logI_prev
+                            error_pcc_cond_logI_train = evaluate_pcc(
+                                final_model_sep, X_train, y_train, logI_train, logI_prev_train, above_threshold=above_threshold)
+                            print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_logI_train}')
+                            wandb.log({"train_pcc+_I": error_pcc_cond_logI_train})
 
                             # Process SEP event files in the specified directory
                             test_directory = root_dir + '/testing'

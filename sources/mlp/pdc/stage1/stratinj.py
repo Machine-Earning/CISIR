@@ -62,7 +62,7 @@ def main():
                             inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                             # Construct the title
-                            title = f'mlp2_pdcStratInj_bs{batch_size}_rho{rho:.2f}'
+                            title = f'mlp2_pdcStratInj_bs{batch_size}_v8'
 
                             # Replace any other characters that are not suitable for filenames (if any)
                             title = title.replace(' ', '_').replace(':', '_')
@@ -104,6 +104,7 @@ def main():
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
                             smoothing_method = SMOOTHING_METHOD
                             window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
+                            val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
 
                             # Initialize wandb
                             wandb.init(project="Repr-Jan-Report", name=experiment_name, config={
@@ -111,6 +112,7 @@ def main():
                                 "add_slope": add_slope,
                                 "patience": patience,
                                 "learning_rate": learning_rate,
+                                "min_lr": LR_CB_MIN_LR_PDS,
                                 "weight_decay": weight_decay,
                                 "momentum_beta1": momentum_beta1,
                                 "batch_size": batch_size,
@@ -131,7 +133,7 @@ def main():
                                 "residual": residual,
                                 "skipped_layers": skipped_layers,
                                 "repr_dim": repr_dim,
-                                "ds_version": DS_VERSION,
+                                "ds_version": DS_VERSION2,
                                 "N_freq": N,
                                 "lower_t": lower_threshold,
                                 "upper_t": upper_threshold,
@@ -141,12 +143,13 @@ def main():
                                 'outputs_to_use': outputs_to_use,
                                 'inj': 'strat',
                                 'smoothing_method': smoothing_method,
-                                'window_size': window_size
+                                'window_size': window_size,
+                                'val_window_size': val_window_size
                             })
                             # set the root directory
-                            root_dir = DS_PATH
+                            root_dir = DS_PATH2 
                             # build the dataset
-                            X_train, y_train = build_dataset(
+                            X_train, y_train, _, _ = build_dataset(
                                 root_dir + '/training',
                                 inputs_to_use=inputs_to_use,
                                 add_slope=add_slope,
@@ -183,7 +186,7 @@ def main():
                                 N=N, seed=seed)
 
                             # build the test set
-                            X_test, y_test = build_dataset(
+                            X_test, y_test, _, _ = build_dataset(
                                 root_dir + '/testing',
                                 inputs_to_use=inputs_to_use,
                                 add_slope=add_slope,
@@ -258,11 +261,6 @@ def main():
                                 model_sep.summary()
 
                                 # Define the EarlyStopping callback
-                                # early_stopping = EarlyStopping(
-                                #     monitor=ES_CB_MONITOR,
-                                #     patience=patience,
-                                #     verbose=VERBOSE,
-                                #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
                                 early_stopping = SmoothEarlyStopping(
                                     monitor=CVRG_METRIC,
                                     min_delta=CVRG_MIN_DELTA,
@@ -313,7 +311,7 @@ def main():
                                 optimal_epoch = find_optimal_epoch_by_smoothing(
                                     history.history[ES_CB_MONITOR],
                                     smoothing_method=smoothing_method,
-                                    smoothing_parameters={'window_size': window_size},
+                                    smoothing_parameters={'window_size': val_window_size},
                                     mode='min')
                                 folds_optimal_epochs.append(optimal_epoch)
                                 # wandb log the fold's optimal
