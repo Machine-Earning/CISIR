@@ -4,7 +4,7 @@ from datetime import datetime
 import numpy as np
 import tensorflow as tf
 import wandb
-from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
+from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
@@ -23,11 +23,10 @@ from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
     build_dataset,
-    create_mlp,
     filter_ds,
     set_seed,
     load_stratified_folds,
-    stratified_batch_dataset, 
+    stratified_batch_dataset,
     create_mlp2
 )
 
@@ -206,14 +205,14 @@ def main():
                             # 4-fold cross-validation
                             folds_optimal_epochs = []
                             for fold_idx, (X_subtrain, y_subtrain_norm, X_val, y_val_norm) in enumerate(
-                                load_stratified_folds(
-                                    root_dir,
-                                    inputs_to_use=inputs_to_use,
-                                    add_slope=add_slope,
-                                    outputs_to_use=outputs_to_use,
-                                    cme_speed_threshold=cme_speed_threshold,
-                                    seed=seed, shuffle=True
-                                )
+                                    load_stratified_folds(
+                                        root_dir,
+                                        inputs_to_use=inputs_to_use,
+                                        add_slope=add_slope,
+                                        outputs_to_use=outputs_to_use,
+                                        cme_speed_threshold=cme_speed_threshold,
+                                        seed=seed, shuffle=True
+                                    )
                             ):
                                 print(f'Fold: {fold_idx}')
                                 # print all cme_files shapes
@@ -287,15 +286,12 @@ def main():
 
                                 subtrain_ds, subtrain_steps = stratified_batch_dataset(
                                     X_subtrain, y_subtrain_norm, batch_size)
-                                val_ds, val_steps = stratified_batch_dataset(
-                                    X_val, y_val_norm, batch_size)
 
                                 history = model_sep.fit(
                                     subtrain_ds,
                                     steps_per_epoch=subtrain_steps,
                                     epochs=epochs,
-                                    validation_data=val_ds,
-                                    validation_steps=val_steps,
+                                    validation_data=(X_val, y_val_norm),
                                     batch_size=batch_size,
                                     callbacks=[
                                         reduce_lr_on_plateau,

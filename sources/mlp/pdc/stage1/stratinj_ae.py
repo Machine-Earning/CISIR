@@ -307,19 +307,16 @@ def main():
 
                                 subtrain_ds, subtrain_steps = stratified_batch_dataset(
                                     X_subtrain, y_subtrain_norm, batch_size)
-                                val_ds, val_steps = stratified_batch_dataset(
-                                    X_val, y_val_norm, batch_size)
 
-                                # Adjust the dataset to include both y_train and X_train for reconstruction
+                                # Adjust the datasets to include both y and X for reconstruction
                                 subtrain_ds = subtrain_ds.map(lambda x, y: (x, (y, x)))
-                                val_ds = val_ds.map(lambda x, y: (x, (y, x)))
+                                val_data = (X_val, (y_val_norm, X_val))
 
                                 history = model_sep.fit(
                                     subtrain_ds,
                                     steps_per_epoch=subtrain_steps,
                                     epochs=epochs,
-                                    validation_data=val_ds,
-                                    validation_steps=val_steps,
+                                    validation_data=val_data,
                                     batch_size=batch_size,
                                     callbacks=[
                                         reduce_lr_on_plateau,
