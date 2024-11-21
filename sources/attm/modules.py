@@ -15,6 +15,7 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.keras.models import Model
 
+from modules.shared.globals import LEAKY_RELU_ALPHA
 from modules.training.cme_modeling import NormalizeLayer
 from modules.training.sam_keras import SAMModel
 
@@ -25,7 +26,7 @@ class AttentionBlock(Layer):
             input_dim: int,
             hidden_units: List[int],
             output_dim: int,
-            hidden_activation: str = 'tanh',
+            hidden_activation: str = 'leaky_relu',
             dropout: float = 0.0,
             norm: str = None,
             skipped_layers: int = 0  # 0 means no residual, >0 means residual is active
@@ -37,7 +38,7 @@ class AttentionBlock(Layer):
         input_dim (int): Dimensionality of input data.
         hidden_units (List[int]): List of hidden layer units.
         output_dim (int): Output dimensionality.
-        hidden_activation (str): Activation function for hidden layers. Default is 'tanh'.
+        hidden_activation (str): Activation function for hidden layers. Default is 'leaky_relu'.
         dropout (float): Dropout rate. Default is 0.0 (no dropout).
         norm (str): Type of normalization ('batch_norm', 'layer_norm', or None). Default is None.
         skipped_layers (int): Number of layers to skip for residual connections. Default is 0 (no residual).
@@ -251,162 +252,6 @@ class TanhAttentiveBlock(Layer):
                                          is the bias tensor.
         """
         return self.dense_layer.get_weights()
-
-
-class FeedForwardBlock(Layer):
-    """
-    A custom layer that applies a feed-forward network with optional residual connections,
-    dropout, and normalization.
-
-    Attributes:
-        hidden_units (List[int]): A list of integers representing the number of units
-                                  in each hidden layer of the feed-forward network.
-        hidden_activation (str): The activation function to use in the hidden layers.
-        dropout (float): The dropout rate to use in the feed-forward network.
-        norm (str): The type of normalization to use ('batch_norm' or 'layer_norm').
-        skipped_layers (int): The number of layers between residual connections.
-        output_dim (int): The dimensionality of the output.
-        output_activation (str): The activation function to use in the output layer.
-        residual (bool): Whether to include residual connections within the feed-forward network.
-    """
-
-    def __init__(self,
-                 hidden_units: Optional[List[int]] = None,
-                 hidden_activation: str = 'leaky_relu',
-                 dropout: float = 0.0,
-                 norm: Optional[str] = None,
-                 skipped_layers: int = 2,
-                 output_dim: Optional[int] = None,
-                 output_activation: Optional[str] = None,
-                 **kwargs):
-        """
-        Initialize the FeedForwardBlock.
-
-        Args:
-            hidden_units (Optional[List[int]]): List of integers for hidden layer units.
-            hidden_activation (str): Activation function to use in hidden layers.
-            dropout (float, optional): The dropout rate to use in the feed-forward layers. Defaults to 0.0.
-            norm (Optional[str], optional): The type of normalization to use ('batch_norm' or 'layer_norm'). Defaults to None.
-            skipped_layers (int, optional): The number of layers between residual connections. Defaults to 2.
-            output_dim (Optional[int], optional): The dimensionality of the output. If None, output dimension equals input dimension.
-            output_activation (Optional[str], optional): Activation function for the output layer. Defaults to None.
-        """
-        super(FeedForwardBlock, self).__init__(**kwargs)
-        self.residual_projection = None
-        self.output_activation_layer = None
-        self.output_norm = None
-        self.output_dense = None
-        self.hidden_units = hidden_units or [64, 64]
-        self.hidden_activation = hidden_activation
-        self.dropout = dropout
-        self.norm = norm
-        self.skipped_layers = skipped_layers
-        self.output_dim = output_dim
-        self.output_activation = output_activation
-        self.layers_list = []
-        self.residual = self.skipped_layers > 0
-
-    def build(self, input_shape):
-        """
-        Build the feed-forward network layers.
-
-        Args:
-            input_shape (tf.TensorShape): The shape of the input tensor.
-        """
-        previous_units = input_shape[-1]
-        residual_input_dim = previous_units
-
-        # Build hidden layers
-        for idx, units in enumerate(self.hidden_units):
-            dense_layer = Dense(units)
-            self.layers_list.append(dense_layer)
-
-            if self.norm == 'batch_norm':
-                norm_layer = BatchNormalization()
-                self.layers_list.append(norm_layer)
-            elif self.norm == 'layer_norm':
-                norm_layer = LayerNormalization()
-                self.layers_list.append(norm_layer)
-
-            if self.hidden_activation == 'leaky_relu':
-                activation_layer = LeakyReLU()
-            else:
-                activation_layer = Activation(self.hidden_activation)
-            self.layers_list.append(activation_layer)
-
-            if self.dropout > 0.0:
-                dropout_layer = Dropout(self.dropout)
-                self.layers_list.append(dropout_layer)
-
-            # Implement residual connections within the feed-forward network
-            if self.residual and self.skipped_layers > 0 and (idx + 1) % self.skipped_layers == 0:
-                # Save the index to add a residual connection later
-                self.layers_list.append('residual')
-
-        # Build output layer
-        output_units = self.output_dim if self.output_dim is not None else input_shape[-1]
-        self.output_dense = Dense(output_units)
-
-        if self.norm == 'batch_norm':
-            self.output_norm = BatchNormalization()
-        elif self.norm == 'layer_norm':
-            self.output_norm = LayerNormalization()
-        else:
-            self.output_norm = None
-
-        if self.output_activation == 'leaky_relu':
-            self.output_activation_layer = LeakyReLU()
-        elif self.output_activation:
-            self.output_activation_layer = Activation(self.output_activation)
-        else:
-            self.output_activation_layer = None
-
-        # Prepare for residual connections
-        if self.residual and residual_input_dim != output_units:
-            self.residual_projection = Dense(output_units, use_bias=False)
-        else:
-            self.residual_projection = None
-
-        super(FeedForwardBlock, self).build(input_shape)
-
-    def call(self, inputs, **kwargs):
-        """
-        Perform the forward pass of the FeedForwardBlock.
-
-        Args:
-            inputs (tf.Tensor): The input tensor.
-
-        Returns:
-            tf.Tensor: The output tensor after applying the feed-forward network.
-        """
-        x = inputs
-        residual_connection = inputs if self.residual else None
-        skip_connection = None
-
-        for layer in self.layers_list:
-            if layer == 'residual' and self.residual:
-                if skip_connection is not None:
-                    x = Add()([x, skip_connection])
-                skip_connection = x
-            else:
-                x = layer(x)
-
-        # Apply residual connection at the end if specified
-        if self.residual and skip_connection is not None:
-            if self.residual_projection is not None:
-                residual_connection = self.residual_projection(residual_connection)
-            x = Add()([x, residual_connection])
-
-        # Output layer
-        x = self.output_dense(x)
-
-        if self.output_norm is not None:
-            x = self.output_norm(x)
-
-        if self.output_activation_layer is not None:
-            x = self.output_activation_layer(x)
-
-        return x
 
 
 def create_attentive_model_dict(
@@ -825,6 +670,358 @@ def add_proj_head(
     return extended_model
 
 
+class AttentionBlock2(Layer):
+    def __init__(
+            self,
+            input_dim: int,
+            hidden_units: List[int],
+            repr_dim: int,
+            output_dim: int,
+            hidden_activation=None,
+            dropout: float = 0.0,
+            norm: str = None,
+            skipped_layers: int = 0,  # 0 means no residual, >0 means residual is active
+            skip_repr: bool = True,
+    ):
+        """
+        Initializes a customizable attention-based neural network block with skip connections,
+        normalization layers, and dropout, following the architectural flow of create_mlp2.
+
+        Parameters:
+        - input_dim (int): Dimensionality of input data.
+        - hidden_units (List[int]): List of hidden layer units.
+        - repr_dim (int): Dimensionality of the representation layer.
+        - output_dim (int): Output dimensionality.
+        - hidden_activation: Activation function for hidden layers. Default is LeakyReLU.
+        - dropout (float): Dropout rate. Default is 0.0 (no dropout).
+        - norm (str): Type of normalization ('batch_norm', 'layer_norm', or None). Default is None.
+        - skipped_layers (int): Number of layers between residual connections. Default is 0 (no residual).
+        - skip_repr (bool): If True, adds a residual connection to the representation layer.
+        """
+        super(AttentionBlock2, self).__init__()
+        self.repr_projection = None
+        self.input_projection = None
+        self.input_dim = input_dim
+        self.hidden_units = hidden_units
+        self.repr_dim = repr_dim
+        self.output_dim = output_dim
+        self.leaky_relu_alpha = LEAKY_RELU_ALPHA
+        self.dropout = dropout
+        self.norm = norm
+        self.skipped_layers = skipped_layers
+        self.skip_repr = skip_repr
+        self.has_residuals = self.skipped_layers > 0
+
+        # Activation function
+        if hidden_activation is None:
+            self.hidden_activation = LeakyReLU(alpha=self.leaky_relu_alpha)
+        elif isinstance(hidden_activation, str):
+            if hidden_activation.lower() == 'leaky_relu':
+                self.hidden_activation = LeakyReLU(alpha=self.leaky_relu_alpha)
+            else:
+                self.hidden_activation = Activation(hidden_activation)
+        elif callable(hidden_activation):
+            self.hidden_activation = hidden_activation
+        else:
+            raise ValueError("Invalid hidden_activation parameter")
+
+        # Layers
+        self.dense_layers: List[Dense] = []
+        self.norm_layers: List[Layer] = []
+        self.dropout_layers: List[Dropout] = []
+        self.projection_layers: Dict[int, Dense] = {}
+
+        # Build hidden layers
+        for units in self.hidden_units:
+            self.dense_layers.append(Dense(units, activation=None))
+            if self.norm == 'batch_norm':
+                self.norm_layers.append(BatchNormalization())
+            else:
+                self.norm_layers.append(None)
+            if self.dropout > 0.0:
+                self.dropout_layers.append(Dropout(self.dropout))
+            else:
+                self.dropout_layers.append(None)
+
+        # Representation layer
+        self.repr_layer = Dense(self.repr_dim, activation=None, name='repr_layer')
+        if self.norm == 'batch_norm':
+            self.repr_norm_layer = BatchNormalization()
+        else:
+            self.repr_norm_layer = None
+
+        # Output layer
+        if self.output_dim > 0:
+            self.output_layer = Dense(self.output_dim, name='output_layer')
+        else:
+            self.output_layer = None
+
+    def build(self, input_shape: tf.TensorShape) -> None:
+        # Projection layers for residual connections (if dimensions mismatch)
+        if self.has_residuals:
+            # For the first skip connection from input to first hidden layer
+            if self.dense_layers[0].units != self.input_dim:
+                self.input_projection = Dense(
+                    self.dense_layers[0].units, use_bias=False, activation=None
+                )
+            else:
+                self.input_projection = None
+
+            # For subsequent skip connections
+            for i in range(1, len(self.dense_layers)):
+                if (i % self.skipped_layers == 0) and (self.skipped_layers > 0):
+                    prev_units = self.dense_layers[i - self.skipped_layers].units
+                    current_units = self.dense_layers[i].units
+                    if prev_units != current_units:
+                        self.projection_layers[i] = Dense(
+                            current_units, use_bias=False, activation=None
+                        )
+                    else:
+                        self.projection_layers[i] = None
+
+            # Projection for residual to representation layer
+            if self.skip_repr:
+                last_residual_units = self.dense_layers[-1].units
+                repr_units = self.repr_dim
+                if last_residual_units != repr_units:
+                    self.repr_projection = Dense(
+                        repr_units, use_bias=False, activation=None
+                    )
+                else:
+                    self.repr_projection = None
+        else:
+            self.input_projection = None
+            self.repr_projection = None
+
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        x = inputs
+
+        # First hidden layer
+        x = self.dense_layers[0](x)
+        if self.norm_layers[0]:
+            x = self.norm_layers[0](x)
+        x = self.hidden_activation(x)
+
+        # First skip connection (from input)
+        if self.has_residuals:
+            if self.input_projection:
+                residual = self.input_projection(inputs)
+            else:
+                residual = inputs
+            x = Add()([x, residual])
+            if self.norm == 'layer_norm':
+                x = LayerNormalization()(x)
+            if self.dropout_layers[0]:
+                x = self.dropout_layers[0](x)
+        elif self.dropout_layers[0]:
+            x = self.dropout_layers[0](x)
+
+        residual_layer = x
+
+        # Remaining hidden layers
+        for i in range(1, len(self.dense_layers)):
+            x = self.dense_layers[i](x)
+            if self.norm_layers[i]:
+                x = self.norm_layers[i](x)
+            x = self.hidden_activation(x)
+
+            # Skip connection
+            if self.has_residuals and (i % self.skipped_layers == 0):
+                if residual_layer is not None:
+                    if self.projection_layers.get(i):
+                        residual = self.projection_layers[i](residual_layer)
+                    else:
+                        residual = residual_layer
+                    x = Add()([x, residual])
+                    if self.norm == 'layer_norm':
+                        x = LayerNormalization()(x)
+                    if self.dropout_layers[i]:
+                        x = self.dropout_layers[i](x)
+                residual_layer = x
+            elif self.dropout_layers[i]:
+                x = self.dropout_layers[i](x)
+
+        # Representation layer
+        x = self.repr_layer(x)
+        if self.repr_norm_layer:
+            x = self.repr_norm_layer(x)
+
+        # Activation
+        x = self.hidden_activation(x)
+
+        # Residual connection to representation layer
+        if self.skip_repr and self.has_residuals:
+            if self.repr_projection:
+                residual = self.repr_projection(residual_layer)
+            else:
+                residual = residual_layer
+            x = Add(name='repr_layer')([x, residual])
+            if self.norm == 'layer_norm':
+                x = LayerNormalization()(x)
+            if self.dropout > 0.0:
+                x = Dropout(self.dropout)(x)
+        elif self.dropout > 0.0:
+            x = Dropout(self.dropout)(x)
+
+        # Output layer
+        if self.output_layer is not None:
+            output = self.output_layer(x)
+            return output
+        else:
+            return x
+
+
+class TanhAttentiveBlock2(Layer):
+    """
+    A custom layer that applies an attention mechanism followed by a dense layer.
+
+    This block consists of an attention layer that computes attention scores,
+    applies these scores to the input via element-wise multiplication,
+    and then passes the result through a dense layer.
+
+    y = w0 + w1 * a1 * x1 + w2 * a2 * x2 + ... + wn * an * xn where tanh is applied to attention scores.
+
+    Attributes:
+        attn_hidden_units (List[int]): A list of integers representing the number of units
+                                       in each hidden layer of the attention mechanism.
+        attn_hidden_activation (str): The activation function to use in the hidden layers of the attention block.
+        attn_dropout (float): The dropout rate to use in the attention layer.
+        attn_norm (str): The type of normalization to use in the attention layer ('batch_norm' or 'layer_norm').
+        attn_skipped_layers (int): The number of layers between residual connections in the attention layer.
+        output_dim (int): The dimensionality of the output.
+        output_activation (str): The activation function to use in the final dense layer.
+        dropout (float): The dropout rate to use in the TanhAttentiveBlock.
+        norm (str): The type of normalization to use in the TanhAttentiveBlock ('batch_norm' or 'layer_norm').
+        attention_block (AttentionBlock): The layer used to compute attention scores.
+        dense_layer (Dense): The final dense layer that produces the output.
+        attention_scores (tf.Tensor): The most recently computed attention scores.
+    """
+
+    def __init__(self,
+                 attn_hidden_units: Optional[List[int]] = None,
+                 attn_hidden_activation: str = 'leaky_relu',
+                 attn_dropout: float = 0,
+                 attn_norm: Optional[str] = None,
+                 attn_skipped_layers: int = 2,
+                 attn_skip_repr: bool = True,
+                 output_dim: int = 1,
+                 output_activation: Optional[str] = 'leaky_relu',
+                 dropout: float = 0.0,
+                 norm: Optional[str] = None,
+                 a: float = 1):
+        """
+        Initialize the TanhAttentiveBlock.
+
+        Args:
+            attn_hidden_units (Optional[List[int]]): List of integers for hidden layer units in attention mechanism.
+            attn_hidden_activation (str): Activation function to use in hidden layers of the attention block.
+            attn_dropout (float, optional): The dropout rate to use in the attention layers. Defaults to 0.0.
+            attn_norm (Optional[str], optional): The type of normalization to use ('batch_norm' or 'layer_norm'). Defaults to None.
+            attn_skipped_layers (int, optional): The number of layers between residual connections. Defaults to 2.
+            output_dim (int, optional): The dimensionality of the output. Defaults to 1.
+            output_activation (Optional[str], optional): Activation function to use in the final dense layer. Defaults to 'leaky_relu'.
+            dropout (float, optional): The dropout rate to use in the TanhAttentiveBlock. Defaults to 0.0.
+            norm (Optional[str], optional): The type of normalization to use ('batch_norm' or 'layer_norm'). Defaults to None.
+            a (float, optional): The parameter to scale the attention scores before applying tanh. Defaults to 0.5.
+        """
+        super(TanhAttentiveBlock2, self).__init__()
+        self.attn_hidden_units = attn_hidden_units or [3]
+        self.attn_hidden_activation = attn_hidden_activation
+        self.attn_dropout = attn_dropout
+        self.attn_norm = attn_norm
+        self.attn_skipped_layers = attn_skipped_layers
+        self.output_dim = output_dim
+        self.output_activation = output_activation
+        self.dropout = dropout
+        self.norm = norm
+        self.a = tf.Variable(a, trainable=True, dtype=tf.float32, name='attention_scale')
+        self.attention_scores = None
+        self.attention_block = None
+        self.dense_layer = None
+        self.tanh = Activation('tanh')
+        self.dropout_layer = Dropout(self.dropout) if self.dropout > 0 else None
+        self.norm_layer = None
+        self.skip_repr = attn_skip_repr
+
+    def build(self, input_shape: tf.TensorShape) -> None:
+        """
+        Build the layer. This method is called automatically by Keras when the layer is first used.
+
+        Args:
+            input_shape (tf.TensorShape): The shape of the input tensor.
+        """
+        # Create the attention block
+        self.attention_block = AttentionBlock2(
+            input_dim=input_shape[-1],
+            hidden_units=self.attn_hidden_units,
+            repr_dim=input_shape[-1],
+            output_dim=input_shape[-1],
+            hidden_activation=self.attn_hidden_activation,
+            dropout=self.attn_dropout,
+            norm=self.attn_norm,
+            skipped_layers=self.attn_skipped_layers,
+            skip_repr=self.skip_repr
+        )
+        # Create the final dense layer
+        self.dense_layer = Dense(self.output_dim)
+
+        # Set the normalization layer if specified
+        if self.norm == 'batch_norm':
+            self.norm_layer = BatchNormalization()
+        # elif self.norm == 'layer_norm':
+        #     self.norm_layer = LayerNormalization()
+
+    def call(self, inputs: tf.Tensor) -> Dict[str, Any]:
+        """
+        Perform the forward pass of the TanhAttentiveBlock layer.
+
+        This method applies the attention mechanism to the inputs,
+        applies tanh to the attention scores, then passes the weighted inputs through a dense layer.
+
+        Args:
+            inputs (tf.Tensor): The input tensor.
+
+        Returns:
+            tf.Tensor: The output tensor after applying attention, tanh, and the dense layer.
+        """
+        # Compute attention scores
+        self.attention_scores = self.attention_block(inputs)
+
+        # Apply scaling factor a and tanh to obtain attention weights between -1 and 1
+        attention_weights = self.tanh(self.a * self.attention_scores)
+
+        self.attention_scores = attention_weights
+
+        # Apply attention weights to inputs via element-wise multiplication
+        weighted_inputs = Multiply()([inputs, attention_weights])
+
+        # Pass the weighted inputs through the final dense layer
+        output = self.dense_layer(weighted_inputs)
+
+        # Apply batch normalization if specified
+        if self.norm == 'batch_norm':
+            output = self.norm_layer(output)
+
+        # Apply the output activation function
+        if self.output_activation == 'leaky_relu':
+            output = LeakyReLU(alpha=LEAKY_RELU_ALPHA)(output)
+        elif self.output_activation:
+            output = Activation(self.output_activation)(output)
+
+        return {'output': output, 'attention_scores': self.attention_scores}
+
+    def get_dense_weights(self) -> Tuple[tf.Tensor, tf.Tensor]:
+        """
+        Retrieve the weights and bias of the output dense layer.
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor]: A tuple containing the weights and bias of the dense layer.
+                                         The first element is the weight tensor, and the second
+                                         is the bias tensor.
+        """
+        return self.dense_layer.get_weights()
+
+
 def create_attentive_model2_dict(
         input_dim: int = 25,
         output_dim: int = 1,
@@ -833,11 +1030,13 @@ def create_attentive_model2_dict(
         attn_hidden_activation: str = 'tanh',
         attn_dropout: float = -1,
         attn_norm: Optional[str] = None,
-        attn_skipped_layers: int = 2,
+        attn_skipped_layers: int = 1,
+        attn_skip_repr: bool = True,
         skipped_blocks: int = 1,
         repr_dim: int = 128,
         dropout: float = 0.0,
         activation='leaky_relu',
+        skip_repr: bool = True,
         pds: bool = False,
         norm: str = None,
         sam_rho: float = 0.05,
@@ -848,25 +1047,30 @@ def create_attentive_model2_dict(
     The final output layer is a Dense layer instead of a TanhAttentiveBlock.
 
     Parameters:
-    - input_dim (int): The number of features in the input data.
+    - input_dim (int): The number of features in the input data. Default is 25.
     - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
-    - hidden_blocks (List[int]): List where each entry is the output_dim of the block at that position.
+    - hidden_blocks (List[int]): List where each entry is the output_dim of the block at that position. Default is [50, 50].
     - attn_hidden_units (List[int]): A list of integers where each integer is the number of units in a hidden layer of the attention block.
-    - attn_hidden_activation (str): Activation function to use in hidden layers of the attention block.
+    - attn_hidden_activation (str): Activation function to use in hidden layers of the attention block. Default is 'tanh'.
     - attn_dropout (float): The dropout rate to use in the attention layers. If 0.0, dropout is not used. If -1, use the same dropout rate as the model dropout rate.
     - attn_norm (str): The type of normalization to use in the attention layers ('batch_norm' or 'layer_norm'). Default is None.
     - attn_skipped_layers (int): Number of layers between residual connections in the attention layer. Default is 2.
+    - attn_skip_repr (bool): Whether to add a residual connection to the representation layer in attention blocks. Default is True.
     - skipped_blocks (int): Number of blocks between residual connections. Default is 1.
-    - repr_dim (int): The number of features in the final representation vector.
+    - repr_dim (int): The number of features in the final representation vector. Default is 128.
     - dropout (float): The dropout rate to use in the model. Default is 0.0.
-    - activation: Activation function to use in the blocks. Default is LeakyReLU.
-    - pds (bool): If True, use a NormalizeLayer after the representation layer.
+    - activation (str): Activation function to use in the blocks. Default is 'leaky_relu'.
+    - skip_repr (bool): Whether to add a residual connection to the representation layer. Default is True.
+    - pds (bool): If True, use a NormalizeLayer after the representation layer. Default is False.
     - norm (str): The type of normalization to use ('batch_norm' or 'layer_norm'). Default is None.
     - sam_rho (float): Size of the neighborhood for perturbation in SAM. Default is 0.05. If 0.0, SAM is not used.
     - name (str): Name of the model. Default is 'attentive_mlp'.
 
     Returns:
-    - Model: A Keras model instance.
+    - Model: A Keras model instance with the following outputs:
+        - 'repr': The representation layer output
+        - 'output': The final model output
+        - 'attention_scores': The attention scores from the last attention block
     """
 
     if hidden_blocks is None:
@@ -874,230 +1078,116 @@ def create_attentive_model2_dict(
 
     input_layer = Input(shape=(input_dim,))
     x = input_layer
-    skip_connection = None
 
-    # Process all hidden blocks
-    for i, block_output_dim in enumerate(hidden_blocks):
+    # Process the first block
+    block = TanhAttentiveBlock2(
+        attn_hidden_units=attn_hidden_units,
+        attn_hidden_activation=attn_hidden_activation,
+        attn_dropout=attn_dropout,
+        attn_norm=attn_norm,
+        attn_skipped_layers=attn_skipped_layers,
+        attn_skip_repr=attn_skip_repr,
+        output_dim=hidden_blocks[0],
+        norm=norm,
+        dropout=dropout,
+        output_activation=activation
+    )
+
+    x = block(x)['output']
+
+    # Add residual connection from input
+    if x.shape[-1] != input_layer.shape[-1]:
+        residual_proj = Dense(x.shape[-1], use_bias=False)(input_layer)
+    else:
+        residual_proj = input_layer
+
+    x = Add()([x, residual_proj])
+
+    if norm == 'layer_norm':
+        x = LayerNormalization()(x)
+
+    if dropout > 0:
+        x = Dropout(dropout)(x)
+
+    # Set skip_connection for future residuals
+    skip_connection = x
+
+    # Process the remaining hidden blocks
+    for i, block_output_dim in enumerate(hidden_blocks[1:], start=1):
         # Create a TanhAttentiveBlock for each specified hidden block
-        block = TanhAttentiveBlock(
+        block = TanhAttentiveBlock2(
             attn_hidden_units=attn_hidden_units,
             attn_hidden_activation=attn_hidden_activation,
             attn_dropout=attn_dropout,
             attn_norm=attn_norm,
             attn_skipped_layers=attn_skipped_layers,
+            attn_skip_repr=attn_skip_repr,
             output_dim=block_output_dim,
             norm=norm,
             dropout=dropout,
             output_activation=activation
         )
 
-        # Implement residual connections between blocks
-        if i % skipped_blocks == 0 and i > 0 and skipped_blocks > 0:
-            if skip_connection is not None:
-                if x.shape[-1] != skip_connection.shape[-1]:
-                    skip_connection = Dense(x.shape[-1], use_bias=False)(skip_connection)
-                x = Add()([x, skip_connection])
-            skip_connection = x
-        else:
-            if i % skipped_blocks == 0 or skip_connection is None:
-                skip_connection = x
-
         x = block(x)['output']
 
+        # Implement residual connections between blocks
+        if skipped_blocks > 0 and i % skipped_blocks == 0:
+            if x.shape[-1] != skip_connection.shape[-1]:
+                residual_proj = Dense(x.shape[-1], use_bias=False)(skip_connection)
+            else:
+                residual_proj = skip_connection
+
+            x = Add()([x, residual_proj])
+
+            if norm == 'layer_norm':
+                x = LayerNormalization()(x)
+
+            if dropout > 0:
+                x = Dropout(dropout)(x)
+
+            # Update skip_connection
+            skip_connection = x
+
     # Add the final block with repr_dim output
-    final_block = TanhAttentiveBlock(
+    final_block = TanhAttentiveBlock2(
         attn_hidden_units=attn_hidden_units,
         attn_hidden_activation=attn_hidden_activation,
         attn_dropout=attn_dropout,
         attn_norm=attn_norm,
         attn_skipped_layers=attn_skipped_layers,
+        attn_skip_repr=attn_skip_repr,
         output_dim=repr_dim,
         norm=norm,
         dropout=dropout,
         output_activation=activation
     )
 
-    final = final_block(x)
-    final_repr = final['output']
-    last_attention_scores = final['attention_scores']
+    final_output = final_block(x)
+    final_repr = final_output['output']
+    last_attention_scores = final_output['attention_scores']
 
+    # Add residual connection to representation if skip_repr is True
+    if skip_repr and skipped_blocks > 0:
+        if final_repr.shape[-1] != skip_connection.shape[-1]:
+            residual_proj = Dense(final_repr.shape[-1], use_bias=False)(skip_connection)
+        else:
+            residual_proj = skip_connection
+
+        final_repr = Add(name='repr_layer')([final_repr, residual_proj])
+
+    if norm == 'layer_norm':
+        final_repr = LayerNormalization()(final_repr)
+
+    if dropout > 0:
+        final_repr = Dropout(dropout)(final_repr)
+
+    # Handle PDS normalization if needed
     if pds:
         final_repr_output = NormalizeLayer(name='normalize_layer')(final_repr)
     else:
         final_repr_output = final_repr
 
-    if output_dim > 0:
-        # Replace the TanhAttentiveBlock with a simple Dense layer for the output
-        output_layer = Dense(output_dim, activation=activation, name='forecast_head')(final_repr_output)
-        model_output = {
-            'repr': final_repr_output,
-            'output': output_layer,
-            'attention_scores': last_attention_scores
-        }
-    else:
-        model_output = {
-            'repr': final_repr_output,
-            'attention_scores': last_attention_scores
-        }
-
-    if sam_rho > 0.0:
-        model = SAMModel(inputs=input_layer, outputs=model_output, rho=sam_rho, name=name)
-    else:
-        model = Model(inputs=input_layer, outputs=model_output, name=name)
-
-    return model
-
-
-def create_attentive_model3_dict(
-        input_dim: int = 25,
-        output_dim: int = 1,
-        hidden_blocks=None,
-        repr_dim: int = 128,
-        dropout: float = 0.0,
-        activation='leaky_relu',
-        pds: bool = False,
-        norm: str = None,
-        sam_rho: float = 0.05,
-        name: str = 'attentive_mlp_ff',
-        # Attention block parameters
-        attn_hidden_units: Optional[List[int]] = None,
-        attn_hidden_activation: str = 'tanh',
-        attn_dropout: float = -1,
-        attn_norm: Optional[str] = None,
-        attn_skipped_layers: int = 2,
-        # Feed-forward network parameters
-        ff_hidden_units: Optional[List[int]] = None,
-        ff_hidden_activation: str = 'leaky_relu',
-        ff_dropout: float = 0.0,
-        ff_norm: Optional[str] = None,
-        ff_skipped_layers: int = 2,
-) -> Model:
-    """
-    Create a model where each TanhAttentiveBlock is followed by a feed-forward network block,
-    with residual connections after each block, similar to the Transformer architecture.
-    The final output layer is a Dense layer.
-
-    Parameters:
-    - input_dim (int): Number of features in the input data.
-    - output_dim (int): Dimension of the output layer.
-    - hidden_blocks (List[int]): Output dimensions of each block.
-    - attn_hidden_units (List[int]): Units in each hidden layer of the attention block.
-    - attn_hidden_activation (str): Activation function for the attention block's hidden layers.
-    - attn_dropout (float): Dropout rate for the attention layers.
-    - attn_norm (str): Normalization type for the attention layers ('batch_norm' or 'layer_norm').
-    - attn_skipped_layers (int): Number of layers between residual connections in the attention block.
-    - repr_dim (int): Number of features in the final representation vector.
-    - dropout (float): Dropout rate for the model.
-    - activation: Activation function to use in the blocks.
-    - pds (bool): If True, use a NormalizeLayer after the representation layer.
-    - norm (str): Normalization type ('batch_norm' or 'layer_norm').
-    - sam_rho (float): Size of the neighborhood for perturbation in SAM.
-    - name (str): Name of the model.
-    - ff_hidden_units (List[int]): Units in each layer of the feed-forward network.
-    - ff_hidden_activation (str): Activation function for the feed-forward network.
-    - ff_dropout (float): Dropout rate for the feed-forward network.
-    - ff_norm (str): Normalization type for the feed-forward network.
-    - ff_skipped_layers (int): Number of layers between residual connections in the feed-forward network.
-
-
-    Returns:
-    - Model: A Keras model instance.
-    """
-
-    if hidden_blocks is None:
-        hidden_blocks = [50, 50]
-
-    input_layer = Input(shape=(input_dim,))
-    x = input_layer
-
-    last_attention_scores = None  # To store the last attention scores if needed
-
-    for i, block_output_dim in enumerate(hidden_blocks):
-
-        # Save input for residual connection
-        attn_input = x
-
-        # Attention block
-        attn_block = TanhAttentiveBlock(
-            attn_hidden_units=attn_hidden_units,
-            attn_hidden_activation=attn_hidden_activation,
-            attn_dropout=attn_dropout,
-            attn_norm=attn_norm,
-            attn_skipped_layers=attn_skipped_layers,
-            output_dim=int(x.shape[-1]),
-            norm=norm,
-            dropout=dropout,
-            output_activation=activation
-        )
-
-        attn_output_dict = attn_block(x)
-        attn_output = attn_output_dict['output']
-        last_attention_scores = attn_output_dict['attention_scores']
-
-        # Apply residual connection after attention block
-        if attn_output.shape[-1] != attn_input.shape[-1]:
-            attn_input = Dense(attn_output.shape[-1], use_bias=False)(attn_input)
-        x = Add()([attn_output, attn_input])
-
-        # Apply normalization after residual addition
-        if norm == 'batch_norm':
-            x = BatchNormalization()(x)
-        elif norm == 'layer_norm':
-            x = LayerNormalization()(x)
-
-        # Save input for residual connection
-        ff_input = x
-
-        # Feed-forward block
-        ff_block = FeedForwardBlock(
-            hidden_units=ff_hidden_units,
-            hidden_activation=ff_hidden_activation,
-            dropout=ff_dropout,
-            norm=ff_norm,
-            skipped_layers=ff_skipped_layers,
-            output_dim=block_output_dim,
-            output_activation=activation
-        )
-        ff_output = ff_block(x)
-
-        # Apply residual connection after feed-forward block
-        if ff_output.shape[-1] != ff_input.shape[-1]:
-            ff_input = Dense(ff_output.shape[-1], use_bias=False)(ff_input)
-        x = Add()([ff_output, ff_input])
-
-        # Apply normalization after residual addition
-        if norm == 'batch_norm':
-            x = BatchNormalization()(x)
-        elif norm == 'layer_norm':
-            x = LayerNormalization()(x)
-
-    # Final representation layer
-    x = Dense(repr_dim)(x)
-
-    # Apply normalization if specified
-    if norm == 'batch_norm':
-        x = BatchNormalization()(x)
-    elif norm == 'layer_norm':
-        x = LayerNormalization()(x)
-
-    # Apply activation
-    if activation == 'leaky_relu':
-        x = LeakyReLU()(x)
-    else:
-        x = Activation(activation)(x)
-
-    # Apply dropout if specified
-    if dropout > 0.0:
-        x = Dropout(dropout)(x)
-
-    final_repr = x  # Final representation
-
-    if pds:
-        final_repr_output = NormalizeLayer(name='normalize_layer')(final_repr)
-    else:
-        final_repr_output = final_repr
-
-    # Final output layer (simple Dense layer)
+    # Add output layer if output_dim > 0
     if output_dim > 0:
         output_layer = Dense(output_dim, activation=activation, name='forecast_head')(final_repr_output)
         model_output = {
@@ -1111,9 +1201,335 @@ def create_attentive_model3_dict(
             'attention_scores': last_attention_scores
         }
 
+    # Create appropriate model type based on SAM parameter
     if sam_rho > 0.0:
         model = SAMModel(inputs=input_layer, outputs=model_output, rho=sam_rho, name=name)
     else:
         model = Model(inputs=input_layer, outputs=model_output, name=name)
 
     return model
+
+# class FeedForwardBlock(Layer):
+#     """
+#     A custom layer that applies a feed-forward network with optional residual connections,
+#     dropout, and normalization.
+
+#     Attributes:
+#         hidden_units (List[int]): A list of integers representing the number of units
+#                                   in each hidden layer of the feed-forward network.
+#         hidden_activation (str): The activation function to use in the hidden layers.
+#         dropout (float): The dropout rate to use in the feed-forward network.
+#         norm (str): The type of normalization to use ('batch_norm' or 'layer_norm').
+#         skipped_layers (int): The number of layers between residual connections.
+#         output_dim (int): The dimensionality of the output.
+#         output_activation (str): The activation function to use in the output layer.
+#         residual (bool): Whether to include residual connections within the feed-forward network.
+#     """
+
+#     def __init__(self,
+#                  hidden_units: Optional[List[int]] = None,
+#                  hidden_activation: str = 'leaky_relu',
+#                  dropout: float = 0.0,
+#                  norm: Optional[str] = None,
+#                  skipped_layers: int = 2,
+#                  output_dim: Optional[int] = None,
+#                  output_activation: Optional[str] = None,
+#                  **kwargs):
+#         """
+#         Initialize the FeedForwardBlock.
+
+#         Args:
+#             hidden_units (Optional[List[int]]): List of integers for hidden layer units.
+#             hidden_activation (str): Activation function to use in hidden layers.
+#             dropout (float, optional): The dropout rate to use in the feed-forward layers. Defaults to 0.0.
+#             norm (Optional[str], optional): The type of normalization to use ('batch_norm' or 'layer_norm'). Defaults to None.
+#             skipped_layers (int, optional): The number of layers between residual connections. Defaults to 2.
+#             output_dim (Optional[int], optional): The dimensionality of the output. If None, output dimension equals input dimension.
+#             output_activation (Optional[str], optional): Activation function for the output layer. Defaults to None.
+#         """
+#         super(FeedForwardBlock, self).__init__(**kwargs)
+#         self.residual_projection = None
+#         self.output_activation_layer = None
+#         self.output_norm = None
+#         self.output_dense = None
+#         self.hidden_units = hidden_units or [64, 64]
+#         self.hidden_activation = hidden_activation
+#         self.dropout = dropout
+#         self.norm = norm
+#         self.skipped_layers = skipped_layers
+#         self.output_dim = output_dim
+#         self.output_activation = output_activation
+#         self.layers_list = []
+#         self.residual = self.skipped_layers > 0
+
+#     def build(self, input_shape):
+#         """
+#         Build the feed-forward network layers.
+
+#         Args:
+#             input_shape (tf.TensorShape): The shape of the input tensor.
+#         """
+#         previous_units = input_shape[-1]
+#         residual_input_dim = previous_units
+
+#         # Build hidden layers
+#         for idx, units in enumerate(self.hidden_units):
+#             dense_layer = Dense(units)
+#             self.layers_list.append(dense_layer)
+
+#             if self.norm == 'batch_norm':
+#                 norm_layer = BatchNormalization()
+#                 self.layers_list.append(norm_layer)
+#             elif self.norm == 'layer_norm':
+#                 norm_layer = LayerNormalization()
+#                 self.layers_list.append(norm_layer)
+
+#             if self.hidden_activation == 'leaky_relu':
+#                 activation_layer = LeakyReLU()
+#             else:
+#                 activation_layer = Activation(self.hidden_activation)
+#             self.layers_list.append(activation_layer)
+
+#             if self.dropout > 0.0:
+#                 dropout_layer = Dropout(self.dropout)
+#                 self.layers_list.append(dropout_layer)
+
+#             # Implement residual connections within the feed-forward network
+#             if self.residual and self.skipped_layers > 0 and (idx + 1) % self.skipped_layers == 0:
+#                 # Save the index to add a residual connection later
+#                 self.layers_list.append('residual')
+
+#         # Build output layer
+#         output_units = self.output_dim if self.output_dim is not None else input_shape[-1]
+#         self.output_dense = Dense(output_units)
+
+#         if self.norm == 'batch_norm':
+#             self.output_norm = BatchNormalization()
+#         elif self.norm == 'layer_norm':
+#             self.output_norm = LayerNormalization()
+#         else:
+#             self.output_norm = None
+
+#         if self.output_activation == 'leaky_relu':
+#             self.output_activation_layer = LeakyReLU()
+#         elif self.output_activation:
+#             self.output_activation_layer = Activation(self.output_activation)
+#         else:
+#             self.output_activation_layer = None
+
+#         # Prepare for residual connections
+#         if self.residual and residual_input_dim != output_units:
+#             self.residual_projection = Dense(output_units, use_bias=False)
+#         else:
+#             self.residual_projection = None
+
+#         super(FeedForwardBlock, self).build(input_shape)
+
+#     def call(self, inputs, **kwargs):
+#         """
+#         Perform the forward pass of the FeedForwardBlock.
+
+#         Args:
+#             inputs (tf.Tensor): The input tensor.
+
+#         Returns:
+#             tf.Tensor: The output tensor after applying the feed-forward network.
+#         """
+#         x = inputs
+#         residual_connection = inputs if self.residual else None
+#         skip_connection = None
+
+#         for layer in self.layers_list:
+#             if layer == 'residual' and self.residual:
+#                 if skip_connection is not None:
+#                     x = Add()([x, skip_connection])
+#                 skip_connection = x
+#             else:
+#                 x = layer(x)
+
+#         # Apply residual connection at the end if specified
+#         if self.residual and skip_connection is not None:
+#             if self.residual_projection is not None:
+#                 residual_connection = self.residual_projection(residual_connection)
+#             x = Add()([x, residual_connection])
+
+#         # Output layer
+#         x = self.output_dense(x)
+
+#         if self.output_norm is not None:
+#             x = self.output_norm(x)
+
+#         if self.output_activation_layer is not None:
+#             x = self.output_activation_layer(x)
+
+#         return x
+
+# def create_attentive_model3_dict(
+#         input_dim: int = 25,
+#         output_dim: int = 1,
+#         hidden_blocks=None,
+#         repr_dim: int = 128,
+#         dropout: float = 0.0,
+#         activation='leaky_relu',
+#         pds: bool = False,
+#         norm: str = None,
+#         sam_rho: float = 0.05,
+#         name: str = 'attentive_mlp_ff',
+#         # Attention block parameters
+#         attn_hidden_units: Optional[List[int]] = None,
+#         attn_hidden_activation: str = 'tanh',
+#         attn_dropout: float = -1,
+#         attn_norm: Optional[str] = None,
+#         attn_skipped_layers: int = 2,
+#         # Feed-forward network parameters
+#         ff_hidden_units: Optional[List[int]] = None,
+#         ff_hidden_activation: str = 'leaky_relu',
+#         ff_dropout: float = 0.0,
+#         ff_norm: Optional[str] = None,
+#         ff_skipped_layers: int = 2,
+# ) -> Model:
+#     """
+#     Create a model where each TanhAttentiveBlock is followed by a feed-forward network block,
+#     with residual connections after each block, similar to the Transformer architecture.
+#     The final output layer is a Dense layer.
+
+#     Parameters:
+#     - input_dim (int): Number of features in the input data.
+#     - output_dim (int): Dimension of the output layer.
+#     - hidden_blocks (List[int]): Output dimensions of each block.
+#     - attn_hidden_units (List[int]): Units in each hidden layer of the attention block.
+#     - attn_hidden_activation (str): Activation function for the attention block's hidden layers.
+#     - attn_dropout (float): Dropout rate for the attention layers.
+#     - attn_norm (str): Normalization type for the attention layers ('batch_norm' or 'layer_norm').
+#     - attn_skipped_layers (int): Number of layers between residual connections in the attention block.
+#     - repr_dim (int): Number of features in the final representation vector.
+#     - dropout (float): Dropout rate for the model.
+#     - activation: Activation function to use in the blocks.
+#     - pds (bool): If True, use a NormalizeLayer after the representation layer.
+#     - norm (str): Normalization type ('batch_norm' or 'layer_norm').
+#     - sam_rho (float): Size of the neighborhood for perturbation in SAM.
+#     - name (str): Name of the model.
+#     - ff_hidden_units (List[int]): Units in each layer of the feed-forward network.
+#     - ff_hidden_activation (str): Activation function for the feed-forward network.
+#     - ff_dropout (float): Dropout rate for the feed-forward network.
+#     - ff_norm (str): Normalization type for the feed-forward network.
+#     - ff_skipped_layers (int): Number of layers between residual connections in the feed-forward network.
+
+
+#     Returns:
+#     - Model: A Keras model instance.
+#     """
+
+#     if hidden_blocks is None:
+#         hidden_blocks = [50, 50]
+
+#     input_layer = Input(shape=(input_dim,))
+#     x = input_layer
+
+#     last_attention_scores = None  # To store the last attention scores if needed
+
+#     for i, block_output_dim in enumerate(hidden_blocks):
+
+#         # Save input for residual connection
+#         attn_input = x
+
+#         # Attention block
+#         attn_block = TanhAttentiveBlock(
+#             attn_hidden_units=attn_hidden_units,
+#             attn_hidden_activation=attn_hidden_activation,
+#             attn_dropout=attn_dropout,
+#             attn_norm=attn_norm,
+#             attn_skipped_layers=attn_skipped_layers,
+#             output_dim=int(x.shape[-1]),
+#             norm=norm,
+#             dropout=dropout,
+#             output_activation=activation
+#         )
+
+#         attn_output_dict = attn_block(x)
+#         attn_output = attn_output_dict['output']
+#         last_attention_scores = attn_output_dict['attention_scores']
+
+#         # Apply residual connection after attention block
+#         if attn_output.shape[-1] != attn_input.shape[-1]:
+#             attn_input = Dense(attn_output.shape[-1], use_bias=False)(attn_input)
+#         x = Add()([attn_output, attn_input])
+
+#         # Apply normalization after residual addition
+#         if norm == 'batch_norm':
+#             x = BatchNormalization()(x)
+#         elif norm == 'layer_norm':
+#             x = LayerNormalization()(x)
+
+#         # Save input for residual connection
+#         ff_input = x
+
+#         # Feed-forward block
+#         ff_block = FeedForwardBlock(
+#             hidden_units=ff_hidden_units,
+#             hidden_activation=ff_hidden_activation,
+#             dropout=ff_dropout,
+#             norm=ff_norm,
+#             skipped_layers=ff_skipped_layers,
+#             output_dim=block_output_dim,
+#             output_activation=activation
+#         )
+#         ff_output = ff_block(x)
+
+#         # Apply residual connection after feed-forward block
+#         if ff_output.shape[-1] != ff_input.shape[-1]:
+#             ff_input = Dense(ff_output.shape[-1], use_bias=False)(ff_input)
+#         x = Add()([ff_output, ff_input])
+
+#         # Apply normalization after residual addition
+#         if norm == 'batch_norm':
+#             x = BatchNormalization()(x)
+#         elif norm == 'layer_norm':
+#             x = LayerNormalization()(x)
+
+#     # Final representation layer
+#     x = Dense(repr_dim)(x)
+
+#     # Apply normalization if specified
+#     if norm == 'batch_norm':
+#         x = BatchNormalization()(x)
+#     elif norm == 'layer_norm':
+#         x = LayerNormalization()(x)
+
+#     # Apply activation
+#     if activation == 'leaky_relu':
+#         x = LeakyReLU()(x)
+#     else:
+#         x = Activation(activation)(x)
+
+#     # Apply dropout if specified
+#     if dropout > 0.0:
+#         x = Dropout(dropout)(x)
+
+#     final_repr = x  # Final representation
+
+#     if pds:
+#         final_repr_output = NormalizeLayer(name='normalize_layer')(final_repr)
+#     else:
+#         final_repr_output = final_repr
+
+#     # Final output layer (simple Dense layer)
+#     if output_dim > 0:
+#         output_layer = Dense(output_dim, activation=activation, name='forecast_head')(final_repr_output)
+#         model_output = {
+#             'repr': final_repr_output,
+#             'output': output_layer,
+#             'attention_scores': last_attention_scores
+#         }
+#     else:
+#         model_output = {
+#             'repr': final_repr_output,
+#             'attention_scores': last_attention_scores
+#         }
+
+#     if sam_rho > 0.0:
+#         model = SAMModel(inputs=input_layer, outputs=model_output, rho=sam_rho, name=name)
+#     else:
+#         model = Model(inputs=input_layer, outputs=model_output, name=name)
+
+#     return model

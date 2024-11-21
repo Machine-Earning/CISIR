@@ -82,7 +82,7 @@ CVRG_METRIC = 'loss'
 ASYM_TYPE = 'sigmoid'
 
 # ATTM AREA
-BLOCKS_HIDDENS = [128 for _ in range(20)]
+BLOCKS_HIDDENS = [128 for _ in range(6)]
 ATTN_HIDDENS = MLP_HIDDENS_S2 # this acchitecture is good enough to predict on its own
 # BLOCKS_HIDDENS = [128 for _ in range(1)]
 # ATTN_HIDDENS = [128 for _ in range(2)]
@@ -103,9 +103,10 @@ ATTM_LR_CB_PATIENCE = 100
 ATTM_RHO = [1e-2]
 
 # FF AREA
-FF_HIDDENS = [128, 256, 128]
-FF_NORM = 'batch_norm'
-FF_DROPOUT = 0.2
-FF_ACTIVATION = 'leaky_relu'
-FF_SKIPPED_LAYERS = 1
+# FF_HIDDENS = [128, 256, 128]
+# FF_NORM = 'batch_norm'
+# FF_DROPOUT = 0.2
+# FF_ACTIVATION = 'leaky_relu'
+# FF_SKIPPED_LAYERS = 1
 
+LEAKY_RELU_ALPHA = 0.3
