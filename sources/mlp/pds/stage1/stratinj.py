@@ -47,11 +47,11 @@ def main():
     mb = cme_modeling.ModelBuilder()  # Model builder
     pm = TrainingPhaseManager()  # Training phase manager
 
-    for seed in SEEDS:
+    for seed in [456789]:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha, alphaV in [(0, 0)]: # PDS_RW:
-                    for rho in RHO:
+                for alpha, alphaV in PDS_RW:
+                    for rho in RHO_PDS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -279,8 +279,8 @@ def main():
                                     loss=lambda y_true, y_pred: mb.pds_loss_linear_vec(
                                         y_true, y_pred,
                                         phase_manager=pm,
-                                        train_sample_weights=None, # subtrain_weights_dict,
-                                        val_sample_weights=None, # val_weights_dict,
+                                        train_sample_weights=subtrain_weights_dict,
+                                        val_sample_weights=val_weights_dict,
                                     )
                                 )
 
@@ -344,7 +344,7 @@ def main():
                                 loss=lambda y_true, y_pred: mb.pds_loss_linear_vec(
                                     y_true, y_pred,
                                     phase_manager=pm,
-                                    train_sample_weights=None, # train_weights_dict,
+                                    train_sample_weights=train_weights_dict,
                                 )
                             )
 
