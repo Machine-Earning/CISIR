@@ -23,7 +23,6 @@ from modules.training.ts_modeling import (
     filter_ds,
     load_stratified_folds,
 )
-
 from sources.attm.modules import create_attentive_model_dict
 
 
@@ -85,7 +84,7 @@ def main():
                             repr_dim = REPR_DIM
                             output_dim = len(outputs_to_use)
                             attn_dropout = DROPOUT
-                            attm_dropout = DROPOUT # TODO: review if attm dropout should be different
+                            attm_dropout = DROPOUT  # TODO: review if attm dropout should be different
                             activation = ATTM_ACTIVATION
                             attn_norm = ATTN_NORM
                             attm_norm = ATTM_NORM
@@ -97,8 +96,8 @@ def main():
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                             mae_plus_threshold = MAE_PLUS_THRESHOLD
                             smoothing_method = SMOOTHING_METHOD
-                            window_size = WINDOW_SIZE # allows margin of error of 10 epochs
-                            val_window_size = VAL_WINDOW_SIZE # allows margin of error of 10 epochs
+                            window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
+                            val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
 
                             # Initialize wandb
                             wandb.init(project="Jan-Report", name=experiment_name, config={
@@ -197,14 +196,14 @@ def main():
                             # 4-fold cross-validation
                             folds_optimal_epochs = []
                             for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
-                                load_stratified_folds(
-                                    root_dir,
-                                    inputs_to_use=inputs_to_use,
-                                    add_slope=add_slope,
-                                    outputs_to_use=outputs_to_use,
-                                    cme_speed_threshold=cme_speed_threshold,
-                                    seed=seed, shuffle=True
-                                )
+                                    load_stratified_folds(
+                                        root_dir,
+                                        inputs_to_use=inputs_to_use,
+                                        add_slope=add_slope,
+                                        outputs_to_use=outputs_to_use,
+                                        cme_speed_threshold=cme_speed_threshold,
+                                        seed=seed, shuffle=True
+                                    )
                             ):
                                 print(f'Fold: {fold_idx}')
 
@@ -419,12 +418,14 @@ def main():
                             wandb.log({"train_pcc": error_pcc_train})
 
                             # evaluate the model correlation on test set based on logI and logI_prev
-                            error_pcc_logI = evaluate_pcc(final_model_sep, X_test, y_test, logI_test, logI_prev_test, use_dict=True)
+                            error_pcc_logI = evaluate_pcc(final_model_sep, X_test, y_test, logI_test, logI_prev_test,
+                                                          use_dict=True)
                             print(f'pcc error logI: {error_pcc_logI}')
                             wandb.log({"pcc_I": error_pcc_logI})
 
                             # evaluate the model correlation on training set based on logI and logI_prev
-                            error_pcc_logI_train = evaluate_pcc(final_model_sep, X_train, y_train, logI_train, logI_prev_train, use_dict=True)
+                            error_pcc_logI_train = evaluate_pcc(final_model_sep, X_train, y_train, logI_train,
+                                                                logI_prev_train, use_dict=True)
                             print(f'pcc error logI train: {error_pcc_logI_train}')
                             wandb.log({"train_pcc_I": error_pcc_logI_train})
 
@@ -456,13 +457,15 @@ def main():
 
                             # evaluate the model correlation for rare samples on test set based on logI and logI_prev
                             error_pcc_cond_logI = evaluate_pcc(
-                                final_model_sep, X_test, y_test, logI_test, logI_prev_test, above_threshold=above_threshold, use_dict=True)
+                                final_model_sep, X_test, y_test, logI_test, logI_prev_test,
+                                above_threshold=above_threshold, use_dict=True)
                             print(f'pcc error delta >= {above_threshold} logI test: {error_pcc_cond_logI}')
                             wandb.log({"pcc+_I": error_pcc_cond_logI})
 
                             # evaluate the model correlation for rare samples on training set based on logI and logI_prev
                             error_pcc_cond_logI_train = evaluate_pcc(
-                                final_model_sep, X_train, y_train, logI_train, logI_prev_train, above_threshold=above_threshold, use_dict=True)
+                                final_model_sep, X_train, y_train, logI_train, logI_prev_train,
+                                above_threshold=above_threshold, use_dict=True)
                             print(f'pcc error delta >= {above_threshold} logI train: {error_pcc_cond_logI_train}')
                             wandb.log({"train_pcc+_I": error_pcc_cond_logI_train})
 
