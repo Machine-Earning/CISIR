@@ -83,8 +83,8 @@ def main():
                             bandwidth = BANDWIDTH
                             repr_dim = REPR_DIM
                             output_dim = len(outputs_to_use)
-                            attn_dropout = DROPOUT
-                            attm_dropout = DROPOUT  # TODO: review if attm dropout should be different
+                            attn_dropout = ATTN_DROPOUT
+                            attm_dropout = ATTM_DROPOUT  # TODO: review if attm dropout should be different
                             activation = ATTM_ACTIVATION
                             attn_norm = ATTN_NORM
                             attm_norm = ATTM_NORM
@@ -137,7 +137,11 @@ def main():
                                 'sam_rho': rho,
                                 'smoothing_method': smoothing_method,
                                 'window_size': window_size,
-                                'val_window_size': val_window_size
+                                'val_window_size': val_window_size,
+                                'attm_lr_cb_min_lr': ATTM_LR_CB_MIN_LR,
+                                'attm_lr_cb_factor': ATTM_LR_CB_FACTOR,
+                                'attm_lr_cb_patience': ATTM_LR_CB_PATIENCE,
+                                'asym_type': asym_type
                             })
 
                             # set the root directory
