@@ -23,7 +23,7 @@ from modules.training.ts_modeling import (
     filter_ds,
     load_stratified_folds,
 )
-from sources.attm.modules import create_attentive_model_dict
+from sources.attm.modules import create_attentive_model2_dict
 
 
 # Set the environment variable for CUDA (in case it is necessary)
@@ -246,7 +246,7 @@ def main():
                                 print(f'validation set rebalanced.')
 
                                 # create the model
-                                model_sep = create_attentive_model_dict(
+                                model_sep = create_attentive_model2_dict(
                                     input_dim=n_features,
                                     output_dim=output_dim,
                                     hidden_blocks=blocks_hiddens,
@@ -335,7 +335,7 @@ def main():
                             print(f'optimal_epochs: {optimal_epochs}')
                             wandb.log({'optimal_epochs': optimal_epochs})
 
-                            final_model_sep = create_attentive_model_dict(
+                            final_model_sep = create_attentive_model2_dict(
                                 input_dim=n_features,
                                 output_dim=output_dim,
                                 hidden_blocks=blocks_hiddens,
