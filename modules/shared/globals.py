@@ -81,7 +81,7 @@ CVRG_METRIC = 'loss'
 ASYM_TYPE = 'sigmoid'
 
 # ATTM AREA
-BLOCKS_HIDDENS = [128 for _ in range(4)]
+BLOCKS_HIDDENS = [128 for _ in range(8)]
 ATTN_HIDDENS = MLP_HIDDENS_S2 # this acchitecture is good enough to predict on its own
 # BLOCKS_HIDDENS = [128 for _ in range(1)]
 # ATTN_HIDDENS = [128 for _ in range(2)]
@@ -96,10 +96,10 @@ ATTM_DROPOUT = 0.1
 ATTN_DROPOUT = 0.2
 ATTN_NORM = 'batch_norm'
 ATTM_NORM = 'batch_norm'
-ATTM_WD = 1e-7
+ATTM_WD = 1e-5
 ATTM_LR_CB_FACTOR = 0.9
 ATTM_LR_CB_PATIENCE = 100
-ATTM_RHO = [1e-2]
+ATTM_RHO = [1e-3]
 
 # FF AREA
 # FF_HIDDENS = [128, 256, 128]

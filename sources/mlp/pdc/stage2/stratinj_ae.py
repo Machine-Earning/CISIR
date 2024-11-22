@@ -34,13 +34,6 @@ from modules.training.utils import get_weight_path
 
 # Define the lookup dictionary
 weight_paths = {
-    # No inj
-    # (False,
-    #  0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-012209MLP_e0_5_e1_8_p_slopeFalse_PDS_bs4096_alpha0.20_CME0_features_noinj.h5',
-    # inj all
-    # (False,
-    #  0): '/home1/jmoukpe2016/keras-functional-api/final_model_weights_20240627-030006MLP_e0_5_e1_8_p_slopeFalse_PDSinj_bs4096_alpha0.20_CME0_features_all.h5',
-    # # inj min 
     (False, 0):
         '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5'
     ,
@@ -59,8 +52,8 @@ def main():
         for inputs_to_use in INPUTS_TO_USE:
             for add_slope in ADD_SLOPE:
                 for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                    for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS:
-                        for freeze in [False, True]:
+                    for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_S:
+                        for freeze in [False]:
                             for rho in RHO:
                                 # PARAMS
                                 outputs_to_use = OUTPUTS_TO_USE
@@ -68,7 +61,7 @@ def main():
                                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                                 lambda_ = LAMBDA_FACTOR  # LAMBDA
                                 # Construct the title
-                                title = f'mlp2_pdcaeS2_amse{alpha_mse:.2f}_fr{freeze}'
+                                title = f'mlp2_pdcaeS2_amse{alpha_mse:.2f}_v8_fr{freeze}'
 
                                 # Replace any other characters that are not suitable for filenames (if any)
                                 title = title.replace(' ', '_').replace(':', '_')
@@ -80,6 +73,7 @@ def main():
                                 set_seed(seed)
                                 patience = PATIENCE  # higher patience
                                 learning_rate = START_LR  # lower due to finetuning
+                                asym_type = ASYM_TYPE
 
                                 reduce_lr_on_plateau = ReduceLROnPlateau(
                                     monitor=LR_CB_MONITOR,
@@ -113,6 +107,7 @@ def main():
                                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                                 smoothing_method = SMOOTHING_METHOD
                                 window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
+                                val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
 
                                 # Initialize wandb
                                 wandb.init(project="Jan-Report", name=experiment_name, config={
@@ -120,6 +115,7 @@ def main():
                                     "add_slope": add_slope,
                                     "patience": patience,
                                     "learning_rate": learning_rate,
+                                    'min_lr': LR_CB_MIN_LR,
                                     "weight_decay": weight_decay,
                                     "momentum_beta1": momentum_beta1,
                                     "batch_size": batch_size,
@@ -147,17 +143,19 @@ def main():
                                     "cme_speed_threshold": cme_speed_threshold,
                                     "skip_repr": skip_repr,
                                     "skipped_layers": skipped_layers,
-                                    'ds_version': DS_VERSION,
+                                    'ds_version': DS_VERSION2,
                                     'mae_plus_th': mae_plus_threshold,
                                     'sam_rho': rho,
                                     'smoothing_method': smoothing_method,
-                                    'window_size': window_size
+                                    'window_size': window_size,
+                                    'val_window_size': val_window_size,
+                                    'asym_type': asym_type
                                 })
 
                                 # set the root directory
-                                root_dir = DS_PATH
+                                root_dir = DS_PATH2
                                 # build the dataset
-                                X_train, y_train = build_dataset(
+                                X_train, y_train, logI_train, logI_prev_train = build_dataset(
                                     root_dir + '/training',
                                     inputs_to_use=inputs_to_use,
                                     add_slope=add_slope,
@@ -186,7 +184,7 @@ def main():
                                 n_features = X_train.shape[1]
                                 print(f'n_features: {n_features}')
 
-                                X_test, y_test = build_dataset(
+                                X_test, y_test, logI_test, logI_prev_test = build_dataset(
                                     root_dir + '/testing',
                                     inputs_to_use=inputs_to_use,
                                     add_slope=add_slope,
@@ -317,12 +315,6 @@ def main():
                                     model_sep.summary()
 
                                     # Define the EarlyStopping callback
-                                    # early_stopping = EarlyStopping(
-                                    #     monitor=ES_CB_MONITOR,
-                                    #     patience=patience,
-                                    #     verbose=VERBOSE,
-                                    #     restore_best_weights=ES_CB_RESTORE_WEIGHTS)
-
                                     early_stopping = SmoothEarlyStopping(
                                         monitor=CVRG_METRIC,
                                         min_delta=CVRG_MIN_DELTA,
@@ -348,6 +340,7 @@ def main():
                                                 train_pcc_weight_dict=pcc_subtrain_weights_dict,
                                                 val_mse_weight_dict=mse_val_weights_dict,
                                                 val_pcc_weight_dict=pcc_val_weights_dict,
+                                                asym_type=asym_type
                                             )
                                         }
                                     )
@@ -355,20 +348,19 @@ def main():
                                     # Step 1: Create stratified dataset for the subtraining and validation set
                                     subtrain_ds, subtrain_steps = stratified_batch_dataset(
                                         X_subtrain, y_subtrain, batch_size)
-                                    val_ds, val_steps = stratified_batch_dataset(
-                                        X_val, y_val, batch_size)
 
                                     # Map the subtraining dataset to return {'output': y} format
                                     subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'forecast_head': y}))
-                                    val_ds = val_ds.map(lambda x, y: (x, {'forecast_head': y}))
+
+                                    # Prepare validation data without batching
+                                    val_data = (X_val, {'forecast_head': y_val})
 
                                     # Train the model with the callback
                                     history = model_sep.fit(
                                         subtrain_ds,
                                         steps_per_epoch=subtrain_steps,
                                         epochs=epochs, batch_size=batch_size,
-                                        validation_data=val_ds,
-                                        validation_steps=val_steps,
+                                        validation_data=val_data,
                                         callbacks=[
                                             early_stopping,
                                             reduce_lr_on_plateau,
@@ -384,7 +376,7 @@ def main():
                                     optimal_epoch = find_optimal_epoch_by_smoothing(
                                         history.history[ES_CB_MONITOR],
                                         smoothing_method=smoothing_method,
-                                        smoothing_parameters={'window_size': window_size},
+                                        smoothing_parameters={'window_size': val_window_size},
                                         mode='min')
 
                                     folds_optimal_epochs.append(optimal_epoch)
@@ -439,6 +431,7 @@ def main():
                                             lambda_factor=lambda_,
                                             train_mse_weight_dict=mse_train_weights_dict,
                                             train_pcc_weight_dict=pcc_train_weights_dict,
+                                            asym_type=asym_type
                                         )
                                     },
                                 )  # Compile the model just like before
@@ -489,6 +482,16 @@ def main():
                                 print(f'pcc error train: {error_pcc_train}')
                                 wandb.log({"train_pcc": error_pcc_train})
 
+                                # evaluate the model correlation on test set based on logI and logI_prev
+                                error_pcc_logI = evaluate_pcc(final_model_sep, X_test, y_test, logI_test, logI_prev_test)
+                                print(f'pcc error logI: {error_pcc_logI}')
+                                wandb.log({"pcc_I": error_pcc_logI})
+
+                                # evaluate the model correlation on training set based on logI and logI_prev
+                                error_pcc_logI_train = evaluate_pcc(final_model_sep, X_train, y_train, logI_train, logI_prev_train)
+                                print(f'pcc error logI train: {error_pcc_logI_train}')
+                                wandb.log({"train_pcc_I": error_pcc_logI_train})
+
                                 # evaluate the model on test cme_files
                                 above_threshold = mae_plus_threshold
                                 # evaluate the model error for rare samples on test set
@@ -514,6 +517,18 @@ def main():
                                     final_model_sep, X_train, y_train, above_threshold=above_threshold)
                                 print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
                                 wandb.log({"train_pcc+": error_pcc_cond_train})
+
+                                # evaluate the model correlation for rare samples on test set based on logI and logI_prev
+                                error_pcc_cond_logI = evaluate_pcc(
+                                    final_model_sep, X_test, y_test, logI_test, logI_prev_test, above_threshold=above_threshold)
+                                print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond_logI}')
+                                wandb.log({"pcc+_I": error_pcc_cond_logI})
+
+                                # evaluate the model correlation for rare samples on training set based on logI and logI_prev
+                                error_pcc_cond_logI_train = evaluate_pcc(
+                                    final_model_sep, X_train, y_train, logI_train, logI_prev_train, above_threshold=above_threshold)
+                                print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_logI_train}')
+                                wandb.log({"train_pcc+_I": error_pcc_cond_logI_train})
 
                                 # Process SEP event files in the specified directory
                                 test_directory = root_dir + '/testing'
