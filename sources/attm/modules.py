@@ -858,7 +858,7 @@ class FeedForwardBlock(Layer):
             activation: Optional[Callable] = None,
             norm: Optional[str] = 'batch_norm',
             dropout: float = 0.1,
-            name: str = 'ff_block',
+            name: str = '',
             **kwargs
     ):
         """
