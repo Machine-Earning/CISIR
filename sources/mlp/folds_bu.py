@@ -43,7 +43,7 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_S:
+                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS:
                     for rho in RHO:  # SAM_RHOS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
@@ -127,7 +127,7 @@ def main():
                                 'architecture': 'mlp_res_repr',
                                 'cme_speed_threshold': cme_speed_threshold,
                                 'residual': residual,
-                                'ds_version': DS_VERSION2,
+                                'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
                                 'smoothing_method': smoothing_method,
@@ -138,7 +138,7 @@ def main():
                             })
 
                             # set the root directory
-                            root_dir = DS_PATH2
+                            root_dir = DS_PATH
                             # build the dataset
                             X_train, y_train, logI_train, logI_prev_train = build_dataset(
                                 root_dir + '/training',

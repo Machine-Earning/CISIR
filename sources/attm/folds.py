@@ -42,7 +42,7 @@ def main():
     for seed in SEEDS:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_S:
+                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS:
                     for rho in ATTM_RHO:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
@@ -132,7 +132,7 @@ def main():
                                 'cme_speed_threshold': cme_speed_threshold,
                                 'attn_skipped_layers': attn_skipped_layers,
                                 'attm_skipped_blocks': attm_skipped_blocks,
-                                'ds_version': DS_VERSION2,
+                                'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
                                 'smoothing_method': smoothing_method,
@@ -145,7 +145,7 @@ def main():
                             })
 
                             # set the root directory
-                            root_dir = DS_PATH2
+                            root_dir = DS_PATH
                             # build the dataset
                             X_train, y_train, logI_train, logI_prev_train = build_dataset(
                                 root_dir + '/training',

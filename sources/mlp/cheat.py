@@ -122,7 +122,7 @@ def main():
                                 'architecture': 'mlp_res_repr',
                                 'cme_speed_threshold': cme_speed_threshold,
                                 'skip_repr': skip_repr,
-                                'ds_version': DS_VERSION2,
+                                'ds_version': DS_VERSION,
                                 'mae_plus_th': mae_plus_threshold,
                                 'sam_rho': rho,
                                 'smoothing_method': smoothing_method,
@@ -131,7 +131,7 @@ def main():
                             })
 
                             # set the root directory
-                            root_dir = DS_PATH2
+                            root_dir = DS_PATH
                             # build the dataset
                             X_train, y_train, logI_train, logI_prev_train = build_dataset(
                                 root_dir + '/training',

@@ -398,17 +398,17 @@ def create_gru(
 
 
 def create_mlp(
-        input_dim: int = 25,
+        input_dim: int = 100,
         output_dim: int = 1,
         hiddens=None,
-        skipped_layers: int = 2,
-        repr_dim: int = 9,
-        skip_repr: bool = False,
+        skipped_layers: int = 1,
+        repr_dim: int = 128,
+        skip_repr: bool = True,
         pds: bool = False,
         activation=None,
-        norm: str = None,
-        sam_rho: float = 0.05,
-        dropout: float = 0.1,
+        norm: str = 'batch_norm',
+        sam_rho: float = 1e-2,
+        dropout: float = 0.2,
         name: str = 'mlp'
 ) -> Model:
     """

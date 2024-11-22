@@ -49,7 +49,7 @@ def main():
     for seed in [456789]:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha, alphaV in PDS_RW:
+                for alpha, alphaV in PDS_REWEIGHTS:
                     for rho in RHO_PDS:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
@@ -132,7 +132,7 @@ def main():
                                 "residual": residual,
                                 "skipped_layers": skipped_layers,
                                 "repr_dim": repr_dim,
-                                "ds_version": DS_VERSION2,
+                                "ds_version": DS_VERSION,
                                 "N_freq": N,
                                 "lower_t": lower_threshold,
                                 "upper_t": upper_threshold,
@@ -146,7 +146,7 @@ def main():
                                 'val_window_size': val_window_size
                             })
                             # set the root directory
-                            root_dir = DS_PATH2
+                            root_dir = DS_PATH
                             # build the dataset
                             X_train, y_train, _, _ = build_dataset(
                                 root_dir + '/training',
