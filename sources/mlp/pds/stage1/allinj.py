@@ -22,7 +22,7 @@ from modules.training.cme_modeling import pds_space_norm
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.ts_modeling import (
     build_dataset,
-    create_mlp2,
+    create_mlp,
     filter_ds,
     set_seed,
     load_stratified_folds

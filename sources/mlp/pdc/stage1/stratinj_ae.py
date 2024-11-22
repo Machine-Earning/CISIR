@@ -27,7 +27,7 @@ from modules.training.ts_modeling import (
     set_seed,
     load_stratified_folds,
     stratified_batch_dataset,
-    create_mlp2,
+    create_mlp,
     add_decoder
 )
 
@@ -248,7 +248,7 @@ def main():
                                 print(f'validation set rebalanced.')
 
                                 # create the model
-                                encoder_model = create_mlp2(
+                                encoder_model = create_mlp(
                                     input_dim=n_features,
                                     hiddens=hiddens,
                                     output_dim=0,
@@ -346,7 +346,7 @@ def main():
                             wandb.log({'optimal_epochs': optimal_epochs})
 
                             # create the model
-                            final_encoder = create_mlp2(
+                            final_encoder = create_mlp(
                                 input_dim=n_features,
                                 hiddens=hiddens,
                                 output_dim=0,

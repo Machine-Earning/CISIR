@@ -11,7 +11,7 @@ from modules.training.ts_modeling import (
     evaluate_mae,
     evaluate_pcc,
     process_sep_events,
-    create_mlp2,
+    create_mlp,
     plot_error_hist,
     filter_ds,
 )
@@ -111,7 +111,7 @@ def main():
                                 N=N, seed=seed)
 
                             # Create and load the model
-                            model = create_mlp2(
+                            model = create_mlp(
                                 input_dim=n_features,
                                 hiddens=hiddens,
                                 repr_dim=repr_dim,

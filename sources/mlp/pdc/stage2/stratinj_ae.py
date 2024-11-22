@@ -24,7 +24,7 @@ from modules.training.ts_modeling import (
     set_seed,
     stratified_batch_dataset,
     load_stratified_folds,
-    create_mlp2,
+    create_mlp,
 )
 from modules.training.utils import get_weight_path
 
@@ -257,7 +257,7 @@ def main():
                                     print(f'validation set rebalanced.')
 
                                     # create the model
-                                    model_sep_stage1 = create_mlp2(
+                                    model_sep_stage1 = create_mlp(
                                         input_dim=n_features,
                                         hiddens=hiddens,
                                         output_dim=0,
@@ -389,7 +389,7 @@ def main():
                                 print(f'optimal_epochs: {optimal_epochs}')
                                 wandb.log({'optimal_epochs': optimal_epochs})
 
-                                final_model_sep_stage1 = create_mlp2(
+                                final_model_sep_stage1 = create_mlp(
                                     input_dim=n_features,
                                     hiddens=hiddens,
                                     output_dim=0,

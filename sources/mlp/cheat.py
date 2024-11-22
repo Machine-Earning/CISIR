@@ -19,7 +19,7 @@ from modules.training.ts_modeling import (
     set_seed,
     cmse,
     filter_ds,
-    create_mlp2,
+    create_mlp,
     plot_error_hist,
 )
 
@@ -200,7 +200,7 @@ def main():
                                 N=N, seed=seed)
 
                             # create the model
-                            final_model_sep = create_mlp2(
+                            final_model_sep = create_mlp(
                                 input_dim=n_features,
                                 hiddens=hiddens,
                                 repr_dim=repr_dim,

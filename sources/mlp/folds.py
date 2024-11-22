@@ -21,7 +21,7 @@ from modules.training.ts_modeling import (
     set_seed,
     cmse,
     filter_ds,
-    create_mlp2,
+    create_mlp,
     plot_error_hist,
     load_stratified_folds,
 )
@@ -242,7 +242,7 @@ def main():
                                 print(f'validation set rebalanced.')
 
                                 # create the model
-                                model_sep = create_mlp2(
+                                model_sep = create_mlp(
                                     input_dim=n_features,
                                     hiddens=hiddens,
                                     repr_dim=repr_dim,
@@ -330,7 +330,7 @@ def main():
                             print(f'optimal_epochs: {optimal_epochs}')
                             wandb.log({'optimal_epochs': optimal_epochs})
 
-                            final_model_sep = create_mlp2(
+                            final_model_sep = create_mlp(
                                 input_dim=n_features,
                                 hiddens=hiddens,
                                 repr_dim=repr_dim,
