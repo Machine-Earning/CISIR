@@ -77,7 +77,7 @@ def main():
                             weight_decay = WEIGHT_DECAY_PDS
                             momentum_beta1 = MOMENTUM_BETA1
 
-                            hiddens = MLP_HIDDENS
+                            hiddens = MLP_HIDDENS_S
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             pds = True
                             repr_dim = REPR_DIM
@@ -95,7 +95,7 @@ def main():
 
                             bandwidth = BANDWIDTH
                             residual = RESIDUAL
-                            skipped_layers = SKIPPED_LAYERS
+                            skipped_layers = SKIPPED_LAYERS_S
                             N = N_FILTERED  # number of samples to keep outside the threshold
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
