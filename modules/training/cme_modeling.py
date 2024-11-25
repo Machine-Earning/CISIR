@@ -1927,6 +1927,7 @@ class ModelBuilder:
         """
         tf.keras.utils.plot_model(model, to_file=f'./{name}.png', show_shapes=True, show_layer_names=True)
 
+    @tf.autograph.experimental.do_not_convert
     def pdc_loss_vec(
             self,
             y_true: tf.Tensor,
@@ -1951,7 +1952,7 @@ class ModelBuilder:
         Returns:
             The PDC loss value as a scalar tensor
         """
-        # Cast tensors to float64 for higher precision
+        # Cast tensors to float32 for stability
         batch_size = tf.shape(y_true)[0]
         dtype = tf.float32  # Use high precision for stability
         y_true = tf.cast(y_true, dtype)
@@ -1968,9 +1969,9 @@ class ModelBuilder:
             axis=-1
         ) + epsilon)
 
-        y_diff = tf.cast(y_diff, z_diff.dtype)
+        y_diff = tf.cast(y_diff, dtype)
 
-        off_diag_size = tf.cast(batch_size * (batch_size - 1), dtype=z_diff.dtype)
+        off_diag_size = tf.cast(batch_size * (batch_size - 1), dtype)
 
         # Compute means excluding diagonal terms
         Dy_mean = tf.reduce_sum(y_diff) / off_diag_size
@@ -1981,15 +1982,16 @@ class ModelBuilder:
         Dz_centered = z_diff - Dz_mean
 
         # Create weights matrix
-        weights_matrix = tf.ones((batch_size, batch_size), dtype=z_diff.dtype)
+        weights_matrix = tf.ones((batch_size, batch_size), dtype=dtype)
 
-        if sample_weights := (train_sample_weights if phase_manager.is_training_phase() else val_sample_weights):
+        # Apply sample weights if provided
+        sample_weights = train_sample_weights if phase_manager.is_training_phase() else val_sample_weights
+        if sample_weights is not None:
             weights = create_weight_tensor_fast(y_true, sample_weights)
-            weights = tf.squeeze(weights)
-            weights_matrix = tf.cast(weights[:, None] * weights[None, :], z_diff.dtype)
+            weights_matrix = tf.cast(weights[:, None] * weights[None, :], dtype)
 
         # Reshape diagonal zeros to match weights_matrix shape
-        diag_zeros = tf.zeros([batch_size, 1], dtype=dtype)
+        diag_zeros = tf.zeros([batch_size], dtype=dtype)
         weights_matrix = tf.linalg.set_diag(weights_matrix, diag_zeros)
 
         # Compute moments
@@ -2077,6 +2079,87 @@ class ModelBuilder:
 
         return 1.0 - pcc
 
+    def pdc_loss_linear_m_vec(
+            self,
+            y_true: tf.Tensor,
+            z_pred: tf.Tensor,
+            phase_manager: TrainingPhaseManager,
+            train_sample_weights: Optional[Dict[float, float]] = None,
+            val_sample_weights: Optional[Dict[float, float]] = None,
+            reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
+    ) -> tf.Tensor:
+        """
+        Computes the PDC loss with specific pairs:
+        - 0 to batch_size - 2 paired with 1 to batch_size - 1
+        - The first element paired with the last element.
+
+        Args:
+            y_true: A batch of true label values, shape of [batch_size, 1].
+            z_pred: A batch of predicted feature vectors, shape of [batch_size, n_features].
+            phase_manager: Manager that tracks training/validation phase.
+            train_sample_weights: Dictionary mapping label values to weights during training.
+            val_sample_weights: Dictionary mapping label values to weights during validation.
+            reduction: Type of reduction to apply (Note: loss is scalar, reduction has no effect).
+
+        Returns:
+            The PDC loss value as a scalar tensor.
+        """
+        batch_size = tf.shape(y_true)[0]
+        dtype = z_pred.dtype
+        y_true = tf.cast(y_true, dtype)
+        eps = tf.keras.backend.epsilon()
+
+        # Create indices for the selected pairs
+        indices1 = tf.range(batch_size - 1)  # 0 -> batch_size - 2
+        indices2 = tf.range(1, batch_size)  # 1 -> batch_size - 1
+        first_last_indices1 = tf.constant([0], dtype=tf.int32)  # First element
+        first_last_indices2 = tf.expand_dims(batch_size - 1, axis=0)  # Last element (Tensor-compatible)
+
+        # Concatenate indices for the two sets of pairs
+        indices1 = tf.concat([indices1, first_last_indices1], axis=0)
+        indices2 = tf.concat([indices2, first_last_indices2], axis=0)
+
+        # Compute all differences at once using gathered indices
+        z_pairs_diff = tf.gather(z_pred, indices1) - tf.gather(z_pred, indices2)
+        y_pairs_diff = tf.gather(y_true, indices1) - tf.gather(y_true, indices2)
+
+        # Compute distances
+        z_diff = tf.sqrt(tf.reduce_sum(tf.square(z_pairs_diff), axis=-1) + eps)
+        y_diff = tf.abs(tf.squeeze(y_pairs_diff))
+
+        # Compute means with epsilon for stability
+        Dy_mean = tf.reduce_mean(y_diff)
+        Dz_mean = tf.reduce_mean(z_diff)
+
+        # Center the variables
+        Dy_centered = y_diff - Dy_mean
+        Dz_centered = z_diff - Dz_mean
+
+        # Create weights
+        weights = tf.ones_like(y_diff, dtype=dtype)
+
+        if sample_weights := (train_sample_weights if phase_manager.is_training_phase() else val_sample_weights):
+            weights = tf.concat(
+                [
+                    create_weight_tensor_fast(tf.gather(y_true, indices1), sample_weights)
+                    * create_weight_tensor_fast(tf.gather(y_true, indices2), sample_weights),
+                ],
+                axis=0,
+            )
+            weights = tf.cast(weights, dtype=dtype)
+
+        # Compute moments with numerical stability
+        cov_Dy_Dz = tf.reduce_sum(weights * Dy_centered * Dz_centered)
+        var_Dy = tf.reduce_sum(weights * tf.square(Dy_centered + eps))
+        var_Dz = tf.reduce_sum(weights * tf.square(Dz_centered + eps))
+
+        # Compute correlation with enhanced stability
+        denominator = tf.sqrt((var_Dy * var_Dz) + eps)
+
+        pcc = cov_Dy_Dz / denominator
+
+        return 1.0 - pcc
+
     def pds_loss_vec(
             self,
             y_true: tf.Tensor,
@@ -2124,24 +2207,21 @@ class ModelBuilder:
         # Compute the pairwise loss
         pairwise_loss = tf.square(z_diff - y_diff)
 
+        # Create weights matrix
+        weights_matrix = tf.ones((batch_size, batch_size), dtype=dtype)
+
         # Apply sample weights if provided
         sample_weights = train_sample_weights if phase_manager.is_training_phase() else val_sample_weights
         if sample_weights is not None:
-            # Create weight matrix based on sample weights
             weights = create_weight_tensor_fast(y_true, sample_weights)
-
-            # print(f"weights: {weights}")
-            # print(f"shape of weights: {weights.shape}")
             weights_matrix = tf.cast(weights[:, None] * weights[None, :], dtype)
-            # print(f"weights_matrix: {weights_matrix}")
-            # print(f"shape of weights_matrix: {weights_matrix.shape}")
-            
-            # Reshape diagonal zeros to match weights_matrix shape
-            diag_zeros = tf.zeros([batch_size, 1], dtype=dtype)
-            weights_matrix = tf.linalg.set_diag(weights_matrix, diag_zeros)
-            
-            # Apply the weights to the pairwise loss
-            pairwise_loss *= weights_matrix
+
+        # Reshape diagonal zeros to match weights_matrix shape
+        diag_zeros = tf.zeros([batch_size], dtype=dtype)
+        weights_matrix = tf.linalg.set_diag(weights_matrix, diag_zeros)
+
+        # Apply the weights to the pairwise loss
+        pairwise_loss *= weights_matrix
 
         # Calculate total weighted error
         total_error = tf.reduce_sum(pairwise_loss)
@@ -2151,6 +2231,155 @@ class ModelBuilder:
             return total_error * 0.5  # Account for symmetry in pairs
         elif reduction == tf.keras.losses.Reduction.NONE:
             return total_error / num_comparisons
+        else:
+            raise ValueError(f"Unsupported reduction type: {reduction}.")
+
+    def pds_sq_loss_vec(
+            self,
+            y_true: tf.Tensor,
+            z_pred: tf.Tensor,
+            phase_manager: TrainingPhaseManager,
+            train_sample_weights: Optional[Dict[float, float]] = None,
+            val_sample_weights: Optional[Dict[float, float]] = None,
+            reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
+    ) -> tf.Tensor:
+        """
+        Computes the weighted loss for a batch of predicted features and their labels,
+        using squared differences for labels and squared L2 norm for representations.
+
+        Args:
+            y_true: A batch of true label values, shape of [batch_size, 1].
+            z_pred: A batch of predicted Z values, shape of [batch_size, n_features].
+            phase_manager: Manager that tracks training/validation phase.
+            train_sample_weights: Dictionary mapping label values to weights during training.
+            val_sample_weights: Dictionary mapping label values to weights during validation.
+            reduction: Type of reduction to apply to the loss.
+
+        Returns:
+            The weighted average error for all unique combinations of the samples in the batch.
+        """
+        batch_size = tf.shape(y_true)[0]
+        dtype = tf.float32  # Use high precision for stability
+        y_true = tf.cast(y_true, dtype)
+        z_pred = tf.cast(z_pred, dtype)
+        epsilon = tf.keras.backend.epsilon()
+
+        # Compute pairwise differences using broadcasting
+        y_diff = tf.square(y_true - tf.transpose(y_true))  # Square instead of abs
+        z_diff = tf.reduce_sum(  # No square root, just squared L2 norm
+            tf.square(
+                z_pred[:, tf.newaxis, :] - z_pred[tf.newaxis, :, :]
+            ), axis=-1
+        )
+
+        # Exclude diagonal elements
+        num_comparisons = tf.cast(batch_size * (batch_size - 1), dtype)
+        y_diff = tf.cast(y_diff, dtype)  # Ensure y_diff is in the same dtype as z_diff
+
+        # Compute the pairwise loss
+        pairwise_loss = tf.square(z_diff - y_diff)
+
+        # Create weights matrix
+        weights_matrix = tf.ones((batch_size, batch_size), dtype=dtype)
+
+        # Apply sample weights if provided
+        sample_weights = train_sample_weights if phase_manager.is_training_phase() else val_sample_weights
+        if sample_weights is not None:
+            weights = create_weight_tensor_fast(y_true, sample_weights)
+            weights_matrix = tf.cast(weights[:, None] * weights[None, :], dtype)
+
+        # Reshape diagonal zeros to match weights_matrix shape
+        diag_zeros = tf.zeros([batch_size], dtype=dtype)
+        weights_matrix = tf.linalg.set_diag(weights_matrix, diag_zeros)
+
+        # Apply the weights to the pairwise loss
+        pairwise_loss *= weights_matrix
+
+        # Calculate total weighted error
+        total_error = tf.reduce_sum(pairwise_loss)
+
+        # Apply reduction
+        if reduction == tf.keras.losses.Reduction.SUM:
+            return total_error * 0.5  # Account for symmetry in pairs
+        elif reduction == tf.keras.losses.Reduction.NONE:
+            return total_error / num_comparisons
+        else:
+            raise ValueError(f"Unsupported reduction type: {reduction}.")
+
+    def pds_loss_linear_m_vec(
+            self,
+            y_true: tf.Tensor,
+            z_pred: tf.Tensor,
+            phase_manager: TrainingPhaseManager,
+            train_sample_weights: Optional[Dict[float, float]] = None,
+            val_sample_weights: Optional[Dict[float, float]] = None,
+            reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
+    ) -> tf.Tensor:
+        """
+        Computes PDS loss using selected pairs of samples:
+        - 0 to batch_size - 1 paired with 1 to batch_size.
+        - The first element paired with the last element.
+
+        Args:
+            y_true: A batch of true label values, shape of [batch_size, 1].
+            z_pred: A batch of predicted Z values, shape of [batch_size, d].
+            phase_manager: Manager that tracks training/validation phase.
+            train_sample_weights: Dictionary mapping label values to weights during training.
+            val_sample_weights: Dictionary mapping label values to weights during validation.
+            reduction: Type of reduction to apply to the loss.
+
+        Returns:
+            The weighted average error for the selected combinations of samples in the batch.
+        """
+        batch_size = tf.shape(y_true)[0]
+        dtype = z_pred.dtype
+        y_true = tf.cast(y_true, dtype)
+        eps = tf.keras.backend.epsilon()
+
+        # Indices for pairwise combinations
+        indices1 = tf.range(batch_size - 1)  # 0 -> batch_size - 2
+        indices2 = tf.range(1, batch_size)  # 1 -> batch_size - 1
+        first_last_indices1 = tf.constant([0], dtype=tf.int32)  # First element
+        first_last_indices2 = tf.expand_dims(batch_size - 1, axis=0)  # Last element (Tensor-compatible)
+
+        # Concatenate indices for the two sets of pairs
+        indices1 = tf.concat([indices1, first_last_indices1], axis=0)
+        indices2 = tf.concat([indices2, first_last_indices2], axis=0)
+
+        # Calculate pairwise differences
+        z_pairs_diff = tf.gather(z_pred, indices1) - tf.gather(z_pred, indices2)
+        y_pairs_diff = tf.gather(y_true, indices1) - tf.gather(y_true, indices2)
+
+        # Compute L2 norm and absolute differences
+        z_diff = tf.sqrt(tf.reduce_sum(tf.square(z_pairs_diff), axis=-1) + eps)
+        y_diff = tf.abs(tf.squeeze(y_pairs_diff))
+
+        # Compute pairwise loss
+        pairwise_loss = tf.square(z_diff - y_diff)
+
+        # Create sample weights if provided
+        sample_weights = (
+            train_sample_weights if phase_manager.is_training_phase() else val_sample_weights
+        )
+        if sample_weights:
+            weights = tf.concat(
+                [
+                    create_weight_tensor_fast(tf.gather(y_true, indices1), sample_weights)
+                    * create_weight_tensor_fast(tf.gather(y_true, indices2), sample_weights),
+                ],
+                axis=0,
+            )
+            pairwise_loss *= tf.cast(weights, dtype=dtype)
+
+        # Calculate total error
+        total_error = tf.reduce_sum(pairwise_loss)
+
+        # Apply the requested reduction
+        if reduction == tf.keras.losses.Reduction.SUM:
+            return total_error
+        elif reduction == tf.keras.losses.Reduction.NONE:
+            num_pairs = tf.cast(batch_size, dtype=dtype)  # Total number of pairs
+            return total_error / num_pairs
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
 
