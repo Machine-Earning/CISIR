@@ -65,7 +65,7 @@ tf.random.set_seed(seed_value)
 def create_1dcnn(
         input_dims: list,
         hiddens: List[tuple],
-        repr_dim: int = 50,
+        embed_dim: int = 50,
         output_dim: int = 1,
         pds: bool = False,
         l2_reg: float = None,
@@ -81,7 +81,7 @@ def create_1dcnn(
     - input_dims (list): List of input dimensions. Groups of similar dimensions represent separate channels.
     - hiddens (list[tuple]): List of tuples for CNN layers configuration.
       Each tuple contains (filters, kernel_size, dilation_rate, pooling_type).
-    - repr_dim (int): The number of units in the fully connected layer. Default is 50.
+    - embed_dim (int): The number of units in the fully connected layer. Default is 50.
     - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
     - pds (bool): If True, the model will be use PDS and there will have its representations normalized.
 
@@ -129,7 +129,7 @@ def create_1dcnn(
 
     concatenated = Concatenate()(branches) if len(branches) > 1 else branches[0]
 
-    dense = Dense(repr_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(concatenated)
+    dense = Dense(embed_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(concatenated)
     if pds:
         normalized_repr_layer = NormalizeLayer(name='normalize_layer')(dense)
         final_repr_output = normalized_repr_layer
@@ -150,7 +150,7 @@ def create_gru_with_addition_skips(
         input_dims: list = None,
         gru_units: int = 64,
         gru_layers: int = 2,
-        repr_dim: int = 50,
+        embed_dim: int = 50,
         output_dim: int = 1,
         pds: bool = False,
         l2_reg: float = None,
@@ -211,7 +211,7 @@ def create_gru_with_addition_skips(
 
     concatenated = Concatenate()(rnn_branches) if len(rnn_branches) > 1 else rnn_branches[0]
 
-    dense = Dense(repr_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(concatenated)
+    dense = Dense(embed_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(concatenated)
     if callable(activation):
         final_repr_output = activation(dense)
     else:
@@ -236,7 +236,7 @@ def create_gru_with_concatenation_skips(
         input_dims: list = None,
         gru_units: int = 64,
         gru_layers: int = 2,
-        repr_dim: int = 50,
+        embed_dim: int = 50,
         output_dim: int = 1,
         pds: bool = False,
         l2_reg: float = None,
@@ -298,7 +298,7 @@ def create_gru_with_concatenation_skips(
     concatenated = Concatenate()(rnn_branches) if len(rnn_branches) > 1 else rnn_branches[0]
 
     # Adjust the Dense layer's input size if necessary due to concatenation
-    dense = Dense(repr_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(concatenated)
+    dense = Dense(embed_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(concatenated)
     if callable(activation):
         final_repr_output = activation()(dense)
     else:
@@ -322,7 +322,7 @@ def create_gru(
         input_dim: int = 100,  # Number of features
         gru_units: int = 30,
         gru_layers: int = 1,
-        repr_dim: int = 128,
+        embed_dim: int = 128,
         output_dim: int = 1,
         pds: bool = False,
         dropout: float = 0.0,
@@ -337,7 +337,7 @@ def create_gru(
         input_dim (int): Dimension of the input features. Default is 100.
         gru_units (int): Number of units in each GRU layer. Default is 30.
         gru_layers (int): Number of GRU layers to stack. Default is 1.
-        repr_dim (int): Dimension of the representation layer. Default is 128.
+        embed_dim (int): Dimension of the representation layer. Default is 128.
         output_dim (int): Dimension of the output layer. If 0, only returns representation. Default is 1.
         pds (bool): Whether to apply normalization to representation layer. Default is False.
         dropout (float): Dropout rate to apply after each GRU layer. Default is 0.0.
@@ -380,7 +380,7 @@ def create_gru(
 
 
     # Dense layer for representation
-    dense = Dense(repr_dim)(x)
+    dense = Dense(embed_dim)(x)
     final_repr_output = activation(dense) if callable(activation) else LeakyReLU()(dense)
 
     if pds:
@@ -402,9 +402,9 @@ def create_mlp(
         output_dim: int = 1,
         hiddens=None,
         skipped_layers: int = 1,
-        repr_dim: int = 128,
+        embed_dim: int = 128,
         skip_repr: bool = True,
-        pds: bool = False,
+        pretraining: bool = False,
         activation=None,
         norm: str = 'batch_norm',
         sam_rho: float = 1e-2,
@@ -421,9 +421,9 @@ def create_mlp(
     - hiddens (list): A list of integers where each integer is the number of units in a hidden layer.
     - skipped_layers (int): Number of layers between residual connections. If 0, no residual connections.
                            Must be less than the total number of hidden layers.
-    - repr_dim (int): The number of features in the final representation vector.
+    - embed_dim (int): The number of features in the final representation vector.
     - skip_repr (bool): If True and skipped_layers > 0, adds a residual connection to the representation layer.
-    - pds (bool): If True, the model will use PDS and normalize its representations.
+    - pretraining (bool): If True, the model will use PDS/PDC and there will have its representations normalized.
     - activation: Optional activation function to use. If None, defaults to LeakyReLU.
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None.
     - sam_rho (float): Size of the neighborhood for perturbation in SAM. Default is 0.05. If 0.0, SAM is not used.
@@ -498,7 +498,7 @@ def create_mlp(
             x = Dropout(dropout)(x)
 
     # Create final representation layer
-    x = Dense(repr_dim)(x)
+    x = Dense(embed_dim)(x)
     if norm == 'batch_norm':
         x = BatchNormalization()(x)
 
@@ -511,7 +511,7 @@ def create_mlp(
     # Add final skip connection if enabled
     if skip_repr and has_residuals:
         if x.shape[-1] != residual_layer.shape[-1]:
-            residual_proj = Dense(repr_dim, use_bias=False)(residual_layer)
+            residual_proj = Dense(embed_dim, use_bias=False)(residual_layer)
         else:
             residual_proj = residual_layer
         x = Add(name='repr_layer')([x, residual_proj])
@@ -527,7 +527,7 @@ def create_mlp(
         x = Dropout(dropout)(x)
 
     # Handle PDS normalization if needed
-    if pds:
+    if pretraining:
         final_repr_output = NormalizeLayer(name='normalize_layer')(x)
     else:
         final_repr_output = x
@@ -616,7 +616,7 @@ def create_mlp_moe(
         output_dim: int = 1,
         hiddens=None,
         skipped_layers: int = 2,
-        repr_dim: int = 9,
+        embed_dim: int = 9,
         pds: bool = False,
         l2_reg: float = None,
         dropout: float = 0.0,
@@ -639,7 +639,7 @@ def create_mlp_moe(
     - input_dim (int): The number of features in the input data.
     - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
     - hiddens (list): A list of integers where each integer is the number of units in a hidden layer.
-    - repr_dim (int): The number of features in the final representation vector.
+    - embed_dim (int): The number of features in the final representation vector.
     - pds (bool): If True, the model will use PDS and there will have its representations normalized.
     - l2_reg (float): L2 regularization factor. Default is None (no regularization).
     - dropout (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
@@ -671,8 +671,8 @@ def create_mlp_moe(
         output_dim=1,  # Single output for regression
         hiddens=hiddens,
         skipped_layers=skipped_layers,
-        repr_dim=repr_dim,
-        pds=pds,
+        embed_dim=embed_dim,
+        pretraining=pretraining,
         l2_reg=l2_reg,
         dropout=dropout,
         activation=activation,
@@ -686,8 +686,8 @@ def create_mlp_moe(
         output_dim=1,  # Single output for regression
         hiddens=hiddens,
         skipped_layers=skipped_layers,
-        repr_dim=repr_dim,
-        pds=pds,
+        embed_dim=embed_dim,
+        pretraining=pretraining,
         l2_reg=l2_reg,
         dropout=dropout,
         activation=activation,
@@ -751,7 +751,7 @@ def create_hybrid_model(
         mlp_hiddens=None,
         mlp_repr_dim: int = 9,
         final_hiddens=None,
-        repr_dim: int = 10,
+        embed_dim: int = 10,
         output_dim: int = 1,
         pds: bool = False,
         l2_reg: float = None,
@@ -768,7 +768,7 @@ def create_hybrid_model(
         - tsf_extractor (Model): A pre-built model for time series feature extraction (CNN or RNN).
         - mlp_input_dim (int): The number of features for the MLP branch.
         - output_dim (int): The dimension of the output layer.
-        - repr_dim (int): The number of features in the final representation vector.
+        - embed_dim (int): The number of features in the final representation vector.
         - mlp_repr_dim (int): The number of features in the representation vector after the MLP branch.
         - mlp_hiddens (List[int]): List of integers for the MLP hidden layers.
         - final_hiddens (List[int]): List of integers for the hidden layers after concatenation.
@@ -835,7 +835,7 @@ def create_hybrid_model(
             x_combined = Dropout(dropout)(x_combined)
 
     # Final representation layer
-    final_repr = Dense(repr_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x_combined)
+    final_repr = Dense(embed_dim, kernel_regularizer=l2(l2_reg) if l2_reg else None)(x_combined)
     if pds:
         # Assuming NormalizeLayer is defined elsewhere for PDS normalization
         final_repr = NormalizeLayer(

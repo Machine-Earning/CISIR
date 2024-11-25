@@ -39,7 +39,7 @@ def main() -> None:
 
                         hiddens = MLP_HIDDENS
                         bandwidth = BANDWIDTH
-                        repr_dim = REPR_DIM
+                        embed_dim = EMBED_DIM
                         output_dim = len(outputs_to_use)
                         dropout = DROPOUT
                         activation = ACTIVATION
@@ -92,7 +92,7 @@ def main() -> None:
                             input_dim=n_features,
                             hiddens=hiddens,
                             output_dim=output_dim,
-                            repr_dim=repr_dim,
+                            embed_dim=embed_dim,
                             dropout=dropout,
                             activation=activation,
                             norm=norm,

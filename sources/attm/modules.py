@@ -30,7 +30,7 @@ def create_attentive_model(
         attn_norm: Optional[str] = None,
         attn_skipped_layers: int = 2,
         skipped_blocks: int = 1,
-        repr_dim: int = 128,
+        embed_dim: int = 128,
         dropout: float = 0.0,
         activation='leaky_relu',
         pds: bool = False,
@@ -51,7 +51,7 @@ def create_attentive_model(
     - attn_norm (str): The type of normalization to use in the attention layers ('batch_norm' or 'layer_norm'). Default is None.
     - attn_skipped_layers (int): Number of layers between residual connections in the attention layer. Default is 2.
     - skipped_blocks (int): Number of blocks between residual connections. Default is 1.
-    - repr_dim (int): The number of features in the final representation vector.
+    - embed_dim (int): The number of features in the final representation vector.
     - dropout (float): The dropout rate to use in the model. Default is 0.0.
     - activation: Optional activation function to use in the blocks. Default is LeakyReLU.
     - pds (bool): If True, use a NormalizeLayer after the representation layer.
@@ -98,14 +98,14 @@ def create_attentive_model(
 
         x = block(x)['output']
 
-    # Add the final block with repr_dim output
+    # Add the final block with embed_dim output
     final_block = TanhAttentiveBlock(
         attn_hidden=attn_hidden_units,
         attn_hidden_activation=attn_hidden_activation,
         attn_dropout=attn_dropout,
         attn_norm=attn_norm,
         attn_skipped_layers=attn_skipped_layers,
-        output_dim=repr_dim,
+        output_dim=embed_dim,
         norm=norm,
         dropout=dropout,
         output_activation=activation
@@ -304,7 +304,7 @@ class AttentionBlock(Layer):
             self,
             input_dim: int,
             hidden_units: List[int],
-            repr_dim: int,
+            embed_dim: int,
             output_dim: int,
             hidden_activation=None,
             dropout: float = 0.0,
@@ -319,7 +319,7 @@ class AttentionBlock(Layer):
         Parameters:
         - input_dim (int): Dimensionality of input data.
         - hidden_units (List[int]): List of hidden layer units.
-        - repr_dim (int): Dimensionality of the representation layer.
+        - embed_dim (int): Dimensionality of the representation layer.
         - output_dim (int): Output dimensionality.
         - hidden_activation: Activation function for hidden layers. Default is LeakyReLU.
         - dropout (float): Dropout rate. Default is 0.0 (no dropout).
@@ -332,7 +332,7 @@ class AttentionBlock(Layer):
         self.input_projection = None
         self.input_dim = input_dim
         self.hidden_units = hidden_units
-        self.repr_dim = repr_dim
+        self.embed_dim = embed_dim
         self.output_dim = output_dim
         self.leaky_relu_alpha = LEAKY_RELU_ALPHA
         self.dropout = dropout
@@ -373,7 +373,7 @@ class AttentionBlock(Layer):
                 self.dropout_layers.append(None)
 
         # Representation layer
-        self.repr_layer = Dense(self.repr_dim, activation=None, name='repr_layer')
+        self.repr_layer = Dense(self.embed_dim, activation=None, name='repr_layer')
         if self.norm == 'batch_norm':
             self.repr_norm_layer = BatchNormalization()
         else:
@@ -411,7 +411,7 @@ class AttentionBlock(Layer):
             # Projection for residual to representation layer
             if self.skip_repr:
                 last_residual_units = self.dense_layers[-1].units
-                repr_units = self.repr_dim
+                repr_units = self.embed_dim
                 if last_residual_units != repr_units:
                     self.repr_projection = Dense(
                         repr_units, use_bias=False, activation=None
@@ -583,7 +583,7 @@ class TanhAttentiveBlock(Layer):
         self.attention_block = AttentionBlock(
             input_dim=input_shape[-1],
             hidden_units=self.attn_hidden_units,
-            repr_dim=input_shape[-1],
+            embed_dim=input_shape[-1],
             output_dim=input_shape[-1],
             hidden_activation=self.attn_hidden_activation,
             dropout=self.attn_dropout,
@@ -662,7 +662,7 @@ def create_attentive_model2_dict(
         attn_skipped_layers: int = 1,
         attn_skip_repr: bool = True,
         skipped_blocks: int = 1,
-        repr_dim: int = 128,
+        embed_dim: int = 128,
         dropout: float = 0.0,
         activation='leaky_relu',
         skip_repr: bool = True,
@@ -686,7 +686,7 @@ def create_attentive_model2_dict(
     - attn_skipped_layers (int): Number of layers between residual connections in the attention layer. Default is 2.
     - attn_skip_repr (bool): Whether to add a residual connection to the representation layer in attention blocks. Default is True.
     - skipped_blocks (int): Number of blocks between residual connections. Default is 1.
-    - repr_dim (int): The number of features in the final representation vector. Default is 128.
+    - embed_dim (int): The number of features in the final representation vector. Default is 128.
     - dropout (float): The dropout rate to use in the model. Default is 0.0.
     - activation (str): Activation function to use in the blocks. Default is 'leaky_relu'.
     - skip_repr (bool): Whether to add a residual connection to the representation layer. Default is True.
@@ -777,7 +777,7 @@ def create_attentive_model2_dict(
             # Update skip_connection
             skip_connection = x
 
-    # Add the final block with repr_dim output
+    # Add the final block with embed_dim output
     final_block = TanhAttentiveBlock(
         attn_hidden=attn_hidden_units,
         attn_hidden_activation=attn_hidden_activation,
@@ -785,7 +785,7 @@ def create_attentive_model2_dict(
         attn_norm=attn_norm,
         attn_skipped_layers=attn_skipped_layers,
         attn_skip_repr=attn_skip_repr,
-        output_dim=repr_dim,
+        output_dim=embed_dim,
         norm=norm,
         dropout=dropout,
         output_activation=activation
@@ -852,7 +852,7 @@ class FeedForwardBlock(Layer):
             output_dim: int = 0,
             hiddens: Optional[List[int]] = None,
             skipped_layers: int = 1,
-            repr_dim: int = 128,
+            embed_dim: int = 128,
             skip_repr: bool = True,
             pds: bool = False,
             activation: Optional[Callable] = None,
@@ -869,7 +869,7 @@ class FeedForwardBlock(Layer):
             output_dim (int): The dimension of the output layer. Default is 1.
             hiddens (Optional[List[int]]): List of integers for hidden layer units.
             skipped_layers (int): Number of layers between residual connections.
-            repr_dim (int): The number of features in the final representation vector.
+            embed_dim (int): The number of features in the final representation vector.
             skip_repr (bool): If True, adds a residual connection to the representation layer.
             pds (bool): If True, the model will use PDS and normalize its representations.
             activation (Optional[Callable]): Activation function to use. If None, defaults to LeakyReLU.
@@ -896,7 +896,7 @@ class FeedForwardBlock(Layer):
         self.output_dim = output_dim
         self.hiddens = hiddens or [50, 50]
         self.skipped_layers = skipped_layers
-        self.repr_dim = repr_dim
+        self.embed_dim = embed_dim
         self.skip_repr = skip_repr
         self.pds = pds
         self.activation = activation or LeakyReLU()
@@ -1024,7 +1024,7 @@ class FeedForwardBlock(Layer):
             self.dropout_layers.append(dropout_layer)
 
         # Build representation layer
-        self.repr_dense = Dense(self.repr_dim)
+        self.repr_dense = Dense(self.embed_dim)
         if self.norm == 'batch_norm':
             self.repr_batch_norm = BatchNormalization()
         else:
@@ -1041,8 +1041,8 @@ class FeedForwardBlock(Layer):
 
         # Residual projection for representation layer if skip_repr is True
         if self.skip_repr and self.residual:
-            if self.repr_dim != residual_layer_units:
-                self.repr_residual_projection = Dense(self.repr_dim, use_bias=False)
+            if self.embed_dim != residual_layer_units:
+                self.repr_residual_projection = Dense(self.embed_dim, use_bias=False)
             else:
                 self.repr_residual_projection = None
             if self.norm == 'layer_norm':
@@ -1291,7 +1291,7 @@ def create_attentive_model3_dict(
             output_dim=0,  # Output_dim is 0 since it's for representation
             hiddens=ff_hiddens,
             skipped_layers=ff_skipped_layers,
-            repr_dim=block_output_dim,  # repr_dim matches block_output_dim
+            embed_dim=block_output_dim,  # embed_dim matches block_output_dim
             skip_repr=ff_skip_repr,
             activation=ff_activation or activation,  # Use ff_activation if provided
             norm=ff_norm,

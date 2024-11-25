@@ -85,7 +85,7 @@ def main():
 
                             # Other params
                             bandwidth = BANDWIDTH
-                            repr_dim = REPR_DIM
+                            embed_dim = EMBED_DIM
                             output_dim = len(outputs_to_use)
                             cme_speed_threshold = cme_speed_threshold
                             N = N_FILTERED  # number of samples to keep outside the threshold
@@ -129,7 +129,7 @@ def main():
                                 "alpha_pcc": alpha_pcc,
                                 "alphaV_pcc": alphaV_pcc,
                                 "bandwidth": bandwidth,
-                                "repr_dim": repr_dim,
+                                "embed_dim": embed_dim,
                                 'optimizer': 'adamw',
                                 'output_dim': output_dim,
                                 'architecture': 'attm',

@@ -89,12 +89,12 @@ def main():
                     rebalacing = True
                     alpha_rw = alpha
                     bandwidth = 0.099  # 0.0519
-                    repr_dim = 9
+                    embed_dim = 9
                     output_dim = len(outputs_to_use)
                     dropout = 0.5
                     activation = None
                     norm = 'layer_norm'
-                    pds = True
+                    pretraining = True
 
                     weight_path = get_weight_path(weight_paths, add_slope)
 
@@ -118,7 +118,7 @@ def main():
                         "alpha_rw": alpha_rw,
                         "bandwidth": bandwidth,
                         "reciprocal_reweight": True,
-                        "repr_dim": repr_dim,
+                        "embed_dim": embed_dim,
                         "dropout": dropout,
                         "activation": 'LeakyReLU',
                         "norm": norm,
@@ -200,7 +200,7 @@ def main():
                         gru_layers=gru_layers,
                         output_dim=0,
                         pds=pds,
-                        repr_dim=repr_dim,
+                        embed_dim=embed_dim,
                         dropout=dropout,
                         activation=activation,
                         norm=norm
@@ -313,7 +313,7 @@ def main():
                         gru_layers=gru_layers,
                         output_dim=0,
                         pds=pds,
-                        repr_dim=repr_dim,
+                        embed_dim=embed_dim,
                         dropout=dropout,
                         activation=activation,
                         norm=norm

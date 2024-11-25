@@ -41,15 +41,15 @@ def main():
                             current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
                             experiment_name = f'{title}_{current_time}'
 
-                            hiddens = MLP_HIDDENS_S
+                            hiddens = MLP_HIDDENS
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-                            repr_dim = REPR_DIM
+                            embed_dim = EMBED_DIM
                             output_dim = len(outputs_to_use)
                             dropout = DROPOUT
                             activation = ACTIVATION
                             norm = NORM
                             skip_repr = SKIP_REPR
-                            skipped_layers = SKIPPED_LAYERS_S
+                            skipped_layers = SKIPPED_LAYERS
                             N = N_FILTERED
                             lower_threshold = LOWER_THRESHOLD
                             upper_threshold = UPPER_THRESHOLD
@@ -62,7 +62,7 @@ def main():
                                 "hiddens": hiddens_str,
                                 "seed": seed,
                                 "alpha_mse": alpha_mse,
-                                "repr_dim": repr_dim,
+                                "embed_dim": embed_dim,
                                 "dropout": dropout,
                                 "activation": 'LeakyReLU',
                                 "norm": norm,
@@ -114,7 +114,7 @@ def main():
                             model = create_mlp(
                                 input_dim=n_features,
                                 hiddens=hiddens,
-                                repr_dim=repr_dim,
+                                embed_dim=embed_dim,
                                 output_dim=output_dim,
                                 dropout=dropout,
                                 activation=activation,

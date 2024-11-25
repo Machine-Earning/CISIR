@@ -99,12 +99,12 @@ def main():
                                 proj_hiddens = PROJ_HIDDENS
                                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                                 bandwidth = BANDWIDTH
-                                repr_dim = REPR_DIM
+                                embed_dim = EMBED_DIM
                                 output_dim = len(outputs_to_use)
                                 dropout = DROPOUT
                                 activation = ACTIVATION
                                 norm = NORM
-                                pds = True
+                                pretraining = True
                                 cme_speed_threshold = cme_speed_threshold
                                 weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
                                 residual = RESIDUAL
@@ -133,7 +133,7 @@ def main():
                                     "alphaV_mse": alphaV_mse,
                                     "alphaV_pcc": alphaV_pcc,
                                     "bandwidth": bandwidth,
-                                    "repr_dim": repr_dim,
+                                    "embed_dim": embed_dim,
                                     "dropout": dropout,
                                     "activation": 'LeakyReLU',
                                     "norm": norm,
@@ -255,8 +255,8 @@ def main():
                                         input_dim=n_features,
                                         hiddens=hiddens,
                                         output_dim=0,
-                                        pds=pds,
-                                        repr_dim=repr_dim,
+                                        pretraining=pretraining,
+                                        embed_dim=embed_dim,
                                         dropout=dropout,
                                         activation=activation,
                                         norm=norm,
@@ -378,8 +378,8 @@ def main():
                                     input_dim=n_features,
                                     hiddens=hiddens,
                                     output_dim=0,
-                                    pds=pds,
-                                    repr_dim=repr_dim,
+                                    pretraining=pretraining,
+                                    embed_dim=embed_dim,
                                     dropout=dropout,
                                     activation=activation,
                                     norm=norm,

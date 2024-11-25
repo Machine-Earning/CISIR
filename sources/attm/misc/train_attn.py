@@ -86,7 +86,7 @@ def main():
                             target_change = ('delta_p' in outputs_to_use)
                             alpha_rw = alpha
                             bandwidth = BANDWIDTH
-                            repr_dim = REPR_DIM
+                            embed_dim = EMBED_DIM
                             output_dim = len(outputs_to_use)
                             # dropout = DROPOUT
                             # activation = ACTIVATION
@@ -118,7 +118,7 @@ def main():
                                 "alpha_val": alpha_val,
                                 "bandwidth": bandwidth,
                                 "reciprocal_reweight": RECIPROCAL_WEIGHTS,
-                                "repr_dim": repr_dim,
+                                "embed_dim": embed_dim,
                                 "dropout": dropout,
                                 "activation": 'LeakyReLU',
                                 "norm": norm,
@@ -236,7 +236,7 @@ def main():
                                 attn_dropout=attn_dropout,
                                 attn_norm=attn_norm,
                                 skipped_blocks=skipped_blocks,
-                                repr_dim=repr_dim,
+                                embed_dim=embed_dim,
                                 dropout=dropout,
                                 activation=activation,
                                 norm=norm,
@@ -293,7 +293,7 @@ def main():
                                 attn_dropout=attn_dropout,
                                 attn_norm=attn_norm,
                                 skipped_blocks=skipped_blocks,
-                                repr_dim=repr_dim,
+                                embed_dim=embed_dim,
                                 dropout=dropout,
                                 activation=activation,
                                 norm=norm,

@@ -96,12 +96,12 @@ def main():
                                 target_change = ('delta_p' in outputs_to_use)
                                 alpha_rw = alpha
                                 bandwidth = BANDWIDTH
-                                repr_dim = REPR_DIM
+                                embed_dim = EMBED_DIM
                                 output_dim = len(outputs_to_use)
                                 dropout = DROPOUT
                                 activation = ACTIVATION
                                 norm = NORM
-                                pds = True
+                                pretraining = True
                                 cme_speed_threshold = cme_speed_threshold
                                 weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
                                 residual = RESIDUAL
@@ -130,7 +130,7 @@ def main():
                                     "alpha_rw": alpha_rw,
                                     "bandwidth": bandwidth,
                                     "reciprocal_reweight": RECIPROCAL_WEIGHTS,
-                                    "repr_dim": repr_dim,
+                                    "embed_dim": embed_dim,
                                     "dropout": dropout,
                                     "activation": 'LeakyReLU',
                                     "norm": norm,
@@ -242,8 +242,8 @@ def main():
                                     input_dim=n_features,
                                     hiddens=hiddens,
                                     output_dim=0,
-                                    pds=pds,
-                                    repr_dim=repr_dim,
+                                    pretraining=pretraining,
+                                    embed_dim=embed_dim,
                                     dropout=dropout,
                                     activation=activation,
                                     norm=norm,
@@ -336,8 +336,8 @@ def main():
                                     input_dim=n_features,
                                     hiddens=hiddens,
                                     output_dim=0,
-                                    pds=pds,
-                                    repr_dim=repr_dim,
+                                    pretraining=pretraining,
+                                    embed_dim=embed_dim,
                                     dropout=dropout,
                                     activation=activation,
                                     norm=norm,

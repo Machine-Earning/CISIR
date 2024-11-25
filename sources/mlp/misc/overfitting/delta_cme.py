@@ -86,7 +86,7 @@ def main():
                     loss_key = 'mse'
                     target_change = ('delta_p' in outputs_to_use)
 
-                    repr_dim = 128
+                    embed_dim = 128
                     output_dim = len(outputs_to_use)
                     dropout = 0.5
                     activation = None
@@ -112,7 +112,7 @@ def main():
                         "printing_batch_mse": False,
                         "seed": seed,
 
-                        "repr_dim": repr_dim,
+                        "embed_dim": embed_dim,
                         "dropout": dropout,
                         "activation": 'LeakyReLU',
                         "norm": norm,
@@ -156,7 +156,7 @@ def main():
                     model_sep = create_mlp(
                         input_dim=n_features,
                         hiddens=hiddens,
-                        repr_dim=repr_dim,
+                        embed_dim=embed_dim,
                         output_dim=output_dim,
                         dropout=dropout,
                         activation=activation,
@@ -184,7 +184,7 @@ def main():
                     final_model_sep = create_mlp(
                         input_dim=n_features,
                         hiddens=hiddens,
-                        repr_dim=repr_dim,
+                        embed_dim=embed_dim,
                         output_dim=output_dim,
                         dropout=dropout,
                         activation=activation,

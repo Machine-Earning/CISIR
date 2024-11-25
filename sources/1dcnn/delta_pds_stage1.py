@@ -84,9 +84,9 @@ def main():
                 # Note: Assuming a reduction towards dense layers after Conv9
             ]
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-            pds = True
+            pretraining = True
             target_change = ('delta_p' in outputs_to_use)
-            repr_dim = 9
+            embed_dim = 9
             dropout = 0.5
             activation = None
             norm = 'batch_norm'
@@ -173,7 +173,7 @@ def main():
                 hiddens=hiddens,
                 output_dim=0,
                 pds=pds,
-                repr_dim=repr_dim,
+                embed_dim=embed_dim,
                 dropout=dropout,
                 activation=activation,
                 norm=norm

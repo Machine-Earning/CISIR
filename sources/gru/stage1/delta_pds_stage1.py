@@ -74,9 +74,9 @@ def main():
             gru_units = 200
             gru_layers = 7
             hiddens_str = f'{gru_units}units_{gru_layers}layers'
-            pds = True
+            pretraining = True
             target_change = ('delta_p' in outputs_to_use)
-            repr_dim = 9
+            embed_dim = 9
             dropout = 0.5
             activation = None
             norm = 'batch_norm'
@@ -164,7 +164,7 @@ def main():
                 gru_layers=gru_layers,
                 output_dim=0,
                 pds=pds,
-                repr_dim=repr_dim,
+                embed_dim=embed_dim,
                 dropout=dropout,
                 activation=activation,
                 norm=norm

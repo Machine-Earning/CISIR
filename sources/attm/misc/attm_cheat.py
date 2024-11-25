@@ -104,7 +104,7 @@ def main():
                             # hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             target_change = ('delta_p' in outputs_to_use)
                             bandwidth = BANDWIDTH
-                            repr_dim = REPR_DIM
+                            embed_dim = EMBED_DIM
                             output_dim = len(outputs_to_use)
                             # dropout = DROPOUT
                             # activation = ACTIVATION
@@ -138,7 +138,7 @@ def main():
                                 "alphaV_pcc": alphaV_pcc,
                                 "bandwidth": bandwidth,
                                 "reciprocal_reweight": RECIPROCAL_WEIGHTS,
-                                "repr_dim": repr_dim,
+                                "embed_dim": embed_dim,
                                 "dropout": dropout,
                                 "activation": 'LeakyReLU',
                                 "norm": norm,
@@ -237,7 +237,7 @@ def main():
                                 attn_dropout=attn_dropout,
                                 attn_norm=attn_norm,
                                 skipped_blocks=skipped_blocks,
-                                repr_dim=repr_dim,
+                                embed_dim=embed_dim,
                                 dropout=dropout,
                                 activation=activation,
                                 norm=norm,

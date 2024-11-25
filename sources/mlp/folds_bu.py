@@ -80,7 +80,7 @@ def main():
 
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                             bandwidth = BANDWIDTH
-                            repr_dim = REPR_DIM
+                            embed_dim = EMBED_DIM
                             output_dim = len(outputs_to_use)
                             dropout = DROPOUT
                             activation = ACTIVATION
@@ -88,7 +88,7 @@ def main():
                             cme_speed_threshold = cme_speed_threshold
                             residual = RESIDUAL
                             skip_repr = SKIP_REPR
-                            skipped_layers = SKIPPED_LAYERS_S
+                            skipped_layers = SKIPPED_LAYERS
                             N = N_FILTERED  # number of samples to keep outside the threshold
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
@@ -118,7 +118,7 @@ def main():
                                 "alpha_pcc": alpha_pcc,
                                 "alphaV_pcc": alphaV_pcc,
                                 "bandwidth": bandwidth,
-                                "repr_dim": repr_dim,
+                                "embed_dim": embed_dim,
                                 "dropout": dropout,
                                 "activation": 'LeakyReLU',
                                 "norm": norm,
@@ -245,7 +245,7 @@ def main():
                                 model_sep = create_mlp(
                                     input_dim=n_features,
                                     hiddens=hiddens,
-                                    repr_dim=repr_dim,
+                                    embed_dim=embed_dim,
                                     output_dim=output_dim,
                                     dropout=dropout,
                                     activation=activation,
@@ -333,7 +333,7 @@ def main():
                             final_model_sep = create_mlp(
                                 input_dim=n_features,
                                 hiddens=hiddens,
-                                repr_dim=repr_dim,
+                                embed_dim=embed_dim,
                                 output_dim=output_dim,
                                 dropout=dropout,
                                 activation=activation,

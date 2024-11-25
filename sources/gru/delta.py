@@ -79,7 +79,7 @@ def main():
                             gru_layers = 1
                             hiddens_str = f'{gru_units}units_{gru_layers}layers'
                             bandwidth = BANDWIDTH
-                            repr_dim = REPR_DIM
+                            embed_dim = EMBED_DIM
                             output_dim = len(outputs_to_use)
                             dropout = DROPOUT
                             activation = ACTIVATION
@@ -111,7 +111,7 @@ def main():
                                 "alpha_pcc": alpha_pcc,
                                 "alphaV_pcc": alphaV_pcc,
                                 "bandwidth": bandwidth,
-                                "repr_dim": repr_dim,
+                                "embed_dim": embed_dim,
                                 "dropout": dropout,
                                 "activation": 'LeakyReLU',
                                 "norm": norm,
@@ -262,7 +262,7 @@ def main():
                                     input_dim=n_features,  # Using first feature dimension since all are same
                                     gru_units=gru_units,
                                     gru_layers=gru_layers,
-                                    repr_dim=repr_dim,
+                                    embed_dim=embed_dim,
                                     output_dim=output_dim,
                                     dropout=dropout,
                                     activation=activation,
@@ -360,7 +360,7 @@ def main():
                                 input_dim=n_features,  # Using first feature dimension since all are same
                                 gru_units=gru_units,
                                 gru_layers=gru_layers,
-                                repr_dim=repr_dim,
+                                embed_dim=embed_dim,
                                 output_dim=output_dim,
                                 dropout=dropout,
                                 activation=activation,

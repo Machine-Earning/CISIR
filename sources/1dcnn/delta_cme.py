@@ -101,7 +101,7 @@ def main():
                     rebalacing = True
                     alpha_rw = alpha
                     bandwidth = 0.099
-                    repr_dim = 9
+                    embed_dim = 9
                     output_dim = len(outputs_to_use)
                     dropout = 0.5
                     activation = None
@@ -133,7 +133,7 @@ def main():
                         "alpha_rw": alpha_rw,
                         "bandwidth": bandwidth,
                         "reciprocal_reweight": True,
-                        "repr_dim": repr_dim,
+                        "embed_dim": embed_dim,
                         "dropout": dropout,
                         "activation": 'LeakyReLU',
                         "norm": norm,
@@ -220,7 +220,7 @@ def main():
                     extractor_model_sep = create_1dcnn(
                         input_dims=n_features,
                         hiddens=hiddens,
-                        repr_dim=repr_dim,
+                        embed_dim=embed_dim,
                         output_dim=0,
                         dropout=dropout,
                         activation=activation,
@@ -235,7 +235,7 @@ def main():
                         mlp_hiddens=mlp_hiddens,
                         mlp_repr_dim=mlp_repr_dim,
                         final_hiddens=final_hiddens,
-                        repr_dim=final_repr_dim,
+                        embed_dim=final_repr_dim,
                         dropout=dropout,
                         activation=activation,
                         norm=norm,
@@ -315,7 +315,7 @@ def main():
                     final_extractor_model_sep = create_1dcnn(
                         input_dims=n_features,
                         hiddens=hiddens,
-                        repr_dim=repr_dim,
+                        embed_dim=embed_dim,
                         output_dim=0,
                         dropout=dropout,
                         activation=activation,
@@ -330,7 +330,7 @@ def main():
                         mlp_hiddens=mlp_hiddens,
                         mlp_repr_dim=mlp_repr_dim,
                         final_hiddens=final_hiddens,
-                        repr_dim=final_repr_dim,
+                        embed_dim=final_repr_dim,
                         dropout=dropout,
                         activation=activation,
                         norm=norm,

@@ -80,7 +80,7 @@ def main():
                             ff_hidden_str = (", ".join(map(str, ff_hidden_units))).replace(', ', '_')
                             blocks_hiddens_str = (", ".join(map(str, blocks_hiddens))).replace(', ', '_')
                             bandwidth = BANDWIDTH
-                            repr_dim = REPR_DIM
+                            embed_dim = EMBED_DIM
                             output_dim = len(outputs_to_use)
                             attn_dropout = DROPOUT
                             attm_dropout = DROPOUT
@@ -122,7 +122,7 @@ def main():
                                 "alpha_pcc": alpha_pcc,
                                 "alphaV_pcc": alphaV_pcc,
                                 "bandwidth": bandwidth,
-                                "repr_dim": repr_dim,
+                                "embed_dim": embed_dim,
                                 "attm_dropout": attm_dropout,
                                 "attn_dropout": attn_dropout,
                                 "ff_dropout": ff_dropout,
@@ -217,7 +217,7 @@ def main():
                             final_model_sep = create_attentive_model3_dict(
                                 input_dim=n_features,
                                 output_dim=output_dim,
-                                repr_dim=repr_dim,
+                                embed_dim=embed_dim,
                                 activation=activation,
                                 sam_rho=rho,
                                 norm=attm_norm,

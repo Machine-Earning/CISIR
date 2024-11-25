@@ -81,7 +81,7 @@ def main():
                             attn_hiddens_str = (", ".join(map(str, attn_hiddens))).replace(', ', '_')
                             blocks_hiddens_str = (", ".join(map(str, blocks_hiddens))).replace(', ', '_')
                             bandwidth = BANDWIDTH
-                            repr_dim = REPR_DIM
+                            embed_dim = EMBED_DIM
                             output_dim = len(outputs_to_use)
                             attn_dropout = ATTN_DROPOUT
                             attm_dropout = ATTM_DROPOUT  # TODO: review if attm dropout should be different
@@ -120,7 +120,7 @@ def main():
                                 "alpha_pcc": alpha_pcc,
                                 "alphaV_pcc": alphaV_pcc,
                                 "bandwidth": bandwidth,
-                                "repr_dim": repr_dim,
+                                "embed_dim": embed_dim,
                                 "attm_dropout": attm_dropout,
                                 "attn_dropout": attn_dropout,
                                 "activation": 'LeakyReLU',
@@ -262,7 +262,7 @@ def main():
                                     dropout=attm_dropout,
                                     attn_norm=attn_norm,
                                     norm=attm_norm,
-                                    repr_dim=repr_dim,
+                                    embed_dim=embed_dim,
                                     activation=activation,
                                     sam_rho=rho
                                 )
@@ -351,7 +351,7 @@ def main():
                                 dropout=attm_dropout,
                                 attn_norm=attn_norm,
                                 norm=attm_norm,
-                                repr_dim=repr_dim,
+                                embed_dim=embed_dim,
                                 activation=activation,
                                 sam_rho=rho
                             )

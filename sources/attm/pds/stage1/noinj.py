@@ -69,13 +69,13 @@ def main():
                             epochs = EPOCHS
                             patience = PDS_PATIENCE
                             learning_rate = START_LR_PDS
-                            weight_decay = WEIGHT_DECAY_PDS
+                            weight_decay = WEIGHT_DECAY_PRE
                             momentum_beta1 = MOMENTUM_BETA1
 
                             hiddens = MLP_HIDDENS
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-                            pds = True
-                            repr_dim = REPR_DIM
+                            pretraining = True
+                            embed_dim = EMBED_DIM
                             dropout = DROPOUT
                             activation = ACTIVATION
                             norm = NORM
@@ -122,7 +122,7 @@ def main():
                                 "bandwidth": bandwidth,
                                 "residual": residual,
                                 "skipped_layers": skipped_layers,
-                                "repr_dim": repr_dim,
+                                "embed_dim": embed_dim,
                                 "ds_version": DS_VERSION,
                                 "N_freq": N,
                                 "lower_t": lower_threshold,
@@ -229,8 +229,8 @@ def main():
                                     input_dim=n_features,
                                     hiddens=hiddens,
                                     output_dim=0,
-                                    pds=pds,
-                                    repr_dim=repr_dim,
+                                    pretraining=pretraining,
+                                    embed_dim=embed_dim,
                                     dropout=dropout,
                                     activation=activation,
                                     norm=norm,
@@ -294,8 +294,8 @@ def main():
                                 input_dim=n_features,
                                 hiddens=hiddens,
                                 output_dim=0,
-                                pds=pds,
-                                repr_dim=repr_dim,
+                                pretraining=pretraining,
+                                embed_dim=embed_dim,
                                 dropout=dropout,
                                 activation=activation,
                                 norm=norm,

@@ -139,7 +139,7 @@ def main():
                             target_change = ('delta_p' in outputs_to_use)
                             alpha_rw = alpha
                             bandwidth = BANDWIDTH
-                            repr_dim = REPR_DIM
+                            embed_dim = EMBED_DIM
                             output_dim = len(outputs_to_use)
                             dropout = DROPOUT
                             activation = ACTIVATION
@@ -170,7 +170,7 @@ def main():
                                 "alpha_rw": alpha_rw,
                                 "bandwidth": bandwidth,
                                 "reciprocal_reweight": RECIPROCAL_WEIGHTS,
-                                "repr_dim": repr_dim,
+                                "embed_dim": embed_dim,
                                 "dropout": dropout,
                                 "activation": 'LeakyReLU',
                                 "norm": norm,
@@ -286,7 +286,7 @@ def main():
                                 model_sep = create_mlp(
                                     input_dim=n_features,
                                     hiddens=hiddens,
-                                    repr_dim=repr_dim,
+                                    embed_dim=embed_dim,
                                     output_dim=output_dim,
                                     dropout=dropout,
                                     activation=activation,
@@ -333,7 +333,7 @@ def main():
                                 final_model_sep = create_mlp(
                                     input_dim=n_features,
                                     hiddens=hiddens,
-                                    repr_dim=repr_dim,
+                                    embed_dim=embed_dim,
                                     output_dim=output_dim,
                                     dropout=dropout,
                                     activation=activation,

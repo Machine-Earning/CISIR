@@ -95,7 +95,7 @@ def main():
                                 attn_hiddens_str = (", ".join(map(str, attn_hiddens))).replace(', ', '_')
                                 blocks_hiddens_str = (", ".join(map(str, blocks_hiddens))).replace(', ', '_')
                                 bandwidth = BANDWIDTH
-                                repr_dim = REPR_DIM
+                                embed_dim = EMBED_DIM
                                 output_dim = len(outputs_to_use)
                                 attn_dropout = ATTN_DROPOUT
                                 attm_dropout = ATTM_DROPOUT
@@ -107,7 +107,7 @@ def main():
                                 attn_skipped_layers = ATTN_SKIPPED_LAYERS
                                 attm_skipped_blocks = ATTM_SKIPPED_BLOCKS
                                 cme_speed_threshold = cme_speed_threshold
-                                pds = True
+                                pretraining = True
                                 weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
                                 N = N_FILTERED  # number of samples to keep outside the threshold
                                 lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
@@ -135,7 +135,7 @@ def main():
                                     "alpha_pcc": alpha_pcc,
                                     "alphaV_pcc": alphaV_pcc,
                                     "bandwidth": bandwidth,
-                                    "repr_dim": repr_dim,
+                                    "embed_dim": embed_dim,
                                     "attm_dropout": attm_dropout,
                                     "attn_dropout": attn_dropout,
                                     "activation": 'LeakyReLU',
@@ -270,7 +270,7 @@ def main():
                                         dropout=attm_dropout,
                                         attn_norm=attn_norm,
                                         norm=attm_norm,
-                                        repr_dim=repr_dim,
+                                        embed_dim=embed_dim,
                                         activation=activation,
                                         sam_rho=rho
                                     )
@@ -404,7 +404,7 @@ def main():
                                     dropout=attm_dropout,
                                     attn_norm=attn_norm,
                                     norm=attm_norm,
-                                    repr_dim=repr_dim,
+                                    embed_dim=embed_dim,
                                     activation=activation,
                                     sam_rho=rho
                                 )

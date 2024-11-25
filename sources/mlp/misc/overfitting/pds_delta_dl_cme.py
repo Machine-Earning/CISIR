@@ -94,9 +94,9 @@ def main():
                         128, 128
                     ]
                     hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-                    pds = True
+                    pretraining = True
                     target_change = ('delta_p' in outputs_to_use)
-                    repr_dim = 128
+                    embed_dim = 128
                     dropout = 0.5
                     activation = None
                     norm = 'batch_norm'
@@ -141,7 +141,7 @@ def main():
                         "bandwidth": bandwidth,
                         "residual": residual,
                         "skipped_layers": skipped_layers,
-                        "repr_dim": repr_dim,
+                        "embed_dim": embed_dim,
                         "ds_version": 5,
                         "N_freq": N,
                         "lower_t": lower_threshold,
@@ -211,8 +211,8 @@ def main():
                         input_dim=n_features,
                         hiddens=hiddens,
                         output_dim=0,
-                        pds=pds,
-                        repr_dim=repr_dim,
+                        pretraining=pretraining,
+                        embed_dim=embed_dim,
                         dropout=dropout,
                         activation=activation,
                         norm=norm,

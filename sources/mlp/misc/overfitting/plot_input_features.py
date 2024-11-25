@@ -96,11 +96,11 @@ def main():
                     rebalacing = True
                     alpha_rw = alpha
                     bandwidth = 4.42e-2  # 0.0519
-                    repr_dim = 128
+                    embed_dim = 128
                     dropout = 0.5
                     activation = None
                     norm = 'batch_norm'
-                    pds = True
+                    pretraining = True
                     cme_speed_threshold = cme_speed_threshold
                     weight_path = get_weight_path(weight_paths, add_slope, cme_speed_threshold)
                     residual = True
@@ -127,7 +127,7 @@ def main():
                         "alpha_rw": alpha_rw,
                         "bandwidth": bandwidth,
                         "reciprocal_reweight": True,
-                        "repr_dim": repr_dim,
+                        "embed_dim": embed_dim,
                         "dropout": dropout,
                         "activation": 'LeakyReLU',
                         "norm": norm,
@@ -190,8 +190,8 @@ def main():
                         input_dim=n_features,
                         hiddens=hiddens,
                         output_dim=0,
-                        pds=pds,
-                        repr_dim=repr_dim,
+                        pretraining=pretraining,
+                        embed_dim=embed_dim,
                         dropout=dropout,
                         activation=activation,
                         norm=norm,

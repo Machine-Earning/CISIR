@@ -51,8 +51,8 @@ def main():
     for seed in [456789]:
         for inputs_to_use in INPUTS_TO_USE:
             for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha, alphaV in PDS_REWEIGHTS:
-                    for rho in RHO_PDS:
+                for alpha, alphaV in REWEIGHTS_PRE:
+                    for rho in RHO_PRE:
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
@@ -76,13 +76,13 @@ def main():
                             epochs = EPOCHS
                             patience = PDS_PATIENCE
                             learning_rate = START_LR_PDS
-                            weight_decay = WEIGHT_DECAY_PDS
+                            weight_decay = WEIGHT_DECAY_PRE
                             momentum_beta1 = MOMENTUM_BETA1
 
-                            hiddens = MLP_HIDDENS_S
+                            hiddens = MLP_HIDDENS
                             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-                            pds = True
-                            repr_dim = REPR_DIM
+                            pretraining = True
+                            embed_dim = EMBED_DIM
                             dropout = DROPOUT
                             activation = ACTIVATION
                             norm = NORM
@@ -94,11 +94,11 @@ def main():
                                 patience=LR_CB_PATIENCE,
                                 verbose=VERBOSE,
                                 min_delta=LR_CB_MIN_DELTA,
-                                min_lr=LR_CB_MIN_LR_PDS)
+                                min_lr=LR_CB_MIN_LR_PRE)
 
                             bandwidth = BANDWIDTH
                             residual = RESIDUAL
-                            skipped_layers = SKIPPED_LAYERS_S
+                            skipped_layers = SKIPPED_LAYERS
                             N = N_FILTERED  # number of samples to keep outside the threshold
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
                             upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
@@ -115,7 +115,7 @@ def main():
                                 "add_slope": add_slope,
                                 "patience": patience,
                                 "learning_rate": learning_rate,
-                                "min_lr": LR_CB_MIN_LR_PDS,
+                                "min_lr": LR_CB_MIN_LR_PRE,
                                 "weight_decay": weight_decay,
                                 "momentum_beta1": momentum_beta1,
                                 "batch_size": batch_size,
@@ -135,7 +135,7 @@ def main():
                                 "bandwidth": bandwidth,
                                 "residual": residual,
                                 "skipped_layers": skipped_layers,
-                                "repr_dim": repr_dim,
+                                "embed_dim": embed_dim,
                                 "ds_version": DS_VERSION,
                                 "N_freq": N,
                                 "lower_t": lower_threshold,
@@ -252,8 +252,8 @@ def main():
                                     input_dim=n_features,
                                     hiddens=hiddens,
                                     output_dim=0,
-                                    pds=pds,
-                                    repr_dim=repr_dim,
+                                    pretraining=pretraining,
+                                    embed_dim=embed_dim,
                                     dropout=dropout,
                                     activation=activation,
                                     norm=norm,
@@ -350,8 +350,8 @@ def main():
                                 input_dim=n_features,
                                 hiddens=hiddens,
                                 output_dim=0,
-                                pds=pds,
-                                repr_dim=repr_dim,
+                                pretraining=pretraining,
+                                embed_dim=embed_dim,
                                 dropout=dropout,
                                 activation=activation,
                                 norm=norm,

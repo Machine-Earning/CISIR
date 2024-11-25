@@ -81,7 +81,7 @@ def main():
 
                             attn_hiddens_str = (", ".join(map(str, attn_hiddens))).replace(', ', '_')
                             blocks_hiddens_str = (", ".join(map(str, blocks_hiddens))).replace(', ', '_')
-                            pds = True
+                            pretraining = True
                             attn_dropout = ATTN_DROPOUT
                             attm_dropout = ATTM_DROPOUT
                             activation = ATTM_ACTIVATION
@@ -100,7 +100,7 @@ def main():
                                 min_delta=LR_CB_MIN_DELTA,
                                 min_lr=LR_CB_MIN_LR)
 
-                            repr_dim = REPR_DIM
+                            embed_dim = EMBED_DIM
                             bandwidth = BANDWIDTH
                             N = N_FILTERED  # number of samples to keep outside the threshold
                             lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
@@ -138,7 +138,7 @@ def main():
                                 'attm_residual': attm_residual,
                                 'attn_skipped_layers': attn_skipped_layers,
                                 'attm_skipped_blocks': attm_skipped_blocks,
-                                "repr_dim": repr_dim,
+                                "embed_dim": embed_dim,
                                 "ds_version": DS_VERSION,
                                 "N_freq": N,
                                 "lower_t": lower_threshold,
@@ -233,7 +233,7 @@ def main():
                                 dropout=attm_dropout,
                                 attn_norm=attn_norm,
                                 norm=attm_norm,
-                                repr_dim=repr_dim,
+                                embed_dim=embed_dim,
                                 activation=activation,
                                 sam_rho=rho
                             )
