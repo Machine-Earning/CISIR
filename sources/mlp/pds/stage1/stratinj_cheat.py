@@ -88,8 +88,8 @@ def main():
 
     reduce_lr_on_plateau = ReduceLROnPlateau(
         monitor=LR_CB_MONITOR,
-        factor=LR_CB_FACTOR,
-        patience=LR_CB_PATIENCE,
+        factor=LR_CB_FACTOR_PDS,
+        patience=LR_CB_PATIENCE_PDS,
         verbose=VERBOSE,
         min_delta=LR_CB_MIN_DELTA,
         min_lr=LR_CB_MIN_LR_PDS)
@@ -235,7 +235,7 @@ def main():
         min_delta=CVRG_MIN_DELTA,
         patience=patience,
         verbose=VERBOSE,
-        restore_best_weights=ES_CB_RESTORE_WEIGHTS,
+        restore_best_weights=True,  # ES_CB_RESTORE_WEIGHTS,
         smoothing_method=smoothing_method,  # 'moving_average'
         smoothing_parameters={'window_size': window_size})  # 10
 
