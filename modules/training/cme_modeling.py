@@ -2152,7 +2152,7 @@ class ModelBuilder:
             return total_error / num_comparisons
         else:
             raise ValueError(f"Unsupported reduction type: {reduction}.")
-        
+
     def pds_sq_loss_vec(
             self,
             y_true: tf.Tensor,
