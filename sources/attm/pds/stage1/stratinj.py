@@ -54,7 +54,7 @@ def main():
                         for add_slope in ADD_SLOPE:
                             # PARAMS
                             outputs_to_use = OUTPUTS_TO_USE
-                            batch_size = PDS_BATCH_SIZE  # full dataset used
+                            batch_size = BATCH_SIZE_PRE  # full dataset used
                             print(f'batch size : {batch_size}')
 
                             # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
@@ -72,8 +72,8 @@ def main():
                             # Set the early stopping patience and learning rate as variables
                             set_seed(seed)
                             epochs = EPOCHS
-                            patience = PDS_PATIENCE
-                            learning_rate = START_LR_PDS
+                            patience = PATIENCE_PRE
+                            learning_rate = START_LR_PRE
                             weight_decay = WEIGHT_DECAY_PRE
                             momentum_beta1 = MOMENTUM_BETA1
 

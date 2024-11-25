@@ -79,7 +79,7 @@ def main():
 
                                 set_seed(seed)
                                 patience = PATIENCE  # higher patience
-                                learning_rate = START_LR_PDS  # lower due to finetuning
+                                learning_rate = START_LR_PRE  # lower due to finetuning
 
                                 reduce_lr_on_plateau = ReduceLROnPlateau(
                                     monitor=LR_CB_MONITOR,

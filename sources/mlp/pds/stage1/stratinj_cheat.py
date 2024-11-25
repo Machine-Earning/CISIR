@@ -50,7 +50,7 @@ def main():
     rho = RHO_PRE[0]
     add_slope = ADD_SLOPE[0]
     outputs_to_use = OUTPUTS_TO_USE
-    batch_size = PDS_BATCH_SIZE  # full dataset used
+    batch_size = BATCH_SIZE_PRE  # full dataset used
     print(f'batch size : {batch_size}')
 
     # Construct the title
@@ -65,8 +65,8 @@ def main():
     # Set the early stopping patience and learning rate as variables
     set_seed(seed)
     epochs = EPOCHS
-    patience = PDS_PATIENCE
-    learning_rate = START_LR_PDS
+    patience = PATIENCE_PRE
+    learning_rate = START_LR_PRE
     weight_decay = WEIGHT_DECAY_PRE
     momentum_beta1 = MOMENTUM_BETA1
 
@@ -228,7 +228,7 @@ def main():
         min_delta=CVRG_MIN_DELTA,
         patience=patience,
         verbose=VERBOSE,
-        restore_best_weights=True,  # ES_CB_RESTORE_WEIGHTS,
+        restore_best_weights= ES_CB_RESTORE_WEIGHTS,
         smoothing_method=smoothing_method,  # 'moving_average'
         smoothing_parameters={'window_size': window_size})  # 10
 
