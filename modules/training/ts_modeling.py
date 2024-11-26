@@ -2539,17 +2539,17 @@ def process_sep_events(
             print(f"Saved ln intensity plot to: {plot_file_location_intensity}")
             plot_names.append(plot_file_location_intensity)
 
-            if show_error_hist:
-                histogram_path = plot_error_dist(
-                    avsp_data_intensity, f"{title} Ln Intensity Error Distribution", prefix + '_ln_intensity')
-                print(f"Saved ln intensity histogram plot to: {histogram_path}")
-                plot_names.append(histogram_path)
+            # if show_error_hist:
+            #     histogram_path = plot_error_dist(
+            #         avsp_data_intensity, f"{title} Ln Intensity Error Distribution", prefix + '_ln_intensity')
+            #     print(f"Saved ln intensity histogram plot to: {histogram_path}")
+            #     plot_names.append(histogram_path)
 
-            if show_error_concentration:
-                concentration_path = plot_error_concentration(
-                    avsp_data_intensity, f"{title} Ln Intensity Error Concentration", prefix + '_ln_intensity')
-                print(f"Saved ln intensity concentration plot to: {concentration_path}")
-                plot_names.append(concentration_path)
+            # if show_error_concentration:
+            #     concentration_path = plot_error_concentration(
+            #         avsp_data_intensity, f"{title} Ln Intensity Error Concentration", prefix + '_ln_intensity')
+            #     print(f"Saved ln intensity concentration plot to: {concentration_path}")
+            #     plot_names.append(concentration_path)
 
     return plot_names
 
