@@ -2442,7 +2442,7 @@ class ModelBuilder:
                 axis=0,
             )
             # Normalize weights to sum to 1
-            weights = weights / (tf.reduce_sum(weights) + eps)
+            # weights = weights / (tf.reduce_sum(weights) + eps)
             pairwise_loss *= tf.cast(weights, dtype=dtype)
 
         # Calculate total error

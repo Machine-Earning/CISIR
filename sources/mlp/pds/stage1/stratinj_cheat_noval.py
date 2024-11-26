@@ -62,7 +62,7 @@ def main():
     experiment_name = f'{title}_{current_time}'
     # Set the early stopping patience and learning rate as variables
     set_seed(seed)
-    epochs = EPOCHS
+    epochs = int(2.5e4)  # EPOCHS
     learning_rate = START_LR_PRE
     weight_decay = WEIGHT_DECAY_PRE
     momentum_beta1 = MOMENTUM_BETA1
