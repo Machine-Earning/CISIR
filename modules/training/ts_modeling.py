@@ -2503,8 +2503,8 @@ def process_sep_events(
 
                     # Collect data for delta plot
                     avsp_data_delta.append((event_id, actual_ch, predicted_ch))
-                    # Collect data for ln intensity plot
-                    avsp_data_intensity.append((event_id, actual_ln_intensity, predicted_ln_intensity))
+                    # Collect data for ln intensity plot including actual_delta
+                    avsp_data_intensity.append((event_id, actual_ln_intensity, predicted_ln_intensity, actual_ch))
 
             except Exception as e:
                 print(f"Error processing file: {file_name}")
@@ -2674,39 +2674,116 @@ def plot_actual_vs_predicted(avsp_data: List[tuple], title: str, prefix: str):
 
     return os.path.abspath(plot_filename)
 
-def plot_actual_vs_predicted_intensity(avsp_data: List[tuple], title: str, prefix: str):
+# def plot_actual_vs_predicted_intensity(avsp_data: List[tuple], title: str, prefix: str):
+#     """
+#     Plots actual vs predicted intensity values for SEP events.
+
+#     Parameters:
+#     - avsp_data (List[tuple]): List of tuples containing event_id, actual intensity, and predicted intensity.
+#     - title (str): The title of the plot.
+#     - prefix (str): Prefix for the plot file names.
+#     """
+
+
+#     plt.figure(figsize=(10, 7))  # Adjust size as needed
+#     norm = plt.Normalize(0, 6)  # Adjusted range for intensity values
+#     cmap = plt.cm.viridis
+
+#     for event_id, actual, predicted in avsp_data:
+#         plt.scatter(actual, predicted, c=actual, cmap=cmap, norm=norm, label=f'{event_id}', alpha=0.7, s=12)
+
+#     plt.plot([0, 6], [0, 6], 'k--', label='Perfect Prediction')  # Adjusted range for intensity values
+#     plt.xlabel('Actual ln(Intensity)')
+#     plt.ylabel('Predicted ln(Intensity)')
+#     plt.title(f"{title}\n{prefix}_Actual_vs_Predicted_Intensity")
+
+#     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+#     sm.set_array([])
+#     plt.colorbar(sm, label='Actual ln(Intensity)', extend='both')
+#     plt.grid(True)
+
+#     plot_filename = f"{title}_{prefix}_actual_vs_predicted_intensity.png"
+#     plt.savefig(plot_filename)
+#     plt.close()
+
+#     return os.path.abspath(plot_filename)
+
+def plot_actual_vs_predicted_intensity(avsp_data: List[tuple], title: str, prefix: str, delta_threshold: float = 0.5):
     """
     Plots actual vs predicted intensity values for SEP events.
 
     Parameters:
-    - avsp_data (List[tuple]): List of tuples containing event_id, actual intensity, and predicted intensity.
+    - avsp_data (List[tuple]): List of tuples containing event_id, actual ln(Intensity),
+                               predicted ln(Intensity), and actual delta.
     - title (str): The title of the plot.
     - prefix (str): Prefix for the plot file names.
+    - delta_threshold (float): Threshold for actual_delta to plot special markers. Default is 0.5.
     """
 
-
     plt.figure(figsize=(10, 7))  # Adjust size as needed
-    norm = plt.Normalize(0, 6)  # Adjusted range for intensity values
+
+    # Extract data from avsp_data
+    actual_ln_intensities = []
+    predicted_ln_intensities = []
+    actual_deltas = []
+    event_ids = []
+
+    for event_id, actual_ln_intensity, predicted_ln_intensity, actual_delta in avsp_data:
+        event_ids.append(event_id)
+        actual_ln_intensities.append(actual_ln_intensity)
+        predicted_ln_intensities.append(predicted_ln_intensity)
+        actual_deltas.append(actual_delta)
+
+    actual_ln_intensities = np.array(actual_ln_intensities)
+    predicted_ln_intensities = np.array(predicted_ln_intensities)
+    actual_deltas = np.array(actual_deltas)
+    event_ids = np.array(event_ids)
+
+    # Create a mask for points with actual_delta > delta_threshold
+    mask_high_delta = actual_deltas > delta_threshold
+    mask_low_delta = ~mask_high_delta
+
+    # Set up color mapping based on actual_delta
+    norm = plt.Normalize(np.min(actual_deltas), np.max(actual_deltas))
     cmap = plt.cm.viridis
 
-    for event_id, actual, predicted in avsp_data:
-        plt.scatter(actual, predicted, c=actual, cmap=cmap, norm=norm, label=f'{event_id}', alpha=0.7, s=12)
+    # Plot points with actual_delta <= delta_threshold
+    plt.scatter(actual_ln_intensities[mask_low_delta], predicted_ln_intensities[mask_low_delta],
+                c=actual_deltas[mask_low_delta], cmap=cmap, norm=norm,
+                alpha=0.7, s=12)
 
-    plt.plot([0, 6], [0, 6], 'k--', label='Perfect Prediction')  # Adjusted range for intensity values
+    # Plot points with actual_delta > delta_threshold as "+" markers, plotted last
+    plt.scatter(actual_ln_intensities[mask_high_delta], predicted_ln_intensities[mask_high_delta],
+                c=actual_deltas[mask_high_delta], cmap=cmap, norm=norm,
+                alpha=0.9, s=60, marker='+', linewidths=1.5)
+
+    # Plot perfect prediction line
+    min_intensity = min(np.min(actual_ln_intensities), np.min(predicted_ln_intensities))
+    max_intensity = max(np.max(actual_ln_intensities), np.max(predicted_ln_intensities))
+    plt.plot([min_intensity, max_intensity], [min_intensity, max_intensity], 'k--', label='Perfect Prediction')
+
+    # Add dashed lines at ln(10) on both axes
+    ln_10 = np.log(10)
+    plt.axvline(ln_10, color='red', linestyle='--', label='SEP Threshold')
+    plt.axhline(ln_10, color='red', linestyle='--')
+
     plt.xlabel('Actual ln(Intensity)')
     plt.ylabel('Predicted ln(Intensity)')
     plt.title(f"{title}\n{prefix}_Actual_vs_Predicted_Intensity")
 
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
-    plt.colorbar(sm, label='Actual ln(Intensity)', extend='both')
+    cbar = plt.colorbar(sm, label='Actual Delta', extend='both')
     plt.grid(True)
+
+    plt.legend()
 
     plot_filename = f"{title}_{prefix}_actual_vs_predicted_intensity.png"
     plt.savefig(plot_filename)
     plt.close()
 
     return os.path.abspath(plot_filename)
+
 
 
 
