@@ -19,7 +19,6 @@ from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training import cme_modeling
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
-from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
     build_dataset,
     filter_ds,
@@ -53,7 +52,7 @@ def main():
     print(f'batch size : {batch_size}')
 
     # Construct the title
-    title = f'mlp2_pdsStratInj_bs{batch_size}_v8'
+    title = f'mlp2_pdsStratInj_bs{batch_size}_v8_noval'
 
     # Replace any other characters that are not suitable for filenames (if any)
     title = title.replace(' ', '_').replace(':', '_')
@@ -64,7 +63,6 @@ def main():
     # Set the early stopping patience and learning rate as variables
     set_seed(seed)
     epochs = EPOCHS
-    patience = PATIENCE_PRE
     learning_rate = START_LR_PRE
     weight_decay = WEIGHT_DECAY_PRE
     momentum_beta1 = MOMENTUM_BETA1
@@ -93,15 +91,11 @@ def main():
     lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
     upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
     mae_plus_threshold = MAE_PLUS_THRESHOLD
-    smoothing_method = SMOOTHING_METHOD
-    window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
-    val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
 
     # Initialize wandb
     wandb.init(project="Repr-Jan-Report", name=experiment_name, config={
         "inputs_to_use": inputs_to_use,
         "add_slope": add_slope,
-        "patience": patience,
         "learning_rate": learning_rate,
         "min_lr": LR_CB_MIN_LR_PRE,
         "weight_decay": weight_decay,
@@ -132,10 +126,7 @@ def main():
         "cme_speed_threshold": cme_speed_threshold,
         "sam_rho": rho,
         'outputs_to_use': outputs_to_use,
-        'inj': 'strat',
-        'smoothing_method': smoothing_method,
-        'window_size': window_size,
-        'val_window_size': val_window_size
+        'inj': 'strat'
     })
     # set the root directory
     root_dir = DS_PATH
@@ -188,18 +179,6 @@ def main():
         high_threshold=upper_threshold,
         N=N, seed=seed)
 
-    # Compute the sample weights for validation (test set)
-    delta_val = y_test[:, 0]
-    print(f'delta_val.shape: {delta_val.shape}')
-    print(f'rebalancing the validation set...')
-    min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
-    val_weights_dict = exDenseReweightsD(
-        X_test, delta_val,
-        alpha=alphaV, bw=bandwidth,
-        min_norm_weight=min_norm_weight,
-        debug=False).label_reweight_dict
-    print(f'validation set rebalanced.')
-
     # create the model
     model_sep = create_mlp(
         input_dim=n_features,
@@ -216,16 +195,6 @@ def main():
     )
     model_sep.summary()
 
-    # Define the EarlyStopping callback
-    early_stopping = SmoothEarlyStopping(
-        monitor=CVRG_METRIC,
-        min_delta=CVRG_MIN_DELTA,
-        patience=patience,
-        verbose=VERBOSE,
-        restore_best_weights= ES_CB_RESTORE_WEIGHTS,
-        smoothing_method=smoothing_method,  # 'moving_average'
-        smoothing_parameters={'window_size': window_size})  # 10
-
     model_sep.compile(
         optimizer=AdamW(
             learning_rate=learning_rate,
@@ -236,69 +205,16 @@ def main():
             y_true, y_pred,
             phase_manager=pm,
             train_sample_weights=train_weights_dict,
-            val_sample_weights=val_weights_dict,
         )
     )
 
     train_ds, train_steps = stratified_batch_dataset(
         X_train, y_train, batch_size)
 
-    history = model_sep.fit(
-        train_ds,
-        steps_per_epoch=train_steps,
-        epochs=epochs,
-        validation_data=(X_test, y_test),
-        batch_size=batch_size,
-        callbacks=[
-            reduce_lr_on_plateau,
-            early_stopping,
-            WandbCallback(save_model=WANDB_SAVE_MODEL),
-            IsTraining(pm)
-        ],
-        verbose=VERBOSE
-    )
-
-    # Use the smoothing function to find the optimal epoch
-    optimal_epoch = find_optimal_epoch_by_smoothing(
-        history.history[ES_CB_MONITOR],
-        smoothing_method=smoothing_method,
-        smoothing_parameters={'window_size': val_window_size},
-        mode='min')
-    print(f'optimal_epoch: {optimal_epoch}')
-    wandb.log({'optimal_epoch': optimal_epoch})
-
-    # Reset model weights and retrain for optimal number of epochs
-    model_sep = create_mlp(
-        input_dim=n_features,
-        hiddens=hiddens,
-        output_dim=0,
-        pretraining=pretraining,
-        embed_dim=embed_dim,
-        dropout=dropout,
-        activation=activation,
-        norm=norm,
-        skip_repr=skip_repr,
-        skipped_layers=skipped_layers,
-        sam_rho=rho,
-    )
-
-    model_sep.compile(
-        optimizer=AdamW(
-            learning_rate=learning_rate,
-            weight_decay=weight_decay,
-            beta_1=momentum_beta1
-        ),
-        loss=lambda y_true, y_pred: mb.pds_loss_linear_vec(
-            y_true, y_pred,
-            phase_manager=pm,
-            train_sample_weights=train_weights_dict,
-        )
-    )
-
     model_sep.fit(
         train_ds,
         steps_per_epoch=train_steps,
-        epochs=optimal_epoch,
+        epochs=epochs,
         batch_size=batch_size,
         callbacks=[
             reduce_lr_on_plateau,
