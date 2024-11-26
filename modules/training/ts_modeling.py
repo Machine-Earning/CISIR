@@ -2714,7 +2714,8 @@ def plot_actual_vs_predicted_intensity(avsp_data: List[tuple], title: str, prefi
 
     Parameters:
     - avsp_data (List[tuple]): List of tuples containing event_id, actual ln(Intensity),
-                               predicted ln(Intensity), and actual delta.
+                               predicted ln(Intensity), and actual delta. The actual ln(Intensity),
+                               predicted ln(Intensity), and actual delta can be arrays.
     - title (str): The title of the plot.
     - prefix (str): Prefix for the plot file names.
     - delta_threshold (float): Threshold for actual_delta to plot special markers. Default is 0.5.
@@ -2722,22 +2723,30 @@ def plot_actual_vs_predicted_intensity(avsp_data: List[tuple], title: str, prefi
 
     plt.figure(figsize=(10, 7))  # Adjust size as needed
 
-    # Extract data from avsp_data
-    actual_ln_intensities = []
-    predicted_ln_intensities = []
-    actual_deltas = []
-    event_ids = []
+    # Initialize empty lists to hold flattened data
+    all_actual_ln_intensities = []
+    all_predicted_ln_intensities = []
+    all_actual_deltas = []
+    all_event_ids = []
 
+    # Iterate over the data and flatten arrays
     for event_id, actual_ln_intensity, predicted_ln_intensity, actual_delta in avsp_data:
-        event_ids.append(event_id)
-        actual_ln_intensities.append(actual_ln_intensity)
-        predicted_ln_intensities.append(predicted_ln_intensity)
-        actual_deltas.append(actual_delta)
+        # Flatten the arrays/lists if necessary
+        actual_ln_intensity = np.array(actual_ln_intensity).flatten()
+        predicted_ln_intensity = np.array(predicted_ln_intensity).flatten()
+        actual_delta = np.array(actual_delta).flatten()
 
-    actual_ln_intensities = np.array(actual_ln_intensities)
-    predicted_ln_intensities = np.array(predicted_ln_intensities)
-    actual_deltas = np.array(actual_deltas)
-    event_ids = np.array(event_ids)
+        # Append data to the overall lists
+        all_actual_ln_intensities.extend(actual_ln_intensity)
+        all_predicted_ln_intensities.extend(predicted_ln_intensity)
+        all_actual_deltas.extend(actual_delta)
+        all_event_ids.extend([event_id] * len(actual_ln_intensity))
+
+    # Convert lists to NumPy arrays
+    actual_ln_intensities = np.array(all_actual_ln_intensities)
+    predicted_ln_intensities = np.array(all_predicted_ln_intensities)
+    actual_deltas = np.array(all_actual_deltas)
+    event_ids = np.array(all_event_ids)
 
     # Create a mask for points with actual_delta > delta_threshold
     mask_high_delta = actual_deltas > delta_threshold
@@ -2783,6 +2792,7 @@ def plot_actual_vs_predicted_intensity(avsp_data: List[tuple], title: str, prefi
     plt.close()
 
     return os.path.abspath(plot_filename)
+
 
 
 
