@@ -409,6 +409,7 @@ def create_mlp(
         norm: str = 'batch_norm',
         sam_rho: float = 1e-2,
         dropout: float = 0.2,
+        output_activation=None,
         name: str = 'mlp'
 ) -> Model:
     """
@@ -428,7 +429,8 @@ def create_mlp(
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None.
     - sam_rho (float): Size of the neighborhood for perturbation in SAM. Default is 0.05. If 0.0, SAM is not used.
     - dropout (float): Dropout rate to apply after activations or residual connections. If 0.0, no dropout is applied.
-
+    - output_activation: Optional activation function for output layer. Use 'softmax' for multi-class or 'sigmoid' for binary.
+    
     Returns:
     - Model: A Keras model instance.
 
@@ -534,7 +536,7 @@ def create_mlp(
 
     # Add output layer if output_dim > 0
     if output_dim > 0:
-        output_layer = Dense(output_dim, name='forecast_head')(final_repr_output)
+        output_layer = Dense(output_dim, activation=output_activation, name='forecast_head')(final_repr_output)
         model_output = [final_repr_output, output_layer]
     else:
         model_output = final_repr_output
@@ -547,6 +549,7 @@ def create_mlp(
 
     return model
 
+    
 
 def add_decoder(encoder_model, hiddens, activation=None, norm=None, dropout=0.0, skip_connections=False):
     """
