@@ -19,7 +19,7 @@ from modules.training.ts_modeling import (
 # Set the environment variable for CUDA (in case it is necessary)
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
-weight_path = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.50_t_20241114-045334_reg.h5'
+weight_path = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.00_v8_updated_20241120-180201_reg.h5'
 
 def main():
     """
@@ -143,6 +143,11 @@ def main():
                             print(f'pcc error: {error_pcc}')
                             wandb.log({"pcc": error_pcc})
 
+                            # evaluate the model correlation on training set
+                            error_pcc_train = evaluate_pcc(model, X_train, y_train)
+                            print(f'pcc error train: {error_pcc_train}')
+                            wandb.log({"train_pcc": error_pcc_train})
+
                             # evaluate the model correlation on test set based on logI and logI_prev
                             error_pcc_logI = evaluate_pcc(model, X_test, y_test, logI_test, logI_prev_test)
                             print(f'pcc error logI: {error_pcc_logI}')
@@ -152,11 +157,6 @@ def main():
                             error_pcc_logI_train = evaluate_pcc(model, X_train, y_train, logI_train, logI_prev_train)
                             print(f'pcc error logI train: {error_pcc_logI_train}')
                             wandb.log({"train_pcc_I": error_pcc_logI_train})
-
-                            # evaluate the model correlation on training set
-                            error_pcc_train = evaluate_pcc(model, X_train, y_train)
-                            print(f'pcc error train: {error_pcc_train}')
-                            wandb.log({"train_pcc": error_pcc_train})
 
                             # evaluate the model on test cme_files
                             above_threshold = mae_plus_threshold
@@ -178,17 +178,17 @@ def main():
                             print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
                             wandb.log({"pcc+": error_pcc_cond})
 
-                            # evaluate the model correlation for rare samples on test set based on logI and logI_prev
-                            error_pcc_cond_logI = evaluate_pcc(
-                                model, X_test, y_test, logI_test, logI_prev_test, above_threshold=above_threshold)
-                            print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond_logI}')
-                            wandb.log({"pcc+_I": error_pcc_cond_logI})
-
                             # evaluate the model correlation for rare samples on training set
                             error_pcc_cond_train = evaluate_pcc(
                                 model, X_train, y_train, above_threshold=above_threshold)
                             print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
                             wandb.log({"train_pcc+": error_pcc_cond_train})
+
+                            # evaluate the model correlation for rare samples on test set based on logI and logI_prev
+                            error_pcc_cond_logI = evaluate_pcc(
+                                model, X_test, y_test, logI_test, logI_prev_test, above_threshold=above_threshold)
+                            print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond_logI}')
+                            wandb.log({"pcc+_I": error_pcc_cond_logI})
 
                             # evaluate the model correlation for rare samples on training set based on logI and logI_prev
                             error_pcc_cond_logI_train = evaluate_pcc(

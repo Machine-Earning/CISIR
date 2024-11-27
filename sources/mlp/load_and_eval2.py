@@ -20,7 +20,10 @@ from modules.training.ts_modeling import (
 # Set the environment variable for CUDA (in case it is necessary)
 # os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
-weight_path = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.50_t_20241114-045334_reg.h5'
+# weight_path = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcaeS2_amse1.00_v8_frFalse_20241121-102817_s2min_reg.h5'
+# weight_path = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcS2_amse1.00_v8_frFalse_20241121-103931_s2min_reg.h5'
+weight_path = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdsS2_amse1.00_v8_frFalse_20241121-101434_s2min_reg.h5'
+
 
 def main():
     """
