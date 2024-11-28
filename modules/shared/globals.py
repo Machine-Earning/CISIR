@@ -58,8 +58,8 @@ ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 
 # Data Filtering and Processing
 N_FILTERED = 500  # Number of samples to keep outside the threshold
-LOWER_THRESHOLD = -0.5  # Lower threshold for delta_p
-UPPER_THRESHOLD = 0.5  # Upper threshold for delta_p
+LOWER_THRESHOLD = -0.2  # Lower threshold for delta_p
+UPPER_THRESHOLD = 0.2  # Upper threshold for delta_p
 MAE_PLUS_THRESHOLD = 0.5  # Threshold for measuring raising edges in delta
 BANDWIDTH = 4.42e-2  # Bandwidth for rebalancing
 TARGET_MIN_NORM_WEIGHT = 0.01  # Minimum weight for the target normalization
