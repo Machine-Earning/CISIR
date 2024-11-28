@@ -45,6 +45,7 @@ from tensorflow.keras.regularizers import l2
 from modules.training.normlayer import NormalizeLayer
 from modules.training.phase_manager import TrainingPhaseManager, create_weight_tensor_fast
 from modules.training.sam_keras import SAMModel
+from modules.shared.globals import PLUS_INDEX, MID_INDEX, MINUS_INDEX
 
 # Seeds for reproducibility
 seed_value = 42
@@ -685,136 +686,154 @@ def add_decoder(encoder_model, hiddens, activation=None, norm=None, dropout=0.0,
 
 
 def create_mlp_moe(
-        input_dim: int = 25,
-        output_dim: int = 1,
+        input_dim: int = 100,
         hiddens=None,
-        skipped_layers: int = 2,
-        embed_dim: int = 9,
-        pds: bool = False,
-        l2_reg: float = None,
-        dropout: float = 0.0,
+        skipped_layers: int = 1,
+        embed_dim: int = 128,
+        skip_repr: bool = True,
+        pretraining: bool = False,
         activation=None,
-        norm: str = None,
-        residual: bool = False,
+        norm: str = 'batch_norm',
+        sam_rho: float = 1e-2,
+        dropout: float = 0.2,
         name: str = 'mlp_moe',
-        expert_high_path: str = None,
-        expert_low_path: str = None,
+        expert_paths: dict = None,
         router_hiddens=None,
-        freeze_experts: bool = False,
-        temperature: float = 1.0
+        freeze_experts: bool = False
 ) -> Model:
     """
-    Create an MLP model with fully connected dense layers, optional dropout, and configurable activation functions,
-    with the option to include residual connections, batch normalization, or layer normalization.
-    Also includes a mixture of experts with pre-trained weights and a configurable gating network.
+    Create an MLP mixture of experts model with pre-trained experts and a router network.
 
     Parameters:
     - input_dim (int): The number of features in the input data.
-    - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
     - hiddens (list): A list of integers where each integer is the number of units in a hidden layer.
-    - embed_dim (int): The number of features in the final representation vector.
-    - pds (bool): If True, the model will use PDS and there will have its representations normalized.
-    - l2_reg (float): L2 regularization factor. Default is None (no regularization).
-    - dropout (float): The fraction of the input units to drop. Default is 0.0 (no dropout).
-    - activation: Optional activation function to use. If None, defaults to LeakyReLU.
-    - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None (no normalization).
     - skipped_layers (int): Number of layers between residual connections.
-    - residual (bool): If True, add residual connections for every 'skipped_layers' hidden layers.
-    - expert_high_path (str): Path to the stored weights of the high expert.
-    - expert_low_path (str): Path to the stored weights of the low expert.
-    - router_hiddens (list): A list of integers where each integer is the number of units in a hidden layer for the router.
+    - embed_dim (int): The number of features in the final representation vector.
+    - skip_repr (bool): If True and skipped_layers > 0, adds a residual connection to the representation layer.
+    - pretraining (bool): If True, the model will use PDS/PDC and have its representations normalized.
+    - activation: Optional activation function to use. If None, defaults to LeakyReLU.
+    - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is 'batch_norm'.
+    - sam_rho (float): Size of the neighborhood for perturbation in SAM. Default is 0.05. If 0.0, SAM is not used.
+    - dropout (float): Dropout rate to apply after activations or residual connections. If 0.0, no dropout is applied.
+    - expert_paths (dict): Dictionary containing paths to expert model weights:
+        {
+            'router': path to router model weights,
+            'plus': path to plus expert weights,
+            'zero': path to zero expert weights,
+            'minus': path to minus expert weights
+        }
+    - router_hiddens (list): A list of integers for router network hidden layers. If None, uses same as hiddens.
     - freeze_experts (bool): If True, freeze the expert layers.
-    - temperature (float): Temperature parameter for the softmax function in the gating network.
 
     Returns:
     - Model: A Keras model instance.
     """
-
     if hiddens is None:
-        hiddens = [50, 50]  # Default hidden layers configuration
+        hiddens = [50, 50]
 
     if activation is None:
         activation = LeakyReLU()
 
     input_layer = Input(shape=(input_dim,))
 
-    # Create experts using the create_mlp function
-    expert_high = create_mlp(
+    # Create experts using the create_mlp function - each expert outputs a single regression value
+    expert_plus = create_mlp(
         input_dim=input_dim,
-        output_dim=1,  # Single output for regression
+        output_dim=1,
         hiddens=hiddens,
         skipped_layers=skipped_layers,
         embed_dim=embed_dim,
+        skip_repr=skip_repr,
         pretraining=pretraining,
-        l2_reg=l2_reg,
-        dropout=dropout,
         activation=activation,
         norm=norm,
-        residual=residual,
-        name='expert_high'
+        sam_rho=sam_rho,
+        dropout=dropout,
+        name='expert_plus'
     )
 
-    expert_low = create_mlp(
+    expert_zero = create_mlp(
         input_dim=input_dim,
-        output_dim=1,  # Single output for regression
+        output_dim=1,
         hiddens=hiddens,
         skipped_layers=skipped_layers,
         embed_dim=embed_dim,
+        skip_repr=skip_repr,
         pretraining=pretraining,
-        l2_reg=l2_reg,
-        dropout=dropout,
         activation=activation,
         norm=norm,
-        residual=residual,
-        name='expert_low'
+        sam_rho=sam_rho,
+        dropout=dropout,
+        name='expert_zero'
     )
 
-    # Load weights for experts if paths are provided
-    if expert_high_path:
-        expert_high.load_weights(expert_high_path)
+    expert_minus = create_mlp(
+        input_dim=input_dim,
+        output_dim=1,
+        hiddens=hiddens,
+        skipped_layers=skipped_layers,
+        embed_dim=embed_dim,
+        skip_repr=skip_repr,
+        pretraining=pretraining,
+        activation=activation,
+        norm=norm,
+        sam_rho=sam_rho,
+        dropout=dropout,
+        name='expert_minus'
+    )
+
+    # Create router network - outputs class probabilities
+    router = create_mlp(
+        input_dim=input_dim,
+        output_dim=3,  # 3 classes: plus, mid, minus
+        hiddens=router_hiddens if router_hiddens else hiddens,
+        skipped_layers=skipped_layers,
+        embed_dim=embed_dim,
+        skip_repr=skip_repr,
+        pretraining=pretraining,
+        activation=activation,
+        norm=norm,
+        sam_rho=sam_rho,
+        dropout=dropout,
+        output_activation='softmax',  # Use softmax for class probabilities
+        name='router'
+    )
+
+    # Load weights if paths are provided
+    if expert_paths:
+        if 'router' in expert_paths:
+            router.load_weights(expert_paths['router'])
+        if 'plus' in expert_paths:
+            expert_plus.load_weights(expert_paths['plus'])
+        if 'zero' in expert_paths:
+            expert_zero.load_weights(expert_paths['zero'])
+        if 'minus' in expert_paths:
+            expert_minus.load_weights(expert_paths['minus'])
+        
         if freeze_experts:
-            for layer in expert_high.layers:
-                layer.trainable = False
+            for expert in [expert_plus, expert_zero, expert_minus]:
+                for layer in expert.layers:
+                    layer.trainable = False
 
-    if expert_low_path:
-        expert_low.load_weights(expert_low_path)
-        if freeze_experts:
-            for layer in expert_low.layers:
-                layer.trainable = False
+    # Get expert outputs
+    plus_output = expert_plus(input_layer)
+    zero_output = expert_zero(input_layer)
+    minus_output = expert_minus(input_layer)
+    router_output = router(input_layer)
 
-    final_repr_output1 = expert_high(input_layer)
-    final_repr_output2 = expert_low(input_layer)
+    # Extract routing probabilities
+    routing_probs = router_output[1]  # Shape: (batch_size, 3)
+    plus_prob = Lambda(lambda x: x[:, PLUS_INDEX:PLUS_INDEX+1])(routing_probs)
+    zero_prob = Lambda(lambda x: x[:, MID_INDEX:MID_INDEX+1])(routing_probs)
+    minus_prob = Lambda(lambda x: x[:, MINUS_INDEX:MINUS_INDEX+1])(routing_probs)
 
-    # Gating network
-    if router_hiddens is None:
-        router_hiddens = hiddens
-    x_router = input_layer
-    for units in router_hiddens:
-        x_router = Dense(units, activation=activation)(x_router)
+    # Combine expert outputs using routing probabilities
+    plus_weighted = Multiply()([plus_output[1], plus_prob])
+    zero_weighted = Multiply()([zero_output[1], zero_prob])
+    minus_weighted = Multiply()([minus_output[1], minus_prob])
+    combined_output = Add()([plus_weighted, zero_weighted, minus_weighted])
 
-    # Apply temperature to the softmax
-    def softmax_with_temperature(logits, temperature=1.0):
-        return Softmax()(logits / temperature)
-
-    gating_logits = Dense(2)(x_router)
-    gating_network = Lambda(lambda x: softmax_with_temperature(x, temperature))(gating_logits)
-
-    # Extract weights for the experts
-    expert1_weight = Lambda(lambda x: x[:, 0:1])(gating_network)
-    expert2_weight = Lambda(lambda x: x[:, 1:2])(gating_network)
-
-    # Combine experts' outputs using the gating network's weights
-    expert1_weighted = Multiply()([final_repr_output1[1], expert1_weight])
-    expert2_weighted = Multiply()([final_repr_output2[1], expert2_weight])
-    combined_output = Add()([expert1_weighted, expert2_weighted])
-
-    if output_dim > 0:
-        output_layer = Dense(output_dim, name='forecast_head')(combined_output)
-        model_output = [combined_output, output_layer]
-    else:
-        model_output = combined_output
-
-    model = Model(inputs=input_layer, outputs=model_output, name=name)
+    model = Model(inputs=input_layer, outputs=[combined_output, routing_probs], name=name)
     return model
 
 
