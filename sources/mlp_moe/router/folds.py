@@ -26,6 +26,7 @@ from modules.training.ts_modeling import (
     create_mlp,
     plot_error_hist,
     load_stratified_folds,
+    convert_to_onehot_cls
 )
 
 
@@ -58,7 +59,7 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE:
             for rho in RHO:  # SAM_RHOS:
                 # PARAMS
                 inputs_to_use = INPUTS_TO_USE[0]  # Use first input configuration
@@ -70,7 +71,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'router_amse{alpha_mse:.2f}_v8_updated'
+                title = f'mlp2_amse{alpha_mse:.2f}_router'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -115,7 +116,7 @@ def main():
                 val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
 
                 # Initialize wandb
-                wandb.init(project="Jan-Report", name=experiment_name, config={
+                wandb.init(project="Jan-moe-Report", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
                     "add_slope": add_slope,
                     "patience": patience,
@@ -166,10 +167,7 @@ def main():
                     shuffle_data=True)
 
                 # Convert y_train to 3 classes based on thresholds
-                y_train_classes = np.zeros((y_train.shape[0], 3))
-                y_train_classes[y_train[:,0] >= upper_threshold, 2] = 1  # High class
-                y_train_classes[(y_train[:,0] > lower_threshold) & (y_train[:,0] < upper_threshold), 1] = 1  # Mid class  
-                y_train_classes[y_train[:,0] <= lower_threshold, 0] = 1  # Low class
+                y_train_classes = convert_to_onehot_cls(y_train, lower_threshold, upper_threshold)
 
                 # print the training set shapes
                 print(f'X_train.shape: {X_train.shape}, y_train_classes.shape: {y_train_classes.shape}')
@@ -183,10 +181,7 @@ def main():
                     cme_speed_threshold=cme_speed_threshold)
 
                 # Convert y_test to 3 classes based on thresholds
-                y_test_classes = np.zeros((y_test.shape[0], 3))
-                y_test_classes[y_test[:,0] >= upper_threshold, 2] = 1  # High class
-                y_test_classes[(y_test[:,0] > lower_threshold) & (y_test[:,0] < upper_threshold), 1] = 1  # Mid class
-                y_test_classes[y_test[:,0] <= lower_threshold, 0] = 1  # Low class
+                y_test_classes = convert_to_onehot_cls(y_test, lower_threshold, upper_threshold)
 
                 print(f'X_test.shape: {X_test.shape}, y_test_classes.shape: {y_test_classes.shape}')
 
@@ -212,15 +207,8 @@ def main():
                     print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val.shape}')
 
                     # Convert labels to classes
-                    y_subtrain_classes = np.zeros((y_subtrain.shape[0], 3))
-                    y_subtrain_classes[y_subtrain[:,0] >= upper_threshold, 2] = 1  # High class
-                    y_subtrain_classes[(y_subtrain[:,0] > lower_threshold) & (y_subtrain[:,0] < upper_threshold), 1] = 1  # Mid class
-                    y_subtrain_classes[y_subtrain[:,0] <= lower_threshold, 0] = 1  # Low class
-
-                    y_val_classes = np.zeros((y_val.shape[0], 3))
-                    y_val_classes[y_val[:,0] >= upper_threshold, 2] = 1  # High class
-                    y_val_classes[(y_val[:,0] > lower_threshold) & (y_val[:,0] < upper_threshold), 1] = 1  # Mid class
-                    y_val_classes[y_val[:,0] <= lower_threshold, 0] = 1  # Low class
+                    y_subtrain_classes = convert_to_onehot_cls(y_subtrain, lower_threshold, upper_threshold)
+                    y_val_classes = convert_to_onehot_cls(y_val, lower_threshold, upper_threshold)
 
                     # Create and compile fold model
                     fold_model = create_mlp(
