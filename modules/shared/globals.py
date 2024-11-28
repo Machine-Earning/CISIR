@@ -72,6 +72,7 @@ WINDOW_SIZE = 101  # NOTE: must be odd
 # Additional Parameters
 RHO = [1e-2]
 REWEIGHTS = [(1.0, 0.3, 0.1, 0)]
+REWEIGHTS_MOE = [(0.0, 0.0, 0.0, 0.0)]
 LAMBDA_FACTOR = 8
 AE_LAMBDA = 0.9
 CVRG_MIN_DELTA = 1e-5
@@ -107,3 +108,6 @@ FF_DROPOUT = 0.2
 FF_NORM = 'batch_norm'
 
 LEAKY_RELU_ALPHA = 0.3
+
+# Router
+ROUTER_OUTPUT_DIM = 3  # 3 classes for routing
