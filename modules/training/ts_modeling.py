@@ -63,24 +63,26 @@ np.random.seed(seed_value)
 tf.random.set_seed(seed_value)
 
 
-def get_plus_cls(X: np.ndarray, y: np.ndarray, upper_threshold: float) -> tuple[np.ndarray, np.ndarray]:
+def get_plus_cls(X: np.ndarray, y: np.ndarray, upper_threshold: float, *additional_sets) -> tuple[np.ndarray, ...]:
     """
     Get data samples where y values are >= upper threshold (plus class).
 
     Args:
         X (np.ndarray): Input features array of shape (n_samples, n_features)
-        y (np.ndarray): Target values array of shape (n_samples, n_outputs)
+        y (np.ndarray): Target values array of shape (n_samples, n_outputs) 
         upper_threshold (float): Upper threshold value to filter samples
+        *additional_sets: Additional arrays to filter using the same mask
 
     Returns:
-        tuple[np.ndarray, np.ndarray]: Filtered X and y arrays containing only plus class samples
+        tuple[np.ndarray, ...]: Filtered X, y and any additional arrays containing only plus class samples
     """
     plus_mask = y[:, 0] >= upper_threshold
-    return X[plus_mask], y[plus_mask]
+    filtered = [X[plus_mask], y[plus_mask]]
+    filtered.extend(arr[plus_mask] for arr in additional_sets)
+    return tuple(filtered)
 
 
-def get_zero_cls(X: np.ndarray, y: np.ndarray, lower_threshold: float, upper_threshold: float) -> tuple[
-    np.ndarray, np.ndarray]:
+def get_zero_cls(X: np.ndarray, y: np.ndarray, lower_threshold: float, upper_threshold: float, *additional_sets) -> tuple[np.ndarray, ...]:
     """
     Get data samples where y values are between the lower and upper thresholds (zero class).
 
@@ -89,15 +91,18 @@ def get_zero_cls(X: np.ndarray, y: np.ndarray, lower_threshold: float, upper_thr
         y (np.ndarray): Target values array of shape (n_samples, n_outputs)
         lower_threshold (float): Lower threshold value to filter samples
         upper_threshold (float): Upper threshold value to filter samples
+        *additional_sets: Additional arrays to filter using the same mask
 
     Returns:
-        tuple[np.ndarray, np.ndarray]: Filtered X and y arrays containing only zero class samples
+        tuple[np.ndarray, ...]: Filtered X, y and any additional arrays containing only zero class samples
     """
     zero_mask = (y[:, 0] > lower_threshold) & (y[:, 0] < upper_threshold)
-    return X[zero_mask], y[zero_mask]
+    filtered = [X[zero_mask], y[zero_mask]]
+    filtered.extend(arr[zero_mask] for arr in additional_sets)
+    return tuple(filtered)
 
 
-def get_minus_cls(X: np.ndarray, y: np.ndarray, threshold: float) -> tuple[np.ndarray, np.ndarray]:
+def get_minus_cls(X: np.ndarray, y: np.ndarray, threshold: float, *additional_sets) -> tuple[np.ndarray, ...]:
     """
     Get data samples where y values are below or equal to the threshold (minus class).
 
@@ -105,12 +110,15 @@ def get_minus_cls(X: np.ndarray, y: np.ndarray, threshold: float) -> tuple[np.nd
         X (np.ndarray): Input features array of shape (n_samples, n_features)
         y (np.ndarray): Target values array of shape (n_samples, n_outputs)
         threshold (float): Threshold value to filter samples
+        *additional_sets: Additional arrays to filter using the same mask
 
     Returns:
-        tuple[np.ndarray, np.ndarray]: Filtered X and y arrays containing only minus class samples
+        tuple[np.ndarray, ...]: Filtered X, y and any additional arrays containing only minus class samples
     """
     minus_mask = y[:, 0] <= threshold
-    return X[minus_mask], y[minus_mask]
+    filtered = [X[minus_mask], y[minus_mask]]
+    filtered.extend(arr[minus_mask] for arr in additional_sets)
+    return tuple(filtered)
 
 
 def convert_to_onehot_cls(y: np.ndarray, lower_threshold: float, upper_threshold: float) -> np.ndarray:

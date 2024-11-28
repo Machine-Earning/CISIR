@@ -8,7 +8,7 @@ ADD_SLOPE = [False]  # Add slope to the inputs
 CME_SPEED_THRESHOLD = [0]  # CME speed threshold
 
 # Training configurations
-SEEDS = [456789, 42, 1234, 0, 9999]  # Seeds for reproducibility
+SEEDS = [456789] # , 42, 1234, 0, 9999]  # Seeds for reproducibility
 BATCH_SIZE = 2500  # Batch size
 EPOCHS = int(1e5)  # Number of epochs
 VERBOSE = 1  # Verbose
