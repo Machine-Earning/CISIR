@@ -6,6 +6,8 @@ import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
+from sklearn.metrics import confusion_matrix, classification_report
+import tensorflow as tf
 
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
@@ -25,6 +27,25 @@ from modules.training.ts_modeling import (
     plot_error_hist,
     load_stratified_folds,
 )
+
+
+def focal_loss(gamma=2.0, alpha=0.25):
+    def focal_loss_fn(y_true, y_pred):
+        # Scale predictions so that the class probabilities sum to 1
+        y_pred /= tf.reduce_sum(y_pred, axis=-1, keepdims=True)
+        
+        # Clip the prediction value to prevent NaN's and Inf's
+        epsilon = tf.keras.backend.epsilon()
+        y_pred = tf.clip_by_value(y_pred, epsilon, 1. - epsilon)
+        
+        # Calculate cross entropy
+        cross_entropy = -y_true * tf.math.log(y_pred)
+        
+        # Calculate focal loss
+        loss = alpha * tf.math.pow(1 - y_pred, gamma) * cross_entropy
+        
+        return tf.reduce_sum(loss, axis=-1)
+    return focal_loss_fn
 
 
 def main():
@@ -106,7 +127,7 @@ def main():
                     "epochs": epochs,
                     # hidden in a more readable format  (wandb does not support lists)
                     "hiddens": hiddens_str,
-                    "loss": 'categorical_crossentropy',
+                    "loss": 'focal_loss',
                     "lambda": lambda_factor,
                     "seed": seed,
                     "alpha_mse": alpha_mse,
@@ -173,7 +194,104 @@ def main():
                 n_features = X_train.shape[1]
                 print(f'n_features: {n_features}')
 
-                # Create router model
+                # 4-fold cross-validation
+                folds_optimal_epochs = []
+                for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
+                    load_stratified_folds(
+                        root_dir,
+                        inputs_to_use=inputs_to_use,
+                        add_slope=add_slope,
+                        outputs_to_use=outputs_to_use,
+                        cme_speed_threshold=cme_speed_threshold,
+                        seed=seed, shuffle=True
+                    )
+                ):
+                    print(f'Fold: {fold_idx}')
+                    # print all shapes
+                    print(f'X_subtrain.shape: {X_subtrain.shape}, y_subtrain.shape: {y_subtrain.shape}')
+                    print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val.shape}')
+
+                    # Convert labels to classes
+                    y_subtrain_classes = np.zeros((y_subtrain.shape[0], 3))
+                    y_subtrain_classes[y_subtrain[:,0] >= upper_threshold, 2] = 1  # High class
+                    y_subtrain_classes[(y_subtrain[:,0] > lower_threshold) & (y_subtrain[:,0] < upper_threshold), 1] = 1  # Mid class
+                    y_subtrain_classes[y_subtrain[:,0] <= lower_threshold, 0] = 1  # Low class
+
+                    y_val_classes = np.zeros((y_val.shape[0], 3))
+                    y_val_classes[y_val[:,0] >= upper_threshold, 2] = 1  # High class
+                    y_val_classes[(y_val[:,0] > lower_threshold) & (y_val[:,0] < upper_threshold), 1] = 1  # Mid class
+                    y_val_classes[y_val[:,0] <= lower_threshold, 0] = 1  # Low class
+
+                    # Create and compile fold model
+                    fold_model = create_mlp(
+                        input_dim=n_features,
+                        hiddens=hiddens,
+                        embed_dim=embed_dim,
+                        output_dim=output_dim,
+                        dropout=dropout,
+                        activation=activation,
+                        norm=norm,
+                        skip_repr=skip_repr,
+                        skipped_layers=skipped_layers,
+                        sam_rho=rho,
+                        output_activation='softmax'
+                    )
+
+                    fold_model.compile(
+                        optimizer=AdamW(
+                            learning_rate=learning_rate,
+                            weight_decay=weight_decay,
+                            beta_1=momentum_beta1
+                        ),
+                        loss=focal_loss(gamma=2.0, alpha=0.25),
+                        metrics=['accuracy']
+                    )
+
+                    # Create early stopping callback
+                    early_stopping = SmoothEarlyStopping(
+                        monitor=CVRG_METRIC,
+                        min_delta=CVRG_MIN_DELTA,
+                        patience=patience,
+                        verbose=VERBOSE,
+                        mode='min',
+                        smoothing_method=smoothing_method,
+                        smoothing_parameters={'window_size': window_size}
+                    )
+
+                    # Train fold model
+                    history = fold_model.fit(
+                        X_subtrain, y_subtrain_classes,
+                        validation_data=(X_val, y_val_classes),
+                        epochs=epochs,
+                        batch_size=batch_size,
+                        callbacks=[
+                            reduce_lr_on_plateau,
+                            early_stopping,
+                            WandbCallback(save_model=False),
+                            IsTraining(pm)
+                        ],
+                        verbose=VERBOSE
+                    )
+
+                    # Find optimal epoch using validation loss
+                    val_losses = history.history['val_loss']
+                    optimal_epoch = find_optimal_epoch_by_smoothing(
+                        val_losses,
+                        smoothing_method=smoothing_method,
+                        smoothing_parameters={'window_size': val_window_size},
+                        mode='min')
+                    folds_optimal_epochs.append(optimal_epoch)
+                    
+                    # Log fold metrics
+                    print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
+                    wandb.log({f'fold_{fold_idx}_best_epoch': folds_optimal_epochs[-1]})
+
+                # Determine optimal number of epochs from folds
+                optimal_epochs = int(np.mean(folds_optimal_epochs))
+                print(f'optimal_epochs: {optimal_epochs}')
+                wandb.log({'optimal_epochs': optimal_epochs})
+
+                # Create final router model
                 router_model = create_mlp(
                     input_dim=n_features,
                     hiddens=hiddens,
@@ -185,7 +303,7 @@ def main():
                     skip_repr=skip_repr,
                     skipped_layers=skipped_layers,
                     sam_rho=rho,
-                    output_activation='softmax'  # Use softmax for multi-class classification
+                    output_activation='softmax'
                 )
 
                 router_model.compile(
@@ -194,18 +312,21 @@ def main():
                         weight_decay=weight_decay,
                         beta_1=momentum_beta1
                     ),
-                    loss='categorical_crossentropy',
+                    loss=focal_loss(gamma=2.0, alpha=0.25),
                     metrics=['accuracy']
                 )
 
-                # Train the router model
+
+
+                # Train the router model for optimal epochs
                 history = router_model.fit(
                     X_train, y_train_classes,
                     validation_data=(X_test, y_test_classes),
-                    epochs=epochs,
+                    epochs=optimal_epochs,
                     batch_size=batch_size,
                     callbacks=[
                         reduce_lr_on_plateau,
+                        early_stopping,
                         WandbCallback(save_model=WANDB_SAVE_MODEL),
                         IsTraining(pm)
                     ],
@@ -216,16 +337,56 @@ def main():
                 router_model.save_weights(f"router_model_weights_{experiment_name}.h5")
                 print(f"Model weights saved in router_model_weights_{experiment_name}.h5")
 
-                # Evaluate accuracy
+                # Get predictions
+                y_train_pred = router_model.predict(X_train)
+                y_test_pred = router_model.predict(X_test)
+
+                # Convert predictions to class labels
+                y_train_pred_classes = np.argmax(y_train_pred, axis=1)
+                y_test_pred_classes = np.argmax(y_test_pred, axis=1)
+                y_train_true_classes = np.argmax(y_train_classes, axis=1)
+                y_test_true_classes = np.argmax(y_test_classes, axis=1)
+
+                # Calculate confusion matrices
+                train_cm = confusion_matrix(y_train_true_classes, y_train_pred_classes)
+                test_cm = confusion_matrix(y_test_true_classes, y_test_pred_classes)
+
+                # Calculate accuracies
                 train_accuracy = router_model.evaluate(X_train, y_train_classes)[1]
                 test_accuracy = router_model.evaluate(X_test, y_test_classes)[1]
 
-                print(f'Train accuracy: {train_accuracy}')
-                print(f'Test accuracy: {test_accuracy}')
+                # Get detailed classification reports
+                train_report = classification_report(y_train_true_classes, y_train_pred_classes)
+                test_report = classification_report(y_test_true_classes, y_test_pred_classes)
 
+                print("\nTraining Results:")
+                print(f'Accuracy: {train_accuracy}')
+                print("Confusion Matrix:")
+                print(train_cm)
+                print("\nClassification Report:")
+                print(train_report)
+
+                print("\nTest Results:")
+                print(f'Accuracy: {test_accuracy}')
+                print("Confusion Matrix:")
+                print(test_cm)
+                print("\nClassification Report:")
+                print(test_report)
+
+                # Log metrics to wandb
                 wandb.log({
                     "train_accuracy": train_accuracy,
-                    "test_accuracy": test_accuracy
+                    "test_accuracy": test_accuracy,
+                    "train_confusion_matrix": wandb.plot.confusion_matrix(
+                        y_true=y_train_true_classes,
+                        preds=y_train_pred_classes,
+                        class_names=['Low', 'Mid', 'High']
+                    ),
+                    "test_confusion_matrix": wandb.plot.confusion_matrix(
+                        y_true=y_test_true_classes,
+                        preds=y_test_pred_classes,
+                        class_names=['Low', 'Mid', 'High']
+                    )
                 })
 
                 # Finish the wandb run
