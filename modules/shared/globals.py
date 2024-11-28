@@ -111,3 +111,8 @@ LEAKY_RELU_ALPHA = 0.3
 
 # Router
 ROUTER_OUTPUT_DIM = 3  # 3 classes for routing
+BATCH_SIZE_MOE = 256  # Batch size for Moe
+PLUS_INDEX = 0
+MID_INDEX = 1
+MINUS_INDEX = 2
+

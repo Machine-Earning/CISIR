@@ -62,6 +62,78 @@ np.random.seed(seed_value)
 tf.random.set_seed(seed_value)
 
 
+def get_plus_cls(X: np.ndarray, y: np.ndarray, upper_threshold: float) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Get data samples where y values are >= upper threshold (plus class).
+
+    Args:
+        X (np.ndarray): Input features array of shape (n_samples, n_features)
+        y (np.ndarray): Target values array of shape (n_samples, n_outputs)
+        upper_threshold (float): Upper threshold value to filter samples
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: Filtered X and y arrays containing only plus class samples
+    """
+    plus_mask = y[:, 0] >= upper_threshold
+    return X[plus_mask], y[plus_mask]
+
+
+def get_zero_cls(X: np.ndarray, y: np.ndarray, lower_threshold: float, upper_threshold: float) -> tuple[
+    np.ndarray, np.ndarray]:
+    """
+    Get data samples where y values are between the lower and upper thresholds (zero class).
+
+    Args:
+        X (np.ndarray): Input features array of shape (n_samples, n_features)
+        y (np.ndarray): Target values array of shape (n_samples, n_outputs)
+        lower_threshold (float): Lower threshold value to filter samples
+        upper_threshold (float): Upper threshold value to filter samples
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: Filtered X and y arrays containing only zero class samples
+    """
+    zero_mask = (y[:, 0] > lower_threshold) & (y[:, 0] < upper_threshold)
+    return X[zero_mask], y[zero_mask]
+
+
+def get_minus_cls(X: np.ndarray, y: np.ndarray, threshold: float) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Get data samples where y values are below or equal to the threshold (minus class).
+
+    Args:
+        X (np.ndarray): Input features array of shape (n_samples, n_features)
+        y (np.ndarray): Target values array of shape (n_samples, n_outputs)
+        threshold (float): Threshold value to filter samples
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: Filtered X and y arrays containing only minus class samples
+    """
+    minus_mask = y[:, 0] <= threshold
+    return X[minus_mask], y[minus_mask]
+
+
+def convert_to_onehot_cls(y: np.ndarray, lower_threshold: float, upper_threshold: float) -> np.ndarray:
+    """
+    Convert regression values to one-hot encoded classes based on thresholds.
+
+    Args:
+        y (np.ndarray): Input array of shape (n_samples, n_features) containing regression values
+        lower_threshold (float): Lower threshold for class separation
+        upper_threshold (float): Upper threshold for class separation
+
+    Returns:
+        np.ndarray: One-hot encoded classes of shape (n_samples, 3) where:
+            - index 0 = high class (values >= upper_threshold)
+            - index 1 = mid class (lower_threshold < values < upper_threshold) 
+            - index 2 = low class (values <= lower_threshold)
+    """
+    y_classes = np.zeros((y.shape[0], 3))
+    y_classes[y[:, 0] >= upper_threshold, 0] = 1  # High class
+    y_classes[(y[:, 0] > lower_threshold) & (y[:, 0] < upper_threshold), 1] = 1  # Mid class
+    y_classes[y[:, 0] <= lower_threshold, 2] = 1  # Low class
+    return y_classes
+
+
 def create_1dcnn(
         input_dims: list,
         hiddens: List[tuple],
@@ -358,7 +430,7 @@ def create_gru(
     """
     # Input shape should be (input_dim,)
     input_layer = Input(shape=(input_dim,))
-    
+
     # Reshape to (timesteps, features)
     timesteps = 25
     features = input_dim // timesteps  # Should be 4 when input_dim is 100
@@ -377,7 +449,6 @@ def create_gru(
 
         if dropout > 0.0:
             x = Dropout(dropout)(x)
-
 
     # Dense layer for representation
     dense = Dense(embed_dim)(x)
@@ -549,7 +620,6 @@ def create_mlp(
 
     return model
 
-    
 
 def add_decoder(encoder_model, hiddens, activation=None, norm=None, dropout=0.0, skip_connections=False):
     """
@@ -1248,11 +1318,11 @@ def stratified_batch_dataset(
     """
     # Generate the stratified groups once
     groups = stratified_groups(y, batch_size)
-    
+
     # Reshape X to remove the extra dimension if it exists
     # if len(X.shape) == 3:
     #     X = X.reshape(X.shape[0], -1)
-        
+
     # Use from_generator to create a dataset from the stratified_data_generator
     dataset = tf.data.Dataset.from_generator(
         lambda: stratified_data_generator(X, y, groups, shuffle=shuffle),
@@ -1577,7 +1647,7 @@ def build_dataset(
 
     if shuffle_data:
         X_combined, y_combined, logI_combined, logI_prev_combined = shuffle(
-            X_combined, y_combined, logI_combined, logI_prev_combined, 
+            X_combined, y_combined, logI_combined, logI_prev_combined,
             random_state=seed_value
         )
 
@@ -2378,14 +2448,14 @@ def plot_avsp_delta(
     # print(f"predicted_changes shape: {predicted_changes.shape}")
     # print(f"actual_ln_intensity shape: {actual_ln_intensity.shape}")
     # print(f"predicted_ln_intensity shape: {predicted_ln_intensity.shape}")
-    
+
     # print("\nFirst 5 elements of each array:")
     # print("Row | actual_changes | predicted_changes | actual_ln_int | predicted_ln_int")
     # print("-" * 65)
     # for i in range(5):
     #     print(f"{i:3d} | {actual_changes[i]:13.6f} | {predicted_changes[i]:16.6f} | "
     #           f"{actual_ln_intensity[i]:11.6f} | {predicted_ln_intensity[i]:14.6f}")
-              
+
     # print("\nValue ranges:")
     # print(f"actual_changes: min={actual_changes.min():.6f}, max={actual_changes.max():.6f}")
     # print(f"predicted_changes: min={predicted_changes.min():.6f}, max={predicted_changes.max():.6f}")
@@ -2676,6 +2746,7 @@ def plot_actual_vs_predicted(avsp_data: List[tuple], title: str, prefix: str):
 
     return os.path.abspath(plot_filename)
 
+
 def plot_actual_vs_predicted_intensity(avsp_data: List[tuple], title: str, prefix: str, delta_threshold: float = 0.5):
     """
     Plots actual vs predicted intensity values for SEP events.
@@ -2760,9 +2831,6 @@ def plot_actual_vs_predicted_intensity(avsp_data: List[tuple], title: str, prefi
     plt.close()
 
     return os.path.abspath(plot_filename)
-
-
-
 
 
 def plot_sample_with_cme(data: np.ndarray, cme_features_names: list = None, sample_index: int = None) -> None:
@@ -3061,7 +3129,7 @@ def evaluate_pcc(
         pcc, _ = pearsonr(logI_test.flatten(), predicted_logI.flatten())
     else:
         pcc, _ = pearsonr(filtered_y_test.flatten(), filtered_predictions.flatten())
-    
+
     return pcc
 
 
