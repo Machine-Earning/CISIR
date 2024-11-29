@@ -327,9 +327,9 @@ def main():
 
                 # Get predictions
                 predictions = router_model.predict(X_train)
-                y_train_pred = predictions['forecast_head']
+                y_train_pred = predictions[1]
                 predictions = router_model.predict(X_test)
-                y_test_pred = predictions['forecast_head']
+                y_test_pred = predictions[1]
 
                 # Convert predictions to class labels
                 y_train_pred_classes = np.argmax(y_train_pred, axis=1)
