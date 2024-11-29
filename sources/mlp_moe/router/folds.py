@@ -8,6 +8,9 @@ from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 from sklearn.metrics import confusion_matrix, classification_report
 import tensorflow as tf
+import matplotlib.pyplot as plt
+import seaborn as sns
+from typing import List, Tuple, Optional, Dict, Union
 
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
@@ -30,7 +33,56 @@ from modules.training.ts_modeling import (
 )
 
 
-def focal_loss(gamma=2.0, alpha=0.25):
+def plot_confusion_matrix(y_true: np.ndarray, 
+                         y_pred: np.ndarray, 
+                         class_names: List[str],
+                         title: str = "Confusion Matrix") -> plt.Figure:
+    """
+    Creates and returns a figure containing a confusion matrix plot.
+    
+    Args:
+        y_true: Ground truth labels as 1D array
+        y_pred: Predicted labels as 1D array  
+        class_names: List of class names for axis labels
+        title: Title for the plot
+        
+    Returns:
+        matplotlib Figure object containing the confusion matrix plot
+    """
+    # Calculate confusion matrix
+    cm = confusion_matrix(y_true, y_pred)
+    
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(10, 8))
+    
+    # Plot confusion matrix using seaborn
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                xticklabels=class_names,
+                yticklabels=class_names,
+                ax=ax)
+    
+    # Set labels and title
+    ax.set_xlabel('Predicted')
+    ax.set_ylabel('True')
+    ax.set_title(title)
+    
+    # Adjust layout
+    plt.tight_layout()
+    
+    return fig
+
+
+def focal_loss(gamma: float = 2.0, alpha: float = 0.25):
+    """
+    Creates a focal loss function with specified gamma and alpha parameters.
+    
+    Args:
+        gamma: Focusing parameter that modulates the rate at which easy examples are down-weighted
+        alpha: Balancing parameter for class weights
+        
+    Returns:
+        Callable focal loss function for model compilation
+    """
     def focal_loss_fn(y_true, y_pred):
         # Scale predictions so that the class probabilities sum to 1
         y_pred /= tf.reduce_sum(y_pred, axis=-1, keepdims=True)
@@ -337,9 +389,24 @@ def main():
                 y_train_true_classes = np.argmax(y_train_classes, axis=1)
                 y_test_true_classes = np.argmax(y_test_classes, axis=1)
 
-                # Calculate confusion matrices
-                train_cm = confusion_matrix(y_train_true_classes, y_train_pred_classes)
-                test_cm = confusion_matrix(y_test_true_classes, y_test_pred_classes)
+                # Calculate confusion matrices and create plots
+                class_names = ['Low', 'Mid', 'High']
+                
+                # Create and save train confusion matrix plot
+                train_cm_fig = plot_confusion_matrix(
+                    y_train_true_classes, 
+                    y_train_pred_classes,
+                    class_names=class_names,
+                    title="Training Confusion Matrix"
+                )
+                
+                # Create and save test confusion matrix plot
+                test_cm_fig = plot_confusion_matrix(
+                    y_test_true_classes, 
+                    y_test_pred_classes,
+                    class_names=class_names,
+                    title="Test Confusion Matrix"
+                )
 
                 # Calculate accuracies
                 train_metrics = router_model.evaluate(X_train, {'forecast_head': y_train_classes})
@@ -353,33 +420,25 @@ def main():
 
                 print("\nTraining Results:")
                 print(f'Accuracy: {train_accuracy}')
-                print("Confusion Matrix:")
-                print(train_cm)
                 print("\nClassification Report:")
                 print(train_report)
 
                 print("\nTest Results:")
                 print(f'Accuracy: {test_accuracy}')
-                print("Confusion Matrix:")
-                print(test_cm)
                 print("\nClassification Report:")
                 print(test_report)
 
-                # Log metrics to wandb
+                # Log metrics and plots to wandb
                 wandb.log({
                     "train_accuracy": train_accuracy,
                     "test_accuracy": test_accuracy,
-                    "train_confusion_matrix": wandb.plot.confusion_matrix(
-                        y_true=y_train_true_classes,
-                        preds=y_train_pred_classes,
-                        class_names=['Low', 'Mid', 'High']
-                    ),
-                    "test_confusion_matrix": wandb.plot.confusion_matrix(
-                        y_true=y_test_true_classes,
-                        preds=y_test_pred_classes,
-                        class_names=['Low', 'Mid', 'High']
-                    )
+                    "train_confusion_matrix": wandb.Image(train_cm_fig),
+                    "test_confusion_matrix": wandb.Image(test_cm_fig)
                 })
+
+                # Close the figures to free memory
+                plt.close(train_cm_fig)
+                plt.close(test_cm_fig)
 
                 # Finish the wandb run
                 wandb.finish()

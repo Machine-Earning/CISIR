@@ -841,7 +841,7 @@ def create_mlp_moe(
     minus_weighted = Multiply()([minus_output[1], minus_prob])
     combined_output = Add()([plus_weighted, zero_weighted, minus_weighted])
 
-    model = Model(inputs=input_layer, outputs=[combined_output, routing_probs], name=name)
+    model = Model(inputs=input_layer, outputs=[routing_probs, combined_output], name=name)
     return model
 
 
