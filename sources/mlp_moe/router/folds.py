@@ -224,6 +224,8 @@ def main():
                         sam_rho=rho,
                         output_activation='softmax'
                     )
+                    # summary
+                    fold_model.summary()
 
                     fold_model.compile(
                         optimizer=AdamW(
