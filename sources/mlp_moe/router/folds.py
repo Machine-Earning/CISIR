@@ -231,8 +231,8 @@ def main():
                             weight_decay=weight_decay,
                             beta_1=momentum_beta1
                         ),
-                        loss=focal_loss(gamma=2.0, alpha=0.25),
-                        metrics=['accuracy']
+                        loss={'forecast_head': focal_loss(gamma=2.0, alpha=0.25)},
+                        metrics={'forecast_head': 'accuracy'}
                     )
 
                     # Create early stopping callback
@@ -248,8 +248,8 @@ def main():
 
                     # Train fold model
                     history = fold_model.fit(
-                        X_subtrain, y_subtrain_classes,
-                        validation_data=(X_val, y_val_classes),
+                        X_subtrain, {'forecast_head': y_subtrain_classes},
+                        validation_data=(X_val, {'forecast_head': y_val_classes}),
                         epochs=epochs,
                         batch_size=batch_size,
                         callbacks=[
@@ -262,7 +262,7 @@ def main():
                     )
 
                     # Find optimal epoch using validation loss
-                    val_losses = history.history['val_loss']
+                    val_losses = history.history['val_forecast_head_loss']
                     optimal_epoch = find_optimal_epoch_by_smoothing(
                         val_losses,
                         smoothing_method=smoothing_method,
@@ -300,16 +300,14 @@ def main():
                         weight_decay=weight_decay,
                         beta_1=momentum_beta1
                     ),
-                    loss=focal_loss(gamma=2.0, alpha=0.25),
-                    metrics=['accuracy']
+                    loss={'forecast_head': focal_loss(gamma=2.0, alpha=0.25)},
+                    metrics={'forecast_head': 'accuracy'}
                 )
-
-
 
                 # Train the router model for optimal epochs
                 history = router_model.fit(
-                    X_train, y_train_classes,
-                    validation_data=(X_test, y_test_classes),
+                    X_train, {'forecast_head': y_train_classes},
+                    validation_data=(X_test, {'forecast_head': y_test_classes}),
                     epochs=optimal_epochs,
                     batch_size=batch_size,
                     callbacks=[
@@ -326,8 +324,10 @@ def main():
                 print(f"Model weights saved in router_model_weights_{experiment_name}.h5")
 
                 # Get predictions
-                y_train_pred = router_model.predict(X_train)
-                y_test_pred = router_model.predict(X_test)
+                predictions = router_model.predict(X_train)
+                y_train_pred = predictions['forecast_head']
+                predictions = router_model.predict(X_test)
+                y_test_pred = predictions['forecast_head']
 
                 # Convert predictions to class labels
                 y_train_pred_classes = np.argmax(y_train_pred, axis=1)
@@ -340,8 +340,10 @@ def main():
                 test_cm = confusion_matrix(y_test_true_classes, y_test_pred_classes)
 
                 # Calculate accuracies
-                train_accuracy = router_model.evaluate(X_train, y_train_classes)[1]
-                test_accuracy = router_model.evaluate(X_test, y_test_classes)[1]
+                train_metrics = router_model.evaluate(X_train, {'forecast_head': y_train_classes})
+                test_metrics = router_model.evaluate(X_test, {'forecast_head': y_test_classes})
+                train_accuracy = train_metrics[1]  # Assuming accuracy is the second metric
+                test_accuracy = test_metrics[1]  # Assuming accuracy is the second metric
 
                 # Get detailed classification reports
                 train_report = classification_report(y_train_true_classes, y_train_pred_classes)
