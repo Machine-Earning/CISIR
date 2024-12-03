@@ -79,8 +79,8 @@ def main():
 
     reduce_lr_on_plateau = ReduceLROnPlateau(
         monitor=LR_CB_MONITOR,
-        factor=LR_CB_FACTOR,
-        patience=LR_CB_PATIENCE,
+        factor=LR_CB_FACTOR_PRE,
+        patience=LR_CB_PATIENCE_PRE,
         verbose=VERBOSE,
         min_delta=LR_CB_MIN_DELTA,
         min_lr=LR_CB_MIN_LR_PRE)

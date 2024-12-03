@@ -17,14 +17,14 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 
 # Pretraining configurations
 BATCH_SIZE_PRE = 6000  # Batch size for PDS
-START_LR_PRE = 5e-3  # starting learning rate for pretraining
-LR_CB_MIN_LR_PRE = 1e-5  # Minimum learning rate for pretraining
-LR_CB_FACTOR_PRE = 0.99  # factor for reducing learning rate in pretraining
-LR_CB_PATIENCE_PRE = 1000  # patience for reducing learning rate in pretraining
-PATIENCE_PRE = int(3e3)  # Higher patience for pretraining
-RHO_PRE = [1e-6]  # Pretraining rho parameter
+START_LR_PRE = 5e-4  # starting learning rate for pretraining
+LR_CB_MIN_LR_PRE = 5e-5  # Minimum learning rate for pretraining
+LR_CB_FACTOR_PRE = 0.95  # factor for reducing learning rate in pretraining
+LR_CB_PATIENCE_PRE = 100  # patience for reducing learning rate in pretraining
+PATIENCE_PRE = int(5e3)  # Higher patience for pretraining
+RHO_PRE = [1e-2]  # Pretraining rho parameter
 REWEIGHTS_PRE = [(1.0, 0.3)]  # Pretraining reweighting parameters
-WEIGHT_DECAY_PRE = 1e-3  # Higher weight decay for projection layers
+WEIGHT_DECAY_PRE = 1e-4  # Higher weight decay for projection layers
 
 # Model Architecture
 MLP_HIDDENS = [2048, 128, 1024, 128, 512, 128, 256, 128]  # Hidden layers
@@ -88,11 +88,12 @@ ATTM_SKIPPED_BLOCKS = 1
 ATTM_RESIDUAL = True
 ATTM_DROPOUT = 0.1
 ATTM_NORM = 'batch_norm'
-ATTM_WD = 1e-8
+ATTM_WD = 1e-6
 ATTM_LR_CB_FACTOR = 0.95
-ATTM_LR_CB_PATIENCE = 50
+ATTM_LR_CB_PATIENCE = 100
 ATTM_RHO = [1e-3]
-ATTM_PATIENCE = int(5e3)
+ATTM_PATIENCE = int(3e3)
+ATTM_CVRG_MIN_DELTA = 1e-2
 
 # ATTN AREA
 ATTN_HIDDENS = [256, 128, 256]  # this architecture is good enough to predict on its own

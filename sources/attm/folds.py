@@ -270,7 +270,7 @@ def main():
                     # Define the EarlyStopping callback
                     early_stopping = SmoothEarlyStopping(
                         monitor=CVRG_METRIC,
-                        min_delta=CVRG_MIN_DELTA,
+                        min_delta=ATTM_CVRG_MIN_DELTA,
                         patience=patience,
                         verbose=VERBOSE,
                         restore_best_weights=ES_CB_RESTORE_WEIGHTS,
@@ -397,7 +397,7 @@ def main():
 
                 early_stopping_cheat = SmoothEarlyStopping(
                     monitor=CVRG_METRIC,
-                    min_delta=CVRG_MIN_DELTA,
+                    min_delta=ATTM_CVRG_MIN_DELTA,
                     patience=patience,
                     verbose=VERBOSE,
                     restore_best_weights=ES_CB_RESTORE_WEIGHTS,
