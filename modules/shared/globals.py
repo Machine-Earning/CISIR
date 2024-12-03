@@ -38,7 +38,7 @@ SKIPPED_LAYERS = 1
 SKIP_REPR = True  # residual representation
 
 # Loss and Optimization
-LOSS_KEY = 'mse_pcc'  # Mean squared error regression loss
+LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
 START_LR = 1e-3  # starting learning rate
 WEIGHT_DECAY = 1e-4  # Higher weight decay
 MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
@@ -80,18 +80,19 @@ CVRG_METRIC = 'loss'
 ASYM_TYPE = 'sigmoid'
 
 # ATTM AREA
-BLOCKS_HIDDENS = [128 for _ in range(6)]
+BLOCKS_HIDDENS = [128 for _ in range(8)]
 ATTM_START_LR = 1e-3
-ATTM_LR_CB_MIN_LR = 1e-6
+ATTM_LR_CB_MIN_LR = 5e-6
 ATTM_ACTIVATION = 'leaky_relu'
 ATTM_SKIPPED_BLOCKS = 1
 ATTM_RESIDUAL = True
 ATTM_DROPOUT = 0.1
 ATTM_NORM = 'batch_norm'
 ATTM_WD = 1e-8
-ATTM_LR_CB_FACTOR = 0.9
-ATTM_LR_CB_PATIENCE = 100
+ATTM_LR_CB_FACTOR = 0.95
+ATTM_LR_CB_PATIENCE = 50
 ATTM_RHO = [1e-3]
+ATTM_PATIENCE = int(5e3)
 
 # ATTN AREA
 ATTN_HIDDENS = [256, 128, 256]  # this architecture is good enough to predict on its own
