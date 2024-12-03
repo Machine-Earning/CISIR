@@ -17,14 +17,14 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 
 # Pretraining configurations
 BATCH_SIZE_PRE = 6000  # Batch size for PDS
-START_LR_PRE = 1e-3  # starting learning rate for pretraining
+START_LR_PRE = 5e-3  # starting learning rate for pretraining
 LR_CB_MIN_LR_PRE = 1e-4  # Minimum learning rate for pretraining
 LR_CB_FACTOR_PRE = 0.99  # factor for reducing learning rate in pretraining
 LR_CB_PATIENCE_PRE = 1000  # patience for reducing learning rate in pretraining
-PATIENCE_PRE = int(1e4)  # Higher patience for pretraining
+PATIENCE_PRE = int(3e3)  # Higher patience for pretraining
 RHO_PRE = [1e-6]  # Pretraining rho parameter
 REWEIGHTS_PRE = [(1.0, 0.3)]  # Pretraining reweighting parameters
-WEIGHT_DECAY_PRE = 1e-6  # Higher weight decay for projection layers
+WEIGHT_DECAY_PRE = 1e-8  # Higher weight decay for projection layers
 
 # Model Architecture
 MLP_HIDDENS = [2048, 128, 1024, 128, 512, 128, 256, 128]  # Hidden layers
