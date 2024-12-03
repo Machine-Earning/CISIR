@@ -80,7 +80,7 @@ CVRG_METRIC = 'loss'
 ASYM_TYPE = 'sigmoid'
 
 # ATTM AREA
-BLOCKS_HIDDENS = [128 for _ in range(8)]
+BLOCKS_HIDDENS = [128 for _ in range(3)]
 ATTM_START_LR = 1e-3
 ATTM_LR_CB_MIN_LR = 5e-6
 ATTM_ACTIVATION = 'leaky_relu'
