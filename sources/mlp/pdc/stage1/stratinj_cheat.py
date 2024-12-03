@@ -217,6 +217,9 @@ def main():
         sam_rho=rho,
     )
 
+    # summary of the model
+    model_sep.summary()
+
     # Define the EarlyStopping callback
     early_stopping = SmoothEarlyStopping(
         monitor=CVRG_METRIC,
