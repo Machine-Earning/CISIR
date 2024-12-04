@@ -94,7 +94,7 @@ def main():
     upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
     mae_plus_threshold = MAE_PLUS_THRESHOLD
     smoothing_method = SMOOTHING_METHOD
-    window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
+    window_size = WINDOW_SIZE_PDS  # allows margin of error of 10 epochs
     val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
 
     # Initialize wandb
@@ -232,7 +232,7 @@ def main():
             weight_decay=weight_decay,
             beta_1=momentum_beta1
         ),
-        loss=lambda y_true, y_pred: mb.pds_loss_vec(
+        loss=lambda y_true, y_pred: mb.pds_loss_linear_m_vec(
             y_true, y_pred,
             phase_manager=pm,
             train_sample_weights=train_weights_dict,
@@ -288,7 +288,7 @@ def main():
             weight_decay=weight_decay,
             beta_1=momentum_beta1
         ),
-        loss=lambda y_true, y_pred: mb.pds_loss_vec(
+        loss=lambda y_true, y_pred: mb.pds_loss_linear_m_vec(
             y_true, y_pred,
             phase_manager=pm,
             train_sample_weights=train_weights_dict,

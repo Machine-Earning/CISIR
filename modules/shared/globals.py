@@ -17,12 +17,12 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 
 # Pretraining configurations
 BATCH_SIZE_PRE = 6000  # Batch size for PDS
-START_LR_PRE = 5e-4  # starting learning rate for pretraining
+START_LR_PRE = 1e-3  # starting learning rate for pretraining
 LR_CB_MIN_LR_PRE = 5e-5  # Minimum learning rate for pretraining
-LR_CB_FACTOR_PRE = 0.95  # factor for reducing learning rate in pretraining
-LR_CB_PATIENCE_PRE = 100  # patience for reducing learning rate in pretraining
+LR_CB_FACTOR_PRE = 0.99  # factor for reducing learning rate in pretraining
+LR_CB_PATIENCE_PRE = 50  # patience for reducing learning rate in pretraining
 PATIENCE_PRE = int(5e3)  # Higher patience for pretraining
-RHO_PRE = [1e-2]  # Pretraining rho parameter
+RHO_PRE = [1e-1]  # Pretraining rho parameter
 REWEIGHTS_PRE = [(1.0, 0.3)]  # Pretraining reweighting parameters
 WEIGHT_DECAY_PRE = 1e-4  # Higher weight decay for projection layers
 
@@ -67,7 +67,9 @@ TARGET_MIN_NORM_WEIGHT = 0.01  # Minimum weight for the target normalization
 # Smoothing Parameters
 SMOOTHING_METHOD = 'moving_average'
 VAL_WINDOW_SIZE = 101  # NOTE: must be odd
+VAL_WINDOW_SIZE_PDC = 101  # NOTE: must be odd
 WINDOW_SIZE = 101  # NOTE: must be odd
+WINDOW_SIZE_PDS = 101  # NOTE: must be odd
 
 # Additional Parameters
 RHO = [1e-2]
@@ -91,7 +93,7 @@ ATTM_NORM = 'batch_norm'
 ATTM_WD = 1e-6
 ATTM_LR_CB_FACTOR = 0.95
 ATTM_LR_CB_PATIENCE = 100
-ATTM_RHO = [1e-3]
+ATTM_RHO = [0.0] #[1e-3]
 ATTM_PATIENCE = int(3e3)
 ATTM_CVRG_MIN_DELTA = 1e-2
 
