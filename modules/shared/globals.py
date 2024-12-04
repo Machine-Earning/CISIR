@@ -119,4 +119,5 @@ BATCH_SIZE_MOE = 256  # Batch size for Moe
 PLUS_INDEX = 0
 MID_INDEX = 1
 MINUS_INDEX = 2
+ASYM_TYPE_ZERO = None
 
