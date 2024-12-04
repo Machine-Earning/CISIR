@@ -119,3 +119,5 @@ PLUS_INDEX = 0
 MID_INDEX = 1
 MINUS_INDEX = 2
 REWEIGHTS_MOE = [(0.0, 0.0, 0.0, 0.0)]  # [(0.3, 0.0, 0.1, 0.0)]  # 
+ASYM_TYPE_ZERO = None
+
