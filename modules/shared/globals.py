@@ -118,6 +118,8 @@ BATCH_SIZE_MOE = 256  # Batch size for Moe
 PLUS_INDEX = 0
 MID_INDEX = 1
 MINUS_INDEX = 2
-REWEIGHTS_MOE = [(0.0, 0.0, 0.0, 0.0)]  # [(0.3, 0.0, 0.1, 0.0)]  # 
+REWEIGHTS_MOE = [(0.3, 0.0, 0.1, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
+REWEIGHTS_MOE_ZERO = [(0.1, 0.0, 0.1, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
 ASYM_TYPE_ZERO = None
-
+PDC_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcStratInj_bs6000_v8_20241203-194954.h5"
+PRE_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.00_v8_updated_20241120-180201_reg.h5"

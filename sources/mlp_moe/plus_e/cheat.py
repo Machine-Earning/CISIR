@@ -43,7 +43,7 @@ def main():
     add_slope = ADD_SLOPE[0]  # Use first element
 
     # Path to pre-trained model weights
-    pretrained_weights = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcStratInj_bs6000_v8_20241203-194954.h5"
+    pretrained_weights = PDC_WEIGHT_PATH
 
     for seed in SEEDS:
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE:
