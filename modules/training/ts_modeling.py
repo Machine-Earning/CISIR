@@ -9,12 +9,14 @@ from typing import List, Union, Callable, Dict
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import tensorflow as tf
 from matplotlib.lines import Line2D
 from numpy import ndarray
 from scipy import stats
 from scipy.signal import correlate, correlation_lags
 from scipy.stats import pearsonr
+from sklearn.metrics import confusion_matrix
 from sklearn.metrics import mean_absolute_error
 from sklearn.utils import shuffle
 from tensorflow.keras import backend as K
@@ -33,7 +35,6 @@ from tensorflow.keras.layers import (
     MaxPooling1D,
     AveragePooling1D,
     Add,
-    Softmax,
     Multiply,
     Lambda,
     Reshape
@@ -42,10 +43,10 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Optimizer
 from tensorflow.keras.regularizers import l2
 
+from modules.shared.globals import PLUS_INDEX, MID_INDEX, MINUS_INDEX
 from modules.training.normlayer import NormalizeLayer
 from modules.training.phase_manager import TrainingPhaseManager, create_weight_tensor_fast
 from modules.training.sam_keras import SAMModel
-from modules.shared.globals import PLUS_INDEX, MID_INDEX, MINUS_INDEX
 
 # Seeds for reproducibility
 seed_value = 42
@@ -82,7 +83,12 @@ def get_plus_cls(X: np.ndarray, y: np.ndarray, upper_threshold: float, *addition
     return tuple(filtered)
 
 
-def get_zero_cls(X: np.ndarray, y: np.ndarray, lower_threshold: float, upper_threshold: float, *additional_sets) -> tuple[np.ndarray, ...]:
+def get_zero_cls(
+        X: np.ndarray,
+        y: np.ndarray,
+        lower_threshold: float,
+        upper_threshold: float,
+        *additional_sets) -> tuple[np.ndarray, ...]:
     """
     Get data samples where y values are between the lower and upper thresholds (zero class).
 
@@ -643,102 +649,102 @@ def add_proj_head(
         name: str = 'mlp',
         sam_rho: float = 0.05
 ) -> Model:
-        """
-        Add a regression head with one output unit and a projection layer to an existing model,
-        replacing the existing prediction layer and optionally the decoder layer.
+    """
+    Add a regression head with one output unit and a projection layer to an existing model,
+    replacing the existing prediction layer and optionally the decoder layer.
 
-        :param model: The existing model
-        :param output_dim: The dimensionality of the output of the regression head.
-        :param freeze_features: Whether to freeze the layers of the base model or not.
-        :param hiddens: List of integers representing the hidden layers for the projection.
-        :param pretraining: Whether to adapt the model for pretraining representations.
-        :param dropout: Dropout rate for adding dropout layers.
-        :param activation: Activation function to use. If None, defaults to LeakyReLU.
-        :param norm: Type of normalization ('batch_norm' or 'layer_norm').
-        :param skipped_layers: Number of layers between residual connections.
-        :param name: Name of the model.
-        :param sam_rho: Rho value for sharpness-aware minimization (SAM). Default is 0.05. if 0.0, SAM is not used.
-        :return: The modified model with a projection layer and a regression head.
-        """
+    :param model: The existing model
+    :param output_dim: The dimensionality of the output of the regression head.
+    :param freeze_features: Whether to freeze the layers of the base model or not.
+    :param hiddens: List of integers representing the hidden layers for the projection.
+    :param pretraining: Whether to adapt the model for pretraining representations.
+    :param dropout: Dropout rate for adding dropout layers.
+    :param activation: Activation function to use. If None, defaults to LeakyReLU.
+    :param norm: Type of normalization ('batch_norm' or 'layer_norm').
+    :param skipped_layers: Number of layers between residual connections.
+    :param name: Name of the model.
+    :param sam_rho: Rho value for sharpness-aware minimization (SAM). Default is 0.05. if 0.0, SAM is not used.
+    :return: The modified model with a projection layer and a regression head.
+    """
 
-        if hiddens is None:
-            hiddens = [6]
+    if hiddens is None:
+        hiddens = [6]
 
-        if activation is None:
-            activation = LeakyReLU()
+    if activation is None:
+        activation = LeakyReLU()
 
-        residual = True if skipped_layers > 0 else False
+    residual = True if skipped_layers > 0 else False
 
-        print(f'Features are frozen: {freeze_features}')
+    print(f'Features are frozen: {freeze_features}')
 
-        # Determine the layer to be kept based on whether pretraining representations are used
-        layer_to_keep = 'normalize_layer' if pretraining else 'repr_layer'
+    # Determine the layer to be kept based on whether pretraining representations are used
+    layer_to_keep = 'normalize_layer' if pretraining else 'repr_layer'
 
-        # Remove the last layer(s) to keep only the representation layer
-        new_base_model = Model(inputs=model.input, outputs=model.get_layer(layer_to_keep).output)
+    # Remove the last layer(s) to keep only the representation layer
+    new_base_model = Model(inputs=model.input, outputs=model.get_layer(layer_to_keep).output)
 
-        # If freeze_features is True, freeze the layers of the new base model
-        if freeze_features:
-            for layer in new_base_model.layers:
-                layer.trainable = False
+    # If freeze_features is True, freeze the layers of the new base model
+    if freeze_features:
+        for layer in new_base_model.layers:
+            layer.trainable = False
 
-        # Count existing dropout layers to avoid naming conflicts
-        dropout_count = sum(1 for layer in model.layers if isinstance(layer, Dropout))
+    # Count existing dropout layers to avoid naming conflicts
+    dropout_count = sum(1 for layer in model.layers if isinstance(layer, Dropout))
 
-        # Extract the output of the last layer of the new base model (representation layer)
-        repr_output = new_base_model.output
+    # Extract the output of the last layer of the new base model (representation layer)
+    repr_output = new_base_model.output
 
-        # Projection Layer(s)
-        x_proj = repr_output
-        residual_layer = None
+    # Projection Layer(s)
+    x_proj = repr_output
+    residual_layer = None
 
-        for i, nodes in enumerate(hiddens):
-            if i % skipped_layers == 0 and i > 0 and residual:
-                if residual_layer is not None:
-                    # Check if projection is needed
-                    if x_proj.shape[-1] != residual_layer.shape[-1]:
-                        # Correct projection to match 'x_proj' dimensions
-                        residual_layer = Dense(x_proj.shape[-1], use_bias=False)(residual_layer)
-                    x_proj = Add()([x_proj, residual_layer])
-                residual_layer = x_proj  # Update the starting point for the next residual connection
-            else:
-                if i % skipped_layers == 0 or residual_layer is None:
-                    residual_layer = x_proj
-
-            x_proj = Dense(
-                nodes,
-                name=f"projection_layer_{i + 1}")(x_proj)
-
-            if norm == 'batch_norm':
-                x_proj = BatchNormalization(name=f"batch_norm_{i + 1}")(x_proj)
-            elif norm == 'layer_norm':
-                x_proj = LayerNormalization(name=f"layer_norm_{i + 1}")(x_proj)
-
-            if callable(activation):
-                x_proj = activation(x_proj)
-            else:
-                x_proj = LeakyReLU(name=f"activation_{i + 1}")(x_proj)
-
-            if dropout > 0.0:
-                x_proj = Dropout(dropout, name=f"proj_dropout_{dropout_count + i + 1}")(x_proj)
-
-        # Add a Dense layer with one output unit for regression
-        output_layer = Dense(output_dim, activation='linear', name=f"forecast_head")(x_proj)
-
-        if sam_rho > 0.0:
-            # create the new extended SAM model
-            extended_model = SAMModel(inputs=new_base_model.input, outputs=[repr_output, output_layer], rho=sam_rho,
-                                      name=name)
+    for i, nodes in enumerate(hiddens):
+        if i % skipped_layers == 0 and i > 0 and residual:
+            if residual_layer is not None:
+                # Check if projection is needed
+                if x_proj.shape[-1] != residual_layer.shape[-1]:
+                    # Correct projection to match 'x_proj' dimensions
+                    residual_layer = Dense(x_proj.shape[-1], use_bias=False)(residual_layer)
+                x_proj = Add()([x_proj, residual_layer])
+            residual_layer = x_proj  # Update the starting point for the next residual connection
         else:
-            # Create the new extended model
-            extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer], name=name)
+            if i % skipped_layers == 0 or residual_layer is None:
+                residual_layer = x_proj
 
-        # If freeze_features is False, make all layers trainable
-        if not freeze_features:
-            for layer in extended_model.layers:
-                layer.trainable = True
+        x_proj = Dense(
+            nodes,
+            name=f"projection_layer_{i + 1}")(x_proj)
 
-        return extended_model
+        if norm == 'batch_norm':
+            x_proj = BatchNormalization(name=f"batch_norm_{i + 1}")(x_proj)
+        elif norm == 'layer_norm':
+            x_proj = LayerNormalization(name=f"layer_norm_{i + 1}")(x_proj)
+
+        if callable(activation):
+            x_proj = activation(x_proj)
+        else:
+            x_proj = LeakyReLU(name=f"activation_{i + 1}")(x_proj)
+
+        if dropout > 0.0:
+            x_proj = Dropout(dropout, name=f"proj_dropout_{dropout_count + i + 1}")(x_proj)
+
+    # Add a Dense layer with one output unit for regression
+    output_layer = Dense(output_dim, activation='linear', name=f"forecast_head")(x_proj)
+
+    if sam_rho > 0.0:
+        # create the new extended SAM model
+        extended_model = SAMModel(inputs=new_base_model.input, outputs=[repr_output, output_layer], rho=sam_rho,
+                                  name=name)
+    else:
+        # Create the new extended model
+        extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer], name=name)
+
+    # If freeze_features is False, make all layers trainable
+    if not freeze_features:
+        for layer in extended_model.layers:
+            layer.trainable = True
+
+    return extended_model
 
 
 def add_decoder(encoder_model, hiddens, activation=None, norm=None, dropout=0.0, skip_connections=False):
@@ -802,6 +808,78 @@ def add_decoder(encoder_model, hiddens, activation=None, norm=None, dropout=0.0,
     autoencoder_model = Model(inputs=encoder_input, outputs=[representation, reconstructed])
 
     return autoencoder_model
+
+
+def plot_confusion_matrix(
+        y_true: np.ndarray,
+        y_pred: np.ndarray,
+        class_names: List[str],
+        title: str = "Confusion Matrix"
+) -> plt.Figure:
+    """
+    Creates and returns a figure containing a confusion matrix plot.
+    
+    Args:
+        y_true: Ground truth labels as 1D array
+        y_pred: Predicted labels as 1D array  
+        class_names: List of class names for axis labels
+        title: Title for the plot
+        
+    Returns:
+        matplotlib Figure object containing the confusion matrix plot
+    """
+    # Calculate confusion matrix
+    cm = confusion_matrix(y_true, y_pred)
+
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    # Plot confusion matrix using seaborn
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                xticklabels=class_names,
+                yticklabels=class_names,
+                ax=ax)
+
+    # Set labels and title
+    ax.set_xlabel('Predicted')
+    ax.set_ylabel('True')
+    ax.set_title(title)
+
+    # Adjust layout
+    plt.tight_layout()
+
+    return fig
+
+
+def focal_loss(gamma: float = 3.0, alpha: float = 0.25):
+    """
+    Creates a focal loss function with specified gamma and alpha parameters.
+    
+    Args:
+        gamma: Focusing parameter that modulates the rate at which easy examples are down-weighted
+        alpha: Balancing parameter for class weights
+        
+    Returns:
+        Callable focal loss function for model compilation
+    """
+
+    def focal_loss_fn(y_true, y_pred):
+        # Scale predictions so that the class probabilities sum to 1
+        y_pred /= tf.reduce_sum(y_pred, axis=-1, keepdims=True)
+
+        # Clip the prediction value to prevent NaN's and Inf's
+        epsilon = tf.keras.backend.epsilon()
+        y_pred = tf.clip_by_value(y_pred, epsilon, 1. - epsilon)
+
+        # Calculate cross entropy
+        cross_entropy = -y_true * tf.math.log(y_pred)
+
+        # Calculate focal loss
+        loss = alpha * tf.math.pow(1 - y_pred, gamma) * cross_entropy
+
+        return tf.reduce_sum(loss, axis=-1)
+
+    return focal_loss_fn
 
 
 def create_mlp_moe(
@@ -928,7 +1006,7 @@ def create_mlp_moe(
             expert_zero.load_weights(expert_paths['zero'])
         if 'minus' in expert_paths:
             expert_minus.load_weights(expert_paths['minus'])
-        
+
         if freeze_experts:
             for expert in [expert_plus, expert_zero, expert_minus]:
                 for layer in expert.layers:
@@ -942,9 +1020,9 @@ def create_mlp_moe(
 
     # Extract routing probabilities
     routing_probs = router_output[1]  # Shape: (batch_size, 3)
-    plus_prob = Lambda(lambda x: x[:, PLUS_INDEX:PLUS_INDEX+1])(routing_probs)
-    zero_prob = Lambda(lambda x: x[:, MID_INDEX:MID_INDEX+1])(routing_probs)
-    minus_prob = Lambda(lambda x: x[:, MINUS_INDEX:MINUS_INDEX+1])(routing_probs)
+    plus_prob = Lambda(lambda x: x[:, PLUS_INDEX:PLUS_INDEX + 1])(routing_probs)
+    zero_prob = Lambda(lambda x: x[:, MID_INDEX:MID_INDEX + 1])(routing_probs)
+    minus_prob = Lambda(lambda x: x[:, MINUS_INDEX:MINUS_INDEX + 1])(routing_probs)
 
     # Combine expert outputs using routing probabilities
     plus_weighted = Multiply()([plus_output[1], plus_prob])
@@ -4114,9 +4192,6 @@ def cmse(
 
     # Return the final loss as a single scalar value
     return loss
-
-
-
 
 
 def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,

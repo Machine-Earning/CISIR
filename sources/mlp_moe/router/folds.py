@@ -1,104 +1,25 @@
-import os
 from datetime import datetime
 
+import matplotlib.pyplot as plt
 import numpy as np
 import wandb
+from sklearn.metrics import classification_report
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
-from sklearn.metrics import confusion_matrix, classification_report
-import tensorflow as tf
-import matplotlib.pyplot as plt
-import seaborn as sns
-from typing import List, Tuple, Optional, Dict, Union
 
-from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
     build_dataset,
-    evaluate_mae,
-    evaluate_pcc,
-    process_sep_events,
-    stratified_batch_dataset,
     set_seed,
-    cmse,
-    filter_ds,
     create_mlp,
-    plot_error_hist,
     load_stratified_folds,
-    convert_to_onehot_cls
+    convert_to_onehot_cls,
+    focal_loss,
+    plot_confusion_matrix
 )
-
-
-def plot_confusion_matrix(y_true: np.ndarray, 
-                         y_pred: np.ndarray, 
-                         class_names: List[str],
-                         title: str = "Confusion Matrix") -> plt.Figure:
-    """
-    Creates and returns a figure containing a confusion matrix plot.
-    
-    Args:
-        y_true: Ground truth labels as 1D array
-        y_pred: Predicted labels as 1D array  
-        class_names: List of class names for axis labels
-        title: Title for the plot
-        
-    Returns:
-        matplotlib Figure object containing the confusion matrix plot
-    """
-    # Calculate confusion matrix
-    cm = confusion_matrix(y_true, y_pred)
-    
-    # Create figure and axis
-    fig, ax = plt.subplots(figsize=(10, 8))
-    
-    # Plot confusion matrix using seaborn
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                xticklabels=class_names,
-                yticklabels=class_names,
-                ax=ax)
-    
-    # Set labels and title
-    ax.set_xlabel('Predicted')
-    ax.set_ylabel('True')
-    ax.set_title(title)
-    
-    # Adjust layout
-    plt.tight_layout()
-    
-    return fig
-
-
-def focal_loss(gamma: float = 2.0, alpha: float = 0.25):
-    """
-    Creates a focal loss function with specified gamma and alpha parameters.
-    
-    Args:
-        gamma: Focusing parameter that modulates the rate at which easy examples are down-weighted
-        alpha: Balancing parameter for class weights
-        
-    Returns:
-        Callable focal loss function for model compilation
-    """
-    def focal_loss_fn(y_true, y_pred):
-        # Scale predictions so that the class probabilities sum to 1
-        y_pred /= tf.reduce_sum(y_pred, axis=-1, keepdims=True)
-        
-        # Clip the prediction value to prevent NaN's and Inf's
-        epsilon = tf.keras.backend.epsilon()
-        y_pred = tf.clip_by_value(y_pred, epsilon, 1. - epsilon)
-        
-        # Calculate cross entropy
-        cross_entropy = -y_true * tf.math.log(y_pred)
-        
-        # Calculate focal loss
-        loss = alpha * tf.math.pow(1 - y_pred, gamma) * cross_entropy
-        
-        return tf.reduce_sum(loss, axis=-1)
-    return focal_loss_fn
 
 
 def main():
@@ -119,7 +40,7 @@ def main():
                 lambda_factor = LAMBDA_FACTOR  # lambda for the loss
                 add_slope = ADD_SLOPE[0]  # Use first add_slope value
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]  # Use first threshold value
-                
+
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
@@ -244,14 +165,14 @@ def main():
                 # 4-fold cross-validation
                 folds_optimal_epochs = []
                 for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
-                    load_stratified_folds(
-                        root_dir,
-                        inputs_to_use=inputs_to_use,
-                        add_slope=add_slope,
-                        outputs_to_use=outputs_to_use,
-                        cme_speed_threshold=cme_speed_threshold,
-                        seed=seed, shuffle=True
-                    )
+                        load_stratified_folds(
+                            root_dir,
+                            inputs_to_use=inputs_to_use,
+                            add_slope=add_slope,
+                            outputs_to_use=outputs_to_use,
+                            cme_speed_threshold=cme_speed_threshold,
+                            seed=seed, shuffle=True
+                        )
                 ):
                     print(f'Fold: {fold_idx}')
                     # print all shapes
@@ -323,7 +244,7 @@ def main():
                         smoothing_parameters={'window_size': val_window_size},
                         mode='min')
                     folds_optimal_epochs.append(optimal_epoch)
-                    
+
                     # Log fold metrics
                     print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
                     wandb.log({f'fold_{fold_idx}_best_epoch': folds_optimal_epochs[-1]})
@@ -391,18 +312,18 @@ def main():
 
                 # Calculate confusion matrices and create plots
                 class_names = ['Low', 'Mid', 'High']
-                
+
                 # Create and save train confusion matrix plot
                 train_cm_fig = plot_confusion_matrix(
-                    y_train_true_classes, 
+                    y_train_true_classes,
                     y_train_pred_classes,
                     class_names=class_names,
                     title="Training Confusion Matrix"
                 )
-                
+
                 # Create and save test confusion matrix plot
                 test_cm_fig = plot_confusion_matrix(
-                    y_test_true_classes, 
+                    y_test_true_classes,
                     y_test_pred_classes,
                     class_names=class_names,
                     title="Test Confusion Matrix"
