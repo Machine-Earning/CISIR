@@ -74,7 +74,6 @@ WINDOW_SIZE_PDS = 101  # NOTE: must be odd
 # Additional Parameters
 RHO = [1e-2]
 REWEIGHTS = [(1.0, 0.3, 0.1, 0)]
-REWEIGHTS_MOE = [(0.0, 0.0, 0.0, 0.0)]
 LAMBDA_FACTOR = 8
 AE_LAMBDA = 0.9
 CVRG_MIN_DELTA = 1e-5
@@ -119,4 +118,4 @@ BATCH_SIZE_MOE = 256  # Batch size for Moe
 PLUS_INDEX = 0
 MID_INDEX = 1
 MINUS_INDEX = 2
-
+REWEIGHTS_MOE = [(0.0, 0.0, 0.0, 0.0)]  # [(0.3, 0.0, 0.1, 0.0)]  # 
