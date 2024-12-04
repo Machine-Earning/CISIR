@@ -409,7 +409,7 @@ def main():
                                     final_model_sep_stage1,
                                     output_dim=output_dim,
                                     freeze_features=freeze,
-                                    pds=pds,
+                                    pretraining=pretraining,
                                     hiddens=proj_hiddens,
                                     dropout=dropout,
                                     activation=activation,

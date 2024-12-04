@@ -252,8 +252,7 @@ class ModelBuilder:
                       output_dim: int = 1,
                       hiddens: Optional[List[int]] = None,
                       freeze_features: bool = True,
-                      pds: bool = False,
-                      l2_reg: float = None,
+                      pretraining: bool = False,
                       dropout: float = 0.0,
                       activation=None,
                       norm: str = None,
@@ -268,8 +267,7 @@ class ModelBuilder:
         :param output_dim: The dimensionality of the output of the regression head.
         :param freeze_features: Whether to freeze the layers of the base model or not.
         :param hiddens: List of integers representing the hidden layers for the projection.
-        :param pds: Whether to adapt the model for PDS representations.
-        :param l2_reg: L2 regularization factor.
+        :param pretraining: Whether to adapt the model for pretraining representations.
         :param dropout: Dropout rate for adding dropout layers.
         :param activation: Activation function to use. If None, defaults to LeakyReLU.
         :param norm: Type of normalization ('batch_norm' or 'layer_norm').
@@ -289,8 +287,8 @@ class ModelBuilder:
 
         print(f'Features are frozen: {freeze_features}')
 
-        # Determine the layer to be kept based on whether PDS representations are used
-        layer_to_keep = 'normalize_layer' if pds else 'repr_layer'
+        # Determine the layer to be kept based on whether pretraining representations are used
+        layer_to_keep = 'normalize_layer' if pretraining else 'repr_layer'
 
         # Remove the last layer(s) to keep only the representation layer
         new_base_model = Model(inputs=model.input, outputs=model.get_layer(layer_to_keep).output)
@@ -316,8 +314,7 @@ class ModelBuilder:
                     # Check if projection is needed
                     if x_proj.shape[-1] != residual_layer.shape[-1]:
                         # Correct projection to match 'x_proj' dimensions
-                        residual_layer = Dense(x_proj.shape[-1], kernel_regularizer=l2(l2_reg) if l2_reg else None,
-                                               use_bias=False)(residual_layer)
+                        residual_layer = Dense(x_proj.shape[-1], use_bias=False)(residual_layer)
                     x_proj = Add()([x_proj, residual_layer])
                 residual_layer = x_proj  # Update the starting point for the next residual connection
             else:
@@ -325,7 +322,7 @@ class ModelBuilder:
                     residual_layer = x_proj
 
             x_proj = Dense(
-                nodes, kernel_regularizer=l2(l2_reg) if l2_reg else None,
+                nodes,
                 name=f"projection_layer_{i + 1}")(x_proj)
 
             if norm == 'batch_norm':
