@@ -17,12 +17,12 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 
 # Pretraining configurations
 BATCH_SIZE_PRE = 6000  # Batch size for PDS
-START_LR_PRE = 1e-3  # starting learning rate for pretraining
-LR_CB_MIN_LR_PRE = 5e-5  # Minimum learning rate for pretraining
-LR_CB_FACTOR_PRE = 0.99  # factor for reducing learning rate in pretraining
+START_LR_PRE = 5e-4  # starting learning rate for pretraining
+LR_CB_MIN_LR_PRE = 1e-5  # Minimum learning rate for pretraining
+LR_CB_FACTOR_PRE = 0.95  # factor for reducing learning rate in pretraining
 LR_CB_PATIENCE_PRE = 50  # patience for reducing learning rate in pretraining
 PATIENCE_PRE = int(5e3)  # Higher patience for pretraining
-RHO_PRE = [1e-1]  # Pretraining rho parameter
+RHO_PRE = [1]  # Pretraining rho parameter
 REWEIGHTS_PRE = [(1.0, 0.3)]  # Pretraining reweighting parameters
 WEIGHT_DECAY_PRE = 1e-4  # Higher weight decay for projection layers
 
@@ -46,13 +46,13 @@ RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 
 # Learning Rate Scheduling
 LR_CB_MIN_LR = 1e-5  # minimum learning rate
-LR_CB_FACTOR = 0.9  # factor for reducing learning rate # gradual decay leads to more stable training
-LR_CB_PATIENCE = 100  # patience for reducing learning rate
+LR_CB_FACTOR = 0.95 # factor for reducing learning rate # gradual decay leads to more stable training
+LR_CB_PATIENCE = 50  # patience for reducing learning rate
 LR_CB_MIN_DELTA = 1e-5  # Minimum delta for reducing learning rate
 LR_CB_MONITOR = 'loss'  # Monitor validation loss
 
 # Early Stopping
-PATIENCE = int(2e3)  # Higher patience
+PATIENCE = int(3e3)  # Higher patience
 ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
 ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 
@@ -66,8 +66,8 @@ TARGET_MIN_NORM_WEIGHT = 0.01  # Minimum weight for the target normalization
 
 # Smoothing Parameters
 SMOOTHING_METHOD = 'moving_average'
-VAL_WINDOW_SIZE = 101  # NOTE: must be odd
-VAL_WINDOW_SIZE_PDC = 101  # NOTE: must be odd
+VAL_WINDOW_SIZE = 151  # NOTE: must be odd
+VAL_WINDOW_SIZE_PDC = 151  # NOTE: must be odd
 WINDOW_SIZE = 101  # NOTE: must be odd
 WINDOW_SIZE_PDS = 101  # NOTE: must be odd
 
@@ -91,7 +91,7 @@ ATTM_DROPOUT = 0.1
 ATTM_NORM = 'batch_norm'
 ATTM_WD = 1e-6
 ATTM_LR_CB_FACTOR = 0.95
-ATTM_LR_CB_PATIENCE = 100
+ATTM_LR_CB_PATIENCE = 50
 ATTM_RHO = [0.0] #[1e-3]
 ATTM_PATIENCE = int(3e3)
 ATTM_CVRG_MIN_DELTA = 1e-2
@@ -114,12 +114,13 @@ LEAKY_RELU_ALPHA = 0.3
 
 # Router
 ROUTER_OUTPUT_DIM = 3  # 3 classes for routing
-BATCH_SIZE_MOE = 256  # Batch size for Moe
+BATCH_SIZE_MOE = 300  # Batch size for Moe
 PLUS_INDEX = 0
 MID_INDEX = 1
 MINUS_INDEX = 2
-REWEIGHTS_MOE = [(0.3, 0.0, 0.1, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
-REWEIGHTS_MOE_ZERO = [(0.1, 0.0, 0.1, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
-ASYM_TYPE_ZERO = None
+REWEIGHTS_MOE = [(0.3, 0.3, 0.1, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
+REWEIGHTS_MOE_0 = [(0.1, 0.1, 0.1, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
+ASYM_TYPE_0 = None
+ASYM_TYPE_MOE = None
 PDC_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcStratInj_bs6000_v8_20241203-194954.h5"
 PRE_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.00_v8_updated_20241120-180201_reg.h5"

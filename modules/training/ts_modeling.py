@@ -4104,7 +4104,7 @@ def asymmetric_weight_silu(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
     return 1 + silu
 
 
-def asymmetric_weight_sigmoid(y_true: tf.Tensor, y_pred: tf.Tensor, eta: float = 0.5, zeta: float = 2) -> tf.Tensor:
+def asymmetric_weight_sigmoid(y_true: tf.Tensor, y_pred: tf.Tensor, eta: float = 0.8, zeta: float = 2) -> tf.Tensor:
     """
     Asymmetric weight based on Sigmoid function:
     AW = 2(1 - eta) * Sigmoid(zeta * (y_true - y_pred)) + eta

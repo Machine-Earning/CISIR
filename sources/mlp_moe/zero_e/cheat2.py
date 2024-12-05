@@ -45,7 +45,7 @@ def main():
     pretrained_weights = PRE_WEIGHT_PATH
 
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_ZERO:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_0:
             for rho in RHO:  # SAM_RHOS:
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
@@ -63,7 +63,7 @@ def main():
                 set_seed(seed)
                 patience = PATIENCE  # higher patience
                 learning_rate = START_LR  # starting learning rate
-                asym_type = ASYM_TYPE_ZERO
+                asym_type = ASYM_TYPE_0
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,

@@ -63,7 +63,7 @@ def main():
                 set_seed(seed)
                 patience = PATIENCE  # higher patience
                 learning_rate = START_LR  # starting learning rate
-                asym_type = ASYM_TYPE
+                asym_type = ASYM_TYPE_MOE
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
