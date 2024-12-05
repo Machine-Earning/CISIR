@@ -248,6 +248,8 @@ def main():
                         debug=False).label_reweight_dict
                     print(f'validation set rebalanced.')
 
+                    set_seed(seed) # set seed for model creation in each fold
+
                     # create the model
                     model_sep = create_attentive_model2_dict(
                         input_dim=n_features,
@@ -338,6 +340,8 @@ def main():
                 print(f'optimal_epochs: {optimal_epochs}')
                 wandb.log({'optimal_epochs': optimal_epochs})
 
+                set_seed(seed) # set seed for cheat training
+
                 # Cheat training to find test set optimal epoch
                 print("Running cheat training with test set validation...")
                 cheat_model = create_attentive_model2_dict(
@@ -426,6 +430,8 @@ def main():
                     mode='min')
                 print(f'cheat_optimal_epoch (using test set): {cheat_optimal_epoch}')
                 wandb.log({'cheat_optimal_epoch': cheat_optimal_epoch})
+
+                set_seed(seed) # set seed for final training
 
                 final_model_sep = create_attentive_model2_dict(
                     input_dim=n_features,

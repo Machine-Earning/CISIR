@@ -45,8 +45,8 @@ def main():
     pretrained_weights = PRE_WEIGHT_PATH
 
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE:
-            for rho in RHO:  # SAM_RHOS:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_P:
+            for rho in RHO_MOE_P:  # SAM_RHOS:
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
                 lambda_factor = LAMBDA_FACTOR  # lambda for the loss

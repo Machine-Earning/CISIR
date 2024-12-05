@@ -17,13 +17,13 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 
 # Pretraining configurations
 BATCH_SIZE_PRE = 6000  # Batch size for PDS
-START_LR_PRE = 5e-4  # starting learning rate for pretraining
-LR_CB_MIN_LR_PRE = 1e-5  # Minimum learning rate for pretraining
+START_LR_PRE = 1e-3  # starting learning rate for pretraining
+LR_CB_MIN_LR_PRE = 1e-6  # Minimum learning rate for pretraining
 LR_CB_FACTOR_PRE = 0.95  # factor for reducing learning rate in pretraining
-LR_CB_PATIENCE_PRE = 50  # patience for reducing learning rate in pretraining
-PATIENCE_PRE = int(5e3)  # Higher patience for pretraining
-RHO_PRE = [1]  # Pretraining rho parameter
-REWEIGHTS_PRE = [(1.0, 0.3)]  # Pretraining reweighting parameters
+LR_CB_PATIENCE_PRE = 20  # patience for reducing learning rate in pretraining
+PATIENCE_PRE = int(8e3)  # Higher patience for pretraining
+RHO_PRE = [0.0]  # Pretraining rho parameter
+REWEIGHTS_PRE = [(1.3, 0.3)]  # Pretraining reweighting parameters
 WEIGHT_DECAY_PRE = 1e-4  # Higher weight decay for projection layers
 
 # Model Architecture
@@ -67,7 +67,7 @@ TARGET_MIN_NORM_WEIGHT = 0.01  # Minimum weight for the target normalization
 # Smoothing Parameters
 SMOOTHING_METHOD = 'moving_average'
 VAL_WINDOW_SIZE = 151  # NOTE: must be odd
-VAL_WINDOW_SIZE_PDC = 151  # NOTE: must be odd
+VAL_WINDOW_SIZE_PDC = 51  # NOTE: must be odd
 WINDOW_SIZE = 101  # NOTE: must be odd
 WINDOW_SIZE_PDS = 101  # NOTE: must be odd
 
@@ -83,7 +83,7 @@ ASYM_TYPE = 'sigmoid'
 # ATTM AREA
 BLOCKS_HIDDENS = [128 for _ in range(3)]
 ATTM_START_LR = 1e-3
-ATTM_LR_CB_MIN_LR = 5e-6
+ATTM_LR_CB_MIN_LR = 1e-6
 ATTM_ACTIVATION = 'leaky_relu'
 ATTM_SKIPPED_BLOCKS = 1
 ATTM_RESIDUAL = True
@@ -118,8 +118,15 @@ BATCH_SIZE_MOE = 300  # Batch size for Moe
 PLUS_INDEX = 0
 MID_INDEX = 1
 MINUS_INDEX = 2
-REWEIGHTS_MOE = [(0.3, 0.3, 0.1, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
-REWEIGHTS_MOE_0 = [(0.1, 0.1, 0.1, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
+RHO_MOE = [5e-1] #[1e-3]
+RHO_MOE_0 = [1e-1] #[1e-3]
+RHO_MOE_P = [1e-1] #[1e-3]
+RHO_MOE_M = [1e-1] #[1e-3]
+
+REWEIGHTS_MOE = [(0.3, 0.15, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
+REWEIGHTS_MOE_P = [(0.2, 0.15, 0.0, 0.0)]
+REWEIGHTS_MOE_M = [(0.5, 0.15, 0.0, 0.0)]
+REWEIGHTS_MOE_0 = [(0.1, 0.0, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
 ASYM_TYPE_0 = None
 ASYM_TYPE_MOE = None
 PDC_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcStratInj_bs6000_v8_20241203-194954.h5"

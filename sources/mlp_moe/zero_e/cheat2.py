@@ -46,7 +46,7 @@ def main():
 
     for seed in SEEDS:
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_0:
-            for rho in RHO:  # SAM_RHOS:
+            for rho in RHO_MOE:  # SAM_RHOS:
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
                 lambda_factor = LAMBDA_FACTOR  # lambda for the loss
