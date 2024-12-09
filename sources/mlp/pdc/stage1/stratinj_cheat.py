@@ -52,7 +52,7 @@ def main():
     print(f'batch size : {batch_size}')
 
     # Construct the title
-    title = f'mlp2_pdcStratInj_bs{batch_size}_v8'
+    title = f'mlp2_pdc_strat_bs{batch_size}'
 
     # Replace any other characters that are not suitable for filenames (if any)
     title = title.replace(' ', '_').replace(':', '_')
@@ -72,7 +72,7 @@ def main():
     hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
     pretraining = True
     embed_dim = EMBED_DIM
-    dropout = DROPOUT
+    dropout = DROPOUT_PRE
     activation = ACTIVATION
     norm = NORM
     skip_repr = SKIP_REPR
@@ -93,7 +93,7 @@ def main():
     upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
     mae_plus_threshold = MAE_PLUS_THRESHOLD
     smoothing_method = SMOOTHING_METHOD
-    window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
+    window_size = WINDOW_SIZE_PDC  # allows margin of error of 10 epochs
     val_window_size = VAL_WINDOW_SIZE_PDC  # allows margin of error of 10 epochs
 
     # Initialize wandb
@@ -103,6 +103,8 @@ def main():
         "patience": patience,
         "learning_rate": learning_rate,
         "min_lr": LR_CB_MIN_LR_PRE,
+        "factor_lr": LR_CB_FACTOR_PRE,
+        "patience_lr": LR_CB_PATIENCE_PRE,
         "weight_decay": weight_decay,
         "momentum_beta1": momentum_beta1,
         "batch_size": batch_size,

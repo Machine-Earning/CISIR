@@ -45,7 +45,7 @@ def main():
     seed = 456789
     inputs_to_use = INPUTS_TO_USE[0]
     cme_speed_threshold = CME_SPEED_THRESHOLD[0]
-    alpha, alphaV = REWEIGHTS_PRE[0]
+    alpha, alphaV = REWEIGHTS_PDS[0]
     rho = RHO_PRE[0]
     add_slope = ADD_SLOPE[0]
     outputs_to_use = OUTPUTS_TO_USE
@@ -65,7 +65,7 @@ def main():
     set_seed(seed)
     epochs = EPOCHS
     patience = PATIENCE_PRE
-    learning_rate = START_LR_PRE
+    learning_rate = START_LR_PDS
     weight_decay = WEIGHT_DECAY_PRE
     momentum_beta1 = MOMENTUM_BETA1
 
@@ -73,18 +73,18 @@ def main():
     hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
     pretraining = True
     embed_dim = EMBED_DIM
-    dropout = DROPOUT
+    dropout = DROPOUT_PRE
     activation = ACTIVATION
     norm = NORM
     skip_repr = SKIP_REPR
 
     reduce_lr_on_plateau = ReduceLROnPlateau(
         monitor=LR_CB_MONITOR,
-        factor=LR_CB_FACTOR_PRE,
-        patience=LR_CB_PATIENCE_PRE,
+        factor=LR_CB_FACTOR_PDS,
+        patience=LR_CB_PATIENCE_PDS,
         verbose=VERBOSE,
         min_delta=LR_CB_MIN_DELTA,
-        min_lr=LR_CB_MIN_LR_PRE)
+        min_lr=LR_CB_MIN_LR_PDS)
 
     bandwidth = BANDWIDTH
     residual = RESIDUAL
@@ -95,7 +95,7 @@ def main():
     mae_plus_threshold = MAE_PLUS_THRESHOLD
     smoothing_method = SMOOTHING_METHOD
     window_size = WINDOW_SIZE_PDS  # allows margin of error of 10 epochs
-    val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
+    val_window_size = VAL_WINDOW_SIZE_PDS  # allows margin of error of 10 epochs
 
     # Initialize wandb
     wandb.init(project="Repr-Jan-Report", name=experiment_name, config={
@@ -103,7 +103,7 @@ def main():
         "add_slope": add_slope,
         "patience": patience,
         "learning_rate": learning_rate,
-        "min_lr": LR_CB_MIN_LR_PRE,
+        "min_lr": LR_CB_MIN_LR_PDS,
         "weight_decay": weight_decay,
         "momentum_beta1": momentum_beta1,
         "batch_size": batch_size,
@@ -135,7 +135,7 @@ def main():
         'inj': 'strat',
         'smoothing_method': smoothing_method,
         'window_size': window_size,
-        'val_window_size': val_window_size
+        'val_window_size': val_window_size,
     })
     # set the root directory
     root_dir = DS_PATH

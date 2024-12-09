@@ -95,8 +95,8 @@ def main():
                 upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                 smoothing_method = SMOOTHING_METHOD
-                window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
-                val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
+                window_size = ATTM_WINDOW_SIZE  # allows margin of error of 10 epochs
+                val_window_size = ATTM_VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
 
                 # Initialize wandb
                 wandb.init(project="Jan-Report", name=experiment_name, config={
