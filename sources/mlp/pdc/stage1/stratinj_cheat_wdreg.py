@@ -28,6 +28,25 @@ from modules.training.ts_modeling import (
 )
 
 
+def add_weight_decay(model: tf.keras.Model, weight_decay: float, debug: bool = True) -> None:
+    """
+    Adds L2 weight decay regularization to all layers that have a kernel attribute.
+
+    :param model: The TensorFlow model to which weight decay should be added.
+    :param weight_decay: The L2 weight decay factor.
+    :param debug: If True, prints debug information about layers
+    """
+    if weight_decay != 0:
+        for layer in model.layers:
+            if debug:
+                print(f"Processing layer: {layer}")
+            # Only apply weight decay if layer has a kernel attribute and it's not None
+            if hasattr(layer, 'kernel') and layer.kernel is not None:
+                if debug:
+                    print(f"In the if - layer {layer} has kernel attribute\n\n")
+                layer.add_loss(lambda: tf.keras.regularizers.l2(weight_decay)(layer.kernel))
+
+
 def main():
     """
     Main function to run the PDS model
@@ -232,13 +251,7 @@ def main():
         smoothing_method=smoothing_method,  # 'moving_average'
         smoothing_parameters={'window_size': window_size})  # 10
 
-    def add_weight_decay(model, weight_decay):
-        if weight_decay != 0:
-            for layer in model.layers:
-                if isinstance(layer, tf.keras.layers.Dense):
-                    layer.add_loss(lambda: tf.keras.regularizers.l2(weight_decay)(layer.kernel))
-                elif hasattr(layer, 'kernel'):  # Check if layer has kernel attribute
-                    layer.add_loss(lambda: tf.keras.regularizers.l2(weight_decay)(layer.kernel))
+
 
     add_weight_decay(model_sep, weight_decay)
 

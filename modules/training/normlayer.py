@@ -13,7 +13,9 @@ class NormalizeLayer(layers.Layer):
         :param kwargs: Additional keyword arguments for the parent class.
         """
         self.epsilon = epsilon
+        self.kernel = None  # Explicitly define kernel as None
         super(NormalizeLayer, self).__init__(**kwargs)
+
 
     def call(self, reprs: Tensor) -> Tensor:
         """

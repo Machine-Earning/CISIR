@@ -30,7 +30,7 @@ from modules.training.ts_modeling import (
 
 def main():
     """
-    Main function to run the E-MLP model for data with labels <= upper threshold
+    Main function to run the E-MLP model for data with labels <= lower threshold
     :return:
     """
 
@@ -61,7 +61,7 @@ def main():
                 experiment_name = f'{title}_{current_time}'
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed)
-                patience = PATIENCE  # higher patience
+                patience = PATIENCE_MOE  # higher patience
                 learning_rate = START_LR  # starting learning rate
                 asym_type = ASYM_TYPE_MOE
 
@@ -92,8 +92,8 @@ def main():
                 skip_repr = SKIP_REPR
                 skipped_layers = SKIPPED_LAYERS
                 N = N_FILTERED  # number of samples to keep outside the threshold
-                lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
-                upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
+                lower_threshold = LOWER_THRESHOLD_MOE  # lower threshold for the delta_p
+                upper_threshold = UPPER_THRESHOLD_MOE  # upper threshold for the delta_p
                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                 smoothing_method = SMOOTHING_METHOD
                 window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
@@ -137,7 +137,9 @@ def main():
                     'window_size': window_size,
                     'val_window_size': val_window_size,
                     'skip_repr': skip_repr,
-                    'asym_type': asym_type
+                    'asym_type': asym_type,
+                    'lower_threshold': lower_threshold,
+                    'upper_threshold': upper_threshold
                 })
 
                 # set the root directory
@@ -151,9 +153,9 @@ def main():
                     cme_speed_threshold=cme_speed_threshold,
                     shuffle_data=True)
 
-                # Filter training data to only include samples where label <= upper_threshold
+                # Filter training data to only include samples where label <= lower_threshold
                 X_train, y_train, logI_train, logI_prev_train = get_minus_cls(
-                    X_train, y_train, upper_threshold, logI_train, logI_prev_train)
+                    X_train, y_train, lower_threshold, logI_train, logI_prev_train)
 
                 # print the training set shapes
                 print(f'X_train.shape: {X_train.shape}, y_train.shape: {y_train.shape}')
@@ -184,24 +186,24 @@ def main():
                     outputs_to_use=outputs_to_use,
                     cme_speed_threshold=cme_speed_threshold)
 
-                # Filter test data to only include samples where label < upper_threshold
+                # Filter test data to only include samples where label <= lower_threshold
                 X_test, y_test, logI_test, logI_prev_test = get_minus_cls(
-                    X_test, y_test, upper_threshold, logI_test, logI_prev_test)
+                    X_test, y_test, lower_threshold, logI_test, logI_prev_test)
 
                 # print the test set shapes
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
 
-                # filtering training and test sets for additional results
-                X_train_filtered, y_train_filtered = filter_ds(
-                    X_train, y_train,
-                    low_threshold=lower_threshold,
-                    high_threshold=upper_threshold,
-                    N=N, seed=seed)
-                X_test_filtered, y_test_filtered = filter_ds(
-                    X_test, y_test,
-                    low_threshold=lower_threshold,
-                    high_threshold=upper_threshold,
-                    N=N, seed=seed)
+                # # filtering training and test sets for additional results
+                # X_train_filtered, y_train_filtered = filter_ds(
+                #     X_train, y_train,
+                #     low_threshold=lower_threshold,
+                #     high_threshold=upper_threshold,
+                #     N=N, seed=seed)
+                # X_test_filtered, y_test_filtered = filter_ds(
+                #     X_test, y_test,
+                #     low_threshold=lower_threshold,
+                #     high_threshold=upper_threshold,
+                #     N=N, seed=seed)
 
                 # Compute the sample weights for test set
                 delta_test = y_test[:, 0]

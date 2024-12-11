@@ -23,7 +23,7 @@ LR_CB_FACTOR_PRE = 0.99  # factor for reducing learning rate in pretraining
 LR_CB_PATIENCE_PRE = 50  # patience for reducing learning rate in pretraining
 PATIENCE_PRE = int(1e4)  # Higher patience for pretraining
 RHO_PRE = [0.2]  # Pretraining rho parameter
-REWEIGHTS_PRE = [(1, 0.4)]  # Pretraining reweighting parameters
+REWEIGHTS_PRE = [(2.5, 2.5)]  # Pretraining reweighting parameters
 WEIGHT_DECAY_PRE = 1e-4  # Higher weight decay for projection layers
 WINDOW_SIZE_PDC = 151  # NOTE: must be odd
 VAL_WINDOW_SIZE_PDC = 151  # NOTE: must be odd
@@ -53,7 +53,7 @@ SKIP_REPR = True  # residual representation
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
 START_LR = 1e-3  # starting learning rate
-WEIGHT_DECAY = 1e-5  # Higher weight decay
+WEIGHT_DECAY = 1e-4  # Higher weight decay
 MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 
@@ -71,8 +71,8 @@ ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 
 # Data Filtering and Processing
 N_FILTERED = 500  # Number of samples to keep outside the threshold
-LOWER_THRESHOLD = -0.3  # Lower threshold for delta_p
-UPPER_THRESHOLD = 0.3  # Upper threshold for delta_p
+LOWER_THRESHOLD = -0.5  # Lower threshold for delta_p
+UPPER_THRESHOLD = 0.5  # Upper threshold for delta_p
 MAE_PLUS_THRESHOLD = 0.5  # Threshold for measuring raising edges in delta
 BANDWIDTH = 4.42e-2  # Bandwidth for rebalancing
 TARGET_MIN_NORM_WEIGHT = 0.01  # Minimum weight for the target normalization
@@ -128,18 +128,21 @@ LEAKY_RELU_ALPHA = 0.3
 
 # Router
 ROUTER_OUTPUT_DIM = 3  # 3 classes for routing
-BATCH_SIZE_MOE = 300  # Batch size for Moe
+BATCH_SIZE_MOE = 16  # Batch size for Moe
 PLUS_INDEX = 0
 MID_INDEX = 1
 MINUS_INDEX = 2
 RHO_MOE = [5e-1] #[1e-3]
 RHO_MOE_0 = [1e-1] #[1e-3]
-RHO_MOE_P = [5e-1] #[1e-3]
-RHO_MOE_M = [3e-1] #[1e-3]
+RHO_MOE_P = [1e-1] #[1e-3]
+RHO_MOE_M = [5e-1] #[1e-3]
+PATIENCE_MOE = int(5e3)
 
+LOWER_THRESHOLD_MOE = -0.4
+UPPER_THRESHOLD_MOE = 0.4
 REWEIGHTS_MOE = [(0.3, 0.15, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
-REWEIGHTS_MOE_P = [(0.27, 0.19, 0.0, 0.0)]
-REWEIGHTS_MOE_M = [(0.15, 0.1, 0.0, 0.0)]
+REWEIGHTS_MOE_P = [(0.1, 0.1, 0.0, 0.0)]
+REWEIGHTS_MOE_M = [(0.1, 0.1, 0.0, 0.0)]
 REWEIGHTS_MOE_0 = [(0.1, 0.0, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
 ASYM_TYPE_0 = None
 ASYM_TYPE_MOE = None
