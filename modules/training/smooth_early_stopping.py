@@ -239,11 +239,12 @@ class SmoothEarlyStopping(Callback):
             print(f"Epoch {self.stopped_epoch + 1}: early stopping")
 
 
-def find_optimal_epoch_by_smoothing(metric_history,
-                                    smoothing_method='none',
-                                    smoothing_parameters=None,
-                                    mode='auto',
-                                    plot=False):
+def find_optimal_epoch_by_smoothing(
+        metric_history,
+        smoothing_method='none',
+        smoothing_parameters=None,
+        mode='auto',
+        plot=False):
     """
     Smooths the metric history using the specified smoothing method and finds the epoch corresponding
     to the best (minimum or maximum) smoothed metric value.
