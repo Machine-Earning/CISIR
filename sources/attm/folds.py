@@ -196,6 +196,27 @@ def main():
                     high_threshold=upper_threshold,
                     N=N, seed=seed)
 
+                # Create initial model and save weights
+                set_seed(seed)
+                initial_model = create_attentive_model2_dict(
+                    input_dim=n_features,
+                    output_dim=output_dim,
+                    hidden_blocks=blocks_hiddens,
+                    attn_hidden_units=attn_hiddens,
+                    attn_hidden_activation=activation,
+                    attn_skipped_layers=attn_skipped_layers,
+                    skipped_blocks=attm_skipped_blocks,
+                    attn_dropout=attn_dropout,
+                    dropout=attm_dropout,
+                    attn_norm=attn_norm,
+                    norm=attm_norm,
+                    embed_dim=embed_dim,
+                    activation=activation,
+                    sam_rho=rho
+                )
+                initial_model.summary()
+                initial_weights = initial_model.get_weights()
+
                 # 4-fold cross-validation
                 folds_optimal_epochs = []
                 for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
@@ -248,26 +269,10 @@ def main():
                         debug=False).label_reweight_dict
                     print(f'validation set rebalanced.')
 
-                    set_seed(seed) # set seed for model creation in each fold
+                    set_seed(seed)
 
-                    # create the model
-                    model_sep = create_attentive_model2_dict(
-                        input_dim=n_features,
-                        output_dim=output_dim,
-                        hidden_blocks=blocks_hiddens,
-                        attn_hidden_units=attn_hiddens,
-                        attn_hidden_activation=activation,
-                        attn_skipped_layers=attn_skipped_layers,
-                        skipped_blocks=attm_skipped_blocks,
-                        attn_dropout=attn_dropout,
-                        dropout=attm_dropout,
-                        attn_norm=attn_norm,
-                        norm=attm_norm,
-                        embed_dim=embed_dim,
-                        activation=activation,
-                        sam_rho=rho
-                    )
-                    model_sep.summary()
+                    # Reset model to initial weights
+                    initial_model.set_weights(initial_weights)
 
                     # Define the EarlyStopping callback
                     early_stopping = SmoothEarlyStopping(
@@ -280,7 +285,7 @@ def main():
                         smoothing_parameters={'window_size': window_size})  # 10
 
                     # Compile the model with the specified learning rate
-                    model_sep.compile(
+                    initial_model.compile(
                         optimizer=AdamW(
                             learning_rate=learning_rate,
                             weight_decay=weight_decay,
@@ -309,7 +314,7 @@ def main():
                     val_data = (X_val, {'output': y_val})
 
                     # Train the model with the callback
-                    history = model_sep.fit(
+                    history = initial_model.fit(
                         subtrain_ds,
                         steps_per_epoch=subtrain_steps,
                         epochs=epochs, batch_size=batch_size,
@@ -340,26 +345,12 @@ def main():
                 print(f'optimal_epochs: {optimal_epochs}')
                 wandb.log({'optimal_epochs': optimal_epochs})
 
-                set_seed(seed) # set seed for cheat training
+                set_seed(seed)
+                # Reset model to initial weights for cheat training
+                initial_model.set_weights(initial_weights)
 
                 # Cheat training to find test set optimal epoch
                 print("Running cheat training with test set validation...")
-                cheat_model = create_attentive_model2_dict(
-                    input_dim=n_features,
-                    output_dim=output_dim,
-                    hidden_blocks=blocks_hiddens,
-                    attn_hidden_units=attn_hiddens,
-                    attn_hidden_activation=activation,
-                    attn_skipped_layers=attn_skipped_layers,
-                    skipped_blocks=attm_skipped_blocks,
-                    attn_dropout=attn_dropout,
-                    dropout=attm_dropout,
-                    attn_norm=attn_norm,
-                    norm=attm_norm,
-                    embed_dim=embed_dim,
-                    activation=activation,
-                    sam_rho=rho
-                )
 
                 # Compute test set weights for validation
                 delta_test = y_test[:, 0]
@@ -375,7 +366,7 @@ def main():
                     min_norm_weight=min_norm_weight,
                     debug=False).label_reweight_dict
 
-                cheat_model.compile(
+                initial_model.compile(
                     optimizer=AdamW(
                         learning_rate=learning_rate,
                         weight_decay=weight_decay,
@@ -408,7 +399,7 @@ def main():
                     smoothing_method=smoothing_method,
                     smoothing_parameters={'window_size': window_size})
 
-                cheat_history = cheat_model.fit(
+                cheat_history = initial_model.fit(
                     train_ds,
                     steps_per_epoch=train_steps,
                     epochs=epochs,
@@ -431,28 +422,13 @@ def main():
                 print(f'cheat_optimal_epoch (using test set): {cheat_optimal_epoch}')
                 wandb.log({'cheat_optimal_epoch': cheat_optimal_epoch})
 
-                set_seed(seed) # set seed for final training
+                set_seed(seed)
+                # Reset model to initial weights for final training
+                initial_model.set_weights(initial_weights)
 
-                final_model_sep = create_attentive_model2_dict(
-                    input_dim=n_features,
-                    output_dim=output_dim,
-                    hidden_blocks=blocks_hiddens,
-                    attn_hidden_units=attn_hiddens,
-                    attn_hidden_activation=activation,
-                    attn_skipped_layers=attn_skipped_layers,
-                    skipped_blocks=attm_skipped_blocks,
-                    attn_dropout=attn_dropout,
-                    dropout=attm_dropout,
-                    attn_norm=attn_norm,
-                    norm=attm_norm,
-                    embed_dim=embed_dim,
-                    activation=activation,
-                    sam_rho=rho
-                )
-
-                final_model_sep.summary()
-                # Recreate the model architecture
-                final_model_sep.compile(
+                initial_model.summary()
+                # Compile the model with the specified learning rate
+                initial_model.compile(
                     optimizer=AdamW(
                         learning_rate=learning_rate,
                         weight_decay=weight_decay,
@@ -468,7 +444,7 @@ def main():
                             asym_type=asym_type
                         )
                     },
-                )  # Compile the model with the specified learning rate
+                )
 
                 train_ds, train_steps = stratified_batch_dataset(
                     X_train, y_train, batch_size)
@@ -477,7 +453,7 @@ def main():
                 train_ds = train_ds.map(lambda x, y: (x, {'output': y}))
 
                 # Train on the full dataset
-                final_model_sep.fit(
+                initial_model.fit(
                     train_ds,
                     steps_per_epoch=train_steps,
                     epochs=optimal_epochs,
@@ -491,38 +467,38 @@ def main():
                 )
 
                 # Save the final model
-                final_model_sep.save_weights(f"final_model_weights_{experiment_name}_reg.h5")
+                initial_model.save_weights(f"final_model_weights_{experiment_name}_reg.h5")
                 # print where the model weights are saved
                 print(f"Model weights are saved in final_model_weights_{experiment_name}_reg.h5")
 
                 # evaluate the model error on test set
-                error_mae = evaluate_mae(final_model_sep, X_test, y_test, use_dict=True)
+                error_mae = evaluate_mae(initial_model, X_test, y_test, use_dict=True)
                 print(f'mae error: {error_mae}')
                 wandb.log({"mae": error_mae})
 
                 # evaluate the model error on training set
-                error_mae_train = evaluate_mae(final_model_sep, X_train, y_train, use_dict=True)
+                error_mae_train = evaluate_mae(initial_model, X_train, y_train, use_dict=True)
                 print(f'mae error train: {error_mae_train}')
                 wandb.log({"train_mae": error_mae_train})
 
                 # evaluate the model correlation on test set
-                error_pcc = evaluate_pcc(final_model_sep, X_test, y_test, use_dict=True)
+                error_pcc = evaluate_pcc(initial_model, X_test, y_test, use_dict=True)
                 print(f'pcc error: {error_pcc}')
                 wandb.log({"pcc": error_pcc})
 
                 # evaluate the model correlation on training set
-                error_pcc_train = evaluate_pcc(final_model_sep, X_train, y_train, use_dict=True)
+                error_pcc_train = evaluate_pcc(initial_model, X_train, y_train, use_dict=True)
                 print(f'pcc error train: {error_pcc_train}')
                 wandb.log({"train_pcc": error_pcc_train})
 
                 # evaluate the model correlation on test set based on logI and logI_prev
-                error_pcc_logI = evaluate_pcc(final_model_sep, X_test, y_test, logI_test, logI_prev_test,
+                error_pcc_logI = evaluate_pcc(initial_model, X_test, y_test, logI_test, logI_prev_test,
                                               use_dict=True)
                 print(f'pcc error logI: {error_pcc_logI}')
                 wandb.log({"pcc_I": error_pcc_logI})
 
                 # evaluate the model correlation on training set based on logI and logI_prev
-                error_pcc_logI_train = evaluate_pcc(final_model_sep, X_train, y_train, logI_train,
+                error_pcc_logI_train = evaluate_pcc(initial_model, X_train, y_train, logI_train,
                                                     logI_prev_train, use_dict=True)
                 print(f'pcc error logI train: {error_pcc_logI_train}')
                 wandb.log({"train_pcc_I": error_pcc_logI_train})
@@ -531,38 +507,38 @@ def main():
                 above_threshold = mae_plus_threshold
                 # evaluate the model error for rare samples on test set
                 error_mae_cond = evaluate_mae(
-                    final_model_sep, X_test, y_test, above_threshold=above_threshold, use_dict=True)
+                    initial_model, X_test, y_test, above_threshold=above_threshold, use_dict=True)
                 print(f'mae error delta >= {above_threshold} test: {error_mae_cond}')
                 wandb.log({"mae+": error_mae_cond})
 
                 # evaluate the model error for rare samples on training set
                 error_mae_cond_train = evaluate_mae(
-                    final_model_sep, X_train, y_train, above_threshold=above_threshold, use_dict=True)
+                    initial_model, X_train, y_train, above_threshold=above_threshold, use_dict=True)
                 print(f'mae error delta >= {above_threshold} train: {error_mae_cond_train}')
                 wandb.log({"train_mae+": error_mae_cond_train})
 
                 # evaluate the model correlation for rare samples on test set
                 error_pcc_cond = evaluate_pcc(
-                    final_model_sep, X_test, y_test, above_threshold=above_threshold, use_dict=True)
+                    initial_model, X_test, y_test, above_threshold=above_threshold, use_dict=True)
                 print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
                 wandb.log({"pcc+": error_pcc_cond})
 
                 # evaluate the model correlation for rare samples on training set
                 error_pcc_cond_train = evaluate_pcc(
-                    final_model_sep, X_train, y_train, above_threshold=above_threshold, use_dict=True)
+                    initial_model, X_train, y_train, above_threshold=above_threshold, use_dict=True)
                 print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
                 wandb.log({"train_pcc+": error_pcc_cond_train})
 
                 # evaluate the model correlation for rare samples on test set based on logI and logI_prev
                 error_pcc_cond_logI = evaluate_pcc(
-                    final_model_sep, X_test, y_test, logI_test, logI_prev_test,
+                    initial_model, X_test, y_test, logI_test, logI_prev_test,
                     above_threshold=above_threshold, use_dict=True)
                 print(f'pcc error delta >= {above_threshold} logI test: {error_pcc_cond_logI}')
                 wandb.log({"pcc+_I": error_pcc_cond_logI})
 
                 # evaluate the model correlation for rare samples on training set based on logI and logI_prev
                 error_pcc_cond_logI_train = evaluate_pcc(
-                    final_model_sep, X_train, y_train, logI_train, logI_prev_train,
+                    initial_model, X_train, y_train, logI_train, logI_prev_train,
                     above_threshold=above_threshold, use_dict=True)
                 print(f'pcc error delta >= {above_threshold} logI train: {error_pcc_cond_logI_train}')
                 wandb.log({"train_pcc+_I": error_pcc_cond_logI_train})
@@ -571,7 +547,7 @@ def main():
                 test_directory = root_dir + '/testing'
                 filenames = process_sep_events(
                     test_directory,
-                    final_model_sep,
+                    initial_model,
                     title=title,
                     inputs_to_use=inputs_to_use,
                     add_slope=add_slope,
@@ -590,7 +566,7 @@ def main():
                 test_directory = root_dir + '/training'
                 filenames = process_sep_events(
                     test_directory,
-                    final_model_sep,
+                    initial_model,
                     title=title,
                     inputs_to_use=inputs_to_use,
                     add_slope=add_slope,
@@ -608,7 +584,7 @@ def main():
 
                 # Evaluate the model correlation with colored
                 file_path = plot_repr_corr_dist(
-                    final_model_sep,
+                    initial_model,
                     X_train_filtered, y_train_filtered,
                     title + "_training",
                     model_type='dict'
@@ -617,7 +593,7 @@ def main():
                 print('file_path: ' + file_path)
 
                 file_path = plot_repr_corr_dist(
-                    final_model_sep,
+                    initial_model,
                     X_test_filtered, y_test_filtered,
                     title + "_test",
                     model_type='dict'
@@ -628,7 +604,7 @@ def main():
                 # Log t-SNE plot
                 # Log the training t-SNE plot to wandb
                 stage1_file_path = plot_tsne_delta(
-                    final_model_sep,
+                    initial_model,
                     X_train_filtered, y_train_filtered, title,
                     'stage2_training',
                     model_type='dict',
@@ -638,7 +614,7 @@ def main():
 
                 # Log the testing t-SNE plot to wandb
                 stage1_file_path = plot_tsne_delta(
-                    final_model_sep,
+                    initial_model,
                     X_test_filtered, y_test_filtered, title,
                     'stage2_testing',
                     model_type='dict',

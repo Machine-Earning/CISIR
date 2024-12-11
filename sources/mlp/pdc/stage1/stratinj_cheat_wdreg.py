@@ -4,7 +4,7 @@ from datetime import datetime
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
-from tensorflow_addons.optimizers import AdamW
+from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import (
@@ -18,6 +18,7 @@ from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training import cme_modeling
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
+from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
     build_dataset,
     create_mlp,
@@ -51,7 +52,7 @@ def main():
     print(f'batch size : {batch_size}')
 
     # Construct the title
-    title = f'mlp2_pdc_strat_bs{batch_size}_noval'
+    title = f'mlp2_pdc_strat_bs{batch_size}_wdreg'
 
     # Replace any other characters that are not suitable for filenames (if any)
     title = title.replace(' ', '_').replace(':', '_')
@@ -116,7 +117,7 @@ def main():
         "dropout": dropout,
         "activation": "LeakyReLU",
         "norm": norm,
-        "optimizer": "adamw",
+        "optimizer": "adam",
         "architecture": "mlp",
         "alpha": alpha,
         "alphaVal": alphaV,
@@ -188,6 +189,18 @@ def main():
         high_threshold=upper_threshold,
         N=N, seed=seed)
 
+    # Compute the sample weights for validation (test set)
+    delta_val = y_test[:, 0]
+    print(f'delta_val.shape: {delta_val.shape}')
+    print(f'rebalancing the validation set...')
+    min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
+    val_weights_dict = exDenseReweightsD(
+        X_test, delta_val,
+        alpha=alphaV, bw=bandwidth,
+        min_norm_weight=min_norm_weight,
+        debug=False).label_reweight_dict
+    print(f'validation set rebalanced.')
+
     train_ds, train_steps = stratified_batch_dataset(
         X_train, y_train, batch_size)
 
@@ -209,10 +222,83 @@ def main():
     # summary of the model
     model_sep.summary()
 
+    # Define the EarlyStopping callback
+    early_stopping = SmoothEarlyStopping(
+        monitor=CVRG_METRIC,
+        min_delta=CVRG_MIN_DELTA,
+        patience=patience,
+        verbose=VERBOSE,
+        restore_best_weights=ES_CB_RESTORE_WEIGHTS,
+        smoothing_method=smoothing_method,  # 'moving_average'
+        smoothing_parameters={'window_size': window_size})  # 10
+
+    def add_weight_decay(model, weight_decay):
+        if weight_decay != 0:
+            for layer in model.layers:
+                if isinstance(layer, tf.keras.layers.Dense):
+                    layer.add_loss(lambda: tf.keras.regularizers.l2(weight_decay)(layer.kernel))
+                elif hasattr(layer, 'kernel'):  # Check if layer has kernel attribute
+                    layer.add_loss(lambda: tf.keras.regularizers.l2(weight_decay)(layer.kernel))
+
+    add_weight_decay(model_sep, weight_decay)
+
     model_sep.compile(
-        optimizer=AdamW(
+        optimizer=Adam(
             learning_rate=learning_rate,
-            weight_decay=weight_decay,
+            beta_1=momentum_beta1
+        ),
+        loss=lambda y_true, y_pred: mb.pdc_loss_linear_vec(
+            y_true, y_pred,
+            phase_manager=pm,
+            train_sample_weights=train_weights_dict,
+            val_sample_weights=val_weights_dict,
+        )
+    )
+
+    history = model_sep.fit(
+        train_ds,
+        steps_per_epoch=train_steps,
+        epochs=epochs,
+        validation_data=(X_test, y_test),
+        batch_size=batch_size,
+        callbacks=[
+            reduce_lr_on_plateau,
+            early_stopping,
+            WandbCallback(save_model=WANDB_SAVE_MODEL),
+            IsTraining(pm)
+        ],
+        verbose=VERBOSE
+    )
+
+    # Use the smoothing function to find the optimal epoch
+    optimal_epoch = find_optimal_epoch_by_smoothing(
+        history.history[ES_CB_MONITOR],
+        smoothing_method=smoothing_method,
+        smoothing_parameters={'window_size': val_window_size},
+        mode='min')
+    print(f'optimal_epoch: {optimal_epoch}')
+    wandb.log({'optimal_epoch': optimal_epoch})
+
+    # Reset model weights and retrain for optimal number of epochs
+    model_sep = create_mlp(
+        input_dim=n_features,
+        hiddens=hiddens,
+        output_dim=0,
+        pretraining=pretraining,
+        embed_dim=embed_dim,
+        dropout=dropout,
+        activation=activation,
+        norm=norm,
+        skip_repr=skip_repr,
+        skipped_layers=skipped_layers,
+        sam_rho=rho,
+    )
+
+    add_weight_decay(model_sep, weight_decay)
+
+    model_sep.compile(
+        optimizer=Adam(
+            learning_rate=learning_rate,
             beta_1=momentum_beta1
         ),
         loss=lambda y_true, y_pred: mb.pdc_loss_linear_vec(
@@ -225,7 +311,7 @@ def main():
     model_sep.fit(
         train_ds,
         steps_per_epoch=train_steps,
-        epochs=epochs,
+        epochs=optimal_epoch,
         batch_size=batch_size,
         callbacks=[
             reduce_lr_on_plateau,
