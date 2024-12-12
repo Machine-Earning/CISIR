@@ -3,7 +3,8 @@ from datetime import datetime
 
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
-from tensorflow_addons.optimizers import AdamW
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import regularizers
 from wandb.integration.keras import WandbCallback
 
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
@@ -53,7 +54,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 # inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_plus_e'
+                title = f'mlp2_amse{alpha_mse:.2f}_plus_e_wdreg'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -125,7 +126,7 @@ def main():
                     "dropout": dropout,
                     "activation": 'LeakyReLU',
                     "norm": norm,
-                    'optimizer': 'adamw',
+                    'optimizer': 'adam',
                     'output_dim': output_dim,
                     'architecture': 'mlp_res_repr',
                     'cme_speed_threshold': cme_speed_threshold,
@@ -236,6 +237,12 @@ def main():
                     skipped_layers=skipped_layers,
                     sam_rho=rho
                 )
+                
+                # Add L2 regularization to all layers with weights
+                for layer in model_sep.layers:
+                    if hasattr(layer, 'kernel_regularizer'):
+                        layer.kernel_regularizer = regularizers.l2(weight_decay)
+                
                 model_sep.summary()
 
                 # Define the EarlyStopping callback
@@ -250,9 +257,8 @@ def main():
 
                 # Compile the model with the specified learning rate
                 model_sep.compile(
-                    optimizer=AdamW(
+                    optimizer=Adam(
                         learning_rate=learning_rate,
-                        weight_decay=weight_decay,
                         beta_1=momentum_beta1
                     ),
                     loss={
@@ -317,13 +323,18 @@ def main():
                     skipped_layers=skipped_layers,
                     sam_rho=rho
                 )
+                
+                # Add L2 regularization to all layers with weights
+                for layer in final_model_sep.layers:
+                    if hasattr(layer, 'kernel_regularizer'):
+                        layer.kernel_regularizer = regularizers.l2(weight_decay)
+                
                 final_model_sep.summary()
 
                 # final_model_sep.summary()
                 final_model_sep.compile(
-                    optimizer=AdamW(
+                    optimizer=Adam(
                         learning_rate=learning_rate,
-                        weight_decay=weight_decay,
                         beta_1=momentum_beta1
                     ),
                     loss={

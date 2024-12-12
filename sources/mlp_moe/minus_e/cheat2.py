@@ -49,7 +49,7 @@ def main():
             for rho in RHO_MOE_M:  # SAM_RHOS:
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = LAMBDA_FACTOR  # lambda for the loss
+                lambda_factor = LAMBDA_FACTOR_MOE_M  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 # inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title

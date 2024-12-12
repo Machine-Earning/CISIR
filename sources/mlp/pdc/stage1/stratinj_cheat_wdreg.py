@@ -5,6 +5,7 @@ import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import regularizers
 from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import (
@@ -26,25 +27,6 @@ from modules.training.ts_modeling import (
     set_seed,
     stratified_batch_dataset
 )
-
-
-def add_weight_decay(model: tf.keras.Model, weight_decay: float, debug: bool = True) -> None:
-    """
-    Adds L2 weight decay regularization to all layers that have a kernel attribute.
-
-    :param model: The TensorFlow model to which weight decay should be added.
-    :param weight_decay: The L2 weight decay factor.
-    :param debug: If True, prints debug information about layers
-    """
-    if weight_decay != 0:
-        for layer in model.layers:
-            if debug:
-                print(f"Processing layer: {layer}")
-            # Only apply weight decay if layer has a kernel attribute and it's not None
-            if hasattr(layer, 'kernel') and layer.kernel is not None:
-                if debug:
-                    print(f"In the if - layer {layer} has kernel attribute\n\n")
-                layer.add_loss(lambda: tf.keras.regularizers.l2(weight_decay)(layer.kernel))
 
 
 def main():
@@ -251,9 +233,10 @@ def main():
         smoothing_method=smoothing_method,  # 'moving_average'
         smoothing_parameters={'window_size': window_size})  # 10
 
-
-
-    add_weight_decay(model_sep, weight_decay)
+    # Add L2 regularization to all layers with weights
+    for layer in model_sep.layers:
+        if hasattr(layer, 'kernel_regularizer'):
+            layer.kernel_regularizer = regularizers.l2(weight_decay)
 
     model_sep.compile(
         optimizer=Adam(
@@ -307,7 +290,10 @@ def main():
         sam_rho=rho,
     )
 
-    add_weight_decay(model_sep, weight_decay)
+    # Add L2 regularization to all layers with weights
+    for layer in model_sep.layers:
+        if hasattr(layer, 'kernel_regularizer'):
+            layer.kernel_regularizer = regularizers.l2(weight_decay)
 
     model_sep.compile(
         optimizer=Adam(
