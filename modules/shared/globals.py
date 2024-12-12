@@ -136,7 +136,7 @@ RHO_MOE = [5e-1] #[1e-3]
 RHO_MOE_0 = [1e-1] #[1e-3]
 RHO_MOE_P = [5e-1] #[1e-3]
 RHO_MOE_M = [2e-1] #[1e-3]
-PATIENCE_MOE = int(5e3)
+PATIENCE_MOE = int(3e3)
 
 LOWER_THRESHOLD_MOE = -0.4
 UPPER_THRESHOLD_MOE = 0.4

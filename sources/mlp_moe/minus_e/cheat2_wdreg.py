@@ -235,9 +235,14 @@ def main():
                     norm=norm,
                     skip_repr=skip_repr,
                     skipped_layers=skipped_layers,
-                    sam_rho=rho,
-                    kernel_regularizer=l2(weight_decay)
+                    sam_rho=rho
                 )
+                
+                # Add L2 regularization to all layers
+                for layer in model_sep.layers:
+                    if hasattr(layer, 'kernel_regularizer'):
+                        layer.kernel_regularizer = l2(weight_decay)
+                
                 model_sep.summary()
                 model_sep.load_weights(pretrained_weights)
 
@@ -317,9 +322,14 @@ def main():
                     norm=norm,
                     skip_repr=skip_repr,
                     skipped_layers=skipped_layers,
-                    sam_rho=rho,
-                    kernel_regularizer=l2(weight_decay)
+                    sam_rho=rho
                 )
+                
+                # Add L2 regularization to all layers
+                for layer in final_model_sep.layers:
+                    if hasattr(layer, 'kernel_regularizer'):
+                        layer.kernel_regularizer = l2(weight_decay)
+                        
                 final_model_sep.summary()
                 final_model_sep.load_weights(pretrained_weights)
 
