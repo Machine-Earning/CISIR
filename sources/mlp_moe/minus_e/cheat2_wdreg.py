@@ -21,7 +21,7 @@ from modules.training.ts_modeling import (
     cmse,
     filter_ds,
     create_mlp,
-    get_plus_cls
+    get_minus_cls
 )
 
 
@@ -31,7 +31,7 @@ from modules.training.ts_modeling import (
 
 def main():
     """
-    Main function to run the E-MLP model for data with labels >= upper threshold
+    Main function to run the E-MLP model for data with labels <= lower threshold
     :return:
     """
 
@@ -46,15 +46,15 @@ def main():
     pretrained_weights = PRE_WEIGHT_PATH
 
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_P:
-            for rho in RHO_MOE_P:  # SAM_RHOS:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_M:
+            for rho in RHO_MOE_M:  # SAM_RHOS:
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = LAMBDA_FACTOR  # lambda for the loss
+                lambda_factor = LAMBDA_FACTOR_MOE_M  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 # inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_plus_e_wdreg'
+                title = f'mlp2_amse{alpha_mse:.2f}_minus_e'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -139,8 +139,8 @@ def main():
                     'val_window_size': val_window_size,
                     'skip_repr': skip_repr,
                     'asym_type': asym_type,
-                    'upper_threshold': upper_threshold,
                     'lower_threshold': lower_threshold,
+                    'upper_threshold': upper_threshold
                 })
 
                 # set the root directory
@@ -154,9 +154,9 @@ def main():
                     cme_speed_threshold=cme_speed_threshold,
                     shuffle_data=True)
 
-                # Filter training data to only include samples where label >= upper_threshold
-                X_train, y_train, logI_train, logI_prev_train = get_plus_cls(
-                    X_train, y_train, upper_threshold, logI_train, logI_prev_train)
+                # Filter training data to only include samples where label <= lower_threshold
+                X_train, y_train, logI_train, logI_prev_train = get_minus_cls(
+                    X_train, y_train, lower_threshold, logI_train, logI_prev_train)
 
                 # print the training set shapes
                 print(f'X_train.shape: {X_train.shape}, y_train.shape: {y_train.shape}')
@@ -187,14 +187,14 @@ def main():
                     outputs_to_use=outputs_to_use,
                     cme_speed_threshold=cme_speed_threshold)
 
-                # Filter test data to only include samples where label >= upper_threshold
-                X_test, y_test, logI_test, logI_prev_test = get_plus_cls(
-                    X_test, y_test, upper_threshold, logI_test, logI_prev_test)
+                # Filter test data to only include samples where label <= lower_threshold
+                X_test, y_test, logI_test, logI_prev_test = get_minus_cls(
+                    X_test, y_test, lower_threshold, logI_test, logI_prev_test)
 
                 # print the test set shapes
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
 
-                # filtering training and test sets for additional results
+                # # filtering training and test sets for additional results
                 # X_train_filtered, y_train_filtered = filter_ds(
                 #     X_train, y_train,
                 #     low_threshold=lower_threshold,
@@ -235,15 +235,11 @@ def main():
                     norm=norm,
                     skip_repr=skip_repr,
                     skipped_layers=skipped_layers,
-                    sam_rho=rho
+                    sam_rho=rho,
+                    kernel_regularizer=l2(weight_decay)
                 )
-                
-                # Add L2 regularization to all layers with weights
-                for layer in model_sep.layers:
-                    if hasattr(layer, 'kernel_regularizer'):
-                        layer.kernel_regularizer = l2(weight_decay)
-                
                 model_sep.summary()
+                model_sep.load_weights(pretrained_weights)
 
                 # Define the EarlyStopping callback
                 early_stopping = SmoothEarlyStopping(
@@ -321,15 +317,11 @@ def main():
                     norm=norm,
                     skip_repr=skip_repr,
                     skipped_layers=skipped_layers,
-                    sam_rho=rho
+                    sam_rho=rho,
+                    kernel_regularizer=l2(weight_decay)
                 )
-                
-                # Add L2 regularization to all layers with weights
-                for layer in final_model_sep.layers:
-                    if hasattr(layer, 'kernel_regularizer'):
-                        layer.kernel_regularizer = l2(weight_decay)
-                
                 final_model_sep.summary()
+                final_model_sep.load_weights(pretrained_weights)
 
                 # final_model_sep.summary()
                 final_model_sep.compile(
@@ -404,6 +396,46 @@ def main():
                 print(f'pcc error logI train: {error_pcc_logI_train}')
                 wandb.log({"train_pcc_I": error_pcc_logI_train})
 
+
+                # # evaluate the model on test cme_files
+                # below_threshold = -mae_plus_threshold  # using lower_threshold for minus class
+                # # evaluate the model error for minus samples on test set
+                # error_mae_cond = evaluate_mae(
+                #     final_model_sep, X_test, y_test, below_threshold=below_threshold)
+                # print(f'mae error delta <= {below_threshold} test: {error_mae_cond}')
+                # wandb.log({"mae-": error_mae_cond})
+
+                # # evaluate the model error for minus samples on training set
+                # error_mae_cond_train = evaluate_mae(
+                #     final_model_sep, X_train, y_train, below_threshold=below_threshold)
+                # print(f'mae error delta <= {below_threshold} train: {error_mae_cond_train}')
+                # wandb.log({"train_mae-": error_mae_cond_train})
+
+                # # evaluate the model correlation for minus samples on test set
+                # error_pcc_cond = evaluate_pcc(
+                #     final_model_sep, X_test, y_test, below_threshold=below_threshold)
+                # print(f'pcc error delta <= {below_threshold} test: {error_pcc_cond}')
+                # wandb.log({"pcc-": error_pcc_cond})
+
+                # # evaluate the model correlation for minus samples on training set
+                # error_pcc_cond_train = evaluate_pcc(
+                #     final_model_sep, X_train, y_train, below_threshold=below_threshold)
+                # print(f'pcc error delta <= {below_threshold} train: {error_pcc_cond_train}')
+                # wandb.log({"train_pcc-": error_pcc_cond_train})
+
+                # # evaluate the model correlation for minus samples on test set based on logI and logI_prev
+                # error_pcc_cond_logI = evaluate_pcc(
+                #     final_model_sep, X_test, y_test, logI_test, logI_prev_test, below_threshold=below_threshold)
+                # print(f'pcc error delta <= {below_threshold} test: {error_pcc_cond_logI}')
+                # wandb.log({"pcc-_I": error_pcc_cond_logI})
+
+                # # evaluate the model correlation for minus samples on training set based on logI and logI_prev
+                # error_pcc_cond_logI_train = evaluate_pcc(
+                #     final_model_sep, X_train, y_train, logI_train, logI_prev_train, below_threshold=below_threshold)
+                # print(f'pcc error delta <= {below_threshold} train: {error_pcc_cond_logI_train}')
+                # wandb.log({"train_pcc-_I": error_pcc_cond_logI_train})
+
+
                 # Process SEP event files in the specified directory
                 test_directory = root_dir + '/testing'
                 filenames = process_sep_events(
@@ -440,6 +472,65 @@ def main():
                 for filename in filenames:
                     log_title = os.path.basename(filename)
                     wandb.log({f'training_{log_title}': wandb.Image(filename)})
+
+                # # Evaluate the model correlation with colored
+                # file_path = plot_repr_corr_dist(
+                #     final_model_sep,
+                #     X_train_filtered, y_train_filtered,
+                #     title + "_training",
+                #     model_type='features_reg'
+                # )
+                # wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
+                # print('file_path: ' + file_path)
+
+                # file_path = plot_repr_corr_dist(
+                #     final_model_sep,
+                #     X_test_filtered, y_test_filtered,
+                #     title + "_test",
+                #     model_type='features_reg'
+                # )
+                # wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
+                # print('file_path: ' + file_path)
+
+                # # Log t-SNE plot
+                # # Log the training t-SNE plot to wandb
+                # stage1_file_path = plot_tsne_delta(
+                #     final_model_sep,
+                #     X_train_filtered, y_train_filtered, title,
+                #     'stage2_training',
+                #     model_type='features_reg',
+                #     save_tag=current_time, seed=seed)
+                # wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
+                # print('stage1_file_path: ' + stage1_file_path)
+
+                # # Log the testing t-SNE plot to wandb
+                # stage1_file_path = plot_tsne_delta(
+                #     final_model_sep,
+                #     X_test_filtered, y_test_filtered, title,
+                #     'stage2_testing',
+                #     model_type='features_reg',
+                #     save_tag=current_time, seed=seed)
+                # wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
+                # print('stage1_file_path: ' + stage1_file_path)
+
+                # # Plot the error histograms
+                # filename = plot_error_hist(
+                #     final_model_sep,
+                #     X_train, y_train,
+                #     sample_weights=None,
+                #     title=title,
+                #     prefix='training')
+                # wandb.log({"training_error_hist": wandb.Image(filename)})
+
+                # # Plot the error histograms on the testing set
+                # filename = plot_error_hist(
+                #     final_model_sep,
+                #     X_test, y_test,
+                #     sample_weights=None,
+                #     title=title,
+                #     prefix='testing')
+                # wandb.log({"testing_error_hist": wandb.Image(filename)})
+
 
                 # Finish the wandb run
                 wandb.finish()

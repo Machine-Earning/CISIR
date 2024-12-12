@@ -5,7 +5,7 @@ import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras import regularizers
+from tensorflow.keras.regularizers import l2
 from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import (
@@ -236,7 +236,7 @@ def main():
     # Add L2 regularization to all layers with weights
     for layer in model_sep.layers:
         if hasattr(layer, 'kernel_regularizer'):
-            layer.kernel_regularizer = regularizers.l2(weight_decay)
+            layer.kernel_regularizer = l2(weight_decay)
 
     model_sep.compile(
         optimizer=Adam(
@@ -293,7 +293,7 @@ def main():
     # Add L2 regularization to all layers with weights
     for layer in model_sep.layers:
         if hasattr(layer, 'kernel_regularizer'):
-            layer.kernel_regularizer = regularizers.l2(weight_decay)
+            layer.kernel_regularizer = l2(weight_decay)
 
     model_sep.compile(
         optimizer=Adam(
