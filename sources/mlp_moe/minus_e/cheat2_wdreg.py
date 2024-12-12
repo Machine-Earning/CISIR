@@ -140,7 +140,8 @@ def main():
                     'skip_repr': skip_repr,
                     'asym_type': asym_type,
                     'lower_threshold': lower_threshold,
-                    'upper_threshold': upper_threshold
+                    'upper_threshold': upper_threshold,
+                    'cvrg_metric': CVRG_METRIC
                 })
 
                 # set the root directory

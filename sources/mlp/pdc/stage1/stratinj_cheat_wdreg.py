@@ -137,7 +137,8 @@ def main():
         'inj': 'strat',
         'smoothing_method': smoothing_method,
         'window_size': window_size,
-        'val_window_size': val_window_size
+        'val_window_size': val_window_size,
+        'cvrg_metric': CVRG_METRIC
     })
     # set the root directory
     root_dir = DS_PATH

@@ -88,7 +88,7 @@ REWEIGHTS = [(1.0, 0.3, 0.1, 0)]
 LAMBDA_FACTOR = 8
 AE_LAMBDA = 0.9
 CVRG_MIN_DELTA = 1e-5
-CVRG_METRIC = 'val_loss'
+CVRG_METRIC = 'loss'
 ASYM_TYPE = 'sigmoid'
 
 # ATTM AREA
