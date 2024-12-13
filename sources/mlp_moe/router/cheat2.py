@@ -51,9 +51,9 @@ def main():
                 experiment_name = f'{title}_{current_time}'
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed)
-                patience = PATIENCE  # higher patience
+                patience = PATIENCE_MOE  # higher patience
                 learning_rate = START_LR  # starting learning rate
-                asym_type = ASYM_TYPE
+                asym_type = ASYM_TYPE_MOE
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -100,7 +100,7 @@ def main():
                     "epochs": epochs,
                     # hidden in a more readable format  (wandb does not support lists)
                     "hiddens": hiddens_str,
-                    "loss": 'focal_loss',
+                    "loss": 'focal_loss', # TODO: change the loss 
                     "lambda": lambda_factor,
                     "seed": seed,
                     "alpha_mse": alpha_mse,

@@ -127,7 +127,7 @@ FF_NORM = 'batch_norm'
 
 LEAKY_RELU_ALPHA = 0.3
 
-# Router
+# MOE
 ROUTER_OUTPUT_DIM = 3  # 3 classes for routing
 BATCH_SIZE_MOE = 32  # Batch size for Moe
 BATCH_SIZE_MOE_0 = 2048  # Batch size for Moe
@@ -147,7 +147,7 @@ LOWER_THRESHOLD_MOE = -0.4
 UPPER_THRESHOLD_MOE = 0.4
 REWEIGHTS_MOE = [(0.3, 0.15, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
 REWEIGHTS_MOE_P = [(0.11, 0.11, 0.0, 0.0)]
-REWEIGHTS_MOE_M = [(0.03, 0.03, 0.0, 0.0)]
+REWEIGHTS_MOE_M = [(0.005, 0.005, 0.0, 0.0)]
 REWEIGHTS_MOE_0 = [(0.1, 0.0, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
 LAMBDA_FACTOR_MOE_P = 6
 LAMBDA_FACTOR_MOE_M = 6
