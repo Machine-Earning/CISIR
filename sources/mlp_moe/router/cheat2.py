@@ -3,23 +3,60 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import wandb
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, precision_score, recall_score, f1_score
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
+from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
-from modules.training.phase_manager import TrainingPhaseManager, IsTraining
+from modules.training.phase_manager import create_weight_tensor_fast
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
     build_dataset,
     set_seed,
     create_mlp,
     convert_to_onehot_cls,
-    focal_loss,
     plot_confusion_matrix
 )
 
+
+# Create classification report tables for wandb
+def create_metrics_table(y_true: np.ndarray, y_pred: np.ndarray, set_name: str) -> wandb.Table:
+    """
+    Creates a wandb table containing classification metrics for model evaluation.
+
+    Args:
+        y_true (np.ndarray): Ground truth labels (class indices)
+        y_pred (np.ndarray): Predicted labels (class indices) 
+        set_name (str): Name of the dataset split ('Train' or 'Test')
+
+    Returns:
+        wandb.Table: Table containing precision, recall and F1 scores for each class
+                    and weighted averages
+    """
+    # Calculate per-class metrics
+    precision = precision_score(y_true, y_pred, average=None)
+    recall = recall_score(y_true, y_pred, average=None)
+    f1 = f1_score(y_true, y_pred, average=None)
+    
+    # Define table structure
+    columns = ["Class", "Precision", "Recall", "F1-Score"]
+    
+    # Create rows for each class
+    data = [
+        ["minus", precision[0], recall[0], f1[0]],  # Class 0 metrics
+        ["zero", precision[1], recall[1], f1[1]],   # Class 1 metrics
+        ["plus", precision[2], recall[2], f1[2]]    # Class 2 metrics
+    ]
+    
+    # Calculate and add weighted averages across all classes
+    weighted_precision = precision_score(y_true, y_pred, average='weighted')
+    weighted_recall = recall_score(y_true, y_pred, average='weighted')
+    weighted_f1 = f1_score(y_true, y_pred, average='weighted')
+    data.append(["weighted avg", weighted_precision, weighted_recall, weighted_f1])
+    
+    return wandb.Table(data=data, columns=columns)
 
 def main():
     """
@@ -27,12 +64,9 @@ def main():
     :return:
     """
 
-    # set the training phase manager - necessary for mse + pcc loss
-    pm = TrainingPhaseManager()
-
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE:
-            for rho in RHO:  # SAM_RHOS:
+        for alpha_ce, alphaV_ce in REWEIGHTS_MOE_R:
+            for rho in RHO_MOE_R:  # SAM_RHOS:
                 # PARAMS
                 inputs_to_use = INPUTS_TO_USE[0]  # Use first input configuration
                 outputs_to_use = OUTPUTS_TO_USE
@@ -43,7 +77,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_router'
+                title = f'mlp2_ace{alpha_ce:.2f}_router'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -88,7 +122,7 @@ def main():
                 val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
 
                 # Initialize wandb
-                wandb.init(project="Jan-moe-Report", name=experiment_name, config={
+                wandb.init(project="Jan-moe-router-Report", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
                     "add_slope": add_slope,
                     "patience": patience,
@@ -100,13 +134,11 @@ def main():
                     "epochs": epochs,
                     # hidden in a more readable format  (wandb does not support lists)
                     "hiddens": hiddens_str,
-                    "loss": 'focal_loss', # TODO: change the loss 
+                    "loss": 'ce',
                     "lambda": lambda_factor,
                     "seed": seed,
-                    "alpha_mse": alpha_mse,
-                    "alphaV_mse": alphaV_mse,
-                    "alpha_pcc": alpha_pcc,
-                    "alphaV_pcc": alphaV_pcc,
+                    "alpha_ce": alpha_ce,
+                    "alphaV_ce": alphaV_ce,
                     "bandwidth": bandwidth,
                     "embed_dim": embed_dim,
                     "dropout": dropout,
@@ -133,7 +165,7 @@ def main():
                 # set the root directory
                 root_dir = DS_PATH
                 # build the dataset
-                X_train, y_train, logI_train, logI_prev_train = build_dataset(
+                X_train, y_train, _, _ = build_dataset(
                     root_dir + '/training',
                     inputs_to_use=inputs_to_use,
                     add_slope=add_slope,
@@ -147,8 +179,19 @@ def main():
                 # print the training set shapes
                 print(f'X_train.shape: {X_train.shape}, y_train_classes.shape: {y_train_classes.shape}')
 
+                # Get sample weights for training set
+                delta_train = y_train[:, 0]
+                print(f'delta_train.shape: {delta_train.shape}')
+                print(f'rebalancing the training set...')
+                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
+                train_weights_dict = exDenseReweightsD(
+                    X_train, delta_train,
+                    alpha=alpha_ce, bw=bandwidth,
+                    min_norm_weight=min_norm_weight,
+                    debug=False).label_reweight_dict
+
                 # Build test set
-                X_test, y_test, logI_test, logI_prev_test = build_dataset(
+                X_test, y_test, _, _ = build_dataset(
                     root_dir + '/testing',
                     inputs_to_use=inputs_to_use,
                     add_slope=add_slope,
@@ -159,6 +202,21 @@ def main():
                 y_test_classes = convert_to_onehot_cls(y_test, lower_threshold, upper_threshold)
 
                 print(f'X_test.shape: {X_test.shape}, y_test_classes.shape: {y_test_classes.shape}')
+
+                # Get sample weights for test set
+                delta_test = y_test[:, 0]
+                print(f'delta_test.shape: {delta_test.shape}')
+                print(f'rebalancing the test set...')
+                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_test)
+                test_weights_dict = exDenseReweightsD(
+                    X_test, delta_test,
+                    alpha=alphaV_ce, bw=bandwidth,
+                    min_norm_weight=min_norm_weight,
+                    debug=False).label_reweight_dict
+
+                # Create weight tensors for train and test sets
+                train_weights = create_weight_tensor_fast(y_train[:, 0], train_weights_dict)
+                test_weights = create_weight_tensor_fast(y_test[:, 0], test_weights_dict)
 
                 # get the number of input features
                 n_features = X_train.shape[1]
@@ -185,7 +243,7 @@ def main():
                         weight_decay=weight_decay,
                         beta_1=momentum_beta1
                     ),
-                    loss={'forecast_head': focal_loss(gamma=2.0, alpha=0.25)},
+                    loss={'forecast_head': 'categorical_crossentropy'},
                     metrics={'forecast_head': 'accuracy'}
                 )
 
@@ -204,13 +262,14 @@ def main():
                 history = initial_model.fit(
                     X_train, {'forecast_head': y_train_classes},
                     validation_data=(X_test, {'forecast_head': y_test_classes}),
+                    sample_weight={'forecast_head': train_weights},
+                    validation_sample_weight={'forecast_head': test_weights},
                     epochs=epochs,
                     batch_size=batch_size,
                     callbacks=[
                         reduce_lr_on_plateau,
                         early_stopping,
-                        WandbCallback(save_model=False),
-                        IsTraining(pm)
+                        WandbCallback(save_model=False)
                     ],
                     verbose=VERBOSE
                 )
@@ -247,7 +306,7 @@ def main():
                         weight_decay=weight_decay,
                         beta_1=momentum_beta1
                     ),
-                    loss={'forecast_head': focal_loss(gamma=2.0, alpha=0.25)},
+                    loss={'forecast_head': 'categorical_crossentropy'},
                     metrics={'forecast_head': 'accuracy'}
                 )
 
@@ -255,18 +314,20 @@ def main():
                 history = router_model.fit(
                     X_train, {'forecast_head': y_train_classes},
                     validation_data=(X_test, {'forecast_head': y_test_classes}),
+                    sample_weight={'forecast_head': train_weights},
+                    validation_sample_weight={'forecast_head': test_weights},
                     epochs=optimal_epochs,
                     batch_size=batch_size,
                     callbacks=[
-                        WandbCallback(save_model=WANDB_SAVE_MODEL),
-                        IsTraining(pm)
+                        reduce_lr_on_plateau,
+                        WandbCallback(save_model=WANDB_SAVE_MODEL)
                     ],
                     verbose=VERBOSE
                 )
 
                 # Save the final model
-                router_model.save_weights(f"router_model_weights_{experiment_name}.h5")
-                print(f"Model weights saved in router_model_weights_{experiment_name}.h5")
+                router_model.save_weights(f"final_router_model_weights_{experiment_name}.h5")
+                print(f"Model weights saved in final_router_model_weights_{experiment_name}.h5")
 
                 # Get predictions
                 predictions = router_model.predict(X_train)
@@ -281,7 +342,7 @@ def main():
                 y_test_true_classes = np.argmax(y_test_classes, axis=1)
 
                 # Calculate confusion matrices and create plots
-                class_names = ['Low', 'Mid', 'High']
+                class_names = ['minus', 'zero', 'plus']
 
                 # Create and save train confusion matrix plot
                 train_cm_fig = plot_confusion_matrix(
@@ -299,9 +360,9 @@ def main():
                     title="Test Confusion Matrix"
                 )
 
-                # Calculate accuracies
-                train_metrics = router_model.evaluate(X_train, {'forecast_head': y_train_classes})
-                test_metrics = router_model.evaluate(X_test, {'forecast_head': y_test_classes})
+                # Calculate accuracies without weights
+                train_metrics = router_model.evaluate(X_train, {'forecast_head': y_train_classes}, verbose=0)
+                test_metrics = router_model.evaluate(X_test, {'forecast_head': y_test_classes}, verbose=0)
                 train_accuracy = train_metrics[1]  # Assuming accuracy is the second metric
                 test_accuracy = test_metrics[1]  # Assuming accuracy is the second metric
 
@@ -319,12 +380,18 @@ def main():
                 print("\nClassification Report:")
                 print(test_report)
 
-                # Log metrics and plots to wandb
+                # Create tables for both train and test sets
+                train_metrics_table = create_metrics_table(y_train_true_classes, y_train_pred_classes, "Train")
+                test_metrics_table = create_metrics_table(y_test_true_classes, y_test_pred_classes, "Test")
+
+                # Update the wandb.log call to include the tables
                 wandb.log({
                     "train_accuracy": train_accuracy,
                     "test_accuracy": test_accuracy,
                     "train_confusion_matrix": wandb.Image(train_cm_fig),
-                    "test_confusion_matrix": wandb.Image(test_cm_fig)
+                    "test_confusion_matrix": wandb.Image(test_cm_fig),
+                    "train_classification_metrics": train_metrics_table,
+                    "test_classification_metrics": test_metrics_table
                 })
 
                 # Close the figures to free memory
