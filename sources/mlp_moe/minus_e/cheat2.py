@@ -42,7 +42,7 @@ def main():
     add_slope = ADD_SLOPE[0]  # Use first element
 
     # Path to pre-trained model weights
-    pretrained_weights = PRE_WEIGHT_PATH
+    pretrained_weights = None #PRE_WEIGHT_PATH
 
     for seed in SEEDS:
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_M:
@@ -194,18 +194,6 @@ def main():
                 # print the test set shapes
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
 
-                # # filtering training and test sets for additional results
-                # X_train_filtered, y_train_filtered = filter_ds(
-                #     X_train, y_train,
-                #     low_threshold=lower_threshold,
-                #     high_threshold=upper_threshold,
-                #     N=N, seed=seed)
-                # X_test_filtered, y_test_filtered = filter_ds(
-                #     X_test, y_test,
-                #     low_threshold=lower_threshold,
-                #     high_threshold=upper_threshold,
-                #     N=N, seed=seed)
-
                 # Compute the sample weights for test set
                 delta_test = y_test[:, 0]
                 print(f'delta_test.shape: {delta_test.shape}')
@@ -238,7 +226,8 @@ def main():
                     sam_rho=rho
                 )
                 model_sep.summary()
-                model_sep.load_weights(pretrained_weights)
+                if pretrained_weights is not None:
+                    model_sep.load_weights(pretrained_weights)
 
                 # Define the EarlyStopping callback
                 early_stopping = SmoothEarlyStopping(
@@ -320,7 +309,8 @@ def main():
                     sam_rho=rho
                 )
                 final_model_sep.summary()
-                final_model_sep.load_weights(pretrained_weights)
+                if pretrained_weights is not None:
+                    final_model_sep.load_weights(pretrained_weights)
 
                 # final_model_sep.summary()
                 final_model_sep.compile(

@@ -130,6 +130,7 @@ LEAKY_RELU_ALPHA = 0.3
 # Router
 ROUTER_OUTPUT_DIM = 3  # 3 classes for routing
 BATCH_SIZE_MOE = 32  # Batch size for Moe
+BATCH_SIZE_MOE_0 = 2048  # Batch size for Moe
 PLUS_INDEX = 0
 MID_INDEX = 1
 MINUS_INDEX = 2
@@ -140,6 +141,7 @@ RHO_MOE_M = [5e-1] #[1e-3]
 PATIENCE_MOE = int(5e3)
 PATIENCE_MOE_M = int(7e3)
 PATIENCE_MOE_P = int(7e3)
+PATIENCE_MOE_0 = int(7e3)
 
 LOWER_THRESHOLD_MOE = -0.4
 UPPER_THRESHOLD_MOE = 0.4

@@ -42,7 +42,7 @@ def main():
     add_slope = ADD_SLOPE[0]  # Use first element
 
     # Path to pre-trained model weights
-    pretrained_weights = PRE_WEIGHT_PATH
+    pretrained_weights = None #PRE_WEIGHT_PATH
 
     for seed in SEEDS:
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_0:
@@ -61,7 +61,7 @@ def main():
                 experiment_name = f'{title}_{current_time}'
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed)
-                patience = PATIENCE  # higher patience
+                patience = PATIENCE_MOE_0  # higher patience
                 learning_rate = START_LR  # starting learning rate
                 asym_type = ASYM_TYPE_0
 
@@ -75,7 +75,7 @@ def main():
 
                 weight_decay = WEIGHT_DECAY  # 1e-5 # higher weight decay
                 momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                batch_size = BATCH_SIZE # higher batch size
+                batch_size = BATCH_SIZE_MOE_0 # higher batch size
                 epochs = EPOCHS  # higher epochs
                 hiddens = MLP_HIDDENS  # hidden layers
                 proj_hiddens = PROJ_HIDDENS  # projection hidden layers
@@ -194,17 +194,6 @@ def main():
                 # print the test set shapes
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
 
-                # filtering training and test sets for additional results
-                # X_train_filtered, y_train_filtered = filter_ds(
-                #     X_train, y_train,
-                #     low_threshold=lower_threshold,
-                #     high_threshold=upper_threshold,
-                #     N=N, seed=seed)
-                # X_test_filtered, y_test_filtered = filter_ds(
-                #     X_test, y_test,
-                #     low_threshold=lower_threshold,
-                #     high_threshold=upper_threshold,
-                #     N=N, seed=seed)
 
                 # Compute the sample weights for test set
                 delta_test = y_test[:, 0]
@@ -238,7 +227,8 @@ def main():
                     sam_rho=rho
                 )
                 model_sep.summary()
-                model_sep.load_weights(pretrained_weights)
+                if pretrained_weights is not None:
+                    model_sep.load_weights(pretrained_weights)
 
                 # Define the EarlyStopping callback
                 early_stopping = SmoothEarlyStopping(
@@ -320,7 +310,8 @@ def main():
                     sam_rho=rho
                 )
                 final_model_sep.summary()
-                final_model_sep.load_weights(pretrained_weights)
+                if pretrained_weights is not None:
+                    final_model_sep.load_weights(pretrained_weights)
 
                 # final_model_sep.summary()
                 final_model_sep.compile(
