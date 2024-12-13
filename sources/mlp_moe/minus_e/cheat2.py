@@ -61,7 +61,7 @@ def main():
                 experiment_name = f'{title}_{current_time}'
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed)
-                patience = PATIENCE_MOE  # higher patience
+                patience = PATIENCE_MOE_M  # higher patience
                 learning_rate = START_LR  # starting learning rate
                 asym_type = ASYM_TYPE_MOE
 
@@ -139,7 +139,8 @@ def main():
                     'skip_repr': skip_repr,
                     'asym_type': asym_type,
                     'lower_threshold': lower_threshold,
-                    'upper_threshold': upper_threshold
+                    'upper_threshold': upper_threshold,
+                    'cvrg_metric': CVRG_METRIC
                 })
 
                 # set the root directory

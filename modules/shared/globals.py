@@ -89,6 +89,7 @@ LAMBDA_FACTOR = 8
 AE_LAMBDA = 0.9
 CVRG_MIN_DELTA = 1e-5
 CVRG_METRIC = 'loss'
+CVRG_METRIC_WDR = 'val_loss'
 ASYM_TYPE = 'sigmoid'
 
 # ATTM AREA
@@ -128,24 +129,26 @@ LEAKY_RELU_ALPHA = 0.3
 
 # Router
 ROUTER_OUTPUT_DIM = 3  # 3 classes for routing
-BATCH_SIZE_MOE = 16  # Batch size for Moe
+BATCH_SIZE_MOE = 32  # Batch size for Moe
 PLUS_INDEX = 0
 MID_INDEX = 1
 MINUS_INDEX = 2
 RHO_MOE = [5e-1] #[1e-3]
 RHO_MOE_0 = [1e-1] #[1e-3]
 RHO_MOE_P = [5e-1] #[1e-3]
-RHO_MOE_M = [2e-1] #[1e-3]
-PATIENCE_MOE = int(3e3)
+RHO_MOE_M = [5e-1] #[1e-3]
+PATIENCE_MOE = int(5e3)
+PATIENCE_MOE_M = int(7e3)
+PATIENCE_MOE_P = int(7e3)
 
 LOWER_THRESHOLD_MOE = -0.4
 UPPER_THRESHOLD_MOE = 0.4
 REWEIGHTS_MOE = [(0.3, 0.15, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
-REWEIGHTS_MOE_P = [(0.1, 0.1, 0.0, 0.0)]
-REWEIGHTS_MOE_M = [(0.1, 0.1, 0.1, 0.0)]
+REWEIGHTS_MOE_P = [(0.08, 0.08, 0.0, 0.0)]
+REWEIGHTS_MOE_M = [(0.03, 0.03, 0.0, 0.0)]
 REWEIGHTS_MOE_0 = [(0.1, 0.0, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
-LAMBDA_FACTOR_MOE_P = 8
-LAMBDA_FACTOR_MOE_M = 12
+LAMBDA_FACTOR_MOE_P = 6
+LAMBDA_FACTOR_MOE_M = 6
 ASYM_TYPE_0 = None
 ASYM_TYPE_MOE = None
 PDC_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcStratInj_bs6000_v8_20241203-194954.h5"

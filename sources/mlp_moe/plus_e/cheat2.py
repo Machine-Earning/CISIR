@@ -49,7 +49,7 @@ def main():
             for rho in RHO_MOE_P:  # SAM_RHOS:
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = LAMBDA_FACTOR  # lambda for the loss
+                lambda_factor = LAMBDA_FACTOR_MOE_P  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 # inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
@@ -61,7 +61,7 @@ def main():
                 experiment_name = f'{title}_{current_time}'
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed)
-                patience = PATIENCE_MOE  # higher patience
+                patience = PATIENCE_MOE_P  # higher patience
                 learning_rate = START_LR  # starting learning rate
                 asym_type = ASYM_TYPE_MOE
 
@@ -140,6 +140,7 @@ def main():
                     'asym_type': asym_type,
                     'upper_threshold': upper_threshold,
                     'lower_threshold': lower_threshold,
+                    'cvrg_metric': CVRG_METRIC_WDR
                 })
 
                 # set the root directory
@@ -240,7 +241,7 @@ def main():
 
                 # Define the EarlyStopping callback
                 early_stopping = SmoothEarlyStopping(
-                    monitor=CVRG_METRIC,
+                    monitor=CVRG_METRIC_WDR,
                     min_delta=CVRG_MIN_DELTA,
                     patience=patience,
                     verbose=VERBOSE,
