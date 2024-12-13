@@ -19,8 +19,8 @@ def create_weight_tensor_fast(y_true: tf.Tensor, weight_dict: Optional[Dict[floa
     # Convert the weight dictionary to sorted tensors
     unique_labels = tf.constant(sorted(weight_dict.keys()), dtype=tf.float32)
     weight_values = tf.constant([weight_dict[label] for label in sorted(weight_dict.keys())], dtype=tf.float32)
-    # Flatten y_true if it has more than one dimension
-    y_true_flat = tf.reshape(y_true, [-1])
+    # Flatten y_true if it has more than one dimension and cast to same dtype as unique_labels
+    y_true_flat = tf.cast(tf.reshape(y_true, [-1]), dtype=unique_labels.dtype)
     # Use tf.searchsorted to find the indices of y_true in unique_labels
     indices = tf.searchsorted(unique_labels, y_true_flat, side='left')
     # Handle the case where the search goes out of bounds
