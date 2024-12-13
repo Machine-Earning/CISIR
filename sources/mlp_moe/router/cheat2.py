@@ -273,13 +273,13 @@ def main():
                     verbose=VERBOSE
                 )
 
-                # Find optimal epoch using test loss
-                val_losses = history.history['val_forecast_head_loss']
+                # Find optimal epoch using validation accuracy
+                val_accuracies = history.history['val_forecast_head_accuracy']
                 optimal_epochs = find_optimal_epoch_by_smoothing(
-                    val_losses,
+                    val_accuracies,
                     smoothing_method=smoothing_method,
                     smoothing_parameters={'window_size': val_window_size},
-                    mode='min')
+                    mode='max')
 
                 print(f'optimal_epochs: {optimal_epochs}')
                 wandb.log({'optimal_epochs': optimal_epochs})
