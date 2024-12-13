@@ -140,7 +140,8 @@ def main():
                     'asym_type': asym_type,
                     'upper_threshold': upper_threshold,
                     'lower_threshold': lower_threshold,
-                    'cvrg_metric': CVRG_METRIC
+                    'cvrg_metric': CVRG_METRIC,
+                    'pretrained_weights': pretrained_weights
                 })
 
                 # set the root directory
