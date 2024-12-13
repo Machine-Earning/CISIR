@@ -140,7 +140,7 @@ def main():
                     'asym_type': asym_type,
                     'upper_threshold': upper_threshold,
                     'lower_threshold': lower_threshold,
-                    'cvrg_metric': CVRG_METRIC_WDR
+                    'cvrg_metric': CVRG_METRIC
                 })
 
                 # set the root directory
@@ -238,10 +238,11 @@ def main():
                     sam_rho=rho
                 )
                 model_sep.summary()
+                model_sep.load_weights(pretrained_weights)
 
                 # Define the EarlyStopping callback
                 early_stopping = SmoothEarlyStopping(
-                    monitor=CVRG_METRIC_WDR,
+                    monitor=CVRG_METRIC,
                     min_delta=CVRG_MIN_DELTA,
                     patience=patience,
                     verbose=VERBOSE,
@@ -319,6 +320,7 @@ def main():
                     sam_rho=rho
                 )
                 final_model_sep.summary()
+                final_model_sep.load_weights(pretrained_weights)
 
                 # final_model_sep.summary()
                 final_model_sep.compile(

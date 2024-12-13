@@ -397,45 +397,6 @@ def main():
                 wandb.log({"train_pcc_I": error_pcc_logI_train})
 
 
-                # # evaluate the model on test cme_files
-                # below_threshold = -mae_plus_threshold  # using lower_threshold for minus class
-                # # evaluate the model error for minus samples on test set
-                # error_mae_cond = evaluate_mae(
-                #     final_model_sep, X_test, y_test, below_threshold=below_threshold)
-                # print(f'mae error delta <= {below_threshold} test: {error_mae_cond}')
-                # wandb.log({"mae-": error_mae_cond})
-
-                # # evaluate the model error for minus samples on training set
-                # error_mae_cond_train = evaluate_mae(
-                #     final_model_sep, X_train, y_train, below_threshold=below_threshold)
-                # print(f'mae error delta <= {below_threshold} train: {error_mae_cond_train}')
-                # wandb.log({"train_mae-": error_mae_cond_train})
-
-                # # evaluate the model correlation for minus samples on test set
-                # error_pcc_cond = evaluate_pcc(
-                #     final_model_sep, X_test, y_test, below_threshold=below_threshold)
-                # print(f'pcc error delta <= {below_threshold} test: {error_pcc_cond}')
-                # wandb.log({"pcc-": error_pcc_cond})
-
-                # # evaluate the model correlation for minus samples on training set
-                # error_pcc_cond_train = evaluate_pcc(
-                #     final_model_sep, X_train, y_train, below_threshold=below_threshold)
-                # print(f'pcc error delta <= {below_threshold} train: {error_pcc_cond_train}')
-                # wandb.log({"train_pcc-": error_pcc_cond_train})
-
-                # # evaluate the model correlation for minus samples on test set based on logI and logI_prev
-                # error_pcc_cond_logI = evaluate_pcc(
-                #     final_model_sep, X_test, y_test, logI_test, logI_prev_test, below_threshold=below_threshold)
-                # print(f'pcc error delta <= {below_threshold} test: {error_pcc_cond_logI}')
-                # wandb.log({"pcc-_I": error_pcc_cond_logI})
-
-                # # evaluate the model correlation for minus samples on training set based on logI and logI_prev
-                # error_pcc_cond_logI_train = evaluate_pcc(
-                #     final_model_sep, X_train, y_train, logI_train, logI_prev_train, below_threshold=below_threshold)
-                # print(f'pcc error delta <= {below_threshold} train: {error_pcc_cond_logI_train}')
-                # wandb.log({"train_pcc-_I": error_pcc_cond_logI_train})
-
-
                 # Process SEP event files in the specified directory
                 test_directory = root_dir + '/testing'
                 filenames = process_sep_events(
@@ -472,64 +433,6 @@ def main():
                 for filename in filenames:
                     log_title = os.path.basename(filename)
                     wandb.log({f'training_{log_title}': wandb.Image(filename)})
-
-                # # Evaluate the model correlation with colored
-                # file_path = plot_repr_corr_dist(
-                #     final_model_sep,
-                #     X_train_filtered, y_train_filtered,
-                #     title + "_training",
-                #     model_type='features_reg'
-                # )
-                # wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
-                # print('file_path: ' + file_path)
-
-                # file_path = plot_repr_corr_dist(
-                #     final_model_sep,
-                #     X_test_filtered, y_test_filtered,
-                #     title + "_test",
-                #     model_type='features_reg'
-                # )
-                # wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
-                # print('file_path: ' + file_path)
-
-                # # Log t-SNE plot
-                # # Log the training t-SNE plot to wandb
-                # stage1_file_path = plot_tsne_delta(
-                #     final_model_sep,
-                #     X_train_filtered, y_train_filtered, title,
-                #     'stage2_training',
-                #     model_type='features_reg',
-                #     save_tag=current_time, seed=seed)
-                # wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
-                # print('stage1_file_path: ' + stage1_file_path)
-
-                # # Log the testing t-SNE plot to wandb
-                # stage1_file_path = plot_tsne_delta(
-                #     final_model_sep,
-                #     X_test_filtered, y_test_filtered, title,
-                #     'stage2_testing',
-                #     model_type='features_reg',
-                #     save_tag=current_time, seed=seed)
-                # wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
-                # print('stage1_file_path: ' + stage1_file_path)
-
-                # # Plot the error histograms
-                # filename = plot_error_hist(
-                #     final_model_sep,
-                #     X_train, y_train,
-                #     sample_weights=None,
-                #     title=title,
-                #     prefix='training')
-                # wandb.log({"training_error_hist": wandb.Image(filename)})
-
-                # # Plot the error histograms on the testing set
-                # filename = plot_error_hist(
-                #     final_model_sep,
-                #     X_test, y_test,
-                #     sample_weights=None,
-                #     title=title,
-                #     prefix='testing')
-                # wandb.log({"testing_error_hist": wandb.Image(filename)})
 
 
                 # Finish the wandb run

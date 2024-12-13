@@ -75,7 +75,7 @@ def main():
 
                 weight_decay = WEIGHT_DECAY  # 1e-5 # higher weight decay
                 momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                batch_size = BATCH_SIZE_MOE  # higher batch size
+                batch_size = BATCH_SIZE # higher batch size
                 epochs = EPOCHS  # higher epochs
                 hiddens = MLP_HIDDENS  # hidden layers
                 proj_hiddens = PROJ_HIDDENS  # projection hidden layers
@@ -92,8 +92,8 @@ def main():
                 skip_repr = SKIP_REPR
                 skipped_layers = SKIPPED_LAYERS
                 N = N_FILTERED  # number of samples to keep outside the threshold
-                lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
-                upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
+                lower_threshold = LOWER_THRESHOLD_MOE  # lower threshold for the delta_p
+                upper_threshold = UPPER_THRESHOLD_MOE  # upper threshold for the delta_p
                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                 smoothing_method = SMOOTHING_METHOD
                 window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
@@ -137,7 +137,10 @@ def main():
                     'window_size': window_size,
                     'val_window_size': val_window_size,
                     'skip_repr': skip_repr,
-                    'asym_type': asym_type
+                    'asym_type': asym_type,
+                    'upper_threshold': upper_threshold,
+                    'lower_threshold': lower_threshold,
+                    'cvrg_metric': CVRG_METRIC
                 })
 
                 # set the root directory
@@ -192,16 +195,16 @@ def main():
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
 
                 # filtering training and test sets for additional results
-                X_train_filtered, y_train_filtered = filter_ds(
-                    X_train, y_train,
-                    low_threshold=lower_threshold,
-                    high_threshold=upper_threshold,
-                    N=N, seed=seed)
-                X_test_filtered, y_test_filtered = filter_ds(
-                    X_test, y_test,
-                    low_threshold=lower_threshold,
-                    high_threshold=upper_threshold,
-                    N=N, seed=seed)
+                # X_train_filtered, y_train_filtered = filter_ds(
+                #     X_train, y_train,
+                #     low_threshold=lower_threshold,
+                #     high_threshold=upper_threshold,
+                #     N=N, seed=seed)
+                # X_test_filtered, y_test_filtered = filter_ds(
+                #     X_test, y_test,
+                #     low_threshold=lower_threshold,
+                #     high_threshold=upper_threshold,
+                #     N=N, seed=seed)
 
                 # Compute the sample weights for test set
                 delta_test = y_test[:, 0]
