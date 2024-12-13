@@ -70,7 +70,6 @@ def main():
                 # PARAMS
                 inputs_to_use = INPUTS_TO_USE[0]  # Use first input configuration
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = LAMBDA_FACTOR  # lambda for the loss
                 add_slope = ADD_SLOPE[0]  # Use first add_slope value
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]  # Use first threshold value
 
@@ -135,7 +134,6 @@ def main():
                     # hidden in a more readable format  (wandb does not support lists)
                     "hiddens": hiddens_str,
                     "loss": 'ce',
-                    "lambda": lambda_factor,
                     "seed": seed,
                     "alpha_ce": alpha_ce,
                     "alphaV_ce": alphaV_ce,
@@ -236,6 +234,8 @@ def main():
                     sam_rho=rho,
                     output_activation='softmax'
                 )
+                # summary of the model
+                initial_model.summary()
 
                 initial_model.compile(
                     optimizer=AdamW(
@@ -261,9 +261,8 @@ def main():
                 # Train initial model to find optimal epochs
                 history = initial_model.fit(
                     X_train, {'forecast_head': y_train_classes},
-                    validation_data=(X_test, {'forecast_head': y_test_classes}),
-                    sample_weight={'forecast_head': train_weights},
-                    validation_sample_weight={'forecast_head': test_weights},
+                    validation_data=(X_test, {'forecast_head': y_test_classes}, test_weights),
+                    sample_weight=train_weights,
                     epochs=epochs,
                     batch_size=batch_size,
                     callbacks=[
@@ -299,6 +298,8 @@ def main():
                     sam_rho=rho,
                     output_activation='softmax'
                 )
+                # summary of the model
+                router_model.summary()
 
                 router_model.compile(
                     optimizer=AdamW(
@@ -313,9 +314,8 @@ def main():
                 # Train the router model for optimal epochs
                 history = router_model.fit(
                     X_train, {'forecast_head': y_train_classes},
-                    validation_data=(X_test, {'forecast_head': y_test_classes}),
-                    sample_weight={'forecast_head': train_weights},
-                    validation_sample_weight={'forecast_head': test_weights},
+                    validation_data=(X_test, {'forecast_head': y_test_classes}, test_weights),
+                    sample_weight=train_weights,
                     epochs=optimal_epochs,
                     batch_size=batch_size,
                     callbacks=[
