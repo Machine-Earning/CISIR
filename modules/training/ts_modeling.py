@@ -811,6 +811,57 @@ def add_decoder(encoder_model, hiddens, activation=None, norm=None, dropout=0.0,
 
     return autoencoder_model
 
+# Create classification report tables for wandb
+def create_metrics_table(y_true: np.ndarray, y_pred: np.ndarray, set_name: str) -> plt.Figure:
+    """
+    Creates a matplotlib figure containing classification metrics for model evaluation.
+
+    Args:
+        y_true (np.ndarray): Ground truth labels (class indices)
+        y_pred (np.ndarray): Predicted labels (class indices) 
+        set_name (str): Name of the dataset split ('Train' or 'Test')
+
+    Returns:
+        plt.Figure: Figure containing accuracy, per-class accuracy, precision, recall and F1 scores
+    """
+    # Calculate overall accuracy
+    accuracy = accuracy_score(y_true, y_pred)
+    
+    # Calculate per-class accuracy
+    class_accuracies = []
+    for i in range(3):  # 3 classes
+        mask = y_true == i
+        class_accuracies.append(accuracy_score(y_true[mask], y_pred[mask]))
+    
+    # Calculate other metrics
+    precision = precision_score(y_true, y_pred, average=None)
+    recall = recall_score(y_true, y_pred, average=None)
+    f1 = f1_score(y_true, y_pred, average=None)
+    
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(12, 8))
+    ax.axis('tight')
+    ax.axis('off')
+    
+    # Define table data
+    table_data = [
+        ["Overall Accuracy", f"{accuracy:.3f}", "", "", ""],
+        ["Class", "Accuracy", "Precision", "Recall", "F1-Score"],
+        ["plus", f"{class_accuracies[2]:.3f}", f"{precision[2]:.3f}", f"{recall[2]:.3f}", f"{f1[2]:.3f}"],
+        ["zero", f"{class_accuracies[1]:.3f}", f"{precision[1]:.3f}", f"{recall[1]:.3f}", f"{f1[1]:.3f}"],
+        ["minus", f"{class_accuracies[0]:.3f}", f"{precision[0]:.3f}", f"{recall[0]:.3f}", f"{f1[0]:.3f}"]
+    ]
+    
+    # Create table
+    table = ax.table(cellText=table_data, loc='center', cellLoc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.scale(1.2, 1.5)
+    
+    # Set title
+    plt.title(f"{set_name} Classification Metrics", pad=20)
+    
+    return fig
 
 def plot_confusion_matrix(
         y_true: np.ndarray,
