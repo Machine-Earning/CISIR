@@ -867,7 +867,11 @@ def plot_confusion_matrix(
         y_true: np.ndarray,
         y_pred: np.ndarray,
         class_names: List[str],
-        title: str = "Confusion Matrix"
+        title: str = "Confusion Matrix",
+        xlabel: str = "Predicted",
+        ylabel: str = "True",
+        xticklabels: List[str] = None,
+        yticklabels: List[str] = None
 ) -> plt.Figure:
     """
     Creates and returns a figure containing a confusion matrix plot.
@@ -877,6 +881,10 @@ def plot_confusion_matrix(
         y_pred: Predicted labels as 1D array  
         class_names: List of class names for axis labels
         title: Title for the plot
+        xlabel: Label for x-axis
+        ylabel: Label for y-axis
+        xticklabels: Custom labels for x-axis ticks
+        yticklabels: Custom labels for y-axis ticks
         
     Returns:
         matplotlib Figure object containing the confusion matrix plot
@@ -887,15 +895,19 @@ def plot_confusion_matrix(
     # Create figure and axis
     fig, ax = plt.subplots(figsize=(10, 8))
 
+    # Use provided tick labels or default to class names
+    xticks = xticklabels if xticklabels is not None else class_names
+    yticks = yticklabels if yticklabels is not None else class_names
+
     # Plot confusion matrix using seaborn
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                xticklabels=class_names,
-                yticklabels=class_names,
+                xticklabels=xticks,
+                yticklabels=yticks,
                 ax=ax)
 
     # Set labels and title
-    ax.set_xlabel('Predicted')
-    ax.set_ylabel('True')
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     ax.set_title(title)
 
     # Adjust layout

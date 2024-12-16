@@ -134,7 +134,7 @@ BATCH_SIZE_MOE_0 = 2048  # Batch size for Moe
 PLUS_INDEX = 0
 MID_INDEX = 1
 MINUS_INDEX = 2
-RHO_MOE_R = [1e-2] 
+RHO_MOE_R = [5e-1] 
 RHO_MOE_0 = [1e-1] 
 RHO_MOE_P = [5e-1] 
 RHO_MOE_M = [5e-1] 
@@ -145,7 +145,7 @@ PATIENCE_MOE_0 = int(7e3)
 
 LOWER_THRESHOLD_MOE = -0.4
 UPPER_THRESHOLD_MOE = 0.4
-REWEIGHTS_MOE_R = [(1.0, 0.3)]  
+REWEIGHTS_MOE_R = [(1.5, 1.5)]  
 REWEIGHTS_MOE_P = [(0.11, 0.11, 0.0, 0.0)]
 REWEIGHTS_MOE_M = [(0.035, 0.035, 0.0, 0.0)]
 REWEIGHTS_MOE_0 = [(0.4, 0.4, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
