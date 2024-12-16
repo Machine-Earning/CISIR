@@ -3,7 +3,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import wandb
-from sklearn.metrics import classification_report, precision_score, recall_score, f1_score
+from sklearn.metrics import classification_report, precision_score, recall_score, f1_score, accuracy_score
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
@@ -22,9 +22,9 @@ from modules.training.ts_modeling import (
 
 
 # Create classification report tables for wandb
-def create_metrics_table(y_true: np.ndarray, y_pred: np.ndarray, set_name: str) -> wandb.Table:
+def create_metrics_table(y_true: np.ndarray, y_pred: np.ndarray, set_name: str) -> plt.Figure:
     """
-    Creates a wandb table containing classification metrics for model evaluation.
+    Creates a matplotlib figure containing classification metrics for model evaluation.
 
     Args:
         y_true (np.ndarray): Ground truth labels (class indices)
@@ -32,31 +32,46 @@ def create_metrics_table(y_true: np.ndarray, y_pred: np.ndarray, set_name: str) 
         set_name (str): Name of the dataset split ('Train' or 'Test')
 
     Returns:
-        wandb.Table: Table containing precision, recall and F1 scores for each class
-                    and weighted averages
+        plt.Figure: Figure containing accuracy, per-class accuracy, precision, recall and F1 scores
     """
-    # Calculate per-class metrics
+    # Calculate overall accuracy
+    accuracy = accuracy_score(y_true, y_pred)
+    
+    # Calculate per-class accuracy
+    class_accuracies = []
+    for i in range(3):  # 3 classes
+        mask = y_true == i
+        class_accuracies.append(accuracy_score(y_true[mask], y_pred[mask]))
+    
+    # Calculate other metrics
     precision = precision_score(y_true, y_pred, average=None)
     recall = recall_score(y_true, y_pred, average=None)
     f1 = f1_score(y_true, y_pred, average=None)
     
-    # Define table structure
-    columns = ["Class", "Precision", "Recall", "F1-Score"]
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(12, 8))
+    ax.axis('tight')
+    ax.axis('off')
     
-    # Create rows for each class
-    data = [
-        ["minus", precision[0], recall[0], f1[0]],  # Class 0 metrics
-        ["zero", precision[1], recall[1], f1[1]],   # Class 1 metrics
-        ["plus", precision[2], recall[2], f1[2]]    # Class 2 metrics
+    # Define table data
+    table_data = [
+        ["Overall Accuracy", f"{accuracy:.3f}", "", "", ""],
+        ["Class", "Accuracy", "Precision", "Recall", "F1-Score"],
+        ["plus", f"{class_accuracies[2]:.3f}", f"{precision[2]:.3f}", f"{recall[2]:.3f}", f"{f1[2]:.3f}"],
+        ["zero", f"{class_accuracies[1]:.3f}", f"{precision[1]:.3f}", f"{recall[1]:.3f}", f"{f1[1]:.3f}"],
+        ["minus", f"{class_accuracies[0]:.3f}", f"{precision[0]:.3f}", f"{recall[0]:.3f}", f"{f1[0]:.3f}"]
     ]
     
-    # Calculate and add weighted averages across all classes
-    weighted_precision = precision_score(y_true, y_pred, average='weighted')
-    weighted_recall = recall_score(y_true, y_pred, average='weighted')
-    weighted_f1 = f1_score(y_true, y_pred, average='weighted')
-    data.append(["weighted avg", weighted_precision, weighted_recall, weighted_f1])
+    # Create table
+    table = ax.table(cellText=table_data, loc='center', cellLoc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.scale(1.2, 1.5)
     
-    return wandb.Table(data=data, columns=columns)
+    # Set title
+    plt.title(f"{set_name} Classification Metrics", pad=20)
+    
+    return fig
 
 def main():
     """
@@ -346,25 +361,31 @@ def main():
 
                 # Create and save train confusion matrix plot
                 train_cm_fig = plot_confusion_matrix(
-                    y_train_true_classes,
-                    y_train_pred_classes,
+                    y_train_pred_classes,  # Switched order to have predicted on y-axis
+                    y_train_true_classes,  # Switched order to have actual on x-axis
                     class_names=class_names,
-                    title="Training Confusion Matrix"
+                    title="Training Confusion Matrix",
+                    xlabel="Actual",  # Added x-label for actual values
+                    ylabel="Predicted",  # Added y-label for predicted values
+                    xticklabels=class_names,  # Add class names on x-axis
+                    yticklabels=class_names  # Add class names on y-axis
                 )
 
                 # Create and save test confusion matrix plot
                 test_cm_fig = plot_confusion_matrix(
-                    y_test_true_classes,
-                    y_test_pred_classes,
+                    y_test_pred_classes,  # Switched order to have predicted on y-axis
+                    y_test_true_classes,  # Switched order to have actual on x-axis
                     class_names=class_names,
-                    title="Test Confusion Matrix"
+                    title="Test Confusion Matrix",
+                    xlabel="Actual",  # Added x-label for actual values
+                    ylabel="Predicted",  # Added y-label for predicted values
+                    xticklabels=class_names,  # Add class names on x-axis
+                    yticklabels=class_names  # Add class names on y-axis
                 )
 
-                # Calculate accuracies without weights
-                train_metrics = router_model.evaluate(X_train, {'forecast_head': y_train_classes}, verbose=0)
-                test_metrics = router_model.evaluate(X_test, {'forecast_head': y_test_classes}, verbose=0)
-                train_accuracy = train_metrics[1]  # Assuming accuracy is the second metric
-                test_accuracy = test_metrics[1]  # Assuming accuracy is the second metric
+                # Calculate accuracies
+                train_accuracy = accuracy_score(y_train_true_classes, y_train_pred_classes)
+                test_accuracy = accuracy_score(y_test_true_classes, y_test_pred_classes)
 
                 # Get detailed classification reports
                 train_report = classification_report(y_train_true_classes, y_train_pred_classes)
@@ -380,23 +401,25 @@ def main():
                 print("\nClassification Report:")
                 print(test_report)
 
-                # Create tables for both train and test sets
-                train_metrics_table = create_metrics_table(y_train_true_classes, y_train_pred_classes, "Train")
-                test_metrics_table = create_metrics_table(y_test_true_classes, y_test_pred_classes, "Test")
+                # Create metric tables as figures
+                train_metrics_fig = create_metrics_table(y_train_true_classes, y_train_pred_classes, "Train")
+                test_metrics_fig = create_metrics_table(y_test_true_classes, y_test_pred_classes, "Test")
 
-                # Update the wandb.log call to include the tables
+                # Update the wandb.log call to include the tables as images
                 wandb.log({
                     "train_accuracy": train_accuracy,
                     "test_accuracy": test_accuracy,
                     "train_confusion_matrix": wandb.Image(train_cm_fig),
                     "test_confusion_matrix": wandb.Image(test_cm_fig),
-                    "train_classification_metrics": train_metrics_table,
-                    "test_classification_metrics": test_metrics_table
+                    "train_classification_metrics": wandb.Image(train_metrics_fig),
+                    "test_classification_metrics": wandb.Image(test_metrics_fig)
                 })
 
-                # Close the figures to free memory
+                # Close all figures to free memory
                 plt.close(train_cm_fig)
                 plt.close(test_cm_fig)
+                plt.close(train_metrics_fig)
+                plt.close(test_metrics_fig)
 
                 # Finish the wandb run
                 wandb.finish()
