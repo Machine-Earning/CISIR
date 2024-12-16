@@ -3,7 +3,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import wandb
-from sklearn.metrics import classification_report, precision_score, recall_score, f1_score, accuracy_score
+from sklearn.metrics import classification_report, accuracy_score
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
@@ -20,8 +20,6 @@ from modules.training.ts_modeling import (
     plot_confusion_matrix,
     create_metrics_table
 )
-
-
 
 
 def main():
