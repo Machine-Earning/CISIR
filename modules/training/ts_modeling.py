@@ -647,14 +647,15 @@ def add_proj_head(
         norm: str = None,
         skipped_layers: int = 2,
         name: str = 'mlp',
-        sam_rho: float = 0.05
+        sam_rho: float = 0.05,
+        output_activation: str = 'linear'
 ) -> Model:
     """
-    Add a regression head with one output unit and a projection layer to an existing model,
+    Add a projection head with output layer to an existing model,
     replacing the existing prediction layer and optionally the decoder layer.
 
     :param model: The existing model
-    :param output_dim: The dimensionality of the output of the regression head.
+    :param output_dim: The dimensionality of the output layer.
     :param freeze_features: Whether to freeze the layers of the base model or not.
     :param hiddens: List of integers representing the hidden layers for the projection.
     :param pretraining: Whether to adapt the model for pretraining representations.
@@ -664,7 +665,8 @@ def add_proj_head(
     :param skipped_layers: Number of layers between residual connections.
     :param name: Name of the model.
     :param sam_rho: Rho value for sharpness-aware minimization (SAM). Default is 0.05. if 0.0, SAM is not used.
-    :return: The modified model with a projection layer and a regression head.
+    :param output_activation: Activation function for output layer. Default 'linear' for regression, use 'softmax' for classification.
+    :return: The modified model with a projection layer and output layer.
     """
 
     if hiddens is None:
@@ -728,8 +730,8 @@ def add_proj_head(
         if dropout > 0.0:
             x_proj = Dropout(dropout, name=f"proj_dropout_{dropout_count + i + 1}")(x_proj)
 
-    # Add a Dense layer with one output unit for regression
-    output_layer = Dense(output_dim, activation='linear', name=f"forecast_head")(x_proj)
+    # Add output layer with specified activation
+    output_layer = Dense(output_dim, activation=output_activation, name=f"forecast_head")(x_proj)
 
     if sam_rho > 0.0:
         # create the new extended SAM model
