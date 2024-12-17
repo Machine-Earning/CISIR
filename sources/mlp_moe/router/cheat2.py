@@ -336,6 +336,23 @@ def main():
                 train_accuracy = accuracy_score(y_train_true_classes, y_train_pred_classes)
                 test_accuracy = accuracy_score(y_test_true_classes, y_test_pred_classes)
 
+                # Calculate class-specific accuracies
+                train_plus_mask = y_train_true_classes == 0  # plus class index
+                train_zero_mask = y_train_true_classes == 1  # zero class index
+                train_minus_mask = y_train_true_classes == 2  # minus class index
+
+                test_plus_mask = y_test_true_classes == 0  # plus class index
+                test_zero_mask = y_test_true_classes == 1  # zero class index
+                test_minus_mask = y_test_true_classes == 2  # minus class index
+
+                train_plus_accuracy = accuracy_score(y_train_true_classes[train_plus_mask], y_train_pred_classes[train_plus_mask])
+                train_zero_accuracy = accuracy_score(y_train_true_classes[train_zero_mask], y_train_pred_classes[train_zero_mask])
+                train_minus_accuracy = accuracy_score(y_train_true_classes[train_minus_mask], y_train_pred_classes[train_minus_mask])
+
+                test_plus_accuracy = accuracy_score(y_test_true_classes[test_plus_mask], y_test_pred_classes[test_plus_mask])
+                test_zero_accuracy = accuracy_score(y_test_true_classes[test_zero_mask], y_test_pred_classes[test_zero_mask])
+                test_minus_accuracy = accuracy_score(y_test_true_classes[test_minus_mask], y_test_pred_classes[test_minus_mask])
+
                 # Get detailed classification reports
                 train_report = classification_report(y_train_true_classes, y_train_pred_classes)
                 test_report = classification_report(y_test_true_classes, y_test_pred_classes)
@@ -354,10 +371,16 @@ def main():
                 train_metrics_fig = create_metrics_table(y_train_true_classes, y_train_pred_classes, "Train")
                 test_metrics_fig = create_metrics_table(y_test_true_classes, y_test_pred_classes, "Test")
 
-                # Update the wandb.log call to include the tables as images
+                # Update the wandb.log call to include the tables as images and class-specific accuracies
                 wandb.log({
                     "train_accuracy": train_accuracy,
                     "test_accuracy": test_accuracy,
+                    "train_plus_accuracy": train_plus_accuracy,
+                    "train_zero_accuracy": train_zero_accuracy,
+                    "train_minus_accuracy": train_minus_accuracy,
+                    "test_plus_accuracy": test_plus_accuracy,
+                    "test_zero_accuracy": test_zero_accuracy,
+                    "test_minus_accuracy": test_minus_accuracy,
                     "train_confusion_matrix": wandb.Image(train_cm_fig),
                     "test_confusion_matrix": wandb.Image(test_cm_fig),
                     "train_classification_metrics": wandb.Image(train_metrics_fig),
