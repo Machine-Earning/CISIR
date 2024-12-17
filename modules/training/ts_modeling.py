@@ -43,7 +43,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Optimizer
 from tensorflow.keras.regularizers import l2
 
-from modules.shared.globals import PLUS_INDEX, MID_INDEX, MINUS_INDEX
+from modules.shared.globals import PLUS_INDEX, MID_INDEX, MINUS_INDEX, MLP_HIDDENS
 from modules.training.normlayer import NormalizeLayer
 from modules.training.phase_manager import TrainingPhaseManager, create_weight_tensor_fast
 from modules.training.sam_keras import SAMModel
@@ -948,22 +948,23 @@ def focal_loss(gamma: float = 3.0, alpha: float = 0.25):
 
     return focal_loss_fn
 
-
 def create_mlp_moe(
-        input_dim: int = 100,
         hiddens=None,
-        skipped_layers: int = 1,
+        router_hiddens=None,
+        input_dim: int = 100,
         embed_dim: int = 128,
+        skipped_layers: int = 1,
         skip_repr: bool = True,
         pretraining: bool = False,
+        freeze_experts: bool = False,
+        expert_paths: dict = None,
+        mode: str = 'soft',  # 'soft' or 'hard'
         activation=None,
         norm: str = 'batch_norm',
         sam_rho: float = 1e-2,
         dropout: float = 0.2,
         name: str = 'mlp_moe',
-        expert_paths: dict = None,
-        router_hiddens=None,
-        freeze_experts: bool = False
+
 ) -> Model:
     """
     Create an MLP mixture of experts model with pre-trained experts and a router network.
@@ -988,22 +989,26 @@ def create_mlp_moe(
         }
     - router_hiddens (list): A list of integers for router network hidden layers. If None, uses same as hiddens.
     - freeze_experts (bool): If True, freeze the expert layers.
+    - mode (str): Either 'soft' for weighted combination of experts or 'hard' for selecting single expert. Default is 'soft'.
 
     Returns:
     - Model: A Keras model instance.
     """
     if hiddens is None:
-        hiddens = [50, 50]
+        hiddens = MLP_HIDDENS
 
     if activation is None:
         activation = LeakyReLU()
+    
+    expert_output_dim = 1
+    router_output_dim = 3
 
     input_layer = Input(shape=(input_dim,))
 
     # Create experts using the create_mlp function - each expert outputs a single regression value
     expert_plus = create_mlp(
         input_dim=input_dim,
-        output_dim=1,
+        output_dim=expert_output_dim,
         hiddens=hiddens,
         skipped_layers=skipped_layers,
         embed_dim=embed_dim,
@@ -1018,7 +1023,7 @@ def create_mlp_moe(
 
     expert_zero = create_mlp(
         input_dim=input_dim,
-        output_dim=1,
+        output_dim=expert_output_dim,
         hiddens=hiddens,
         skipped_layers=skipped_layers,
         embed_dim=embed_dim,
@@ -1033,7 +1038,7 @@ def create_mlp_moe(
 
     expert_minus = create_mlp(
         input_dim=input_dim,
-        output_dim=1,
+        output_dim=expert_output_dim,
         hiddens=hiddens,
         skipped_layers=skipped_layers,
         embed_dim=embed_dim,
@@ -1049,7 +1054,7 @@ def create_mlp_moe(
     # Create router network - outputs class probabilities
     router = create_mlp(
         input_dim=input_dim,
-        output_dim=3,  # 3 classes: plus, mid, minus
+        output_dim=router_output_dim,  # 3 classes: plus, mid, minus
         hiddens=router_hiddens if router_hiddens else hiddens,
         skipped_layers=skipped_layers,
         embed_dim=embed_dim,
@@ -1087,15 +1092,25 @@ def create_mlp_moe(
 
     # Extract routing probabilities
     routing_probs = router_output[1]  # Shape: (batch_size, 3)
-    plus_prob = Lambda(lambda x: x[:, PLUS_INDEX:PLUS_INDEX + 1])(routing_probs)
-    zero_prob = Lambda(lambda x: x[:, MID_INDEX:MID_INDEX + 1])(routing_probs)
-    minus_prob = Lambda(lambda x: x[:, MINUS_INDEX:MINUS_INDEX + 1])(routing_probs)
 
-    # Combine expert outputs using routing probabilities
-    plus_weighted = Multiply()([plus_output[1], plus_prob])
-    zero_weighted = Multiply()([zero_output[1], zero_prob])
-    minus_weighted = Multiply()([minus_output[1], minus_prob])
-    combined_output = Add()([plus_weighted, zero_weighted, minus_weighted])
+    if mode == 'soft':
+        # Soft mixture - weighted combination of experts
+        plus_prob = Lambda(lambda x: x[:, PLUS_INDEX:PLUS_INDEX + 1])(routing_probs)
+        zero_prob = Lambda(lambda x: x[:, MID_INDEX:MID_INDEX + 1])(routing_probs)
+        minus_prob = Lambda(lambda x: x[:, MINUS_INDEX:MINUS_INDEX + 1])(routing_probs)
+
+        plus_weighted = Multiply()([plus_output[1], plus_prob])
+        zero_weighted = Multiply()([zero_output[1], zero_prob])
+        minus_weighted = Multiply()([minus_output[1], minus_prob])
+        combined_output = Add()([plus_weighted, zero_weighted, minus_weighted])
+    else:
+        # Hard selection - choose expert with highest probability
+        expert_selector = Lambda(lambda x: tf.argmax(x, axis=1))(routing_probs)
+        combined_output = Lambda(lambda args: tf.case({
+            tf.equal(args[0], PLUS_INDEX): lambda: args[1],
+            tf.equal(args[0], MID_INDEX): lambda: args[2],
+            tf.equal(args[0], MINUS_INDEX): lambda: args[3]
+        }, exclusive=True))([expert_selector, plus_output[1], zero_output[1], minus_output[1]])
 
     model = Model(inputs=input_layer, outputs=[routing_probs, combined_output], name=name)
     return model
