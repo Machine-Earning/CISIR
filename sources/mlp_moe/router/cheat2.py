@@ -181,8 +181,8 @@ def main():
                     debug=False).label_reweight_dict
 
                 # Create weight tensors for train and test sets
-                train_weights = create_weight_tensor_fast(y_train[:, 0], train_weights_dict)
-                test_weights = create_weight_tensor_fast(y_test[:, 0], test_weights_dict)
+                train_weights = create_weight_tensor_fast(delta_train, train_weights_dict)
+                test_weights = create_weight_tensor_fast(delta_test, test_weights_dict)
 
                 # get the number of input features
                 n_features = X_train.shape[1]
@@ -235,7 +235,7 @@ def main():
                 # Create stratified dataset for training
                 train_dataset, steps_per_epoch = stratified_batch_dataset_cls(
                     X_train, 
-                    y_train[:, 0],  # Use first column for stratification
+                    delta_train,  # Use first column for stratification
                     y_train_classes,
                     train_weights,
                     batch_size

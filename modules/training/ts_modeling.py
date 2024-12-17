@@ -1576,6 +1576,9 @@ def stratified_data_generator_cls(
         batch_y = y_labels[batch_indices]
         batch_w = y_weights[batch_indices]
 
+        # Ensure the labels have the correct shape
+        batch_y = batch_y.reshape(-1)
+
         # Debugging: Print the current batch
         if debug:
             print(f'Batch shape: X={batch_X.shape}, y={batch_y.shape}, w={batch_w.shape}')
