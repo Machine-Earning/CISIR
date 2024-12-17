@@ -181,8 +181,8 @@ def main():
                     debug=False).label_reweight_dict
 
                 # Create weight tensors for train and test sets
-                train_weights = create_weight_tensor_fast(delta_train, train_weights_dict)
-                test_weights = create_weight_tensor_fast(delta_test, test_weights_dict)
+                train_weights = create_weight_tensor_fast(delta_train, train_weights_dict).numpy()
+                test_weights = create_weight_tensor_fast(delta_test, test_weights_dict).numpy()
 
                 # get the number of input features
                 n_features = X_train.shape[1]
