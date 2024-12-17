@@ -1622,6 +1622,83 @@ def stratified_batch_dataset(
     return dataset, steps_per_epoch
 
 
+def stratified_batch_dataset_cls(
+    X: np.ndarray,
+    y_sort: np.ndarray,
+    y_labels: np.ndarray,
+    y_weights: np.ndarray,
+    batch_size: int,
+    shuffle: bool = True
+) -> Tuple[tf.data.Dataset, int]:
+    """
+    Creates a TensorFlow dataset from the stratified data generator for a classification scenario,
+    leveraging a continuous label array `y_sort` to stratify and a separate array `y_labels` for 
+    the final training labels. Additionally, this version supports per-sample weights to 
+    handle imbalanced data or focus training on particular samples.
+
+    This function uses `y_sort` solely for determining how to group samples into batches. These 
+    batches are formed by slicing the dataset after sorting by `y_sort`, effectively grouping 
+    together samples with similar continuous label values. The `y_labels` (e.g., one-hot encoded 
+    classes) are the actual training targets, and `y_weights` is an array of sample-wise weights 
+    that will be returned alongside the features and labels.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        Feature matrix of shape (n_samples, n_features).
+    y_sort : np.ndarray
+        Continuous label vector of shape (n_samples,). Used only for stratification.
+        Must be numeric and sortable.
+    y_labels : np.ndarray
+        Label matrix of shape (n_samples, n_classes) representing final classification targets.
+        For example, one-hot encoded classes.
+    y_weights : np.ndarray
+        Sample weight vector of shape (n_samples,). Each value corresponds to the weight 
+        assigned to a sample, influencing how much the sample contributes to loss computation.
+    batch_size : int
+        Number of samples in each batch.
+    shuffle : bool, optional
+        If True, shuffles the groups and the elements within each group before each epoch
+        (default is True).
+
+    Returns
+    -------
+    Tuple[tf.data.Dataset, int]
+        A tuple of:
+        - A TensorFlow dataset object that yields `(features, labels, sample_weights)` tuples.
+        - An integer representing the number of steps (batches) per epoch.
+
+    Notes
+    -----
+    - The dataset is created using `tf.data.Dataset.from_generator`, ensuring compatibility 
+      with large datasets and on-demand batch construction.
+    - Prefetching is enabled for better performance.
+    - Ensure that `X`, `y_sort`, `y_labels`, and `y_weights` have the same first dimension (n_samples).
+    """
+    # Generate stratified groups once using the continuous labels
+    groups = stratified_groups(y_sort, batch_size)
+
+    # The generator will yield batches of (X_batch, y_labels_batch, w_batch)
+    dataset = tf.data.Dataset.from_generator(
+        lambda: stratified_data_generator(X, y_labels, y_weights, groups, shuffle=shuffle),
+        output_signature=(
+            tf.TensorSpec(shape=(batch_size, X.shape[1]), dtype=tf.float32),
+            tf.TensorSpec(shape=(batch_size, y_labels.shape[1]), dtype=tf.float32),
+            tf.TensorSpec(shape=(batch_size,), dtype=tf.float32)
+        )
+    )
+
+    # Compute the number of steps per epoch. Integer division used since partial batch is discarded.
+    steps_per_epoch = len(y_sort) // batch_size
+
+    # Prefetch the dataset for performance optimization
+    dataset = dataset.prefetch(tf.data.AUTOTUNE)
+
+    return dataset, steps_per_epoch
+
+
+
+
 # def stratified_batch_dataset(
 #         X: np.ndarray,
 #         y: np.ndarray,

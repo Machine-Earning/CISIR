@@ -18,7 +18,8 @@ from modules.training.ts_modeling import (
     create_mlp,
     convert_to_onehot_cls,
     plot_confusion_matrix,
-    create_metrics_table
+    create_metrics_table,
+    stratified_batch_dataset_cls
 )
 
 
@@ -27,6 +28,9 @@ def main():
     Main function to run the Router model
     :return:
     """
+
+    # Path to pre-trained model weights
+    pretrained_weights = None #PRE_WEIGHT_PATH
 
     for seed in SEEDS:
         for alpha_ce, alphaV_ce in REWEIGHTS_MOE_R:
@@ -198,6 +202,12 @@ def main():
                     sam_rho=rho,
                     output_activation='softmax'
                 )
+
+                # Load pre-trained weights if available
+                if pretrained_weights is not None:
+                    print(f"Loading pre-trained weights from {pretrained_weights}")
+                    initial_model.load_weights(pretrained_weights)  
+
                 # summary of the model
                 initial_model.summary()
 
@@ -222,13 +232,27 @@ def main():
                     smoothing_parameters={'window_size': window_size}
                 )
 
+                # Create stratified dataset for training
+                train_dataset, steps_per_epoch = stratified_batch_dataset_cls(
+                    X_train, 
+                    y_train[:, 0],  # Use first column for stratification
+                    y_train_classes,
+                    train_weights,
+                    batch_size,
+                    shuffle=True
+                )
+
+                # Map the dataset to include the 'forecast_head' key
+                train_dataset = train_dataset.map(
+                    lambda x, y, w: (x, {'forecast_head': y}, w)
+                )
+
                 # Train initial model to find optimal epochs
                 history = initial_model.fit(
-                    X_train, {'forecast_head': y_train_classes},
+                    train_dataset,
                     validation_data=(X_test, {'forecast_head': y_test_classes}, test_weights),
-                    sample_weight=train_weights,
                     epochs=epochs,
-                    batch_size=batch_size,
+                    steps_per_epoch=steps_per_epoch,
                     callbacks=[
                         reduce_lr_on_plateau,
                         early_stopping,
@@ -275,13 +299,17 @@ def main():
                     metrics={'forecast_head': 'accuracy'}
                 )
 
+                # Load pre-trained weights if available
+                if pretrained_weights is not None:
+                    print(f"Loading pre-trained weights from {pretrained_weights}")
+                    router_model.load_weights(pretrained_weights)
+
                 # Train the router model for optimal epochs
                 history = router_model.fit(
-                    X_train, {'forecast_head': y_train_classes},
+                    train_dataset,
                     validation_data=(X_test, {'forecast_head': y_test_classes}, test_weights),
-                    sample_weight=train_weights,
                     epochs=optimal_epochs,
-                    batch_size=batch_size,
+                    steps_per_epoch=steps_per_epoch,
                     callbacks=[
                         reduce_lr_on_plateau,
                         WandbCallback(save_model=WANDB_SAVE_MODEL)
