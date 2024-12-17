@@ -238,8 +238,7 @@ def main():
                     y_train[:, 0],  # Use first column for stratification
                     y_train_classes,
                     train_weights,
-                    batch_size,
-                    shuffle=True
+                    batch_size
                 )
 
                 # Map the dataset to include the 'forecast_head' key

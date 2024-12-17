@@ -1516,6 +1516,76 @@ def stratified_data_generator(
         # Yield the current batch
         yield batch_X, batch_y
 
+def stratified_data_generator_cls(
+    X: np.ndarray,
+    y_labels: np.ndarray,
+    y_weights: np.ndarray,
+    groups: np.ndarray,
+    shuffle: bool = True,
+    debug: bool = False
+) -> Generator[Tuple[np.ndarray, np.ndarray, np.ndarray], None, None]:
+    """
+    Generator that yields stratified batches of (X, y_labels, y_weights) by selecting one sample 
+    from each group in `groups`. The groups are precomputed as a 2D array of sample indices.
+
+    This version differs from the original in that it returns sample weights along with the features 
+    and labels, which can be useful for handling imbalanced datasets or customizing the importance 
+    of specific samples during training.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        Feature matrix of shape (n_samples, n_features).
+    y_labels : np.ndarray
+        Label matrix of shape (n_samples, n_classes) or (n_samples,) depending on the use case.
+        For classification, this could be one-hot encoded targets.
+    y_weights : np.ndarray
+        Sample weights vector of shape (n_samples,). Each value corresponds to the weight assigned 
+        to a particular sample.
+    groups : np.ndarray
+        Precomputed groups of sample indices, shape (n_groups, group_size), obtained from stratified 
+        grouping functions.
+    shuffle : bool, optional
+        If True, shuffles the groups and the elements within each group before each epoch (default is True).
+    debug : bool, optional
+        If True, prints the generated batches for debugging purposes (default is False).
+
+    Yields
+    ------
+    Tuple[np.ndarray, np.ndarray, np.ndarray]
+        A tuple `(batch_X, batch_y, batch_w)` where:
+        - `batch_X` is a feature batch of shape (batch_size, n_features).
+        - `batch_y` is a label batch of shape (batch_size, n_classes) or (batch_size,) depending 
+          on the label format.
+        - `batch_w` is a weight batch of shape (batch_size,), containing the corresponding sample weights.
+    """
+    while True:
+        # Shuffle within each group if requested
+        if shuffle:
+            np.apply_along_axis(np.random.shuffle, 1, groups)
+
+        # Select the first element from each group to form the batch
+        batch_indices = groups[:, 0]
+
+        # Optionally, shuffle the order of the selected samples to randomize batch order
+        if shuffle:
+            np.random.shuffle(batch_indices)
+
+        # Create the feature, label, and weight batches using the selected indices
+        batch_X = X[batch_indices]
+        batch_y = y_labels[batch_indices]
+        batch_w = y_weights[batch_indices]
+
+        # Debugging: Print the current batch
+        if debug:
+            print(f'Batch shape: X={batch_X.shape}, y={batch_y.shape}, w={batch_w.shape}')
+            print(f"Batch indices: {batch_indices}")
+            print(f"Batch weights:\n{batch_w}")
+
+        # Yield the current batch as (features, labels, weights)
+        yield batch_X, batch_y, batch_w
+
+
 
 # def stratified_data_generator(
 #         X: np.ndarray,
@@ -1680,7 +1750,7 @@ def stratified_batch_dataset_cls(
 
     # The generator will yield batches of (X_batch, y_labels_batch, w_batch)
     dataset = tf.data.Dataset.from_generator(
-        lambda: stratified_data_generator(X, y_labels, y_weights, groups, shuffle=shuffle),
+        lambda: stratified_data_generator_cls(X, y_labels, y_weights, groups, shuffle=shuffle),
         output_signature=(
             tf.TensorSpec(shape=(batch_size, X.shape[1]), dtype=tf.float32),
             tf.TensorSpec(shape=(batch_size, y_labels.shape[1]), dtype=tf.float32),
