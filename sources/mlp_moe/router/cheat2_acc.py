@@ -40,7 +40,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_ace{alpha_ce:.2f}_router'
+                title = f'mlp2_ace{alpha_ce:.2f}_router_acc'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -237,13 +237,13 @@ def main():
                     verbose=VERBOSE
                 )
 
-                # Find optimal epoch using validation loss
-                val_losses = history.history['val_forecast_head_loss']
+                # Find optimal epoch using validation accuracy
+                val_accuracies = history.history['val_forecast_head_accuracy']
                 optimal_epochs = find_optimal_epoch_by_smoothing(
-                    val_losses,
+                    val_accuracies,
                     smoothing_method=smoothing_method,
                     smoothing_parameters={'window_size': val_window_size},
-                    mode='min')
+                    mode='max')
 
                 print(f'optimal_epochs: {optimal_epochs}')
                 wandb.log({'optimal_epochs': optimal_epochs})
