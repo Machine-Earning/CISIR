@@ -31,7 +31,7 @@ def main():
     """
 
     # Path to pre-trained model weights
-    pretrained_weights = None  # PRE_WEIGHT_PATH
+    pretrained_weights = PRE_WEIGHT_PATH
 
     for seed in SEEDS:
         for alpha_ce, alphaV_ce in REWEIGHTS_MOE_R:
@@ -128,7 +128,8 @@ def main():
                     'upper_threshold': upper_threshold,
                     'lower_threshold': lower_threshold,
                     'cvrg_metric': CVRG_METRIC,
-                    'pretraining': pretraining
+                    'pretraining': pretraining,
+                    'pretrained_weights': pretrained_weights
                 })
 
                 # set the root directory
