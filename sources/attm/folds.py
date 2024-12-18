@@ -47,7 +47,7 @@ def main():
                 add_slope = ADD_SLOPE[0] # Use first add_slope value
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0] # Use first threshold value
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = LAMBDA_FACTOR  # lambda for the loss
+                lambda_factor = LAMBDA_FACTOR_ATTM  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
