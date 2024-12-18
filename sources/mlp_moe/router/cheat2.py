@@ -19,7 +19,8 @@ from modules.training.ts_modeling import (
     convert_to_onehot_cls,
     plot_confusion_matrix,
     create_metrics_table,
-    stratified_batch_dataset_cls
+    stratified_batch_dataset_cls,
+    load_partial_weights_from_path
 )
 
 
@@ -30,7 +31,7 @@ def main():
     """
 
     # Path to pre-trained model weights
-    pretrained_weights = None #PRE_WEIGHT_PATH
+    pretrained_weights = None  # PRE_WEIGHT_PATH
 
     for seed in SEEDS:
         for alpha_ce, alphaV_ce in REWEIGHTS_MOE_R:
@@ -87,6 +88,7 @@ def main():
                 smoothing_method = SMOOTHING_METHOD
                 window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
                 val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
+                pretraining = False
 
                 # Initialize wandb
                 wandb.init(project="Jan-moe-router-Report", name=experiment_name, config={
@@ -125,7 +127,8 @@ def main():
                     'asym_type': asym_type,
                     'upper_threshold': upper_threshold,
                     'lower_threshold': lower_threshold,
-                    'cvrg_metric': CVRG_METRIC
+                    'cvrg_metric': CVRG_METRIC,
+                    'pretraining': pretraining
                 })
 
                 # set the root directory
@@ -188,12 +191,27 @@ def main():
                 n_features = X_train.shape[1]
                 print(f'n_features: {n_features}')
 
+                old_model_params = {
+                    'input_dim': n_features,
+                    'hiddens': hiddens,
+                    'output_dim': 1,  # original output dimension
+                    'pretraining': pretraining,
+                    'embed_dim': embed_dim,
+                    'dropout': dropout,
+                    'activation': activation,
+                    'norm': norm,
+                    'skip_repr': skip_repr,
+                    'skipped_layers': skipped_layers,
+                    'sam_rho': rho
+                }
+
                 # Create initial model for finding optimal epochs
                 initial_model = create_mlp(
                     input_dim=n_features,
                     hiddens=hiddens,
                     embed_dim=embed_dim,
                     output_dim=output_dim,
+                    pretraining=pretraining,
                     dropout=dropout,
                     activation=activation,
                     norm=norm,
@@ -206,7 +224,12 @@ def main():
                 # Load pre-trained weights if available
                 if pretrained_weights is not None:
                     print(f"Loading pre-trained weights from {pretrained_weights}")
-                    initial_model.load_weights(pretrained_weights)  
+                    load_partial_weights_from_path(
+                        pretrained_weights_path=PRE_WEIGHT_PATH,
+                        new_model=initial_model,
+                        old_model_params=old_model_params,
+                        skip_layers=["forecast_head"]  # skip final layer if output_dim differs
+                    )
 
                 # summary of the model
                 initial_model.summary()
@@ -234,7 +257,7 @@ def main():
 
                 # Create stratified dataset for training
                 train_dataset, steps_per_epoch = stratified_batch_dataset_cls(
-                    X_train, 
+                    X_train,
                     delta_train,  # Use first column for stratification
                     y_train_classes,
                     train_weights,
@@ -277,6 +300,7 @@ def main():
                     hiddens=hiddens,
                     embed_dim=embed_dim,
                     output_dim=output_dim,
+                    pretraining=pretraining,
                     dropout=dropout,
                     activation=activation,
                     norm=norm,
@@ -301,7 +325,12 @@ def main():
                 # Load pre-trained weights if available
                 if pretrained_weights is not None:
                     print(f"Loading pre-trained weights from {pretrained_weights}")
-                    router_model.load_weights(pretrained_weights)
+                    load_partial_weights_from_path(
+                        pretrained_weights_path=PRE_WEIGHT_PATH,
+                        new_model=router_model,
+                        old_model_params=old_model_params,
+                        skip_layers=["forecast_head"]  # skip final layer if output_dim differs
+                    )
 
                 # Train the router model for optimal epochs
                 history = router_model.fit(
@@ -372,13 +401,19 @@ def main():
                 test_zero_mask = y_test_true_classes == 1  # zero class index
                 test_minus_mask = y_test_true_classes == 2  # minus class index
 
-                train_plus_accuracy = accuracy_score(y_train_true_classes[train_plus_mask], y_train_pred_classes[train_plus_mask])
-                train_zero_accuracy = accuracy_score(y_train_true_classes[train_zero_mask], y_train_pred_classes[train_zero_mask])
-                train_minus_accuracy = accuracy_score(y_train_true_classes[train_minus_mask], y_train_pred_classes[train_minus_mask])
+                train_plus_accuracy = accuracy_score(y_train_true_classes[train_plus_mask],
+                                                     y_train_pred_classes[train_plus_mask])
+                train_zero_accuracy = accuracy_score(y_train_true_classes[train_zero_mask],
+                                                     y_train_pred_classes[train_zero_mask])
+                train_minus_accuracy = accuracy_score(y_train_true_classes[train_minus_mask],
+                                                      y_train_pred_classes[train_minus_mask])
 
-                test_plus_accuracy = accuracy_score(y_test_true_classes[test_plus_mask], y_test_pred_classes[test_plus_mask])
-                test_zero_accuracy = accuracy_score(y_test_true_classes[test_zero_mask], y_test_pred_classes[test_zero_mask])
-                test_minus_accuracy = accuracy_score(y_test_true_classes[test_minus_mask], y_test_pred_classes[test_minus_mask])
+                test_plus_accuracy = accuracy_score(y_test_true_classes[test_plus_mask],
+                                                    y_test_pred_classes[test_plus_mask])
+                test_zero_accuracy = accuracy_score(y_test_true_classes[test_zero_mask],
+                                                    y_test_pred_classes[test_zero_mask])
+                test_minus_accuracy = accuracy_score(y_test_true_classes[test_minus_mask],
+                                                     y_test_pred_classes[test_minus_mask])
 
                 # Get detailed classification reports
                 train_report = classification_report(y_train_true_classes, y_train_pred_classes)

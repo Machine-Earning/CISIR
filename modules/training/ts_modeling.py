@@ -483,6 +483,109 @@ def create_gru(
     return model
 
 
+def load_partial_weights_from_path(
+        pretrained_weights_path: str,
+        new_model: Model,
+        old_model_params: Dict,
+        skip_layers: Optional[List[str]] = None
+) -> None:
+    """
+    Load weights from a pre-trained model (via a weights file path) into an existing new model,
+    transferring compatible layers and skipping any layers that differ (such as the final output layer).
+
+    This utility:
+    - Creates the old model using the provided parameters in `old_model_params`.
+    - Loads the old model's weights from `pretrained_weights_path`.
+    - Copies matching layer weights into `new_model`.
+    - Skips loading weights for layers specified in `skip_layers` or any that are incompatible by shape.
+
+    Parameters
+    ----------
+    pretrained_weights_path : str
+        Path to the file containing the pre-trained model's weights. Typically something like 'model_weights.h5'.
+
+    new_model : Model
+        The new Keras model instance into which compatible weights will be loaded.
+        This model may have a different output dimension than the original model.
+
+    old_model_params : Dict
+        A dictionary containing the parameters needed to recreate the old model.
+        For example:
+        {
+            'input_dim': <int>,
+            'hiddens': <list of ints>,
+            'output_dim': <int>,    # The original output dimension
+            'pretraining': <bool>,
+            'embed_dim': <int>,
+            'dropout': <float>,
+            'activation': <callable or None>,
+            'norm': <str>,
+            'skip_repr': <bool>,
+            'skipped_layers': <int>,
+            'sam_rho': <float>
+        }
+        Make sure these match exactly the parameters used when the pre-trained model was saved.
+
+    skip_layers : Optional[List[str]]
+        A list of layer names to skip while loading weights. For example, ['forecast_head']
+        if the output layer's shape has changed.
+
+    Returns
+    -------
+    None
+        The function modifies `new_model` in-place by setting the weights of its matching layers
+        to those of the old model where compatible.
+    """
+    if skip_layers is None:
+        skip_layers = []
+
+    # Import the same create_mlp function used to create the old model
+    # Ensure that this matches the original environment:
+    # from your_module import create_mlp
+
+    # Create the old model with identical parameters used originally
+    old_model = create_mlp(
+        input_dim=old_model_params['input_dim'],
+        hiddens=old_model_params['hiddens'],
+        output_dim=old_model_params['output_dim'],  # original output dimension
+        pretraining=old_model_params['pretraining'],
+        embed_dim=old_model_params['embed_dim'],
+        dropout=old_model_params['dropout'],
+        activation=old_model_params['activation'],
+        norm=old_model_params['norm'],
+        skip_repr=old_model_params['skip_repr'],
+        skipped_layers=old_model_params['skipped_layers'],
+        sam_rho=old_model_params['sam_rho']
+    )
+
+    # Load the old model's weights
+    old_model.load_weights(pretrained_weights_path)
+
+    # Map old model's layers by name for easy access
+    old_layers_dict = {layer.name: layer for layer in old_model.layers}
+
+    # Transfer weights from old_model to new_model
+    for new_layer in new_model.layers:
+        if new_layer.name in skip_layers:
+            continue
+
+        if new_layer.name in old_layers_dict:
+            old_layer = old_layers_dict[new_layer.name]
+            old_weights = old_layer.get_weights()
+            new_weights = new_layer.get_weights()
+
+            # Ensure the layer has weights and they match in count
+            if len(old_weights) == len(new_weights):
+                # Verify that corresponding weight arrays have the same shape
+                if all(o_w.shape == n_w.shape for o_w, n_w in zip(old_weights, new_weights)):
+                    new_layer.set_weights(old_weights)
+                # else shapes differ, skip loading this layer
+            # else number of weights differ, skip this layer
+        # else no corresponding old layer by that name, skip
+
+    # After this, `new_model` will have partially loaded weights, except for layers that didn't match or were skipped.
+
+
 def create_mlp(
         input_dim: int = 100,
         output_dim: int = 1,
@@ -948,6 +1051,7 @@ def focal_loss(gamma: float = 3.0, alpha: float = 0.25):
 
     return focal_loss_fn
 
+
 def create_mlp_moe(
         hiddens=None,
         router_hiddens=None,
@@ -999,7 +1103,7 @@ def create_mlp_moe(
 
     if activation is None:
         activation = LeakyReLU()
-    
+
     expert_output_dim = 1
     router_output_dim = 3
 
@@ -1531,13 +1635,14 @@ def stratified_data_generator(
         # Yield the current batch
         yield batch_X, batch_y
 
+
 def stratified_data_generator_cls(
-    X: np.ndarray,
-    y_labels: np.ndarray,
-    y_weights: np.ndarray,
-    groups: np.ndarray,
-    shuffle: bool = True,
-    debug: bool = False
+        X: np.ndarray,
+        y_labels: np.ndarray,
+        y_weights: np.ndarray,
+        groups: np.ndarray,
+        shuffle: bool = True,
+        debug: bool = False
 ) -> Generator[Tuple[np.ndarray, np.ndarray, np.ndarray], None, None]:
     """
     Generator that yields stratified batches of (X, y_labels, y_weights) by selecting one sample 
@@ -1599,7 +1704,6 @@ def stratified_data_generator_cls(
 
         # Yield the current batch as (features, labels, weights)
         yield batch_X, batch_y, batch_w
-
 
 
 # def stratified_data_generator(
@@ -1708,12 +1812,12 @@ def stratified_batch_dataset(
 
 
 def stratified_batch_dataset_cls(
-    X: np.ndarray,
-    y_sort: np.ndarray,
-    y_labels: np.ndarray,
-    y_weights: np.ndarray,
-    batch_size: int,
-    shuffle: bool = True
+        X: np.ndarray,
+        y_sort: np.ndarray,
+        y_labels: np.ndarray,
+        y_weights: np.ndarray,
+        batch_size: int,
+        shuffle: bool = True
 ) -> Tuple[tf.data.Dataset, int]:
     """
     Creates a TensorFlow dataset from the stratified data generator for a classification scenario,
@@ -1780,8 +1884,6 @@ def stratified_batch_dataset_cls(
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
 
     return dataset, steps_per_epoch
-
-
 
 
 # def stratified_batch_dataset(
