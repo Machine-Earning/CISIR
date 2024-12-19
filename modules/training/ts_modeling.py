@@ -4453,6 +4453,53 @@ def asymmetric_weight_sigmoid(y_true: tf.Tensor, y_pred: tf.Tensor, eta: float =
     return 2 * (1 - eta) * sigmoid + eta
 
 
+def coreg(y_true, y_pred, pcc_weights=None):
+    """
+    Correlation based regularizer:
+    Compute 1 minus the Pearson Correlation Coefficient (PCC) between two sets of predictions.
+    
+    PCC measures the linear correlation between two variables, providing a value 
+    between -1 (perfect negative correlation) and 1 (perfect positive correlation).
+    A value of 0 indicates no linear correlation.
+    
+    Returns 1-PCC which can be used as a loss function, where 0 represents perfect 
+    positive correlation and 2 represents perfect negative correlation.
+
+    Parameters
+    ----------
+    y_true : tf.Tensor
+        Ground-truth values.
+    y_pred : tf.Tensor
+        Predicted values.
+    pcc_weights : tf.Tensor, optional
+        Weights for each observation. If None, uniform weights are used.
+
+    Returns
+    -------
+    tf.Tensor
+        A scalar tensor representing 1-PCC (for use as a loss function)
+    """
+    if pcc_weights is None:
+        pcc_weights = tf.ones_like(y_true)
+
+    # Center the data by subtracting their means
+    y_true_centered = y_true - tf.reduce_mean(y_true)
+    y_pred_centered = y_pred - tf.reduce_mean(y_pred)
+
+    # Compute covariance
+    cov = tf.reduce_sum(pcc_weights * y_true_centered * y_pred_centered)
+
+    # Compute standard deviations
+    std_y_true = tf.sqrt(tf.reduce_sum(pcc_weights * tf.square(y_true_centered)))
+    std_y_pred = tf.sqrt(tf.reduce_sum(pcc_weights * tf.square(y_pred_centered)))
+
+    # Compute PCC
+    pcc = cov / (std_y_true * std_y_pred + K.epsilon())
+
+    # Return 1-PCC
+    return 1.0 - pcc
+
+
 def cmse(
         y_true: tf.Tensor, y_pred: tf.Tensor,
         lambda_factor: float,
@@ -4486,10 +4533,6 @@ def cmse(
     mse_weight_dict = train_mse_weight_dict if phase_manager.is_training_phase() else val_mse_weight_dict
     pcc_weight_dict = train_pcc_weight_dict if phase_manager.is_training_phase() else val_pcc_weight_dict
 
-    # # print shape and elements of y_true and y_pred
-    # print(f"y_true shape: {y_true.shape}, y_pred shape: {y_pred.shape}")
-    # print(f"y_true elements: {y_true}, y_pred elements: {y_pred}")
-
     # Generate the weight tensors for MSE and PCC using the optimized function
     mse_weights = create_weight_tensor_fast(y_true, mse_weight_dict)
     pcc_weights = create_weight_tensor_fast(y_true, pcc_weight_dict)
@@ -4502,24 +4545,70 @@ def cmse(
     else:
         asym_weights = 1.0  # No asymmetric weighting if not specified
 
-    # Compute the Mean Squared Error (MSE)
-    # mse = tf.reduce_mean(mse_weights * tf.square(y_pred - y_true))
-
     # Compute the Mean Squared Error (MSE) with asymmetric weights
     mse = tf.reduce_mean(asym_weights * mse_weights * tf.square(y_pred - y_true))
 
-    # Compute the Pearson Correlation Coefficient (PCC)
-    y_true_centered = y_true - tf.reduce_mean(y_true)
-    y_pred_centered = y_pred - tf.reduce_mean(y_pred)
-
-    cov = tf.reduce_sum(pcc_weights * y_true_centered * y_pred_centered)
-    std_y_true = tf.sqrt(tf.reduce_sum(pcc_weights * tf.square(y_true_centered)))
-    std_y_pred = tf.sqrt(tf.reduce_sum(pcc_weights * tf.square(y_pred_centered)))
-
-    pcc = cov / (std_y_true * std_y_pred + K.epsilon())
+    # Compute the correlation regularization term using coreg
+    pcc_loss = coreg(y_true, y_pred, pcc_weights)
 
     # Combine the weighted MSE and weighted PCC with lambda_factor
-    loss = mse + lambda_factor * (1.0 - pcc)
+    loss = mse + lambda_factor * pcc_loss
+
+    # Return the final loss as a single scalar value
+    return loss
+
+
+def cce(
+        p_true: tf.Tensor, p_pred: tf.Tensor, y_true: tf.Tensor,
+        phase_manager: 'TrainingPhaseManager',
+        lambda_1: float = 1.0, lambda_2: float = 1.0, k: float = 5.0,
+        train_ce_weight_dict: Optional[Dict[float, float]] = None,
+        val_ce_weight_dict: Optional[Dict[float, float]] = None,
+        train_pcc_weight_dict: Optional[Dict[float, float]] = None,
+        val_pcc_weight_dict: Optional[Dict[float, float]] = None,
+        
+) -> tf.Tensor:
+    """
+    Custom loss function combining Cross Entropy (CE) and Pearson Correlation Coefficient (PCC)
+    with re-weighting based on the delta values. The final loss is a combination of weighted CE and
+    weighted PCC with scaling factors lambda_1 and lambda_2. K is a constant that upper bounds the 
+    absolute value of the delta values in the zero delta term.
+
+    Args:
+    - p_true (tf.Tensor): Ground truth probabilities.
+    - p_pred (tf.Tensor): Predicted probabilities.
+    - y_true (tf.Tensor): Ground truth labels.
+    - lambda_1 (float): Scaling factor for the plus and minus delta portion of the PCC loss. Default is 1.0.
+    - lambda_2 (float): Scaling factor for the zero delta portion of the PCC loss. Default is 1.0.
+    - k (float): Constant that upper bounds the absolute value of the delta values in the zero delta term. Default is 5.0.
+    - phase_manager (TrainingPhaseManager): Manager that tracks whether we are in training or validation phase.
+    - train_ce_weight_dict (dict, optional): Dictionary mapping label values to weights for training CE samples.
+    - val_ce_weight_dict (dict, optional): Dictionary mapping label values to weights for validation CE samples.
+    - train_pcc_weight_dict (dict, optional): Dictionary mapping label values to weights for training PCC samples.
+    - val_pcc_weight_dict (dict, optional): Dictionary mapping label values to weights for validation PCC samples.
+
+    Returns:
+    - tf.Tensor: The calculated loss value as a single scalar.
+    """
+    # Select the appropriate weight dictionaries based on the mode
+    ce_weight_dict = train_ce_weight_dict if phase_manager.is_training_phase() else val_ce_weight_dict
+    pcc_weight_dict = train_pcc_weight_dict if phase_manager.is_training_phase() else val_pcc_weight_dict
+
+    # Generate the weight tensors for CE and PCC using the optimized function
+    ce_weights = create_weight_tensor_fast(y_true, ce_weight_dict)
+    pcc_weights = create_weight_tensor_fast(y_true, pcc_weight_dict)
+
+    # Compute the Cross Entropy (CE)
+    ce = -tf.reduce_mean(ce_weights * tf.reduce_sum(p_true * tf.math.log(p_pred + K.epsilon()), axis=-1))
+
+    # Compute the plus and minus delta PCC loss as pcc_loss_1
+    pcc_loss_1 = coreg(y_true, p_pred[:, 0] - p_pred[:, 2], pcc_weights)
+
+    # Compute the zero delta PCC loss as pcc_loss_2
+    pcc_loss_2 = coreg(k - tf.abs(y_true), p_pred[:, 1], pcc_weights)
+
+    # Combine the weighted CE and weighted PCC with lambda_factor
+    loss = ce + lambda_1 * pcc_loss_1 + lambda_2 * pcc_loss_2
 
     # Return the final loss as a single scalar value
     return loss
@@ -4552,20 +4641,8 @@ def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,
     y_true = tf.cast(y_true, tf.float32)
     y_pred = tf.cast(y_pred, tf.float32)
 
-    # Calculate centered values
-    y_true_centered = y_true - tf.reduce_mean(y_true)
-    y_pred_centered = y_pred - tf.reduce_mean(y_pred)
-
-    # Calculate covariance and standard deviations
-    cov = tf.reduce_sum(weights * y_true_centered * y_pred_centered)
-    std_y_true = tf.sqrt(tf.reduce_sum(weights * tf.square(y_true_centered)))
-    std_y_pred = tf.sqrt(tf.reduce_sum(weights * tf.square(y_pred_centered)))
-
-    # Calculate PCC and the final loss
-    pcc = cov / (std_y_true * std_y_pred + K.epsilon())
-    loss = 1.0 - pcc
-
-    return loss
+    # Use coreg function to calculate loss
+    return coreg(y_true, y_pred, weights)
 
 
 def get_loss(loss_key: str = 'mse', lambda_factor: float = 3.3, norm_factor: float = 1) -> Callable[
