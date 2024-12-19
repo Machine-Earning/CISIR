@@ -2,7 +2,6 @@ from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
-import tensorflow as tf
 import wandb
 from sklearn.metrics import classification_report, accuracy_score
 from tensorflow.keras.callbacks import ReduceLROnPlateau
@@ -11,9 +10,8 @@ from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
-from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.shared.globals import *
-from modules.training.phase_manager import create_weight_tensor_fast
+from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
     build_dataset,
@@ -180,7 +178,6 @@ def main():
                     debug=False).label_reweight_dict
                 print(f'training set rebalanced.')
 
-
                 # Build test set
                 X_test, y_test, _, _ = build_dataset(
                     root_dir + '/testing',
@@ -209,7 +206,6 @@ def main():
                     alpha=alphaV_pcc, bw=bandwidth,
                     min_norm_weight=min_norm_weight,
                     debug=False).label_reweight_dict
-
 
                 # filtering training and test sets for additional results
                 X_train_filtered, y_train_filtered = filter_ds(
@@ -305,7 +301,7 @@ def main():
                 train_dataset, steps_per_epoch = stratified_batch_dataset_cls(
                     X_train,
                     y_train_classes,
-                    delta_train, 
+                    delta_train,
                     batch_size
                 )
 
