@@ -429,7 +429,7 @@ def plot_repr_corr_dist(model, X, y, title, model_type='features'):
     - Plots the representation distance correlation plot with label-based coloring.
     """
     print('In plot_repr_corr_dist')
-    if model_type in ['features_reg_dec', 'features_reg', 'features_dec']:
+    if model_type in ['features_reg_dec', 'features_reg', 'features_dec', 'features_cls']:
         representations = model.predict(X)[0]  # Assuming the first output is always features
     elif model_type == 'dict':
         representations = model.predict(X)['repr']
@@ -760,7 +760,7 @@ def plot_tsne_delta(
     """
 
     # Extract features based on the model type
-    if model_type in ['features_reg_dec', 'features_reg', 'features_dec']:
+    if model_type in ['features_reg_dec', 'features_reg', 'features_dec', 'features_cls']:
         features = model.predict(X)[0]  # Assuming the first output is always features
     elif model_type == 'dict':
         features = model.predict(X)['repr']

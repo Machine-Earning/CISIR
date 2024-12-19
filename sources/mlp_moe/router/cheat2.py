@@ -8,6 +8,7 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
+from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.phase_manager import create_weight_tensor_fast
@@ -20,7 +21,8 @@ from modules.training.ts_modeling import (
     plot_confusion_matrix,
     create_metrics_table,
     stratified_batch_dataset_cls,
-    load_partial_weights_from_path
+    load_partial_weights_from_path,
+    filter_ds
 )
 
 
@@ -183,6 +185,18 @@ def main():
                     alpha=alphaV_ce, bw=bandwidth,
                     min_norm_weight=min_norm_weight,
                     debug=False).label_reweight_dict
+
+                # filtering training and test sets for additional results
+                X_train_filtered, y_train_filtered = filter_ds(
+                    X_train, y_train,
+                    low_threshold=LOWER_THRESHOLD,  # std threshold for evals
+                    high_threshold=UPPER_THRESHOLD,  # std threshold for evals
+                    N=N, seed=seed)
+                X_test_filtered, y_test_filtered = filter_ds(
+                    X_test, y_test,
+                    low_threshold=LOWER_THRESHOLD,  # std threshold for evals
+                    high_threshold=UPPER_THRESHOLD,  # std threshold for evals
+                    N=N, seed=seed)
 
                 # Create weight tensors for train and test sets
                 train_weights = create_weight_tensor_fast(delta_train, train_weights_dict).numpy()
@@ -455,6 +469,44 @@ def main():
                 plt.close(test_cm_fig)
                 plt.close(train_metrics_fig)
                 plt.close(test_metrics_fig)
+
+                # Evaluate the model correlation with colored
+                file_path = plot_repr_corr_dist(
+                    router_model,
+                    X_train_filtered, y_train_filtered,
+                    title + "_training",
+                    model_type='features_cls')
+                wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
+                print('file_path: ' + file_path)
+
+                file_path = plot_repr_corr_dist(
+                    router_model,
+                    X_test_filtered, y_test_filtered,
+                    title + "_test",
+                    model_type='features_cls')
+                wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
+                print('file_path: ' + file_path)
+
+                # Log t-SNE plot
+                # Log the training t-SNE plot to wandb
+                stage1_file_path = plot_tsne_delta(
+                    router_model,
+                    X_train_filtered, y_train_filtered,
+                    title, 'router_training',
+                    model_type='features_cls',
+                    save_tag=current_time, seed=seed)
+                wandb.log({'router_tsne_training_plot': wandb.Image(stage1_file_path)})
+                print('stage1_file_path: ' + stage1_file_path)
+
+                # Log the testing t-SNE plot to wandb
+                stage1_file_path = plot_tsne_delta(
+                    router_model,
+                    X_test_filtered, y_test_filtered,
+                    title, 'router_testing',
+                    model_type='features_cls',
+                    save_tag=current_time, seed=seed)
+                wandb.log({'router_tsne_testing_plot': wandb.Image(stage1_file_path)})
+                print('stage1_file_path: ' + stage1_file_path)
 
                 # Finish the wandb run
                 wandb.finish()
