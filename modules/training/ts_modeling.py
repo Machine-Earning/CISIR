@@ -1643,9 +1643,9 @@ def stratified_data_generator_cls(
         groups: np.ndarray,
         shuffle: bool = True,
         debug: bool = False
-) -> Generator[Tuple[np.ndarray, np.ndarray, np.ndarray], None, None]:
+) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
     """
-    Generator that yields stratified batches of (X, y_labels, delta) by selecting one sample 
+    Generator that yields stratified batches of (X, y_labels_concat) by selecting one sample 
     from each group in `groups`. The groups are precomputed as a 2D array of sample indices.
 
     This version differs from the original in that it returns delta values along with 
@@ -1657,7 +1657,6 @@ def stratified_data_generator_cls(
         Feature matrix of shape (n_samples, n_features).
     y_labels : np.ndarray
         Label matrix of shape (n_samples, n_classes) or (n_samples,) depending on the use case.
-        For classification, this could be one-hot encoded targets.
     delta : np.ndarray
         Delta values vector of shape (n_samples,).
     groups : np.ndarray
@@ -1670,12 +1669,11 @@ def stratified_data_generator_cls(
 
     Yields
     ------
-    Tuple[np.ndarray, np.ndarray, np.ndarray]
-        A tuple `(batch_X, batch_y, batch_delta)` where:
+    Tuple[np.ndarray, np.ndarray]
+        A tuple `(batch_X, batch_y_concat)` where:
         - `batch_X` is a feature batch of shape (batch_size, n_features).
-        - `batch_y` is a label batch of shape (batch_size, n_classes) or (batch_size,) depending 
-          on the label format.
-        - `batch_delta` is a delta batch of shape (batch_size,).
+        - `batch_y_concat` is the concatenation of `y_labels` and `delta` with shape 
+          (batch_size, n_classes + 1).
     """
     while True:
         # Shuffle within each group if requested
@@ -1694,13 +1692,16 @@ def stratified_data_generator_cls(
         batch_y = y_labels[batch_indices]
         batch_delta = delta[batch_indices]
 
-        # Debugging: Print the current batch
+        # Concatenate y_labels and delta
+        batch_y_concat = np.concatenate([batch_y, batch_delta[:, None]], axis=1)
+
+        # Debugging: Print the batch details if required
         if debug:
-            print(f'Batch shape: X={batch_X.shape}, y={batch_y.shape}, delta={batch_delta.shape}')
+            print(f"Batch shape: X={batch_X.shape}, y_concat={batch_y_concat.shape}")
             print(f"Batch indices: {batch_indices}")
 
-        # Yield the current batch as (features, labels, delta)
-        yield batch_X, batch_y, batch_delta
+        # Yield the current batch
+        yield batch_X, batch_y_concat
 
 
 # def stratified_data_generator(
@@ -1870,9 +1871,6 @@ def stratified_batch_dataset_cls(
             tf.TensorSpec(shape=(batch_size, y_labels.shape[1] + 1), dtype=tf.float32) # Combined y_labels and delta
         )
     )
-
-    # Map the output to combine y_labels and delta
-    dataset = dataset.map(lambda x, y_label, delta: (x, tf.concat([y_label, tf.expand_dims(delta, -1)], axis=1)))
 
     # Compute the number of steps per epoch. Integer division used since partial batch is discarded.
     steps_per_epoch = len(delta) // batch_size
