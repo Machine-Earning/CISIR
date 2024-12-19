@@ -4586,7 +4586,7 @@ def cce(
     - tf.Tensor: The calculated loss value as a single scalar.
     """
     # Unpack the tuple
-    y_classes, delta_batch = y_true
+    y_classes, delta_batch = y_true[0], y_true[1]
 
     # Determine which weight dictionaries to use
     ce_weight_dict = train_ce_weight_dict if phase_manager.is_training_phase() else val_ce_weight_dict
