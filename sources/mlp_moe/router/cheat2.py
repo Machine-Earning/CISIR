@@ -282,8 +282,7 @@ def main():
                             train_pcc_weight_dict=pcc_train_weights_dict,
                             val_pcc_weight_dict=pcc_test_weights_dict
                         )
-                    },
-                    metrics={'forecast_head': 'accuracy'}
+                    }
                 )
 
                 # Create early stopping callback
@@ -362,16 +361,17 @@ def main():
                         weight_decay=weight_decay,
                         beta_1=momentum_beta1
                     ),
-                    loss={'forecast_head': lambda y_true, y_pred: cce(
-                        y_true, y_pred,
-                        phase_manager=pm,
-                        lambda_1=lambda_1, lambda_2=lambda_2, k=k,
-                        train_ce_weight_dict=ce_train_weights_dict,
-                        val_ce_weight_dict=ce_test_weights_dict,
-                        train_pcc_weight_dict=pcc_train_weights_dict,
-                        val_pcc_weight_dict=pcc_test_weights_dict
-                    )},
-                    metrics={'forecast_head': 'accuracy'}
+                    loss={
+                        'forecast_head': lambda y_true, y_pred: cce(
+                            y_true, y_pred,
+                            phase_manager=pm,
+                            lambda_1=lambda_1, lambda_2=lambda_2, k=k,
+                            train_ce_weight_dict=ce_train_weights_dict,
+                            val_ce_weight_dict=ce_test_weights_dict,
+                            train_pcc_weight_dict=pcc_train_weights_dict,
+                            val_pcc_weight_dict=pcc_test_weights_dict
+                        )
+                    }
                 )
 
                 # Load pre-trained weights if available
