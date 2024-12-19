@@ -10,6 +10,7 @@ from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.shared.globals import *
 from modules.training.phase_manager import create_weight_tensor_fast
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
@@ -22,7 +23,8 @@ from modules.training.ts_modeling import (
     create_metrics_table,
     stratified_batch_dataset_cls,
     load_partial_weights_from_path,
-    filter_ds
+    filter_ds,
+    cce
 )
 
 
@@ -34,6 +36,7 @@ def main():
 
     # Path to pre-trained model weights
     pretrained_weights = PRE_WEIGHT_PATH
+    pm = TrainingPhaseManager()
 
     for seed in SEEDS:
         for alpha_ce, alphaV_ce in REWEIGHTS_MOE_R:
@@ -58,6 +61,9 @@ def main():
                 patience = PATIENCE_MOE  # higher patience
                 learning_rate = START_LR  # starting learning rate
                 asym_type = ASYM_TYPE_MOE
+                lambda_1 = LAMBDA_1_CCE
+                lambda_2 = LAMBDA_2_CCE
+                k = K_CCE
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -105,7 +111,10 @@ def main():
                     "epochs": epochs,
                     # hidden in a more readable format  (wandb does not support lists)
                     "hiddens": hiddens_str,
-                    "loss": 'ce',
+                    "loss": 'cce',
+                    "lambda_1": lambda_1,
+                    "lambda_2": lambda_2,
+                    "k": k,
                     "seed": seed,
                     "alpha_ce": alpha_ce,
                     "alphaV_ce": alphaV_ce,
@@ -255,7 +264,17 @@ def main():
                         weight_decay=weight_decay,
                         beta_1=momentum_beta1
                     ),
-                    loss={'forecast_head': 'categorical_crossentropy'},
+                    loss={
+                        'forecast_head': lambda y_true, y_pred: cce(
+                            y_true, y_pred, delta_train,
+                            phase_manager=pm,
+                            lambda_1=lambda_1, lambda_2=lambda_2, k=k,
+                            train_ce_weight_dict=train_weights_dict,
+                            val_ce_weight_dict=test_weights_dict,
+                            train_pcc_weight_dict=train_weights_dict,
+                            val_pcc_weight_dict=test_weights_dict
+                        )
+                    },
                     metrics={'forecast_head': 'accuracy'}
                 )
 
@@ -333,7 +352,7 @@ def main():
                         weight_decay=weight_decay,
                         beta_1=momentum_beta1
                     ),
-                    loss={'forecast_head': 'categorical_crossentropy'},
+                    loss={'forecast_head': cce},
                     metrics={'forecast_head': 'accuracy'}
                 )
 

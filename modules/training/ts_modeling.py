@@ -4559,14 +4559,14 @@ def cmse(
 
 
 def cce(
-        p_true: tf.Tensor, p_pred: tf.Tensor, y_true: tf.Tensor,
+        y_true: Tuple[tf.Tensor, tf.Tensor],
+        y_pred: tf.Tensor,
         phase_manager: 'TrainingPhaseManager',
         lambda_1: float = 1.0, lambda_2: float = 1.0, k: float = 5.0,
         train_ce_weight_dict: Optional[Dict[float, float]] = None,
         val_ce_weight_dict: Optional[Dict[float, float]] = None,
         train_pcc_weight_dict: Optional[Dict[float, float]] = None,
         val_pcc_weight_dict: Optional[Dict[float, float]] = None,
-        
 ) -> tf.Tensor:
     """
     Custom loss function combining Cross Entropy (CE) and Pearson Correlation Coefficient (PCC)
@@ -4575,9 +4575,10 @@ def cce(
     absolute value of the delta values in the zero delta term.
 
     Args:
-    - p_true (tf.Tensor): Ground truth probabilities.
-    - p_pred (tf.Tensor): Predicted probabilities.
-    - y_true (tf.Tensor): Ground truth labels.
+    - y_true (Tuple[tf.Tensor, tf.Tensor]): A tuple (y_classes, delta_batch)
+        - y_classes: Ground truth class probabilities (one-hot vector)
+        - delta_batch: Corresponding delta values for each sample
+    - y_pred (tf.Tensor): Predicted probabilities from the model
     - lambda_1 (float): Scaling factor for the plus and minus delta portion of the PCC loss. Default is 1.0.
     - lambda_2 (float): Scaling factor for the zero delta portion of the PCC loss. Default is 1.0.
     - k (float): Constant that upper bounds the absolute value of the delta values in the zero delta term. Default is 5.0.
@@ -4590,27 +4591,29 @@ def cce(
     Returns:
     - tf.Tensor: The calculated loss value as a single scalar.
     """
-    # Select the appropriate weight dictionaries based on the mode
+    # Unpack the tuple
+    y_classes, delta_batch = y_true
+
+    # Determine which weight dictionaries to use
     ce_weight_dict = train_ce_weight_dict if phase_manager.is_training_phase() else val_ce_weight_dict
     pcc_weight_dict = train_pcc_weight_dict if phase_manager.is_training_phase() else val_pcc_weight_dict
 
-    # Generate the weight tensors for CE and PCC using the optimized function
-    ce_weights = create_weight_tensor_fast(y_true, ce_weight_dict)
-    pcc_weights = create_weight_tensor_fast(y_true, pcc_weight_dict)
+    # Create weight tensors based on delta_batch
+    ce_weights = create_weight_tensor_fast(delta_batch, ce_weight_dict)
+    pcc_weights = create_weight_tensor_fast(delta_batch, pcc_weight_dict)
 
-    # Compute the Cross Entropy (CE)
-    ce = -tf.reduce_mean(ce_weights * tf.reduce_sum(p_true * tf.math.log(p_pred + K.epsilon()), axis=-1))
+    # Compute Cross Entropy
+    ce = -tf.reduce_mean(ce_weights * tf.reduce_sum(y_classes * tf.math.log(y_pred + K.epsilon()), axis=-1))
 
-    # Compute the plus and minus delta PCC loss as pcc_loss_1
-    pcc_loss_1 = coreg(y_true, p_pred[:, 0] - p_pred[:, 2], pcc_weights)
+    # PCC loss for plus-minus delta
+    # Assuming plus class index=0 and minus class index=2
+    pcc_loss_1 = coreg(delta_batch, y_pred[:, 0] - y_pred[:, 2], pcc_weights)
 
-    # Compute the zero delta PCC loss as pcc_loss_2
-    pcc_loss_2 = coreg(k - tf.abs(y_true), p_pred[:, 1], pcc_weights)
+    # PCC loss for zero delta
+    # Assuming zero class index=1
+    pcc_loss_2 = coreg(k - tf.abs(delta_batch), y_pred[:, 1], pcc_weights)
 
-    # Combine the weighted CE and weighted PCC with lambda_factor
     loss = ce + lambda_1 * pcc_loss_1 + lambda_2 * pcc_loss_2
-
-    # Return the final loss as a single scalar value
     return loss
 
 
