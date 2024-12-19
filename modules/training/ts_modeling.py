@@ -4589,41 +4589,32 @@ def cce(
     - tf.Tensor: The calculated loss value as a single scalar.
     """
 
-    print("y_true:", y_true)
-    print("y_true shape:", y_true.shape)
-
-
     # Get y_classes and delta_batch from y_true
     # y_true shape is (batch_size, num_classes + 1) where last column is delta
     y_classes = y_true[:, :-1]  # All columns except last
     delta_batch = y_true[:, -1] # Last column
 
-
-
     # Determine which weight dictionaries to use
-    # ce_weight_dict = train_ce_weight_dict if phase_manager.is_training_phase() else val_ce_weight_dict
-    # pcc_weight_dict = train_pcc_weight_dict if phase_manager.is_training_phase() else val_pcc_weight_dict
+    ce_weight_dict = train_ce_weight_dict if phase_manager.is_training_phase() else val_ce_weight_dict
+    pcc_weight_dict = train_pcc_weight_dict if phase_manager.is_training_phase() else val_pcc_weight_dict
 
-    # # Create weight tensors based on delta_batch
-    # ce_weights = create_weight_tensor_fast(delta_batch, ce_weight_dict)
-    # pcc_weights = create_weight_tensor_fast(delta_batch, pcc_weight_dict)
+    # Create weight tensors based on delta_batch
+    ce_weights = create_weight_tensor_fast(delta_batch, ce_weight_dict)
+    pcc_weights = create_weight_tensor_fast(delta_batch, pcc_weight_dict)
 
-    # # Compute Cross Entropy
-    # ce = -tf.reduce_mean(ce_weights * tf.reduce_sum(y_classes * tf.math.log(y_pred + K.epsilon()), axis=-1))
+    # Compute Cross Entropy
+    ce = -tf.reduce_mean(ce_weights * tf.reduce_sum(y_classes * tf.math.log(y_pred + K.epsilon()), axis=-1))
 
-    # # PCC loss for plus-minus delta
-    # # Assuming plus class index=0 and minus class index=2
-    # pcc_loss_1 = coreg(delta_batch, y_pred[:, 0] - y_pred[:, 2], pcc_weights)
+    # PCC loss for plus-minus delta
+    # Assuming plus class index=0 and minus class index=2
+    pcc_loss_1 = coreg(delta_batch, y_pred[:, 0] - y_pred[:, 2], pcc_weights)
 
-    # # PCC loss for zero delta
-    # # Assuming zero class index=1
-    # pcc_loss_2 = coreg(k - tf.abs(delta_batch), y_pred[:, 1], pcc_weights)
+    # PCC loss for zero delta
+    # Assuming zero class index=1
+    pcc_loss_2 = coreg(k - tf.abs(delta_batch), y_pred[:, 1], pcc_weights)
 
-    # loss = ce + lambda_1 * pcc_loss_1 + lambda_2 * pcc_loss_2
-    # return loss
-
-    return 0.0
-
+    loss = ce + lambda_1 * pcc_loss_1 + lambda_2 * pcc_loss_2
+    return loss
 
 def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,
              phase_manager: TrainingPhaseManager,
