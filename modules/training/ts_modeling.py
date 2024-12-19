@@ -1846,7 +1846,8 @@ def stratified_batch_dataset_cls(
     -------
     Tuple[tf.data.Dataset, int]
         A tuple of:
-        - A TensorFlow dataset object that yields `(features, labels, delta)` tuples.
+        - A TensorFlow dataset object that yields `(features, combined_labels)` tuples where
+          combined_labels concatenates y_labels and delta.
         - An integer representing the number of steps (batches) per epoch.
 
     Notes
@@ -1866,10 +1867,12 @@ def stratified_batch_dataset_cls(
         ),
         output_signature=(
             tf.TensorSpec(shape=(batch_size, X.shape[1]), dtype=tf.float32),           # X_batch
-            tf.TensorSpec(shape=(batch_size, y_labels.shape[1]), dtype=tf.float32),    # y_labels_batch
-            tf.TensorSpec(shape=(batch_size,), dtype=tf.float32)                       # delta_batch
+            tf.TensorSpec(shape=(batch_size, y_labels.shape[1] + 1), dtype=tf.float32) # Combined y_labels and delta
         )
     )
+
+    # Map the output to combine y_labels and delta
+    dataset = dataset.map(lambda x, y_label, delta: (x, tf.concat([y_label, tf.expand_dims(delta, -1)], axis=1)))
 
     # Compute the number of steps per epoch. Integer division used since partial batch is discarded.
     steps_per_epoch = len(delta) // batch_size
