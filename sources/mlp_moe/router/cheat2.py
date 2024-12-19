@@ -39,7 +39,7 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
-        for alpha_ce, alphaV_ce in REWEIGHTS_MOE_R:
+        for alpha_ce, alphaV_ce, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_R:
             for rho in RHO_MOE_R:  # SAM_RHOS:
                 # PARAMS
                 inputs_to_use = INPUTS_TO_USE[0]  # Use first input configuration
@@ -118,6 +118,8 @@ def main():
                     "seed": seed,
                     "alpha_ce": alpha_ce,
                     "alphaV_ce": alphaV_ce,
+                    "alpha_pcc": alpha_pcc,
+                    "alphaV_pcc": alphaV_pcc,
                     "bandwidth": bandwidth,
                     "embed_dim": embed_dim,
                     "dropout": dropout,
@@ -165,11 +167,18 @@ def main():
                 print(f'delta_train.shape: {delta_train.shape}')
                 print(f'rebalancing the training set...')
                 min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
-                train_weights_dict = exDenseReweightsD(
+                ce_train_weights_dict = exDenseReweightsD(
                     X_train, delta_train,
                     alpha=alpha_ce, bw=bandwidth,
                     min_norm_weight=min_norm_weight,
                     debug=False).label_reweight_dict
+                pcc_train_weights_dict = exDenseReweightsD(
+                    X_train, delta_train,
+                    alpha=alpha_pcc, bw=bandwidth,
+                    min_norm_weight=min_norm_weight,
+                    debug=False).label_reweight_dict
+                print(f'training set rebalanced.')
+
 
                 # Build test set
                 X_test, y_test, _, _ = build_dataset(
@@ -189,11 +198,17 @@ def main():
                 print(f'delta_test.shape: {delta_test.shape}')
                 print(f'rebalancing the test set...')
                 min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_test)
-                test_weights_dict = exDenseReweightsD(
+                ce_test_weights_dict = exDenseReweightsD(
                     X_test, delta_test,
                     alpha=alphaV_ce, bw=bandwidth,
                     min_norm_weight=min_norm_weight,
                     debug=False).label_reweight_dict
+                pcc_test_weights_dict = exDenseReweightsD(
+                    X_test, delta_test,
+                    alpha=alphaV_pcc, bw=bandwidth,
+                    min_norm_weight=min_norm_weight,
+                    debug=False).label_reweight_dict
+
 
                 # filtering training and test sets for additional results
                 X_train_filtered, y_train_filtered = filter_ds(
@@ -206,10 +221,6 @@ def main():
                     low_threshold=LOWER_THRESHOLD,  # std threshold for evals
                     high_threshold=UPPER_THRESHOLD,  # std threshold for evals
                     N=N, seed=seed)
-
-                # Create weight tensors for train and test sets
-                train_weights = create_weight_tensor_fast(delta_train, train_weights_dict).numpy()
-                test_weights = create_weight_tensor_fast(delta_test, test_weights_dict).numpy()
 
                 # get the number of input features
                 n_features = X_train.shape[1]
@@ -266,13 +277,13 @@ def main():
                     ),
                     loss={
                         'forecast_head': lambda y_true, y_pred: cce(
-                            y_true, y_pred, delta_train,
+                            y_true, y_pred,
                             phase_manager=pm,
                             lambda_1=lambda_1, lambda_2=lambda_2, k=k,
-                            train_ce_weight_dict=train_weights_dict,
-                            val_ce_weight_dict=test_weights_dict,
-                            train_pcc_weight_dict=train_weights_dict,
-                            val_pcc_weight_dict=test_weights_dict
+                            train_ce_weight_dict=ce_train_weights_dict,
+                            val_ce_weight_dict=ce_test_weights_dict,
+                            train_pcc_weight_dict=pcc_train_weights_dict,
+                            val_pcc_weight_dict=pcc_test_weights_dict
                         )
                     },
                     metrics={'forecast_head': 'accuracy'}
@@ -292,27 +303,30 @@ def main():
                 # Create stratified dataset for training
                 train_dataset, steps_per_epoch = stratified_batch_dataset_cls(
                     X_train,
-                    delta_train,  # Use first column for stratification
                     y_train_classes,
-                    train_weights,
+                    delta_train, 
                     batch_size
                 )
 
                 # Map the dataset to include the 'forecast_head' key
                 train_dataset = train_dataset.map(
-                    lambda x, y, w: (x, {'forecast_head': y}, w)
-                )
+                    lambda x, y, d: (x, {'forecast_head': (y, d)}))
+
+                # Prepare validation data without batching
+                val_data = (X_test, {'forecast_head': (y_test_classes, delta_test)})
 
                 # Train initial model to find optimal epochs
                 history = initial_model.fit(
                     train_dataset,
-                    validation_data=(X_test, {'forecast_head': y_test_classes}, test_weights),
+                    validation_data=val_data,
                     epochs=epochs,
                     steps_per_epoch=steps_per_epoch,
                     callbacks=[
                         reduce_lr_on_plateau,
                         early_stopping,
-                        WandbCallback(save_model=False)
+                        WandbCallback(save_model=False),
+                        IsTraining(pm)
+
                     ],
                     verbose=VERBOSE
                 )
@@ -352,7 +366,15 @@ def main():
                         weight_decay=weight_decay,
                         beta_1=momentum_beta1
                     ),
-                    loss={'forecast_head': cce},
+                    loss={'forecast_head': lambda y_true, y_pred: cce(
+                        y_true, y_pred,
+                        phase_manager=pm,
+                        lambda_1=lambda_1, lambda_2=lambda_2, k=k,
+                        train_ce_weight_dict=ce_train_weights_dict,
+                        val_ce_weight_dict=ce_test_weights_dict,
+                        train_pcc_weight_dict=pcc_train_weights_dict,
+                        val_pcc_weight_dict=pcc_test_weights_dict
+                    )},
                     metrics={'forecast_head': 'accuracy'}
                 )
 
@@ -369,12 +391,13 @@ def main():
                 # Train the router model for optimal epochs
                 history = router_model.fit(
                     train_dataset,
-                    validation_data=(X_test, {'forecast_head': y_test_classes}, test_weights),
+                    validation_data=val_data,
                     epochs=optimal_epochs,
                     steps_per_epoch=steps_per_epoch,
                     callbacks=[
                         reduce_lr_on_plateau,
-                        WandbCallback(save_model=WANDB_SAVE_MODEL)
+                        WandbCallback(save_model=WANDB_SAVE_MODEL),
+                        IsTraining(pm)
                     ],
                     verbose=VERBOSE
                 )

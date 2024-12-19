@@ -1639,18 +1639,17 @@ def stratified_data_generator(
 def stratified_data_generator_cls(
         X: np.ndarray,
         y_labels: np.ndarray,
-        y_weights: np.ndarray,
+        delta: np.ndarray,
         groups: np.ndarray,
         shuffle: bool = True,
         debug: bool = False
 ) -> Generator[Tuple[np.ndarray, np.ndarray, np.ndarray], None, None]:
     """
-    Generator that yields stratified batches of (X, y_labels, y_weights) by selecting one sample 
+    Generator that yields stratified batches of (X, y_labels, delta) by selecting one sample 
     from each group in `groups`. The groups are precomputed as a 2D array of sample indices.
 
-    This version differs from the original in that it returns sample weights along with the features 
-    and labels, which can be useful for handling imbalanced datasets or customizing the importance 
-    of specific samples during training.
+    This version differs from the original in that it returns delta values along with 
+    the features and labels, which can be useful for handling imbalanced datasets.
 
     Parameters
     ----------
@@ -1659,9 +1658,8 @@ def stratified_data_generator_cls(
     y_labels : np.ndarray
         Label matrix of shape (n_samples, n_classes) or (n_samples,) depending on the use case.
         For classification, this could be one-hot encoded targets.
-    y_weights : np.ndarray
-        Sample weights vector of shape (n_samples,). Each value corresponds to the weight assigned 
-        to a particular sample.
+    delta : np.ndarray
+        Delta values vector of shape (n_samples,).
     groups : np.ndarray
         Precomputed groups of sample indices, shape (n_groups, group_size), obtained from stratified 
         grouping functions.
@@ -1673,11 +1671,11 @@ def stratified_data_generator_cls(
     Yields
     ------
     Tuple[np.ndarray, np.ndarray, np.ndarray]
-        A tuple `(batch_X, batch_y, batch_w)` where:
+        A tuple `(batch_X, batch_y, batch_delta)` where:
         - `batch_X` is a feature batch of shape (batch_size, n_features).
         - `batch_y` is a label batch of shape (batch_size, n_classes) or (batch_size,) depending 
           on the label format.
-        - `batch_w` is a weight batch of shape (batch_size,), containing the corresponding sample weights.
+        - `batch_delta` is a delta batch of shape (batch_size,).
     """
     while True:
         # Shuffle within each group if requested
@@ -1691,19 +1689,18 @@ def stratified_data_generator_cls(
         if shuffle:
             np.random.shuffle(batch_indices)
 
-        # Create the feature, label, and weight batches using the selected indices
+        # Create the feature, label and delta batches using the selected indices
         batch_X = X[batch_indices]
         batch_y = y_labels[batch_indices]
-        batch_w = y_weights[batch_indices]
+        batch_delta = delta[batch_indices]
 
         # Debugging: Print the current batch
         if debug:
-            print(f'Batch shape: X={batch_X.shape}, y={batch_y.shape}, w={batch_w.shape}')
+            print(f'Batch shape: X={batch_X.shape}, y={batch_y.shape}, delta={batch_delta.shape}')
             print(f"Batch indices: {batch_indices}")
-            print(f"Batch weights:\n{batch_w}")
 
-        # Yield the current batch as (features, labels, weights)
-        yield batch_X, batch_y, batch_w
+        # Yield the current batch as (features, labels, delta)
+        yield batch_X, batch_y, batch_delta
 
 
 # def stratified_data_generator(
@@ -1811,39 +1808,34 @@ def stratified_batch_dataset(
     return dataset, steps_per_epoch
 
 
+
 def stratified_batch_dataset_cls(
         X: np.ndarray,
-        y_sort: np.ndarray,
         y_labels: np.ndarray,
-        y_weights: np.ndarray,
+        delta: np.ndarray,
         batch_size: int,
         shuffle: bool = True
 ) -> Tuple[tf.data.Dataset, int]:
     """
     Creates a TensorFlow dataset from the stratified data generator for a classification scenario,
-    leveraging a continuous label array `y_sort` to stratify and a separate array `y_labels` for 
-    the final training labels. Additionally, this version supports per-sample weights to 
-    handle imbalanced data or focus training on particular samples.
+    leveraging a continuous label array `delta` to stratify and a separate array `y_labels` for 
+    the final training labels.
 
-    This function uses `y_sort` solely for determining how to group samples into batches. These 
-    batches are formed by slicing the dataset after sorting by `y_sort`, effectively grouping 
+    This function uses `delta` solely for determining how to group samples into batches. These 
+    batches are formed by slicing the dataset after sorting by `delta`, effectively grouping 
     together samples with similar continuous label values. The `y_labels` (e.g., one-hot encoded 
-    classes) are the actual training targets, and `y_weights` is an array of sample-wise weights 
-    that will be returned alongside the features and labels.
+    classes) are the actual training targets.
 
     Parameters
     ----------
     X : np.ndarray
         Feature matrix of shape (n_samples, n_features).
-    y_sort : np.ndarray
+    y_labels : np.ndarray
+        Label matrix of shape (n_samples, n_classes) or (n_samples,) depending on the use case.
+        For classification, this could be one-hot encoded targets.
+    delta : np.ndarray
         Continuous label vector of shape (n_samples,). Used only for stratification.
         Must be numeric and sortable.
-    y_labels : np.ndarray
-        Label matrix of shape (n_samples, n_classes) representing final classification targets.
-        For example, one-hot encoded classes.
-    y_weights : np.ndarray
-        Sample weight vector of shape (n_samples,). Each value corresponds to the weight 
-        assigned to a sample, influencing how much the sample contributes to loss computation.
     batch_size : int
         Number of samples in each batch.
     shuffle : bool, optional
@@ -1854,7 +1846,7 @@ def stratified_batch_dataset_cls(
     -------
     Tuple[tf.data.Dataset, int]
         A tuple of:
-        - A TensorFlow dataset object that yields `(features, labels, sample_weights)` tuples.
+        - A TensorFlow dataset object that yields `(features, labels, delta)` tuples.
         - An integer representing the number of steps (batches) per epoch.
 
     Notes
@@ -1862,23 +1854,25 @@ def stratified_batch_dataset_cls(
     - The dataset is created using `tf.data.Dataset.from_generator`, ensuring compatibility 
       with large datasets and on-demand batch construction.
     - Prefetching is enabled for better performance.
-    - Ensure that `X`, `y_sort`, `y_labels`, and `y_weights` have the same first dimension (n_samples).
+    - Ensure that `X`, `delta`, and `y_labels` have the same first dimension (n_samples).
     """
     # Generate stratified groups once using the continuous labels
-    groups = stratified_groups(y_sort, batch_size)
+    groups = stratified_groups(delta, batch_size)
 
-    # The generator will yield batches of (X_batch, y_labels_batch, w_batch)
+    # The generator will yield batches of (X_batch, y_labels_batch, delta_batch)
     dataset = tf.data.Dataset.from_generator(
-        lambda: stratified_data_generator_cls(X, y_labels, y_weights, groups, shuffle=shuffle),
+        lambda: stratified_data_generator_cls(
+            X, y_labels, delta, groups, shuffle=shuffle,
+        ),
         output_signature=(
-            tf.TensorSpec(shape=(batch_size, X.shape[1]), dtype=tf.float32),
-            tf.TensorSpec(shape=(batch_size, y_labels.shape[1]), dtype=tf.float32),
-            tf.TensorSpec(shape=(batch_size,), dtype=tf.float32)
+            tf.TensorSpec(shape=(batch_size, X.shape[1]), dtype=tf.float32),           # X_batch
+            tf.TensorSpec(shape=(batch_size, y_labels.shape[1]), dtype=tf.float32),    # y_labels_batch
+            tf.TensorSpec(shape=(batch_size,), dtype=tf.float32)                       # delta_batch
         )
     )
 
     # Compute the number of steps per epoch. Integer division used since partial batch is discarded.
-    steps_per_epoch = len(y_sort) // batch_size
+    steps_per_epoch = len(delta) // batch_size
 
     # Prefetch the dataset for performance optimization
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
