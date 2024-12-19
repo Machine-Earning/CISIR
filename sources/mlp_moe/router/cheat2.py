@@ -2,6 +2,7 @@ from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
+import tensorflow as tf
 import wandb
 from sklearn.metrics import classification_report, accuracy_score
 from tensorflow.keras.callbacks import ReduceLROnPlateau
@@ -307,8 +308,8 @@ def main():
                 # Map the dataset to include the 'forecast_head' key
                 train_dataset = train_dataset.map(lambda x, y: (x, {'forecast_head': y}))
 
-                # Prepare validation data without batching
-                val_data = (X_test, {'forecast_head': y_test_classes})
+                # Prepare validation data without batching and concatenate y_test_classes and delta_test
+                val_data = (X_test, {'forecast_head': tf.concat([y_test_classes, tf.expand_dims(delta_test, -1)], axis=1)})
 
                 # Train initial model to find optimal epochs
                 history = initial_model.fit(
@@ -363,7 +364,7 @@ def main():
                     ),
                     loss={
                         'forecast_head': lambda y_true, y_pred: cce(
-                            y_true, y_pred,
+                        y_true, y_pred,
                             phase_manager=pm,
                             lambda_1=lambda_1, lambda_2=lambda_2, k=k,
                             train_ce_weight_dict=ce_train_weights_dict,
