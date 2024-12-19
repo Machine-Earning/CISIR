@@ -4587,10 +4587,16 @@ def cce(
     - tf.Tensor: The calculated loss value as a single scalar.
     """
 
+    print(f"y_true shape: {y_true.shape}")
+    print(f"y_pred shape: {y_pred.shape}")
+
     # Get y_classes and delta_batch from y_true
     # y_true shape is (batch_size, num_classes + 1) where last column is delta
     y_classes = y_true[:, :-1]  # All columns except last
     delta_batch = y_true[:, -1] # Last column
+
+    print(f"y_classes shape: {y_classes.shape}")
+    print(f"delta_batch shape: {delta_batch.shape}")
 
     # Determine which weight dictionaries to use
     ce_weight_dict = train_ce_weight_dict if phase_manager.is_training_phase() else val_ce_weight_dict
@@ -4599,6 +4605,9 @@ def cce(
     # Create weight tensors based on delta_batch
     ce_weights = create_weight_tensor_fast(delta_batch, ce_weight_dict)
     pcc_weights = create_weight_tensor_fast(delta_batch, pcc_weight_dict)
+
+    print(f"ce_weights shape: {ce_weights.shape}")
+    print(f"pcc_weights shape: {pcc_weights.shape}")
 
     # Compute Cross Entropy
     ce = -tf.reduce_mean(ce_weights * tf.reduce_sum(y_classes * tf.math.log(y_pred + K.epsilon()), axis=-1))
