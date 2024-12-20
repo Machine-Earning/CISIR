@@ -146,7 +146,7 @@ PATIENCE_MOE_0 = int(7e3)
 
 LOWER_THRESHOLD_MOE = -0.4
 UPPER_THRESHOLD_MOE = 0.4
-REWEIGHTS_MOE_R = [(0.6, 0.6, 0.0, 0.0)]  
+REWEIGHTS_MOE_R = [(1, 1, 0.0, 0.0)]  
 REWEIGHTS_MOE_P = [(0.11, 0.11, 0.0, 0.0)]
 REWEIGHTS_MOE_M = [(0.035, 0.035, 0.0, 0.0)]
 REWEIGHTS_MOE_0 = [(0.4, 0.4, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
@@ -159,5 +159,5 @@ PRE_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_m
 LAMBDA_1_CCE = 1.0
 LAMBDA_2_CCE = 1.0
 
-START_LR_MOE_R = 5e-3
+START_LR_MOE_R = 5e-4
 

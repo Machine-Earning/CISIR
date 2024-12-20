@@ -59,7 +59,7 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed)
                 patience = PATIENCE_MOE  # higher patience
-                learning_rate = START_LR  # starting learning rate
+                learning_rate = START_LR_MOE_R  # starting learning rate
                 asym_type = ASYM_TYPE_MOE
                 lambda_1 = LAMBDA_1_CCE
                 lambda_2 = LAMBDA_2_CCE
