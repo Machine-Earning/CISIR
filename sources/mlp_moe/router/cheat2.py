@@ -58,7 +58,7 @@ def main():
                 experiment_name = f'{title}_{current_time}'
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed)
-                patience = PATIENCE_MOE  # higher patience
+                patience = PATIENCE_MOE_R  # higher patience
                 learning_rate = START_LR_MOE_R  # starting learning rate
                 asym_type = ASYM_TYPE_MOE
                 lambda_1 = LAMBDA_1_CCE
