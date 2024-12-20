@@ -4557,7 +4557,7 @@ def cce(
         y_true: Tuple[tf.Tensor, tf.Tensor],
         y_pred: tf.Tensor,
         phase_manager: 'TrainingPhaseManager',
-        lambda_1: float = 1.0, lambda_2: float = 1.0, k: float = 5.0,
+        lambda_1: float = 1.0, lambda_2: float = 1.0
         train_ce_weight_dict: Optional[Dict[float, float]] = None,
         val_ce_weight_dict: Optional[Dict[float, float]] = None,
         train_pcc_weight_dict: Optional[Dict[float, float]] = None,
@@ -4618,7 +4618,7 @@ def cce(
 
     # PCC loss for zero delta
     # Assuming zero class index=1
-    pcc_loss_2 = coreg(k - tf.abs(delta_batch), y_pred[:, 1], pcc_weights)
+    pcc_loss_2 = coreg(tf.abs(delta_batch), y_pred[:, 1], pcc_weights)
 
     loss = ce + lambda_1 * pcc_loss_1 + lambda_2 * pcc_loss_2
     return loss
