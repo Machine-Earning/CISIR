@@ -63,7 +63,6 @@ def main():
                 asym_type = ASYM_TYPE_MOE
                 lambda_1 = LAMBDA_1_CCE
                 lambda_2 = LAMBDA_2_CCE
-                k = K_CCE
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -114,7 +113,6 @@ def main():
                     "loss": 'cce',
                     "lambda_1": lambda_1,
                     "lambda_2": lambda_2,
-                    "k": k,
                     "seed": seed,
                     "alpha_ce": alpha_ce,
                     "alphaV_ce": alphaV_ce,
@@ -277,7 +275,7 @@ def main():
                         'forecast_head': lambda y_true, y_pred: cce(
                             y_true, y_pred,
                             phase_manager=pm,
-                            lambda_1=lambda_1, lambda_2=lambda_2, k=k,
+                            lambda_1=lambda_1, lambda_2=lambda_2,
                             train_ce_weight_dict=ce_train_weights_dict,
                             val_ce_weight_dict=ce_test_weights_dict,
                             train_pcc_weight_dict=pcc_train_weights_dict,
@@ -366,7 +364,7 @@ def main():
                         'forecast_head': lambda y_true, y_pred: cce(
                         y_true, y_pred,
                             phase_manager=pm,
-                            lambda_1=lambda_1, lambda_2=lambda_2, k=k,
+                            lambda_1=lambda_1, lambda_2=lambda_2,
                             train_ce_weight_dict=ce_train_weights_dict,
                             val_ce_weight_dict=ce_test_weights_dict,
                             train_pcc_weight_dict=pcc_train_weights_dict,

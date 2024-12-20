@@ -4557,7 +4557,7 @@ def cce(
         y_true: Tuple[tf.Tensor, tf.Tensor],
         y_pred: tf.Tensor,
         phase_manager: 'TrainingPhaseManager',
-        lambda_1: float = 1.0, lambda_2: float = 1.0
+        lambda_1: float = 1.0, lambda_2: float = 1.0,
         train_ce_weight_dict: Optional[Dict[float, float]] = None,
         val_ce_weight_dict: Optional[Dict[float, float]] = None,
         train_pcc_weight_dict: Optional[Dict[float, float]] = None,
@@ -4576,7 +4576,6 @@ def cce(
     - y_pred (tf.Tensor): Predicted probabilities from the model
     - lambda_1 (float): Scaling factor for the plus and minus delta portion of the PCC loss. Default is 1.0.
     - lambda_2 (float): Scaling factor for the zero delta portion of the PCC loss. Default is 1.0.
-    - k (float): Constant that upper bounds the absolute value of the delta values in the zero delta term. Default is 5.0.
     - phase_manager (TrainingPhaseManager): Manager that tracks whether we are in training or validation phase.
     - train_ce_weight_dict (dict, optional): Dictionary mapping label values to weights for training CE samples.
     - val_ce_weight_dict (dict, optional): Dictionary mapping label values to weights for validation CE samples.
@@ -4611,8 +4610,8 @@ def cce(
     pcc_loss_1 = coreg(delta_batch, y_pred[:, 0] - y_pred[:, 2], pcc_weights)
 
     # PCC loss for zero delta
-    # Assuming zero class index=1
-    pcc_loss_2 = coreg(tf.abs(delta_batch), y_pred[:, 1], pcc_weights)
+    # Assuming zero class index=1, and using a Gaussian kernel with sigma=0.0347
+    pcc_loss_2 = coreg(tf.exp(-28.82 * tf.square(delta_batch)), y_pred[:, 1], pcc_weights)
 
     loss = ce + lambda_1 * pcc_loss_1 + lambda_2 * pcc_loss_2
     return loss
