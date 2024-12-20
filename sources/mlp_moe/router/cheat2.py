@@ -35,7 +35,7 @@ def main():
     """
 
     # Path to pre-trained model weights
-    pretrained_weights = PRE_WEIGHT_PATH
+    pretrained_weights = None #PRE_WEIGHT_PATH
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
