@@ -414,7 +414,8 @@ def main():
                 y_test_true_classes = np.argmax(y_test_classes, axis=1)
 
                 # Calculate confusion matrices and create plots
-                class_names = ['minus', 'zero', 'plus']
+                # plus is index 0, zero is index 1, minus is index 2
+                class_names = ['plus', 'zero', 'minus']
 
                 # Create and save train confusion matrix plot
                 train_cm_fig = plot_confusion_matrix(
