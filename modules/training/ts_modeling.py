@@ -4607,10 +4607,12 @@ def cce(
 
     # PCC loss for plus-minus delta
     # Assuming plus class index=0 and minus class index=2
+    # p(p|x) - p(m|x)
     pcc_loss_1 = coreg(delta_batch, y_pred[:, 0] - y_pred[:, 2], pcc_weights)
 
     # PCC loss for zero delta
     # Assuming zero class index=1, and using a Gaussian kernel with sigma=0.0347
+    # p(z|x)
     pcc_loss_2 = coreg(tf.exp(-28.82 * tf.square(delta_batch)), y_pred[:, 1], pcc_weights)
 
     loss = ce + lambda_1 * pcc_loss_1 + lambda_2 * pcc_loss_2
