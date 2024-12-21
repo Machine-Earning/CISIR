@@ -996,13 +996,16 @@ def plot_confusion_matrix(
     """
     # Calculate confusion matrix
     cm = confusion_matrix(y_true, y_pred)
-
+    
+    # Reverse the confusion matrix rows to flip the y-axis
+    cm = np.flipud(cm)
+    
     # Create figure and axis
     fig, ax = plt.subplots(figsize=(10, 8))
 
     # Use provided tick labels or default to class names
     xticks = xticklabels if xticklabels is not None else class_names
-    yticks = yticklabels if yticklabels is not None else class_names
+    yticks = yticklabels if yticklabels is not None else class_names[::-1]  # Reverse for y-axis
 
     # Plot confusion matrix using seaborn
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
@@ -1800,7 +1803,6 @@ def stratified_batch_dataset(
             tf.TensorSpec(shape=(batch_size, X.shape[1]), dtype=tf.float32),
             tf.TensorSpec(shape=(batch_size,), dtype=tf.float32)
         )
-    )
     # Compute the number of steps per epoch
     steps_per_epoch = len(y) // batch_size
     # Prefetch for performance optimization
