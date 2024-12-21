@@ -1803,6 +1803,7 @@ def stratified_batch_dataset(
             tf.TensorSpec(shape=(batch_size, X.shape[1]), dtype=tf.float32),
             tf.TensorSpec(shape=(batch_size,), dtype=tf.float32)
         )
+    )
     # Compute the number of steps per epoch
     steps_per_epoch = len(y) // batch_size
     # Prefetch for performance optimization
