@@ -1,6 +1,7 @@
 # Dataset configurations
 DS_VERSION = 8  # Dataset version
 DS_PATH = 'data/electron_cme_data_split_v8'  # Path to the dataset
+
 INPUTS_TO_USE = [['e0.5', 'e4.4', 'p6.1', 'p']]  # Inputs to use
 OUTPUTS_TO_USE = ['delta_p']  # Output to use
 OUTPUT_DIM = len(OUTPUTS_TO_USE)  # Number of outputs
@@ -84,7 +85,7 @@ WINDOW_SIZE = 101  # NOTE: must be odd
 
 # Additional Parameters
 RHO = [1e-2]
-REWEIGHTS = [(1.0, 0.3, 0.1, 0)]
+REWEIGHTS = [(1.0, 0.4, 0.1, 0)]
 LAMBDA_FACTOR = 8
 AE_LAMBDA = 0.9
 CVRG_MIN_DELTA = 1e-5
@@ -104,12 +105,12 @@ ATTM_NORM = 'batch_norm'
 ATTM_WD = 1e-6
 ATTM_LR_CB_FACTOR = 0.95
 ATTM_LR_CB_PATIENCE = 50
-ATTM_RHO = [1e-5] #[1e-3]
-ATTM_PATIENCE = int(3e3)
+ATTM_RHO = [1e-3] #[1e-3]
+ATTM_PATIENCE = int(2e3)
 ATTM_CVRG_MIN_DELTA = 1e-2
-ATTM_VAL_WINDOW_SIZE = 33
-ATTM_WINDOW_SIZE = 33
-LAMBDA_FACTOR_ATTM = 4
+ATTM_VAL_WINDOW_SIZE = 15
+ATTM_WINDOW_SIZE = 15
+LAMBDA_FACTOR_ATTM = 6
 
 
 # ATTN AREA
@@ -146,7 +147,7 @@ PATIENCE_MOE_0 = int(7e3)
 
 LOWER_THRESHOLD_MOE = -0.4
 UPPER_THRESHOLD_MOE = 0.4
-REWEIGHTS_MOE_R = [(0.55, 0.55, 0.0, 0.0)]  
+REWEIGHTS_MOE_R = [(0.58, 0.58, 0.0, 0.0)]  
 REWEIGHTS_MOE_P = [(0.11, 0.11, 0.0, 0.0)]
 REWEIGHTS_MOE_M = [(0.035, 0.035, 0.0, 0.0)]
 REWEIGHTS_MOE_0 = [(0.4, 0.4, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
