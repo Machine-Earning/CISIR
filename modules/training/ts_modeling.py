@@ -43,7 +43,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Optimizer
 from tensorflow.keras.regularizers import l2
 
-from modules.shared.globals import PLUS_INDEX, MID_INDEX, MINUS_INDEX, MLP_HIDDENS
+from modules.shared.globals import PLUS_INDEX, MID_INDEX, MINUS_INDEX, MLP_HIDDENS, UPPER_THRESHOLD_MOE, LOWER_THRESHOLD_MOE
 from modules.training.normlayer import NormalizeLayer
 from modules.training.phase_manager import TrainingPhaseManager, create_weight_tensor_fast
 from modules.training.sam_keras import SAMModel
@@ -64,7 +64,12 @@ np.random.seed(seed_value)
 tf.random.set_seed(seed_value)
 
 
-def get_plus_cls(X: np.ndarray, y: np.ndarray, upper_threshold: float, *additional_sets) -> tuple[np.ndarray, ...]:
+def get_plus_cls(
+        X: np.ndarray,
+        y: np.ndarray,
+        upper_threshold: float = UPPER_THRESHOLD_MOE,
+        *additional_sets
+) -> tuple[np.ndarray, ...]:
     """
     Get data samples where y values are >= upper threshold (plus class).
 
@@ -86,8 +91,8 @@ def get_plus_cls(X: np.ndarray, y: np.ndarray, upper_threshold: float, *addition
 def get_zero_cls(
         X: np.ndarray,
         y: np.ndarray,
-        lower_threshold: float,
-        upper_threshold: float,
+        lower_threshold: float = LOWER_THRESHOLD_MOE,
+        upper_threshold: float = UPPER_THRESHOLD_MOE,
         *additional_sets) -> tuple[np.ndarray, ...]:
     """
     Get data samples where y values are between the lower and upper thresholds (zero class).
@@ -108,7 +113,12 @@ def get_zero_cls(
     return tuple(filtered)
 
 
-def get_minus_cls(X: np.ndarray, y: np.ndarray, threshold: float, *additional_sets) -> tuple[np.ndarray, ...]:
+def get_minus_cls(
+        X: np.ndarray,
+        y: np.ndarray,
+        threshold: float = LOWER_THRESHOLD_MOE,
+        *additional_sets
+) -> tuple[np.ndarray, ...]:
     """
     Get data samples where y values are below or equal to the threshold (minus class).
 
@@ -127,7 +137,11 @@ def get_minus_cls(X: np.ndarray, y: np.ndarray, threshold: float, *additional_se
     return tuple(filtered)
 
 
-def convert_to_onehot_cls(y: np.ndarray, lower_threshold: float, upper_threshold: float) -> np.ndarray:
+def convert_to_onehot_cls(
+        y: np.ndarray,
+        lower_threshold: float = LOWER_THRESHOLD_MOE,
+        upper_threshold: float = UPPER_THRESHOLD_MOE
+) -> np.ndarray:
     """
     Convert regression values to one-hot encoded classes based on thresholds.
 
