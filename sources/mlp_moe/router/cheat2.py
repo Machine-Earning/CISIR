@@ -414,40 +414,30 @@ def main():
                 y_test_true_classes = np.argmax(y_test_classes, axis=1)
 
                 # Calculate confusion matrices and create plots
-                # plus is index 0, zero is index 1, minus is index 2
-                class_names = ['minus', 'zero', 'plus']  # Reordered for display
-
-                # Create mapping from model indices to display order
-                model_to_display = {2: 0, 1: 1, 0: 2}  # Maps minus(2)->0, zero(1)->1, plus(0)->2
-
-                # Remap predictions and true values to display order
-                y_train_pred_display = np.array([model_to_display[i] for i in y_train_pred_classes])
-                y_test_pred_display = np.array([model_to_display[i] for i in y_test_pred_classes])
-                y_train_true_display = np.array([model_to_display[i] for i in y_train_true_classes])
-                y_test_true_display = np.array([model_to_display[i] for i in y_test_true_classes])
+                class_names = ['minus', 'zero', 'plus']
 
                 # Create and save train confusion matrix plot
                 train_cm_fig = plot_confusion_matrix(
-                    y_train_pred_display,
-                    y_train_true_display,
+                    y_train_pred_classes,  # Switched order to have predicted on y-axis
+                    y_train_true_classes,  # Switched order to have actual on x-axis
                     class_names=class_names,
                     title="Training Confusion Matrix",
-                    xlabel="Actual",
-                    ylabel="Predicted",
-                    xticklabels=class_names,
-                    yticklabels=class_names
+                    xlabel="Actual",  # Added x-label for actual values
+                    ylabel="Predicted",  # Added y-label for predicted values
+                    xticklabels=class_names,  # Add class names on x-axis
+                    yticklabels=class_names  # Add class names on y-axis
                 )
 
                 # Create and save test confusion matrix plot
                 test_cm_fig = plot_confusion_matrix(
-                    y_test_pred_display,
-                    y_test_true_display,
+                    y_test_pred_classes,  # Switched order to have predicted on y-axis
+                    y_test_true_classes,  # Switched order to have actual on x-axis
                     class_names=class_names,
                     title="Test Confusion Matrix",
-                    xlabel="Actual",
-                    ylabel="Predicted",
-                    xticklabels=class_names,
-                    yticklabels=class_names
+                    xlabel="Actual",  # Added x-label for actual values
+                    ylabel="Predicted",  # Added y-label for predicted values
+                    xticklabels=class_names,  # Add class names on x-axis
+                    yticklabels=class_names  # Add class names on y-axis
                 )
 
                 # Calculate accuracies
