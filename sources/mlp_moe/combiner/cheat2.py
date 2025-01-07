@@ -40,17 +40,20 @@ def main():
 
     for seed in SEEDS:
         for alpha_ce, alphaV_ce, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_C:
-            for rho in RHO_MOE_R:  # SAM_RHOS:
+            for rho in RHO_MOE_C:  # SAM_RHOS:
                 # PARAMS
                 inputs_to_use = INPUTS_TO_USE[0]  # Use first input configuration
                 outputs_to_use = OUTPUTS_TO_USE
                 add_slope = ADD_SLOPE[0]  # Use first add_slope value
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]  # Use first threshold value
+                lambda_1 = LAMBDA_PN_CCE
+                lambda_2 = LAMBDA_NZ_CCE
+                Tth = NZ_Y_TRANSITION
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_ace{alpha_ce:.2f}_combiner'
+                title = f'mlp2_ace{alpha_ce:.2f}_combiner_lpn{lambda_1:.2f}_lnz{lambda_2:.2f}'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -61,9 +64,7 @@ def main():
                 patience = PATIENCE_MOE_C  # higher patience
                 learning_rate = START_LR_MOE_R  # starting learning rate
                 asym_type = ASYM_TYPE_MOE
-                lambda_1 = LAMBDA_PN_CCE
-                lambda_2 = LAMBDA_NZ_CCE
-                Tth = NZ_Y_TRANSITION
+
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -99,7 +100,7 @@ def main():
                 pretraining = False
 
                 # Initialize wandb
-                wandb.init(project="Jan-moe-combiner-Report", name=experiment_name, config={
+                wandb.init(project="Jan-moe-router-Report", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
                     "add_slope": add_slope,
                     "patience": patience,
