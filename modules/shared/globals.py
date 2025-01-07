@@ -130,7 +130,7 @@ FF_NORM = 'batch_norm'
 LEAKY_RELU_ALPHA = 0.3
 
 # MOE
-ROUTER_OUTPUT_DIM = 3  # 3 classes for routing
+COMBINER_OUTPUT_DIM = 3  # 3 classes for routing
 BATCH_SIZE_MOE = 32  # Batch size for Moe
 BATCH_SIZE_MOE_0 = 2048  # Batch size for Moe
 PLUS_INDEX = 0

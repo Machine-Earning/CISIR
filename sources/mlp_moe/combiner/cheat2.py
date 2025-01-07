@@ -30,7 +30,7 @@ from modules.training.ts_modeling import (
 
 def main():
     """
-    Main function to run the Router model
+    Main function to run the Combiner model
     :return:
     """
 
@@ -50,7 +50,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_ace{alpha_ce:.2f}_router'
+                title = f'mlp2_ace{alpha_ce:.2f}_combiner'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -81,7 +81,7 @@ def main():
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 bandwidth = BANDWIDTH
                 embed_dim = EMBED_DIM
-                output_dim = ROUTER_OUTPUT_DIM  # 3 classes for routing
+                output_dim = COMBINER_OUTPUT_DIM  # 3 classes for routing
                 dropout = DROPOUT
                 activation = ACTIVATION
                 norm = NORM
@@ -98,7 +98,7 @@ def main():
                 pretraining = False
 
                 # Initialize wandb
-                wandb.init(project="Jan-moe-router-Report", name=experiment_name, config={
+                wandb.init(project="Jan-moe-combiner-Report", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
                     "add_slope": add_slope,
                     "patience": patience,
@@ -125,7 +125,7 @@ def main():
                     "norm": norm,
                     'optimizer': 'adamw',
                     'output_dim': output_dim,
-                    'architecture': 'router',
+                    'architecture': 'combiner',
                     'cme_speed_threshold': cme_speed_threshold,
                     'residual': residual,
                     'ds_version': DS_VERSION,
@@ -336,8 +336,8 @@ def main():
                 print(f'optimal_epochs: {optimal_epochs}')
                 wandb.log({'optimal_epochs': optimal_epochs})
 
-                # Create final router model
-                router_model = create_mlp(
+                # Create final combiner model
+                combiner_model = create_mlp(
                     input_dim=n_features,
                     hiddens=hiddens,
                     embed_dim=embed_dim,
@@ -352,9 +352,9 @@ def main():
                     output_activation='softmax'
                 )
                 # summary of the model
-                router_model.summary()
+                combiner_model.summary()
 
-                router_model.compile(
+                combiner_model.compile(
                     optimizer=AdamW(
                         learning_rate=learning_rate,
                         weight_decay=weight_decay,
@@ -378,13 +378,13 @@ def main():
                     print(f"Loading pre-trained weights from {pretrained_weights}")
                     load_partial_weights_from_path(
                         pretrained_weights_path=PRE_WEIGHT_PATH,
-                        new_model=router_model,
+                        new_model=combiner_model,
                         old_model_params=old_model_params,
                         skip_layers=["forecast_head"]  # skip final layer if output_dim differs
                     )
 
-                # Train the router model for optimal epochs
-                history = router_model.fit(
+                # Train the combiner model for optimal epochs
+                history = combiner_model.fit(
                     train_dataset,
                     validation_data=val_data,
                     epochs=optimal_epochs,
@@ -398,13 +398,13 @@ def main():
                 )
 
                 # Save the final model
-                router_model.save_weights(f"final_router_model_weights_{experiment_name}.h5")
-                print(f"Model weights saved in final_router_model_weights_{experiment_name}.h5")
+                combiner_model.save_weights(f"final_combiner_model_weights_{experiment_name}.h5")
+                print(f"Model weights saved in final_combiner_model_weights_{experiment_name}.h5")
 
                 # Get predictions
-                predictions = router_model.predict(X_train)
+                predictions = combiner_model.predict(X_train)
                 y_train_pred = predictions[1]
-                predictions = router_model.predict(X_test)
+                predictions = combiner_model.predict(X_test)
                 y_test_pred = predictions[1]
 
                 # Convert predictions to class labels
@@ -509,7 +509,7 @@ def main():
 
                 # Evaluate the model correlation with colored
                 file_path = plot_repr_corr_dist(
-                    router_model,
+                    combiner_model,
                     X_train_filtered, y_train_filtered,
                     title + "_training",
                     model_type='features_cls')
@@ -517,7 +517,7 @@ def main():
                 print('file_path: ' + file_path)
 
                 file_path = plot_repr_corr_dist(
-                    router_model,
+                    combiner_model,
                     X_test_filtered, y_test_filtered,
                     title + "_test",
                     model_type='features_cls')
@@ -527,22 +527,22 @@ def main():
                 # Log t-SNE plot
                 # Log the training t-SNE plot to wandb
                 stage1_file_path = plot_tsne_delta(
-                    router_model,
+                    combiner_model,
                     X_train_filtered, y_train_filtered,
-                    title, 'router_training',
+                    title, 'combiner_training',
                     model_type='features_cls',
                     save_tag=current_time, seed=seed)
-                wandb.log({'router_tsne_training_plot': wandb.Image(stage1_file_path)})
+                wandb.log({'combiner_tsne_training_plot': wandb.Image(stage1_file_path)})
                 print('stage1_file_path: ' + stage1_file_path)
 
                 # Log the testing t-SNE plot to wandb
                 stage1_file_path = plot_tsne_delta(
-                    router_model,
+                    combiner_model,
                     X_test_filtered, y_test_filtered,
-                    title, 'router_testing',
+                    title, 'combiner_testing',
                     model_type='features_cls',
                     save_tag=current_time, seed=seed)
-                wandb.log({'router_tsne_testing_plot': wandb.Image(stage1_file_path)})
+                wandb.log({'combiner_tsne_testing_plot': wandb.Image(stage1_file_path)})
                 print('stage1_file_path: ' + stage1_file_path)
 
                 # Finish the wandb run
