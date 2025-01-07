@@ -9,7 +9,7 @@ ADD_SLOPE = [False]  # Add slope to the inputs
 CME_SPEED_THRESHOLD = [0]  # CME speed threshold
 
 # Training configurations
-SEEDS = [456789] # , 42, 1234, 0, 9999]  # Seeds for reproducibility
+SEEDS = [456789]  # , 42, 1234, 0, 9999]  # Seeds for reproducibility
 BATCH_SIZE = 2500  # Batch size
 EPOCHS = int(1e5)  # Number of epochs
 VERBOSE = 1  # Verbose
@@ -60,7 +60,7 @@ RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 
 # Learning Rate Scheduling
 LR_CB_MIN_LR = 1e-5  # minimum learning rate
-LR_CB_FACTOR = 0.95 # factor for reducing learning rate # gradual decay leads to more stable training
+LR_CB_FACTOR = 0.95  # factor for reducing learning rate # gradual decay leads to more stable training
 LR_CB_PATIENCE = 50  # patience for reducing learning rate
 LR_CB_MIN_DELTA = 1e-5  # Minimum delta for reducing learning rate
 LR_CB_MONITOR = 'loss'  # Monitor validation loss
@@ -105,13 +105,12 @@ ATTM_NORM = 'batch_norm'
 ATTM_WD = 1e-6
 ATTM_LR_CB_FACTOR = 0.95
 ATTM_LR_CB_PATIENCE = 50
-ATTM_RHO = [1e-3] #[1e-3]
+ATTM_RHO = [1e-3]  #[1e-3]
 ATTM_PATIENCE = int(2e3)
 ATTM_CVRG_MIN_DELTA = 1e-2
 ATTM_VAL_WINDOW_SIZE = 15
 ATTM_WINDOW_SIZE = 15
 LAMBDA_FACTOR_ATTM = 6
-
 
 # ATTN AREA
 ATTN_HIDDENS = [256, 128, 256]  # this architecture is good enough to predict on its own
@@ -136,18 +135,18 @@ BATCH_SIZE_MOE_0 = 2048  # Batch size for Moe
 PLUS_INDEX = 0
 MID_INDEX = 1
 MINUS_INDEX = 2
-RHO_MOE_R = [1e-2] 
-RHO_MOE_0 = [1e-1] 
-RHO_MOE_P = [5e-1] 
-RHO_MOE_M = [5e-1] 
-PATIENCE_MOE_R = int(2e3)
+RHO_MOE_R = [1e-2]
+RHO_MOE_0 = [1e-1]
+RHO_MOE_P = [5e-1]
+RHO_MOE_M = [5e-1]
+PATIENCE_MOE_C = int(2e3)
 PATIENCE_MOE_M = int(7e3)
 PATIENCE_MOE_P = int(7e3)
 PATIENCE_MOE_0 = int(7e3)
 
 LOWER_THRESHOLD_MOE = -0.4
 UPPER_THRESHOLD_MOE = 0.4
-REWEIGHTS_MOE_R = [(0.58, 0.58, 0.0, 0.0)]  
+REWEIGHTS_MOE_C = [(0.58, 0.58, 0.0, 0.0)]
 REWEIGHTS_MOE_P = [(0.11, 0.11, 0.0, 0.0)]
 REWEIGHTS_MOE_M = [(0.035, 0.035, 0.0, 0.0)]
 REWEIGHTS_MOE_0 = [(0.4, 0.4, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
@@ -157,8 +156,9 @@ ASYM_TYPE_0 = None
 ASYM_TYPE_MOE = None
 PDC_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcStratInj_bs6000_v8_20241203-194954.h5"
 PRE_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.00_v8_updated_20241120-180201_reg.h5"
-LAMBDA_1_CCE = 1.0
-LAMBDA_2_CCE = 1.0
+LAMBDA_PN_CCE = 0.25
+LAMBDA_NZ_CCE = 0.25
 
 START_LR_MOE_R = 3e-4
 
+NZ_Y_TRANSITION = 0.5  # value of y at the transition point from posterior 1 to posterior zero for transition delta

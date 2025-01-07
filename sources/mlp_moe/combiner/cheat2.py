@@ -35,11 +35,11 @@ def main():
     """
 
     # Path to pre-trained model weights
-    pretrained_weights = None #PRE_WEIGHT_PATH
+    pretrained_weights = None  # PRE_WEIGHT_PATH
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
-        for alpha_ce, alphaV_ce, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_R:
+        for alpha_ce, alphaV_ce, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_C:
             for rho in RHO_MOE_R:  # SAM_RHOS:
                 # PARAMS
                 inputs_to_use = INPUTS_TO_USE[0]  # Use first input configuration
@@ -58,11 +58,12 @@ def main():
                 experiment_name = f'{title}_{current_time}'
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed)
-                patience = PATIENCE_MOE_R  # higher patience
+                patience = PATIENCE_MOE_C  # higher patience
                 learning_rate = START_LR_MOE_R  # starting learning rate
                 asym_type = ASYM_TYPE_MOE
-                lambda_1 = LAMBDA_1_CCE
-                lambda_2 = LAMBDA_2_CCE
+                lambda_1 = LAMBDA_PN_CCE
+                lambda_2 = LAMBDA_NZ_CCE
+                Tth = NZ_Y_TRANSITION
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -140,7 +141,8 @@ def main():
                     'lower_threshold': lower_threshold,
                     'cvrg_metric': CVRG_METRIC,
                     'pretraining': pretraining,
-                    'pretrained_weights': pretrained_weights
+                    'pretrained_weights': pretrained_weights,
+                    'Transition_threshold': Tth
                 })
 
                 # set the root directory
@@ -275,7 +277,7 @@ def main():
                         'forecast_head': lambda y_true, y_pred: cce(
                             y_true, y_pred,
                             phase_manager=pm,
-                            lambda_1=lambda_1, lambda_2=lambda_2,
+                            lambda_1=lambda_1, lambda_2=lambda_2, Tth=Tth,
                             train_ce_weight_dict=ce_train_weights_dict,
                             val_ce_weight_dict=ce_test_weights_dict,
                             train_pcc_weight_dict=pcc_train_weights_dict,
@@ -307,7 +309,8 @@ def main():
                 train_dataset = train_dataset.map(lambda x, y: (x, {'forecast_head': y}))
 
                 # Prepare validation data without batching and concatenate y_test_classes and delta_test
-                val_data = (X_test, {'forecast_head': tf.concat([y_test_classes, tf.expand_dims(delta_test, -1)], axis=1)})
+                val_data = (
+                X_test, {'forecast_head': tf.concat([y_test_classes, tf.expand_dims(delta_test, -1)], axis=1)})
 
                 # Train initial model to find optimal epochs
                 history = initial_model.fit(
@@ -362,9 +365,9 @@ def main():
                     ),
                     loss={
                         'forecast_head': lambda y_true, y_pred: cce(
-                        y_true, y_pred,
+                            y_true, y_pred,
                             phase_manager=pm,
-                            lambda_1=lambda_1, lambda_2=lambda_2,
+                            lambda_1=lambda_1, lambda_2=lambda_2, Tth=Tth,
                             train_ce_weight_dict=ce_train_weights_dict,
                             val_ce_weight_dict=ce_test_weights_dict,
                             train_pcc_weight_dict=pcc_train_weights_dict,
