@@ -156,8 +156,8 @@ ASYM_TYPE_0 = None
 ASYM_TYPE_MOE = None
 PDC_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcStratInj_bs6000_v8_20241203-194954.h5"
 PRE_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.00_v8_updated_20241120-180201_reg.h5"
-LAMBDA_PN_CCE = 2
-LAMBDA_NZ_CCE = 2
+LAMBDA_PN_CCE = 0.25
+LAMBDA_NZ_CCE = 0.25
 
 START_LR_MOE_R = 3e-4
 
