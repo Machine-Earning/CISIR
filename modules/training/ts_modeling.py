@@ -4569,6 +4569,28 @@ def cmse(
     # Return the final loss as a single scalar value
     return loss
 
+def dual_sigmoid(x: tf.Tensor, steepness: float = 999.0) -> tf.Tensor:
+    """
+    Implements a double sigmoid function of the form:
+    y = 1/(1+exp(steepness*(x-0.4))) + 1/(1+exp(steepness*(-x-0.4))) - 1
+    
+    This creates a symmetric function with two sigmoid transitions centered at x=±0.4.
+    The steepness parameter controls how sharp the transitions are.
+
+    Args:
+        x (tf.Tensor): Input tensor
+        steepness (float): Controls the steepness of the sigmoid transitions. 
+                          Default is 999.0 for very sharp transitions.
+                          Use 1.0 for normal sigmoid steepness.
+
+    Returns:
+        tf.Tensor: Result of the double sigmoid function
+    """
+    left_sigmoid = 1.0 / (1.0 + tf.exp(steepness * (x - 0.4)))
+    right_sigmoid = 1.0 / (1.0 + tf.exp(steepness * (-x - 0.4)))
+    return left_sigmoid + right_sigmoid - 1.0
+
+
 
 def cce(
         y_true: Tuple[tf.Tensor, tf.Tensor],
@@ -4631,7 +4653,8 @@ def cce(
     # PCC loss for zero delta
     # Assuming zero class index=1, and using a Gaussian kernel
     # p(z|x)
-    pcc_loss_2 = coreg(tf.exp(6.25 * tf.math.log(Tth) * tf.square(delta_batch)), y_pred[:, 1], pcc_weights)
+    # pcc_loss_2 = coreg(tf.exp(6.25 * tf.math.log(Tth) * tf.square(delta_batch)), y_pred[:, 1], pcc_weights)
+    pcc_loss_2 = coreg(dual_sigmoid(delta_batch), y_pred[:, 1], pcc_weights)
 
     loss = ce + lambda_1 * pcc_loss_1 + lambda_2 * pcc_loss_2
     return loss
