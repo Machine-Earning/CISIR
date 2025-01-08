@@ -52,7 +52,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_ace{alpha_ce:.2f}_combiner_lpn{lambda_1:.2f}_lnz{lambda_2:.2f}'
+                title = f'mlp2_ace{alpha_ce:.2f}_combiner_lpn{lambda_1:.2f}_lnz{lambda_2:.2f}_filtered'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -75,7 +75,7 @@ def main():
 
                 weight_decay = WEIGHT_DECAY  # 1e-5 # higher weight decay
                 momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                batch_size = BATCH_SIZE  # higher batch size
+                batch_size = 512  # higher batch size
                 epochs = EPOCHS  # higher epochs
                 hiddens = MLP_HIDDENS  # hidden layers
 

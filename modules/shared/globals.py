@@ -62,7 +62,7 @@ RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 LR_CB_MIN_LR = 1e-5  # minimum learning rate
 LR_CB_FACTOR = 0.95  # factor for reducing learning rate # gradual decay leads to more stable training
 LR_CB_PATIENCE = 50  # patience for reducing learning rate
-LR_CB_MIN_DELTA = 1e-5  # Minimum delta for reducing learning rate
+LR_CB_MIN_DELTA = 1e-3 # Minimum delta for reducing learning rate
 LR_CB_MONITOR = 'loss'  # Monitor validation loss
 
 # Early Stopping
@@ -146,7 +146,7 @@ PATIENCE_MOE_0 = int(7e3)
 
 LOWER_THRESHOLD_MOE = -0.4
 UPPER_THRESHOLD_MOE = 0.4
-REWEIGHTS_MOE_C = [(0.65, 0.65, 0.0, 0.0)]
+REWEIGHTS_MOE_C = [(0.2, 0.2, 0.0, 0.0)]
 REWEIGHTS_MOE_P = [(0.11, 0.11, 0.0, 0.0)]
 REWEIGHTS_MOE_M = [(0.035, 0.035, 0.0, 0.0)]
 REWEIGHTS_MOE_0 = [(0.4, 0.4, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
