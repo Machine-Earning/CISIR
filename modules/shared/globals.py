@@ -152,8 +152,8 @@ REWEIGHTS_MOE_M = [(0.035, 0.035, 0.0, 0.0)]
 REWEIGHTS_MOE_0 = [(0.4, 0.4, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
 LAMBDA_FACTOR_MOE_P = 6
 LAMBDA_FACTOR_MOE_M = 6
+
 ASYM_TYPE_0 = None
-ASYM_TYPE_MOE = None
 PDC_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcStratInj_bs6000_v8_20241203-194954.h5"
 PRE_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.00_v8_updated_20241120-180201_reg.h5"
 # Model paths
@@ -161,7 +161,21 @@ POS_EXPERT_PATH = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_m
 NEG_EXPERT_PATH = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse0.03_minus_e_20241212-133248_reg.h5'
 NZ_EXPERT_PATH = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse0.10_zero_e_20241205-111054_reg.h5'
 COMBINER_PATH = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2_ace0.65_combiner_lpn1.00_lnz1.00_dualsig_20250107-152210.h5'
+# assemble hyperparams
+REWEIGHTS_MOE = [(1.0, 0.3, 0.1, 0.0)]
+RHO_MOE = [1e-2]
+LAMBDA_FACTOR_MOE = 8
+START_LR_MOE = 1e-3
+LR_CB_MIN_LR_MOE = 1e-5
+LR_CB_FACTOR_MOE = 0.95
+LR_CB_PATIENCE_MOE = 50
+WEIGHT_DECAY_MOE = 1e-4
+PATIENCE_MOE = int(2e3)
+ASYM_TYPE_MOE = 'sigmoid'
 
+FREEZE_EXPERT = True
+PRETRAINING_MOE = False
+MODE_MOE = 'soft'
 
 
 LAMBDA_PN_CCE = 1

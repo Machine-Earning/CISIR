@@ -43,7 +43,8 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Optimizer
 from tensorflow.keras.regularizers import l2
 
-from modules.shared.globals import PLUS_INDEX, MID_INDEX, MINUS_INDEX, MLP_HIDDENS, UPPER_THRESHOLD_MOE, LOWER_THRESHOLD_MOE
+from modules.shared.globals import PLUS_INDEX, MID_INDEX, MINUS_INDEX, MLP_HIDDENS, UPPER_THRESHOLD_MOE, \
+    LOWER_THRESHOLD_MOE
 from modules.training.normlayer import NormalizeLayer
 from modules.training.phase_manager import TrainingPhaseManager, create_weight_tensor_fast
 from modules.training.sam_keras import SAMModel
@@ -1010,10 +1011,10 @@ def plot_confusion_matrix(
     """
     # Calculate confusion matrix
     cm = confusion_matrix(y_true, y_pred)
-    
+
     # Reverse the confusion matrix rows to flip the y-axis
     cm = np.flipud(cm)
-    
+
     # Create figure and axis
     fig, ax = plt.subplots(figsize=(10, 8))
 
@@ -1071,13 +1072,13 @@ def focal_loss(gamma: float = 3.0, alpha: float = 0.25):
 
 def create_mlp_moe(
         hiddens=None,
-        router_hiddens=None,
+        combiner_hiddens=None,
         input_dim: int = 100,
         embed_dim: int = 128,
         skipped_layers: int = 1,
         skip_repr: bool = True,
         pretraining: bool = False,
-        freeze_experts: bool = False,
+        freeze_experts: bool = True,
         expert_paths: dict = None,
         mode: str = 'soft',  # 'soft' or 'hard'
         activation=None,
@@ -1088,7 +1089,7 @@ def create_mlp_moe(
 
 ) -> Model:
     """
-    Create an MLP mixture of experts model with pre-trained experts and a router network.
+    Create an MLP mixture of experts model with pre-trained experts and a combiner network.
 
     Parameters:
     - input_dim (int): The number of features in the input data.
@@ -1103,12 +1104,12 @@ def create_mlp_moe(
     - dropout (float): Dropout rate to apply after activations or residual connections. If 0.0, no dropout is applied.
     - expert_paths (dict): Dictionary containing paths to expert model weights:
         {
-            'router': path to router model weights,
+            'combiner': path to combiner model weights,
             'plus': path to plus expert weights,
             'zero': path to zero expert weights,
             'minus': path to minus expert weights
         }
-    - router_hiddens (list): A list of integers for router network hidden layers. If None, uses same as hiddens.
+    - combiner_hiddens (list): A list of integers for combiner network hidden layers. If None, uses same as hiddens.
     - freeze_experts (bool): If True, freeze the expert layers.
     - mode (str): Either 'soft' for weighted combination of experts or 'hard' for selecting single expert. Default is 'soft'.
 
@@ -1122,7 +1123,7 @@ def create_mlp_moe(
         activation = LeakyReLU()
 
     expert_output_dim = 1
-    router_output_dim = 3
+    combiner_output_dim = 3
 
     input_layer = Input(shape=(input_dim,))
 
@@ -1139,7 +1140,7 @@ def create_mlp_moe(
         norm=norm,
         sam_rho=sam_rho,
         dropout=dropout,
-        name='expert_plus'
+        name='expert_p'
     )
 
     expert_zero = create_mlp(
@@ -1154,7 +1155,7 @@ def create_mlp_moe(
         norm=norm,
         sam_rho=sam_rho,
         dropout=dropout,
-        name='expert_zero'
+        name='expert_nz'
     )
 
     expert_minus = create_mlp(
@@ -1169,14 +1170,14 @@ def create_mlp_moe(
         norm=norm,
         sam_rho=sam_rho,
         dropout=dropout,
-        name='expert_minus'
+        name='expert_m'
     )
 
-    # Create router network - outputs class probabilities
-    router = create_mlp(
+    # Create combiner network - outputs class probabilities
+    combiner = create_mlp(
         input_dim=input_dim,
-        output_dim=router_output_dim,  # 3 classes: plus, mid, minus
-        hiddens=router_hiddens if router_hiddens else hiddens,
+        output_dim=combiner_output_dim,  # 3 classes: plus, mid, minus
+        hiddens=combiner_hiddens if combiner_hiddens else hiddens,
         skipped_layers=skipped_layers,
         embed_dim=embed_dim,
         skip_repr=skip_repr,
@@ -1186,13 +1187,13 @@ def create_mlp_moe(
         sam_rho=sam_rho,
         dropout=dropout,
         output_activation='softmax',  # Use softmax for class probabilities
-        name='router'
+        name='combiner'
     )
 
     # Load weights if paths are provided
     if expert_paths:
-        if 'router' in expert_paths:
-            router.load_weights(expert_paths['router'])
+        if 'combiner' in expert_paths:
+            combiner.load_weights(expert_paths['combiner'])
         if 'plus' in expert_paths:
             expert_plus.load_weights(expert_paths['plus'])
         if 'zero' in expert_paths:
@@ -1209,10 +1210,10 @@ def create_mlp_moe(
     plus_output = expert_plus(input_layer)
     zero_output = expert_zero(input_layer)
     minus_output = expert_minus(input_layer)
-    router_output = router(input_layer)
+    combiner_output = combiner(input_layer)
 
     # Extract routing probabilities
-    routing_probs = router_output[1]  # Shape: (batch_size, 3)
+    routing_probs = combiner_output[1]  # Shape: (batch_size, 3)
 
     if mode == 'soft':
         # Soft mixture - weighted combination of experts
@@ -1826,7 +1827,6 @@ def stratified_batch_dataset(
     return dataset, steps_per_epoch
 
 
-
 def stratified_batch_dataset_cls(
         X: np.ndarray,
         y_labels: np.ndarray,
@@ -1884,8 +1884,8 @@ def stratified_batch_dataset_cls(
             X, y_labels, delta, groups, shuffle=shuffle,
         ),
         output_signature=(
-            tf.TensorSpec(shape=(batch_size, X.shape[1]), dtype=tf.float32),           # X_batch
-            tf.TensorSpec(shape=(batch_size, y_labels.shape[1] + 1), dtype=tf.float32) # Combined y_labels and delta
+            tf.TensorSpec(shape=(batch_size, X.shape[1]), dtype=tf.float32),  # X_batch
+            tf.TensorSpec(shape=(batch_size, y_labels.shape[1] + 1), dtype=tf.float32)  # Combined y_labels and delta
         )
     )
 
@@ -4569,6 +4569,7 @@ def cmse(
     # Return the final loss as a single scalar value
     return loss
 
+
 def dual_sigmoid(x: tf.Tensor, steepness: float = 999.0) -> tf.Tensor:
     """
     Implements a double sigmoid function of the form:
@@ -4589,7 +4590,6 @@ def dual_sigmoid(x: tf.Tensor, steepness: float = 999.0) -> tf.Tensor:
     left_sigmoid = 1.0 / (1.0 + tf.exp(steepness * (x - 0.4)))
     right_sigmoid = 1.0 / (1.0 + tf.exp(steepness * (-x - 0.4)))
     return left_sigmoid + right_sigmoid - 1.0
-
 
 
 def cce(
@@ -4625,12 +4625,10 @@ def cce(
     - tf.Tensor: The calculated loss value as a single scalar.
     """
 
-
     # Get y_classes and delta_batch from y_true
     # y_true shape is (batch_size, num_classes + 1) where last column is delta
     y_classes = y_true[:, :-1]  # All columns except last
-    delta_batch = y_true[:, -1] # Last column
-
+    delta_batch = y_true[:, -1]  # Last column
 
     # Determine which weight dictionaries to use
     ce_weight_dict = train_ce_weight_dict if phase_manager.is_training_phase() else val_ce_weight_dict
@@ -4639,7 +4637,6 @@ def cce(
     # Create weight tensors based on delta_batch
     ce_weights = create_weight_tensor_fast(delta_batch, ce_weight_dict)
     pcc_weights = create_weight_tensor_fast(delta_batch, pcc_weight_dict)
-
 
     # Compute Cross Entropy
     ce = -tf.reduce_mean(ce_weights * tf.reduce_sum(y_classes * tf.math.log(y_pred + K.epsilon()), axis=-1))
@@ -4656,6 +4653,7 @@ def cce(
 
     loss = ce + lambda_1 * pcc_loss_1 + lambda_2 * pcc_loss_2
     return loss
+
 
 def pcc_loss(y_true: tf.Tensor, y_pred: tf.Tensor,
              phase_manager: TrainingPhaseManager,
