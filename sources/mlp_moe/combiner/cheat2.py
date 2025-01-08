@@ -426,8 +426,6 @@ def main():
                     title="Training Confusion Matrix",
                     xlabel="Actual",  # Added x-label for actual values
                     ylabel="Predicted",  # Added y-label for predicted values
-                    xticklabels=class_names,  # Add class names on x-axis
-                    yticklabels=class_names  # Add class names on y-axis
                 )
 
                 # Create and save test confusion matrix plot
@@ -438,8 +436,6 @@ def main():
                     title="Test Confusion Matrix",
                     xlabel="Actual",  # Added x-label for actual values
                     ylabel="Predicted",  # Added y-label for predicted values
-                    xticklabels=class_names,  # Add class names on x-axis
-                    yticklabels=class_names  # Add class names on y-axis
                 )
 
                 # Calculate accuracies
@@ -447,13 +443,13 @@ def main():
                 test_accuracy = accuracy_score(y_test_true_classes, y_test_pred_classes)
 
                 # Calculate class-specific accuracies
-                train_plus_mask = y_train_true_classes == 0  # plus class index
-                train_zero_mask = y_train_true_classes == 1  # zero class index
-                train_minus_mask = y_train_true_classes == 2  # minus class index
+                train_plus_mask = y_train_true_classes == PLUS_INDEX  # plus class index
+                train_zero_mask = y_train_true_classes == MID_INDEX  # zero class index
+                train_minus_mask = y_train_true_classes == MINUS_INDEX  # minus class index
 
-                test_plus_mask = y_test_true_classes == 0  # plus class index
-                test_zero_mask = y_test_true_classes == 1  # zero class index
-                test_minus_mask = y_test_true_classes == 2  # minus class index
+                test_plus_mask = y_test_true_classes == PLUS_INDEX  # plus class index
+                test_zero_mask = y_test_true_classes == MID_INDEX  # zero class index
+                test_minus_mask = y_test_true_classes == MINUS_INDEX  # minus class index
 
                 train_plus_accuracy = accuracy_score(y_train_true_classes[train_plus_mask],
                                                      y_train_pred_classes[train_plus_mask])
