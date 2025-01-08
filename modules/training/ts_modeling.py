@@ -1724,6 +1724,71 @@ def stratified_data_generator_cls(
         yield batch_X, batch_y_concat
 
 
+def stratified_data_generator_cls2(
+        X: np.ndarray,
+        y_labels: np.ndarray,
+        delta: np.ndarray,
+        groups: np.ndarray,
+        shuffle: bool = True,
+        debug: bool = False
+) -> Generator[Tuple[np.ndarray, np.ndarray, np.ndarray], None, None]:
+    """
+    Generator that yields stratified batches of (X, y_labels, delta) by selecting one sample 
+    from each group in `groups`. The groups are precomputed as a 2D array of sample indices.
+
+    This version differs from the original in that it returns delta values along with 
+    the features and labels, which can be useful for handling imbalanced datasets.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        Feature matrix of shape (n_samples, n_features).
+    y_labels : np.ndarray
+        Label matrix of shape (n_samples, n_classes) or (n_samples,) depending on the use case.
+    delta : np.ndarray
+        Delta values vector of shape (n_samples,).
+    groups : np.ndarray
+        Precomputed groups of sample indices, shape (n_groups, group_size), obtained from stratified 
+        grouping functions.
+    shuffle : bool, optional
+        If True, shuffles the groups and the elements within each group before each epoch (default is True).
+    debug : bool, optional
+        If True, prints the generated batches for debugging purposes (default is False).
+
+    Yields
+    ------
+    Tuple[np.ndarray, np.ndarray, np.ndarray]
+        A tuple `(batch_X, batch_y, batch_delta)` where:
+        - `batch_X` is a feature batch of shape (batch_size, n_features).
+        - `batch_y` is the labels batch of shape (batch_size, n_classes).
+        - `batch_delta` is the delta values batch of shape (batch_size,).
+    """
+    while True:
+        # Shuffle within each group if requested
+        if shuffle:
+            np.apply_along_axis(np.random.shuffle, 1, groups)
+
+        # Select the first element from each group to form the batch
+        batch_indices = groups[:, 0]
+
+        # Optionally, shuffle the order of the selected samples to randomize batch order
+        if shuffle:
+            np.random.shuffle(batch_indices)
+
+        # Create the feature, label and delta batches using the selected indices
+        batch_X = X[batch_indices]
+        batch_y = y_labels[batch_indices]
+        batch_delta = delta[batch_indices]
+
+        # Debugging: Print the batch details if required
+        if debug:
+            print(f"Batch shape: X={batch_X.shape}, y={batch_y.shape}, delta={batch_delta.shape}")
+            print(f"Batch indices: {batch_indices}")
+
+        # Yield the current batch
+        yield batch_X, batch_y, batch_delta
+
+
 # def stratified_data_generator(
 #         X: np.ndarray,
 #         y: np.ndarray,
@@ -1898,6 +1963,79 @@ def stratified_batch_dataset_cls(
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
 
     return dataset, steps_per_epoch
+
+def stratified_batch_dataset_cls2(
+        X: np.ndarray,
+        y_labels: np.ndarray,
+        delta: np.ndarray,
+        batch_size: int,
+        shuffle: bool = True
+) -> Tuple[tf.data.Dataset, int]:
+    """
+    Creates a TensorFlow dataset from the stratified data generator for a classification scenario,
+    leveraging a continuous label array `delta` to stratify and a separate array `y_labels` for 
+    the final training labels.
+
+    This function uses `delta` solely for determining how to group samples into batches. These 
+    batches are formed by slicing the dataset after sorting by `delta`, effectively grouping 
+    together samples with similar continuous label values. The `y_labels` (e.g., one-hot encoded 
+    classes) are the actual training targets.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        Feature matrix of shape (n_samples, n_features).
+    y_labels : np.ndarray
+        Label matrix of shape (n_samples, n_classes) or (n_samples,) depending on the use case.
+        For classification, this could be one-hot encoded targets.
+    delta : np.ndarray
+        Continuous label vector of shape (n_samples,). Used only for stratification.
+        Must be numeric and sortable.
+    batch_size : int
+        Number of samples in each batch.
+    shuffle : bool, optional
+        If True, shuffles the groups and the elements within each group before each epoch
+        (default is True).
+
+    Returns
+    -------
+    Tuple[tf.data.Dataset, int]
+        A tuple of:
+        - A TensorFlow dataset object that yields `(features, y_labels, delta)` tuples.
+        - An integer representing the number of steps (batches) per epoch.
+
+    Notes
+    -----
+    - The dataset is created using `tf.data.Dataset.from_generator`, ensuring compatibility 
+      with large datasets and on-demand batch construction.
+    - Prefetching is enabled for better performance.
+    - Ensure that `X`, `delta`, and `y_labels` have the same first dimension (n_samples).
+    """
+    # Generate stratified groups once using the continuous labels
+    groups = stratified_groups(delta, batch_size)
+
+    # The generator will yield batches of (X_batch, y_labels_batch, delta_batch)
+    dataset = tf.data.Dataset.from_generator(
+        lambda: stratified_data_generator_cls2(
+            X, y_labels, delta, groups, shuffle=shuffle,
+        ),
+        output_signature=(
+            tf.TensorSpec(shape=(batch_size, X.shape[1]), dtype=tf.float32),  # X_batch
+            tf.TensorSpec(shape=(batch_size, y_labels.shape[1]), dtype=tf.float32),  # y_labels_batch
+            tf.TensorSpec(shape=(batch_size,), dtype=tf.float32)  # delta_batch
+        )
+    )
+
+    # Compute the number of steps per epoch. Integer division used since partial batch is discarded.
+    steps_per_epoch = len(delta) // batch_size
+
+    # Prefetch the dataset for performance optimization
+    dataset = dataset.prefetch(tf.data.AUTOTUNE)
+
+    return dataset, steps_per_epoch
+
+
+
 
 
 # def stratified_batch_dataset(

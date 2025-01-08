@@ -16,7 +16,6 @@ from modules.training.ts_modeling import (
     evaluate_mae,
     evaluate_pcc,
     process_sep_events,
-    stratified_batch_dataset,
     set_seed,
     cmse,
     # filter_ds,
@@ -24,7 +23,7 @@ from modules.training.ts_modeling import (
     plot_error_hist,
     create_mlp_moe,
     convert_to_onehot_cls,
-    stratified_batch_dataset_cls
+    stratified_batch_dataset_cls2
 )
 
 
@@ -279,21 +278,20 @@ def main():
 
                 # Step 1: Create stratified dataset for the subtraining and validation set
                 # Create stratified dataset for training
-                train_dataset, train_steps = stratified_batch_dataset_cls(
+                train_dataset, train_steps = stratified_batch_dataset_cls2(
                     X_train, y_train_classes, y_train, batch_size
                 )
-                test_ds, test_steps = stratified_batch_dataset_cls(
+                test_ds, test_steps = stratified_batch_dataset_cls2(
                     X_test, y_test_classes, y_test, batch_size)
-
                 # Map the training dataset to return {'forecast_head': delta, 'combiner': y_labels} format
                 train_ds = train_dataset.map(
-                    lambda x, y_cls_delta: (
-                        x, {'forecast_head': y_cls_delta[:, -1], 'combiner': y_cls_delta[:, :-1]}
+                    lambda x, y_cls, delta: (
+                        x, {'forecast_head': delta, 'combiner': y_cls}
                     )
                 )
                 test_ds = test_ds.map(
-                    lambda x, y_cls_delta: (
-                        x, {'forecast_head': y_cls_delta[:, -1], 'combiner': y_cls_delta[:, :-1]}
+                    lambda x, y_cls, delta: (
+                        x, {'forecast_head': delta, 'combiner': y_cls}
                     )
                 )
 
@@ -361,13 +359,13 @@ def main():
 
 
                 # Step 1: Create stratified dataset for the subtraining and validation set
-                train_ds, train_steps = stratified_batch_dataset_cls(
+                train_ds, train_steps = stratified_batch_dataset_cls2(
                     X_train, y_train_classes, y_train, batch_size)
 
                 # Map the training dataset to return {'forecast_head': delta, 'combiner': y_labels} format
                 train_ds = train_ds.map(
-                    lambda x, y_cls_delta: (
-                        x, {'forecast_head': y_cls_delta[:, -1], 'combiner': y_cls_delta[:, :-1]}
+                    lambda x, y_cls, delta: (
+                        x, {'forecast_head': delta, 'combiner': y_cls}
                     )
                 )
 
