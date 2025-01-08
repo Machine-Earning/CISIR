@@ -156,6 +156,14 @@ ASYM_TYPE_0 = None
 ASYM_TYPE_MOE = None
 PDC_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcStratInj_bs6000_v8_20241203-194954.h5"
 PRE_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.00_v8_updated_20241120-180201_reg.h5"
+# Model paths
+POS_EXPERT_PATH = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse0.10_plus_e_20241212-140850_reg.h5'
+NEG_EXPERT_PATH = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse0.03_minus_e_20241212-133248_reg.h5'
+NZ_EXPERT_PATH = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse0.10_zero_e_20241205-111054_reg.h5'
+COMBINER_PATH = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2_ace0.65_combiner_lpn1.00_lnz1.00_dualsig_20250107-152210.h5'
+
+
+
 LAMBDA_PN_CCE = 1
 LAMBDA_NZ_CCE = 1
 
