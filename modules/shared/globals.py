@@ -163,13 +163,13 @@ NZ_EXPERT_PATH = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_ml
 COMBINER_PATH = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2_ace0.65_combiner_lpn1.00_lnz1.00_dualsig_20250107-152210.h5'
 # assemble hyperparams
 REWEIGHTS_MOE = [(1.0, 0.3, 0.1, 0.0)]
-RHO_MOE = [1e-2]
+RHO_MOE = [1e-4]
 LAMBDA_FACTOR_MOE = 8
-START_LR_MOE = 1e-3
+START_LR_MOE = 3e-4
 LR_CB_MIN_LR_MOE = 1e-5
 LR_CB_FACTOR_MOE = 0.95
 LR_CB_PATIENCE_MOE = 50
-WEIGHT_DECAY_MOE = 1e-4
+WEIGHT_DECAY_MOE = 1e-5
 PATIENCE_MOE = int(2e3)
 ASYM_TYPE_MOE = 'sigmoid'
 
