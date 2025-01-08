@@ -1224,17 +1224,19 @@ def create_mlp_moe(
         plus_weighted = Multiply()([plus_output[1], plus_prob])
         zero_weighted = Multiply()([zero_output[1], zero_prob])
         minus_weighted = Multiply()([minus_output[1], minus_prob])
-        combined_output = Add()([plus_weighted, zero_weighted, minus_weighted])
+        forecast_head = Add(name='forecast_head')([plus_weighted, zero_weighted, minus_weighted])
     else:
         # Hard selection - choose expert with highest probability
         expert_selector = Lambda(lambda x: tf.argmax(x, axis=1))(routing_probs)
-        combined_output = Lambda(lambda args: tf.case({
+        forecast_head = Lambda(lambda args: tf.case({
             tf.equal(args[0], PLUS_INDEX): lambda: args[1],
             tf.equal(args[0], MID_INDEX): lambda: args[2],
             tf.equal(args[0], MINUS_INDEX): lambda: args[3]
-        }, exclusive=True))([expert_selector, plus_output[1], zero_output[1], minus_output[1]])
+        }, exclusive=True), name='forecast_head')(
+            [expert_selector, plus_output[1], zero_output[1], minus_output[1]]
+        )
 
-    model = Model(inputs=input_layer, outputs=[routing_probs, combined_output], name=name)
+    model = Model(inputs=input_layer, outputs=[routing_probs, forecast_head], name=name)
     return model
 
 
