@@ -1778,7 +1778,7 @@ def stratified_data_generator_cls2(
         # Create the feature, label and delta batches using the selected indices
         batch_X = X[batch_indices]
         batch_y = y_labels[batch_indices]
-        batch_delta = delta[batch_indices]
+        batch_delta = delta[batch_indices].reshape(-1)  # Ensure delta is 1D
 
         # Debugging: Print the batch details if required
         if debug:
