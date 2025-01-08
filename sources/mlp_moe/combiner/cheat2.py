@@ -35,7 +35,7 @@ def main():
     """
 
     # Path to pre-trained model weights
-    pretrained_weights = None  # PRE_WEIGHT_PATH
+    pretrained_weights = PRE_WEIGHT_PATH
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
@@ -48,12 +48,11 @@ def main():
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]  # Use first threshold value
                 lambda_1 = LAMBDA_PN_CCE
                 lambda_2 = LAMBDA_NZ_CCE
-                Tth = NZ_Y_TRANSITION
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_ace{alpha_ce:.2f}_combiner_lpn{lambda_1:.2f}_lnz{lambda_2:.2f}_dualsig'
+                title = f'mlp2_ace{alpha_ce:.2f}_combiner_lpn{lambda_1:.2f}_lnz{lambda_2:.2f}'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -143,7 +142,6 @@ def main():
                     'cvrg_metric': CVRG_METRIC,
                     'pretraining': pretraining,
                     'pretrained_weights': pretrained_weights,
-                    'Transition_threshold': Tth
                 })
 
                 # set the root directory
@@ -278,7 +276,7 @@ def main():
                         'forecast_head': lambda y_true, y_pred: cce(
                             y_true, y_pred,
                             phase_manager=pm,
-                            lambda_1=lambda_1, lambda_2=lambda_2, Tth=Tth,
+                            lambda_1=lambda_1, lambda_2=lambda_2,
                             train_ce_weight_dict=ce_train_weights_dict,
                             val_ce_weight_dict=ce_test_weights_dict,
                             train_pcc_weight_dict=pcc_train_weights_dict,
@@ -368,7 +366,7 @@ def main():
                         'forecast_head': lambda y_true, y_pred: cce(
                             y_true, y_pred,
                             phase_manager=pm,
-                            lambda_1=lambda_1, lambda_2=lambda_2, Tth=Tth,
+                            lambda_1=lambda_1, lambda_2=lambda_2,
                             train_ce_weight_dict=ce_train_weights_dict,
                             val_ce_weight_dict=ce_test_weights_dict,
                             train_pcc_weight_dict=pcc_train_weights_dict,
