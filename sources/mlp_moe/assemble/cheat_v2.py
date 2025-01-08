@@ -108,7 +108,7 @@ def main():
                     "add_slope": add_slope,
                     "patience": patience,
                     "learning_rate": learning_rate,
-                    'min_lr': LR_CB_MIN_LR,
+                    'min_lr': LR_CB_MIN_LR_MOE,
                     "weight_decay": weight_decay,
                     "momentum_beta1": momentum_beta1,
                     "batch_size": batch_size,
@@ -511,23 +511,23 @@ def main():
                 # wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
                 # print('stage1_file_path: ' + stage1_file_path)
 
-                # Plot the error histograms
-                filename = plot_error_hist(
-                    final_model_sep,
-                    X_train, y_train,
-                    sample_weights=None,
-                    title=title,
-                    prefix='training')
-                wandb.log({"training_error_hist": wandb.Image(filename)})
+                # # Plot the error histograms
+                # filename = plot_error_hist(
+                #     final_model_sep,
+                #     X_train, y_train,
+                #     sample_weights=None,
+                #     title=title,
+                #     prefix='training')
+                # wandb.log({"training_error_hist": wandb.Image(filename)})
 
-                # Plot the error histograms on the testing set
-                filename = plot_error_hist(
-                    final_model_sep,
-                    X_test, y_test,
-                    sample_weights=None,
-                    title=title,
-                    prefix='testing')
-                wandb.log({"testing_error_hist": wandb.Image(filename)})
+                # # Plot the error histograms on the testing set
+                # filename = plot_error_hist(
+                #     final_model_sep,
+                #     X_test, y_test,
+                #     sample_weights=None,
+                #     title=title,
+                #     prefix='testing')
+                # wandb.log({"testing_error_hist": wandb.Image(filename)})
 
                 # Finish the wandb run
                 wandb.finish()

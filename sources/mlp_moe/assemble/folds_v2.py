@@ -7,7 +7,7 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
-from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
+# from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
@@ -20,56 +20,50 @@ from modules.training.ts_modeling import (
     stratified_batch_dataset,
     set_seed,
     cmse,
-    filter_ds,
-    create_mlp,
+    # filter_ds,
+    # create_mlp,
     create_mlp_moe,
     plot_error_hist,
     load_stratified_folds,
 )
 
-# Model paths
-MINUS_MODEL_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse0.00_minus_e_20241128-131008_reg.h5"
-PLUS_MODEL_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse0.00_plus_e_20241128-131012_reg.h5"
-ZERO_MODEL_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse0.00_zero_e_20241128-131020_reg.h5"
-ROUTER_MODEL_PATH = "/home1/jmoukpe2016/keras-functional-api/router_model_weights_mlp2_amse0.00_router_20241128-222651.h5"
-
 def main():
     """
-    Main function to run the E-MLP model with MoE
+    Main function to run the E-MLP model with MoE using 4-fold cross validation
     :return:
     """
 
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
-
+    # Main function to run the E-MLP model with MoE
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS:
-            for rho in RHO:  # SAM_RHOS:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE:
+            for rho in RHO_MOE:  # SAM:
                 # PARAMS
                 inputs_to_use = INPUTS_TO_USE[0]  # Use first input configuration
                 outputs_to_use = OUTPUTS_TO_USE
                 add_slope = ADD_SLOPE[0]  # Use first add_slope configuration
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]  # Use first threshold
-                lambda_factor = LAMBDA_FACTOR  # lambda for the loss
+                lambda_factor = LAMBDA_FACTOR_MOE  # lambda for the loss
                 
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_v8_moe'
+                title = f'mlp2_amse{alpha_mse:.2f}_moe'
                 title = title.replace(' ', '_').replace(':', '_')
                 current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
                 experiment_name = f'{title}_{current_time}'
                 
                 set_seed(seed)
-                patience = PATIENCE
-                learning_rate = START_LR
-                asym_type = ASYM_TYPE
+                patience = PATIENCE_MOE
+                learning_rate = START_LR_MOE
+                asym_type = ASYM_TYPE_MOE
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
-                    factor=LR_CB_FACTOR,
-                    patience=LR_CB_PATIENCE,
+                    factor=LR_CB_FACTOR_MOE,
+                    patience=LR_CB_PATIENCE_MOE,
                     verbose=VERBOSE,
                     min_delta=LR_CB_MIN_DELTA,
-                    min_lr=LR_CB_MIN_LR)
+                    min_lr=LR_CB_MIN_LR_MOE)
 
                 weight_decay = WEIGHT_DECAY
                 momentum_beta1 = MOMENTUM_BETA1
@@ -84,30 +78,37 @@ def main():
                 dropout = DROPOUT
                 activation = ACTIVATION
                 norm = NORM
-                residual = RESIDUAL
                 skip_repr = SKIP_REPR
                 skipped_layers = SKIPPED_LAYERS
-                N = N_FILTERED
-                lower_threshold = LOWER_THRESHOLD
-                upper_threshold = UPPER_THRESHOLD
+                # NOTE: no need for filtering for moe since cannot run t-SNE and repr correlation
+                # N = N_FILTERED  # number of samples to keep outside the threshold
+                # lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
+                # upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                 smoothing_method = SMOOTHING_METHOD
                 window_size = WINDOW_SIZE
                 val_window_size = VAL_WINDOW_SIZE
 
+                expert_paths = {
+                    'plus': POS_EXPERT_PATH,
+                    'zero': NZ_EXPERT_PATH,
+                    'minus': NEG_EXPERT_PATH,
+                    'combiner': COMBINER_PATH
+                }
+
                 # Initialize wandb
-                wandb.init(project="Jan-moe-Report", name=experiment_name, config={
+                wandb.init(project="Jan-Report", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
                     "add_slope": add_slope,
                     "patience": patience,
                     "learning_rate": learning_rate,
-                    'min_lr': LR_CB_MIN_LR,
+                    'min_lr': LR_CB_MIN_LR_MOE,
                     "weight_decay": weight_decay,
                     "momentum_beta1": momentum_beta1,
                     "batch_size": batch_size,
                     "epochs": epochs,
                     "hiddens": hiddens_str,
-                    "loss": 'mse_pcc',
+                    "loss": 'cmse',
                     "lambda": lambda_factor,
                     "seed": seed,
                     "alpha_mse": alpha_mse,
@@ -123,7 +124,6 @@ def main():
                     'output_dim': output_dim,
                     'architecture': 'mlp_moe',
                     'cme_speed_threshold': cme_speed_threshold,
-                    'residual': residual,
                     'ds_version': DS_VERSION,
                     'mae_plus_th': mae_plus_threshold,
                     'sam_rho': rho,
@@ -131,7 +131,11 @@ def main():
                     'window_size': window_size,
                     'val_window_size': val_window_size,
                     'skip_repr': skip_repr,
-                    'asym_type': asym_type
+                    'asym_type': asym_type,
+                    'expert+_path': POS_EXPERT_PATH,
+                    'expert0_path': NZ_EXPERT_PATH,
+                    'expert-_path': NEG_EXPERT_PATH,
+                    'combiner_path': COMBINER_PATH,
                 })
 
                 # set the root directory
@@ -172,17 +176,18 @@ def main():
                     cme_speed_threshold=cme_speed_threshold)
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
 
-                # filtering training and test sets for additional results
-                X_train_filtered, y_train_filtered = filter_ds(
-                    X_train, y_train,
-                    low_threshold=lower_threshold,
-                    high_threshold=upper_threshold,
-                    N=N, seed=seed)
-                X_test_filtered, y_test_filtered = filter_ds(
-                    X_test, y_test,
-                    low_threshold=lower_threshold,
-                    high_threshold=upper_threshold,
-                    N=N, seed=seed)
+                # NOTE: no need for filtering for moe since cannot run t-SNE and repr correlation
+                # # filtering training and test sets for additional results
+                # X_train_filtered, y_train_filtered = filter_ds(
+                #     X_train, y_train,
+                #     low_threshold=lower_threshold,
+                #     high_threshold=upper_threshold,
+                #     N=N, seed=seed)
+                # X_test_filtered, y_test_filtered = filter_ds(
+                #     X_test, y_test,
+                #     low_threshold=lower_threshold,
+                #     high_threshold=upper_threshold,
+                #     N=N, seed=seed)
 
                 # 4-fold cross-validation
                 folds_optimal_epochs = []
@@ -235,23 +240,22 @@ def main():
                     print(f'validation set rebalanced.')
 
                     # create the model
-                    model_sep = create_mlp_moe(
-                        input_dim=n_features,
+                    init_model_sep = create_mlp_moe(
                         hiddens=hiddens,
+                        combiner_hiddens=hiddens,
+                        input_dim=n_features,
                         embed_dim=embed_dim,
-                        output_dim=output_dim,
-                        dropout=dropout,
+                        skipped_layers=skipped_layers,
+                        skip_repr=skip_repr,
+                        pretraining=PRETRAINING_MOE,
+                        freeze_experts=FREEZE_EXPERT,
+                        expert_paths=expert_paths,
+                        mode=MODE_MOE,
                         activation=activation,
                         norm=norm,
-                        skip_repr=skip_repr,
-                        skipped_layers=skipped_layers,
-                        sam_rho=rho,
-                        minus_model_path=MINUS_MODEL_PATH,
-                        plus_model_path=PLUS_MODEL_PATH,
-                        zero_model_path=ZERO_MODEL_PATH,
-                        router_model_path=ROUTER_MODEL_PATH
+                        sam_rho=rho
                     )
-                    model_sep.summary()
+                    init_model_sep.summary()
 
                     # Define the EarlyStopping callback
                     early_stopping = SmoothEarlyStopping(
@@ -264,7 +268,7 @@ def main():
                         smoothing_parameters={'window_size': window_size})
 
                     # Compile the model
-                    model_sep.compile(
+                    init_model_sep.compile(
                         optimizer=AdamW(
                             learning_rate=learning_rate,
                             weight_decay=weight_decay,
@@ -291,7 +295,7 @@ def main():
                     val_data = (X_val, {'forecast_head': y_val})
 
                     # Train the model
-                    history = model_sep.fit(
+                    history = init_model_sep.fit(
                         subtrain_ds,
                         steps_per_epoch=subtrain_steps,
                         epochs=epochs,
@@ -320,21 +324,22 @@ def main():
                 print(f'optimal_epochs: {optimal_epochs}')
                 wandb.log({'optimal_epochs': optimal_epochs})
 
-                final_model_sep = create_mlp_moe(
-                    input_dim=n_features,
+
+                # Recreate and recompile the model for optimal epoch training
+                final_model_sep =  create_mlp_moe(
                     hiddens=hiddens,
+                    combiner_hiddens=hiddens,
+                    input_dim=n_features,
                     embed_dim=embed_dim,
-                    output_dim=output_dim,
-                    dropout=dropout,
+                    skipped_layers=skipped_layers,
+                    skip_repr=skip_repr,
+                    pretraining=PRETRAINING_MOE,
+                    freeze_experts=FREEZE_EXPERT,
+                    expert_paths=expert_paths,
+                    mode=MODE_MOE,
                     activation=activation,
                     norm=norm,
-                    skip_repr=skip_repr,
-                    skipped_layers=skipped_layers,
-                    sam_rho=rho,
-                    minus_model_path=MINUS_MODEL_PATH,
-                    plus_model_path=PLUS_MODEL_PATH,
-                    zero_model_path=ZERO_MODEL_PATH,
-                    router_model_path=ROUTER_MODEL_PATH
+                    sam_rho=rho
                 )
 
                 final_model_sep.compile(
@@ -355,11 +360,14 @@ def main():
                     },
                 )
 
+                # Step 1: Create stratified dataset for the subtraining and validation set
                 train_ds, train_steps = stratified_batch_dataset(
                     X_train, y_train, batch_size)
+
+                # Map the training dataset to return {'output': y} format
                 train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
 
-                # Train on the full dataset
+                # Train to the optimal epoch with the full dataset
                 final_model_sep.fit(
                     train_ds,
                     steps_per_epoch=train_steps,
@@ -374,8 +382,9 @@ def main():
                 )
 
                 # Save the final model
-                final_model_sep.save_weights(f"final_model_weights_{experiment_name}_reg.h5")
-                print(f"Model weights are saved in final_model_weights_{experiment_name}_reg.h5")
+                final_model_sep.save_weights(f"final_model_moe_weights_{experiment_name}_reg.h5")
+                # print where the model weights are saved
+                print(f"Model weights are saved in final_model_moe_weights_{experiment_name}_reg.h5")
 
                 # Evaluation section remains the same
                 error_mae = evaluate_mae(final_model_sep, X_test, y_test)
@@ -467,57 +476,59 @@ def main():
                     log_title = os.path.basename(filename)
                     wandb.log({f'training_{log_title}': wandb.Image(filename)})
 
-                file_path = plot_repr_corr_dist(
-                    final_model_sep,
-                    X_train_filtered, y_train_filtered,
-                    title + "_training",
-                    model_type='features_reg'
-                )
-                wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
-                print('file_path: ' + file_path)
+                # NOTE: cannot run plot_repr_corr_dist for moe
+                # file_path = plot_repr_corr_dist(
+                #     final_model_sep,
+                #     X_train_filtered, y_train_filtered,
+                #     title + "_training",
+                #     model_type='features_reg'
+                # )
+                # wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
+                # print('file_path: ' + file_path)
 
-                file_path = plot_repr_corr_dist(
-                    final_model_sep,
-                    X_test_filtered, y_test_filtered,
-                    title + "_test",
-                    model_type='features_reg'
-                )
-                wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
-                print('file_path: ' + file_path)
+                # file_path = plot_repr_corr_dist(
+                #     final_model_sep,
+                #     X_test_filtered, y_test_filtered,
+                #     title + "_test",
+                #     model_type='features_reg'
+                # )
+                # wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
+                # print('file_path: ' + file_path)
 
-                stage1_file_path = plot_tsne_delta(
-                    final_model_sep,
-                    X_train_filtered, y_train_filtered, title,
-                    'stage2_training',
-                    model_type='features_reg',
-                    save_tag=current_time, seed=seed)
-                wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
-                print('stage1_file_path: ' + stage1_file_path)
+                # NOTE: cannot run t-SNE for moe
+                # stage1_file_path = plot_tsne_delta(
+                #     final_model_sep,
+                #     X_train_filtered, y_train_filtered, title,
+                #     'stage2_training',
+                #     model_type='features_reg',
+                #     save_tag=current_time, seed=seed)
+                # wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
+                # print('stage1_file_path: ' + stage1_file_path)
 
-                stage1_file_path = plot_tsne_delta(
-                    final_model_sep,
-                    X_test_filtered, y_test_filtered, title,
-                    'stage2_testing',
-                    model_type='features_reg',
-                    save_tag=current_time, seed=seed)
-                wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
-                print('stage1_file_path: ' + stage1_file_path)
+                # stage1_file_path = plot_tsne_delta(
+                #     final_model_sep,
+                #     X_test_filtered, y_test_filtered, title,
+                #     'stage2_testing',
+                #     model_type='features_reg',
+                #     save_tag=current_time, seed=seed)
+                # wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
+                # print('stage1_file_path: ' + stage1_file_path)
 
-                filename = plot_error_hist(
-                    final_model_sep,
-                    X_train, y_train,
-                    sample_weights=None,
-                    title=title,
-                    prefix='training')
-                wandb.log({"training_error_hist": wandb.Image(filename)})
+                # filename = plot_error_hist(
+                #     final_model_sep,
+                #     X_train, y_train,
+                #     sample_weights=None,
+                #     title=title,
+                #     prefix='training')
+                # wandb.log({"training_error_hist": wandb.Image(filename)})
 
-                filename = plot_error_hist(
-                    final_model_sep,
-                    X_test, y_test,
-                    sample_weights=None,
-                    title=title,
-                    prefix='testing')
-                wandb.log({"testing_error_hist": wandb.Image(filename)})
+                # filename = plot_error_hist(
+                #     final_model_sep,
+                #     X_test, y_test,
+                #     sample_weights=None,
+                #     title=title,
+                #     prefix='testing')
+                # wandb.log({"testing_error_hist": wandb.Image(filename)})
 
                 wandb.finish()
 
