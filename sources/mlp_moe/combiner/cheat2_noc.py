@@ -46,13 +46,13 @@ def main():
                 outputs_to_use = OUTPUTS_TO_USE
                 add_slope = ADD_SLOPE[0]  # Use first add_slope value
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]  # Use first threshold value
-                lambda_1 = LAMBDA_PN_CCE
-                lambda_2 = LAMBDA_NZ_CCE
+                lambda_1 = 0.0
+                lambda_2 = 0.0
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_ace{alpha_ce:.2f}_combiner_lpn{lambda_1:.2f}_lnz{lambda_2:.2f}_filtered'
+                title = f'mlp2_ace{alpha_ce:.2f}_combiner_noc'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -75,7 +75,7 @@ def main():
 
                 weight_decay = WEIGHT_DECAY  # 1e-5 # higher weight decay
                 momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                batch_size = 512  # higher batch size
+                batch_size = BATCH_SIZE  # higher batch size
                 epochs = EPOCHS  # higher epochs
                 hiddens = MLP_HIDDENS  # hidden layers
 
@@ -89,7 +89,7 @@ def main():
                 residual = RESIDUAL
                 skip_repr = SKIP_REPR
                 skipped_layers = SKIPPED_LAYERS
-                N = 300 # N_FILTERED  # number of samples to keep outside the threshold
+                N = N_FILTERED  # number of samples to keep outside the threshold
                 lower_threshold = LOWER_THRESHOLD_MOE  # lower threshold for the delta_p
                 upper_threshold = UPPER_THRESHOLD_MOE  # upper threshold for the delta_p
                 mae_plus_threshold = MAE_PLUS_THRESHOLD
@@ -154,14 +154,6 @@ def main():
                     outputs_to_use=outputs_to_use,
                     cme_speed_threshold=cme_speed_threshold,
                     shuffle_data=True)
-                
-                # filter the training set
-                X_train, y_train = filter_ds(
-                    X_train, y_train, 
-                    low_threshold=LOWER_THRESHOLD_MOE, 
-                    high_threshold=UPPER_THRESHOLD_MOE, 
-                    N=N, 
-                    seed=seed)
 
                 # Convert y_train to 3 classes based on thresholds
                 y_train_classes = convert_to_onehot_cls(y_train, lower_threshold, upper_threshold)

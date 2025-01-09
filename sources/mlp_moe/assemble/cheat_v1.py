@@ -3,7 +3,6 @@ from datetime import datetime
 
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
-from tensorflow.keras.losses import CategoricalCrossentropy
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
@@ -16,14 +15,13 @@ from modules.training.ts_modeling import (
     evaluate_mae,
     evaluate_pcc,
     process_sep_events,
+    stratified_batch_dataset,
     set_seed,
     cmse,
     # filter_ds,
     # create_mlp,
     plot_error_hist,
-    create_mlp_moe,
-    convert_to_onehot_cls,
-    stratified_batch_dataset_cls2
+    create_mlp_moe
 )
 
 
@@ -52,7 +50,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_moe_cheat_v4'
+                title = f'mlp2_amse{alpha_mse:.2f}_moe_cheat_v1'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -90,8 +88,8 @@ def main():
                 skipped_layers = SKIPPED_LAYERS
                 # NOTE: no need for filtering for moe since cannot run t-SNE and repr correlation
                 # N = N_FILTERED  # number of samples to keep outside the threshold
-                lower_threshold = LOWER_THRESHOLD_MOE  # lower threshold for the delta_p
-                upper_threshold = UPPER_THRESHOLD_MOE  # upper threshold for the delta_p
+                # lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
+                # upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                 smoothing_method = SMOOTHING_METHOD
                 window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
@@ -101,7 +99,7 @@ def main():
                     'plus': POS_EXPERT_PATH,
                     'zero': NZ_EXPERT_PATH,
                     'minus': NEG_EXPERT_PATH,
-                    # 'combiner': COMBINER_PATH
+                    'combiner': COMBINER_PATH_NOC
                 }
 
                 # Initialize wandb
@@ -157,9 +155,6 @@ def main():
                     outputs_to_use=outputs_to_use,
                     cme_speed_threshold=cme_speed_threshold,
                     shuffle_data=True)
-                
-                # Convert y_train to 3 classes based on thresholds
-                y_train_classes = convert_to_onehot_cls(y_train, lower_threshold, upper_threshold)
                 # print the training set shapes
                 print(f'X_train.shape: {X_train.shape}, y_train.shape: {y_train.shape}')
                 # getting the reweights for training set
@@ -188,9 +183,6 @@ def main():
                     add_slope=add_slope,
                     outputs_to_use=outputs_to_use,
                     cme_speed_threshold=cme_speed_threshold)
-                
-                # Convert y_test to 3 classes based on thresholds
-                y_test_classes = convert_to_onehot_cls(y_test, lower_threshold, upper_threshold)
                 # print the test set shapes
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
                 # getting the reweights for test set
@@ -270,30 +262,19 @@ def main():
                             val_mse_weight_dict=mse_test_weights_dict,
                             val_pcc_weight_dict=pcc_test_weights_dict,
                             asym_type=asym_type
-                        ),
-                        'combiner': CategoricalCrossentropy()
-                    },
-                    loss_weights={'forecast_head': 0.5, 'combiner': 0.5}
+                        )
+                    }
                 )
 
                 # Step 1: Create stratified dataset for the subtraining and validation set
-                # Create stratified dataset for training
-                train_dataset, train_steps = stratified_batch_dataset_cls2(
-                    X_train, y_train_classes, y_train, batch_size
-                )
-                test_ds, test_steps = stratified_batch_dataset_cls2(
-                    X_test, y_test_classes, y_test, batch_size)
-                # Map the training dataset to return {'forecast_head': delta, 'combiner': y_labels} format
-                train_ds = train_dataset.map(
-                    lambda x, y_cls, delta: (
-                        x, {'forecast_head': delta, 'combiner': y_cls}
-                    )
-                )
-                test_ds = test_ds.map(
-                    lambda x, y_cls, delta: (
-                        x, {'forecast_head': delta, 'combiner': y_cls}
-                    )
-                )
+                train_ds, train_steps = stratified_batch_dataset(
+                    X_train, y_train, batch_size)
+                test_ds, test_steps = stratified_batch_dataset(
+                    X_test, y_test, batch_size)
+
+                # Map the training dataset to return {'output': y} format
+                train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
+                test_ds = test_ds.map(lambda x, y: (x, {'forecast_head': y}))
 
                 # Train the model with the callback
                 history = init_model_sep.fit(
@@ -351,23 +332,17 @@ def main():
                             train_mse_weight_dict=mse_train_weights_dict,
                             train_pcc_weight_dict=pcc_train_weights_dict,
                             asym_type=asym_type
-                        ),
-                        'combiner': CategoricalCrossentropy()
-                    },
-                    loss_weights={'forecast_head': 0.5, 'combiner': 0.5}
+                        )
+                    }
                 )
 
 
                 # Step 1: Create stratified dataset for the subtraining and validation set
-                train_ds, train_steps = stratified_batch_dataset_cls2(
-                    X_train, y_train_classes, y_train, batch_size)
+                train_ds, train_steps = stratified_batch_dataset(
+                    X_train, y_train, batch_size)
 
-                # Map the training dataset to return {'forecast_head': delta, 'combiner': y_labels} format
-                train_ds = train_ds.map(
-                    lambda x, y_cls, delta: (
-                        x, {'forecast_head': delta, 'combiner': y_cls}
-                    )
-                )
+                # Map the training dataset to return {'output': y} format
+                train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
 
 
                 # Train to the optimal epoch
