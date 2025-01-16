@@ -4757,11 +4757,10 @@ def pn_staircase(x: tf.Tensor, steepness: float = 64.0) -> tf.Tensor:
     return left_sigmoid + right_sigmoid - 1.0
 
 
-def cce(
-        y_true: Tuple[tf.Tensor, tf.Tensor],
-        y_pred: tf.Tensor,
+def pn_nz_loss(
+        y_true: Tuple[tf.Tensor, tf.Tensor], y_pred: tf.Tensor,
         phase_manager: 'TrainingPhaseManager',
-        lambda_1: float = 1.0, lambda_2: float = 1.0,
+        loss_weights: Dict[str, float] = {'ce': 0.5, 'pn': 1.0, 'nz': 1.0},
         train_ce_weight_dict: Optional[Dict[float, float]] = None,
         val_ce_weight_dict: Optional[Dict[float, float]] = None,
         train_pcc_weight_dict: Optional[Dict[float, float]] = None,
@@ -4770,7 +4769,7 @@ def cce(
     """
     Custom loss function combining Cross Entropy (CE) and Pearson Correlation Coefficient (PCC)
     with re-weighting based on the delta values. The final loss is a combination of weighted CE and
-    weighted PCC with scaling factors lambda_1 and lambda_2. K is a constant that upper bounds the 
+    weighted PCC with scaling factors specified in loss_weights. K is a constant that upper bounds the 
     absolute value of the delta values in the zero delta term.
 
     Args:
@@ -4778,8 +4777,10 @@ def cce(
         - y_classes: Ground truth class probabilities (one-hot vector)
         - delta_batch: Corresponding delta values for each sample
     - y_pred (tf.Tensor): Predicted probabilities from the model
-    - lambda_1 (float): Scaling factor for the plus and minus delta portion of the PCC loss. Default is 1.0.
-    - lambda_2 (float): Scaling factor for the zero delta portion of the PCC loss. Default is 1.0.
+    - loss_weights (Dict[str, float]): Dictionary containing weights for different loss components:
+        - 'ce': weight for cross entropy loss
+        - 'pn': weight for plus-minus delta PCC loss
+        - 'nz': weight for near-zero delta PCC loss
     - phase_manager (TrainingPhaseManager): Manager that tracks whether we are in training or validation phase.
     - train_ce_weight_dict (dict, optional): Dictionary mapping label values to weights for training CE samples.
     - val_ce_weight_dict (dict, optional): Dictionary mapping label values to weights for validation CE samples.
@@ -4806,17 +4807,74 @@ def cce(
     # Compute Cross Entropy
     ce = -tf.reduce_mean(ce_weights * tf.reduce_sum(y_classes * tf.math.log(y_pred + K.epsilon()), axis=-1))
 
-    # PCC loss for plus-minus delta
-    # Assuming plus class index=0 and minus class index=2
-    # p(p|x) - p(m|x)
-    pcc_loss_1 = coreg(delta_batch, y_pred[:, 0] - y_pred[:, 2], pcc_weights)
-
+    # PCC loss for positive-negative delta
+    # Assuming positive class index=0 and negative class index=2
+    # p(p|x) - p(n|x)
+    # pcc_pn = coreg(delta_batch, y_pred[:, 0] - y_pred[:, 2], pcc_weights)
+    pcc_pn = coreg(pn_staircase(delta_batch), y_pred[:, 0] - y_pred[:, 2], pcc_weights)
     # PCC loss for zero delta
     # Assuming zero class index=1, and using a Gaussian kernel
     # p(z|x)
-    pcc_loss_2 = coreg(nz_hump(delta_batch), y_pred[:, 1], pcc_weights)
+    pcc_nz = coreg(nz_hump(delta_batch), y_pred[:, 1], pcc_weights)
 
-    loss = ce + lambda_1 * pcc_loss_1 + lambda_2 * pcc_loss_2
+    loss = loss_weights['ce'] * ce + loss_weights['pn'] * pcc_pn + loss_weights['nz'] * pcc_nz
+    return loss
+
+
+def pcc_ce(
+        y_true: Tuple[tf.Tensor, tf.Tensor], y_pred: tf.Tensor,
+        phase_manager: 'TrainingPhaseManager',
+        lambda_ce: float = 0.5,
+        train_ce_weight_dict: Optional[Dict[float, float]] = None,
+        val_ce_weight_dict: Optional[Dict[float, float]] = None,
+        train_pcc_weight_dict: Optional[Dict[float, float]] = None,
+        val_pcc_weight_dict: Optional[Dict[float, float]] = None,
+) -> tf.Tensor:
+    """
+    Custom loss function combining Cross Entropy (CE) and Pearson Correlation Coefficient (PCC)
+    with re-weighting based on the delta values. The final loss is a weighted sum of CE and PCC:
+    loss = pcc_pn + lambda_ce * ce
+    where pcc_pn is the PCC between delta values and the difference in predicted probabilities 
+    for positive and negative classes.
+
+    Args:
+    - y_true (Tuple[tf.Tensor, tf.Tensor]): A tuple (y_classes, delta_batch)
+        - y_classes: Ground truth class probabilities (one-hot vector)
+        - delta_batch: Corresponding delta values for each sample
+    - y_pred (tf.Tensor): Predicted probabilities from the model
+    - lambda_ce (float): Scaling factor for the cross entropy loss. Default is 0.5.
+    - phase_manager (TrainingPhaseManager): Manager that tracks whether we are in training or validation phase.
+    - train_ce_weight_dict (dict, optional): Dictionary mapping label values to weights for training CE samples.
+    - val_ce_weight_dict (dict, optional): Dictionary mapping label values to weights for validation CE samples.
+    - train_pcc_weight_dict (dict, optional): Dictionary mapping label values to weights for training PCC samples.
+    - val_pcc_weight_dict (dict, optional): Dictionary mapping label values to weights for validation PCC samples.
+
+    Returns:
+    - tf.Tensor: The calculated loss value as a single scalar.
+    """
+
+    # Get y_classes and delta_batch from y_true
+    # y_true shape is (batch_size, num_classes + 1) where last column is delta
+    y_classes = y_true[:, :-1]  # All columns except last
+    delta_batch = y_true[:, -1]  # Last column
+
+    # Determine which weight dictionaries to use
+    ce_weight_dict = train_ce_weight_dict if phase_manager.is_training_phase() else val_ce_weight_dict
+    pcc_weight_dict = train_pcc_weight_dict if phase_manager.is_training_phase() else val_pcc_weight_dict
+
+    # Create weight tensors based on delta_batch
+    ce_weights = create_weight_tensor_fast(delta_batch, ce_weight_dict)
+    pcc_weights = create_weight_tensor_fast(delta_batch, pcc_weight_dict)
+
+    # Compute Cross Entropy
+    ce = -tf.reduce_mean(ce_weights * tf.reduce_sum(y_classes * tf.math.log(y_pred + K.epsilon()), axis=-1))
+
+    # PCC loss for positive-negative delta
+    # Assuming positive class index=0 and negative class index=2
+    # p(p|x) - p(n|x)
+    pcc_pn = coreg(delta_batch, y_pred[:, 0] - y_pred[:, 2], pcc_weights)
+
+    loss = pcc_pn + lambda_ce * ce
     return loss
 
 
