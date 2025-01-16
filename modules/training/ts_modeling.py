@@ -502,6 +502,7 @@ def load_partial_weights_from_path(
         pretrained_weights_path: str,
         new_model: Model,
         old_model_params: Dict,
+        pretraining: bool,
         skip_layers: Optional[List[str]] = None
 ) -> None:
     """
@@ -541,6 +542,10 @@ def load_partial_weights_from_path(
         }
         Make sure these match exactly the parameters used when the pre-trained model was saved.
 
+    pretraining : bool
+        If True, the model is pretraining and the weights are loaded from a PDC/PDS pre-trained model.
+        If False, the model is not pretraining and the weights are loaded from a trained model.
+        
     skip_layers : Optional[List[str]]
         A list of layer names to skip while loading weights. For example, ['forecast_head']
         if the output layer's shape has changed.
@@ -573,6 +578,9 @@ def load_partial_weights_from_path(
         sam_rho=old_model_params['sam_rho']
     )
 
+    if pretraining:
+        old_model = add_proj_head(old_model)
+
     # Load the old model's weights
     old_model.load_weights(pretrained_weights_path)
 
@@ -599,7 +607,6 @@ def load_partial_weights_from_path(
         # else no corresponding old layer by that name, skip
 
     # After this, `new_model` will have partially loaded weights, except for layers that didn't match or were skipped.
-
 
 def create_mlp(
         input_dim: int = 100,
@@ -1161,6 +1168,7 @@ def create_mlp_moe(
         skipped_layers: int = 1,
         skip_repr: bool = True,
         pretraining: bool = False,
+        pretraining_paths: str = None,
         freeze_experts: bool = True,
         expert_paths: dict = None,
         mode: str = 'soft',  # 'soft' or 'hard'
@@ -1181,6 +1189,7 @@ def create_mlp_moe(
     - embed_dim (int): The number of features in the final representation vector.
     - skip_repr (bool): If True and skipped_layers > 0, adds a residual connection to the representation layer.
     - pretraining (bool): If True, the model will use PDS/PDC and have its representations normalized.
+    - pretraining_paths (str): Path to the pre-trained model weights.
     - activation: Optional activation function to use. If None, defaults to LeakyReLU.
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is 'batch_norm'.
     - sam_rho (float): Size of the neighborhood for perturbation in SAM. Default is 0.05. If 0.0, SAM is not used.
@@ -1199,6 +1208,14 @@ def create_mlp_moe(
     Returns:
     - Model: A Keras model instance.
     """
+    if pretraining_paths is None:
+        pretraining_paths = {
+            'combiner': None,
+            'plus': None,
+            'zero': None,
+            'minus': None
+        }
+
     if hiddens is None:
         hiddens = MLP_HIDDENS
 
