@@ -29,7 +29,7 @@ def main():
     """
 
     # Path to pre-trained model weights
-    combiner_path = COMBINER_PATH
+    combiner_path = COMBINER_PATH_NOC
 
     for seed in SEEDS:
         # PARAMS
@@ -43,7 +43,7 @@ def main():
         
         # Create a unique experiment name with a timestamp
         current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-        experiment_name = f'combiner_eval_{current_time}'
+        experiment_name = f'combiner_eval_noc_{current_time}'
 
         set_seed(seed)
         

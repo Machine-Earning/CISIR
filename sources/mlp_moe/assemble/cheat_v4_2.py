@@ -51,13 +51,13 @@ def main():
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
                 lambda_factor = LAMBDA_FACTOR_MOE  # lambda for the loss
-                lambda_pn = LAMBDA_PN
-                lambda_nz = LAMBDA_NZ
-                lambda_ce = 0.2 # LAMBDA_CE
+                lambda_pn = LAMBDA_PN_CCE
+                lambda_nz = LAMBDA_NZ_CCE
+                lambda_ce = 0 # LAMBDA_CE
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_moe_cheat_v4_pn_nz_ce'
+                title = f'mlp2_amse{alpha_mse:.2f}_moe_cheat_v4_pn_nz_ce0'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
