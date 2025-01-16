@@ -4710,10 +4710,12 @@ def cmse(
     return loss
 
 
-def dual_sigmoid(x: tf.Tensor, steepness: float = 999.0) -> tf.Tensor:
+def nz_hump(x: tf.Tensor, steepness: float = 64.0) -> tf.Tensor:
     """
     Implements a double sigmoid function of the form:
-    y = 1/(1+exp(steepness*(x-0.4))) + 1/(1+exp(steepness*(-x-0.4))) - 1
+    y = 1/(1+exp(steepness*(x-0.4))) + 1/(1+exp(steepness*(-x-0.4))) - 1. 
+    
+    this is a for the near-zero hump.
     
     This creates a symmetric function with two sigmoid transitions centered at x=±0.4.
     The steepness parameter controls how sharp the transitions are.
@@ -4728,6 +4730,29 @@ def dual_sigmoid(x: tf.Tensor, steepness: float = 999.0) -> tf.Tensor:
         tf.Tensor: Result of the double sigmoid function
     """
     left_sigmoid = 1.0 / (1.0 + tf.exp(steepness * (x - 0.4)))
+    right_sigmoid = 1.0 / (1.0 + tf.exp(steepness * (-x - 0.4)))
+    return left_sigmoid + right_sigmoid - 1.0
+
+
+def pn_staircase(x: tf.Tensor, steepness: float = 64.0) -> tf.Tensor:
+    """
+    Implements a double sigmoid function of the form:
+    y = 1/(1+exp(steepness*(-x+0.4))) + 1/(1+exp(steepness*(-x-0.4))) - 1
+
+    this is for the positive and negative staircase
+    
+    This creates a staircase-like function with two sigmoid transitions.
+    The steepness parameter controls how sharp the transitions are.
+
+    Args:
+        x (tf.Tensor): Input tensor
+        steepness (float): Controls the steepness of the sigmoid transitions.
+                          Default is 64.0 for sharp transitions.
+
+    Returns:
+        tf.Tensor: Result of the double sigmoid function
+    """
+    left_sigmoid = 1.0 / (1.0 + tf.exp(steepness * (-x + 0.4)))
     right_sigmoid = 1.0 / (1.0 + tf.exp(steepness * (-x - 0.4)))
     return left_sigmoid + right_sigmoid - 1.0
 
@@ -4789,7 +4814,7 @@ def cce(
     # PCC loss for zero delta
     # Assuming zero class index=1, and using a Gaussian kernel
     # p(z|x)
-    pcc_loss_2 = coreg(dual_sigmoid(delta_batch), y_pred[:, 1], pcc_weights)
+    pcc_loss_2 = coreg(nz_hump(delta_batch), y_pred[:, 1], pcc_weights)
 
     loss = ce + lambda_1 * pcc_loss_1 + lambda_2 * pcc_loss_2
     return loss
