@@ -1022,6 +1022,7 @@ def plot_posteriors(
     axes[0].set_title("P(+|x)", fontsize=14)
     axes[0].set_xlabel("Delta", fontsize=12)
     axes[0].set_ylabel("Posterior Probability", fontsize=12)
+    axes[0].set_xlim(-2.5, 2.5)
     axes[0].set_ylim(0, 1)
 
     # -------------------------------------------------
@@ -1036,6 +1037,7 @@ def plot_posteriors(
     )
     axes[1].set_title("P(0|x)", fontsize=14)
     axes[1].set_xlabel("Delta", fontsize=12)
+    axes[1].set_xlim(-2.5, 2.5)
     axes[1].set_ylim(0, 1)
 
     # -------------------------------------------------
@@ -1050,7 +1052,9 @@ def plot_posteriors(
     )
     axes[2].set_title("P(-|x)", fontsize=14)
     axes[2].set_xlabel("Delta", fontsize=12)
+    axes[2].set_xlim(-2.5, 2.5)
     axes[2].set_ylim(0, 1)
+
 
     # Optional super-title
     if suptitle:
