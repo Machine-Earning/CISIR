@@ -1,295 +1,269 @@
-import os
 from datetime import datetime
 
+import matplotlib.pyplot as plt
 import numpy as np
+import tensorflow as tf
 import wandb
+from sklearn.metrics import classification_report, accuracy_score
+from tensorflow_addons.optimizers import AdamW
 
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
+from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.ts_modeling import (
     build_dataset,
-    evaluate_mae,
-    evaluate_pcc,
-    process_sep_events,
+    set_seed,
     create_mlp,
-    plot_error_hist,
+    convert_to_onehot_cls,
+    plot_confusion_matrix,
+    create_metrics_table,
     filter_ds,
+    plot_posteriors
 )
 
-# Set the environment variable for CUDA (in case it is necessary)
-# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
-
-weight_path = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.50_t_20241114-045334_reg.h5'
 
 def main():
     """
-    Main function to load and evaluate the E-MLP model
-    
+    Main function to load and evaluate a trained Combiner model
     :return:
     """
 
-    for seed in [456789]:
-        for inputs_to_use in INPUTS_TO_USE:
-            for cme_speed_threshold in CME_SPEED_THRESHOLD:
-                for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS:
-                    for rho in RHO:  # SAM_RHOS:
-                        for add_slope in ADD_SLOPE:
-                            # PARAMS
-                            outputs_to_use = OUTPUTS_TO_USE
-                            title = f'mlp2_amse{alpha_mse:.2f}'
-                            title = title.replace(' ', '_').replace(':', '_')
-                            current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-                            experiment_name = f'{title}_{current_time}'
+    # Path to pre-trained model weights
+    combiner_path = COMBINER_PATH
 
-                            hiddens = MLP_HIDDENS
-                            hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-                            embed_dim = EMBED_DIM
-                            output_dim = len(outputs_to_use)
-                            dropout = DROPOUT
-                            activation = ACTIVATION
-                            norm = NORM
-                            skip_repr = SKIP_REPR
-                            skipped_layers = SKIPPED_LAYERS
-                            N = N_FILTERED
-                            lower_threshold = LOWER_THRESHOLD
-                            upper_threshold = UPPER_THRESHOLD
-                            mae_plus_threshold = MAE_PLUS_THRESHOLD
+    for seed in SEEDS:
+        # PARAMS
+        inputs_to_use = INPUTS_TO_USE[0]  # Use first input configuration
+        outputs_to_use = OUTPUTS_TO_USE
+        add_slope = ADD_SLOPE[0]  # Use first add_slope value
+        cme_speed_threshold = CME_SPEED_THRESHOLD[0]  # Use first threshold value
 
-                            # Initialize wandb
-                            wandb.init(project="Jan-Report-Evals", name=experiment_name + "_eval", config={
-                                "inputs_to_use": inputs_to_use,
-                                "add_slope": add_slope,
-                                "hiddens": hiddens_str,
-                                "seed": seed,
-                                "alpha_mse": alpha_mse,
-                                "embed_dim": embed_dim,
-                                "dropout": dropout,
-                                "activation": 'LeakyReLU',
-                                "norm": norm,
-                                'output_dim': output_dim,
-                                'architecture': 'mlp_res_repr',
-                                'skip_repr': skip_repr,
-                                'cme_speed_threshold': cme_speed_threshold,
-                                'ds_version': DS_VERSION,
-                                'mae_plus_th': mae_plus_threshold,
-                                'sam_rho': rho,
-                            })
+        # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
+        inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
+        
+        # Create a unique experiment name with a timestamp
+        current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+        experiment_name = f'combiner_eval_{current_time}'
 
-                            # set the root directory
-                            root_dir = DS_PATH
-                            # build the dataset
-                            X_train, y_train, logI_train, logI_prev_train = build_dataset(
-                                root_dir + '/training',
-                                inputs_to_use=inputs_to_use,
-                                add_slope=add_slope,
-                                outputs_to_use=outputs_to_use,
-                                cme_speed_threshold=cme_speed_threshold,
-                                shuffle_data=True)
+        set_seed(seed)
+        
+        hiddens = MLP_HIDDENS  # hidden layers
+        bandwidth = BANDWIDTH
+        embed_dim = EMBED_DIM
+        output_dim = COMBINER_OUTPUT_DIM  # 3 classes for routing
+        dropout = DROPOUT
+        activation = ACTIVATION
+        norm = NORM
+        residual = RESIDUAL
+        skip_repr = SKIP_REPR
+        skipped_layers = SKIPPED_LAYERS
+        N = N_FILTERED  # number of samples to keep outside the threshold
+        lower_threshold = LOWER_THRESHOLD_MOE  # lower threshold for the delta_p
+        upper_threshold = UPPER_THRESHOLD_MOE  # upper threshold for the delta_p
+        rho = RHO_MOE_C[0]
 
-                            print(f'X_train.shape: {X_train.shape}, y_train.shape: {y_train.shape}')
-                            n_features = X_train.shape[1]
-                            print(f'n_features: {n_features}')
+        # Initialize wandb
+        wandb.init(project="Jan-moe-router-Report", name=experiment_name)
 
-                            X_test, y_test, logI_test, logI_prev_test = build_dataset(
-                                root_dir + '/testing',
-                                inputs_to_use=inputs_to_use,
-                                add_slope=add_slope,
-                                outputs_to_use=outputs_to_use,
-                                cme_speed_threshold=cme_speed_threshold)
-                            print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
+        # set the root directory
+        root_dir = DS_PATH
+        
+        # build the dataset
+        X_train, y_train, _, _ = build_dataset(
+            root_dir + '/training',
+            inputs_to_use=inputs_to_use,
+            add_slope=add_slope,
+            outputs_to_use=outputs_to_use,
+            cme_speed_threshold=cme_speed_threshold,
+            shuffle_data=True)
 
-                            # filtering training and test sets for additional results
-                            X_train_filtered, y_train_filtered = filter_ds(
-                                X_train, y_train,
-                                low_threshold=lower_threshold,
-                                high_threshold=upper_threshold,
-                                N=N, seed=seed)
-                            X_test_filtered, y_test_filtered = filter_ds(
-                                X_test, y_test,
-                                low_threshold=lower_threshold,
-                                high_threshold=upper_threshold,
-                                N=N, seed=seed)
+        # Convert y_train to 3 classes based on thresholds
+        y_train_classes = convert_to_onehot_cls(y_train, lower_threshold, upper_threshold)
 
-                            # Create and load the model
-                            model = create_mlp(
-                                input_dim=n_features,
-                                hiddens=hiddens,
-                                embed_dim=embed_dim,
-                                output_dim=output_dim,
-                                dropout=dropout,
-                                activation=activation,
-                                norm=norm,
-                                skip_repr=skip_repr,
-                                skipped_layers=skipped_layers,
-                                sam_rho=rho
-                            )
+        # Build test set
+        X_test, y_test, _, _ = build_dataset(
+            root_dir + '/testing',
+            inputs_to_use=inputs_to_use,
+            add_slope=add_slope,
+            outputs_to_use=outputs_to_use,
+            cme_speed_threshold=cme_speed_threshold)
 
-                            # Load the weights
-                            model.load_weights(weight_path)
-                            print(f"Loaded weights from {weight_path}")
+        # Convert y_test to 3 classes based on thresholds
+        y_test_classes = convert_to_onehot_cls(y_test, lower_threshold, upper_threshold)
 
-                            # evaluate the model error on test set
-                            error_mae = evaluate_mae(model, X_test, y_test)
-                            print(f'mae error: {error_mae}')
-                            wandb.log({"mae": error_mae})
+        # filtering training and test sets for additional results
+        X_train_filtered, y_train_filtered = filter_ds(
+            X_train, y_train,
+            low_threshold=LOWER_THRESHOLD,  # std threshold for evals
+            high_threshold=UPPER_THRESHOLD,  # std threshold for evals
+            N=N, seed=seed)
+        X_test_filtered, y_test_filtered = filter_ds(
+            X_test, y_test,
+            low_threshold=LOWER_THRESHOLD,  # std threshold for evals
+            high_threshold=UPPER_THRESHOLD,  # std threshold for evals
+            N=N, seed=seed)
 
-                            # evaluate the model error on training set
-                            error_mae_train = evaluate_mae(model, X_train, y_train)
-                            print(f'mae error train: {error_mae_train}')
-                            wandb.log({"train_mae": error_mae_train})
+        # get the number of input features
+        n_features = X_train.shape[1]
 
-                            # evaluate the model correlation on test set
-                            error_pcc = evaluate_pcc(model, X_test, y_test)
-                            print(f'pcc error: {error_pcc}')
-                            wandb.log({"pcc": error_pcc})
+        # Create combiner model
+        combiner_model = create_mlp(
+            input_dim=n_features,
+            hiddens=hiddens,
+            embed_dim=embed_dim,
+            output_dim=output_dim,
+            dropout=dropout,
+            activation=activation,
+            norm=norm,
+            skip_repr=skip_repr,
+            skipped_layers=skipped_layers,
+            sam_rho=rho,
+            output_activation='softmax'
+        )
 
-                            # evaluate the model correlation on test set based on logI and logI_prev
-                            error_pcc_logI = evaluate_pcc(model, X_test, y_test, logI_test, logI_prev_test)
-                            print(f'pcc error logI: {error_pcc_logI}')
-                            wandb.log({"pcc_I": error_pcc_logI})
+        # Load trained weights
+        print(f"Loading model weights from {combiner_path}")
+        combiner_model.load_weights(combiner_path)
 
-                            # evaluate the model correlation on training set based on logI and logI_prev
-                            error_pcc_logI_train = evaluate_pcc(model, X_train, y_train, logI_train, logI_prev_train)
-                            print(f'pcc error logI train: {error_pcc_logI_train}')
-                            wandb.log({"train_pcc_I": error_pcc_logI_train})
+        # Get predictions
+        predictions = combiner_model.predict(X_train)
+        y_train_pred = predictions[1]
+        predictions = combiner_model.predict(X_test)
+        y_test_pred = predictions[1]
 
-                            # evaluate the model correlation on training set
-                            error_pcc_train = evaluate_pcc(model, X_train, y_train)
-                            print(f'pcc error train: {error_pcc_train}')
-                            wandb.log({"train_pcc": error_pcc_train})
+        # Convert predictions to class labels
+        y_train_pred_classes = np.argmax(y_train_pred, axis=1)
+        y_test_pred_classes = np.argmax(y_test_pred, axis=1)
+        y_train_true_classes = np.argmax(y_train_classes, axis=1)
+        y_test_true_classes = np.argmax(y_test_classes, axis=1)
 
-                            # evaluate the model on test cme_files
-                            above_threshold = mae_plus_threshold
-                            # evaluate the model error for rare samples on test set
-                            error_mae_cond = evaluate_mae(
-                                model, X_test, y_test, above_threshold=above_threshold)
-                            print(f'mae error delta >= {above_threshold} test: {error_mae_cond}')
-                            wandb.log({"mae+": error_mae_cond})
+        # Calculate confusion matrices and create plots
+        class_names = ['minus', 'zero', 'plus']
 
-                            # evaluate the model error for rare samples on training set
-                            error_mae_cond_train = evaluate_mae(
-                                model, X_train, y_train, above_threshold=above_threshold)
-                            print(f'mae error delta >= {above_threshold} train: {error_mae_cond_train}')
-                            wandb.log({"train_mae+": error_mae_cond_train})
+        # Create and save train confusion matrix plot
+        train_cm_fig = plot_confusion_matrix(
+            y_train_pred_classes,
+            y_train_true_classes,
+            class_names=class_names,
+            title="Training Confusion Matrix",
+            xlabel="Actual",
+            ylabel="Predicted",
+        )
 
-                            # evaluate the model correlation for rare samples on test set
-                            error_pcc_cond = evaluate_pcc(
-                                model, X_test, y_test, above_threshold=above_threshold)
-                            print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
-                            wandb.log({"pcc+": error_pcc_cond})
+        # Create and save test confusion matrix plot
+        test_cm_fig = plot_confusion_matrix(
+            y_test_pred_classes,
+            y_test_true_classes,
+            class_names=class_names,
+            title="Test Confusion Matrix",
+            xlabel="Actual",
+            ylabel="Predicted",
+        )
 
-                            # evaluate the model correlation for rare samples on test set based on logI and logI_prev
-                            error_pcc_cond_logI = evaluate_pcc(
-                                model, X_test, y_test, logI_test, logI_prev_test, above_threshold=above_threshold)
-                            print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond_logI}')
-                            wandb.log({"pcc+_I": error_pcc_cond_logI})
+        # Calculate accuracies
+        train_accuracy = accuracy_score(y_train_true_classes, y_train_pred_classes)
+        test_accuracy = accuracy_score(y_test_true_classes, y_test_pred_classes)
 
-                            # evaluate the model correlation for rare samples on training set
-                            error_pcc_cond_train = evaluate_pcc(
-                                model, X_train, y_train, above_threshold=above_threshold)
-                            print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
-                            wandb.log({"train_pcc+": error_pcc_cond_train})
+        # Calculate class-specific accuracies
+        train_plus_mask = y_train_true_classes == PLUS_INDEX
+        train_zero_mask = y_train_true_classes == MID_INDEX
+        train_minus_mask = y_train_true_classes == MINUS_INDEX
 
-                            # evaluate the model correlation for rare samples on training set based on logI and logI_prev
-                            error_pcc_cond_logI_train = evaluate_pcc(
-                                model, X_train, y_train, logI_train, logI_prev_train, above_threshold=above_threshold)
-                            print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_logI_train}')
-                            wandb.log({"train_pcc+_I": error_pcc_cond_logI_train})
+        test_plus_mask = y_test_true_classes == PLUS_INDEX
+        test_zero_mask = y_test_true_classes == MID_INDEX
+        test_minus_mask = y_test_true_classes == MINUS_INDEX
 
-                            # Process SEP event files in the specified directory
-                            test_directory = root_dir + '/testing'
-                            filenames = process_sep_events(
-                                test_directory,
-                                model,
-                                title=title,
-                                inputs_to_use=inputs_to_use,
-                                add_slope=add_slope,
-                                outputs_to_use=outputs_to_use,
-                                show_avsp=True,
-                                using_cme=True,
-                                cme_speed_threshold=cme_speed_threshold)
+        train_plus_accuracy = accuracy_score(y_train_true_classes[train_plus_mask],
+                                             y_train_pred_classes[train_plus_mask])
+        train_zero_accuracy = accuracy_score(y_train_true_classes[train_zero_mask],
+                                             y_train_pred_classes[train_zero_mask])
+        train_minus_accuracy = accuracy_score(y_train_true_classes[train_minus_mask],
+                                              y_train_pred_classes[train_minus_mask])
 
-                            # Log the plot to wandb
-                            for filename in filenames:
-                                log_title = os.path.basename(filename)
-                                wandb.log({f'testing_{log_title}': wandb.Image(filename)})
+        test_plus_accuracy = accuracy_score(y_test_true_classes[test_plus_mask],
+                                            y_test_pred_classes[test_plus_mask])
+        test_zero_accuracy = accuracy_score(y_test_true_classes[test_zero_mask],
+                                            y_test_pred_classes[test_zero_mask])
+        test_minus_accuracy = accuracy_score(y_test_true_classes[test_minus_mask],
+                                             y_test_pred_classes[test_minus_mask])
 
-                            # Process SEP event files in the specified directory
-                            test_directory = root_dir + '/training'
-                            filenames = process_sep_events(
-                                test_directory,
-                                model,
-                                title=title,
-                                inputs_to_use=inputs_to_use,
-                                add_slope=add_slope,
-                                outputs_to_use=outputs_to_use,
-                                show_avsp=True,
-                                prefix='training',
-                                using_cme=True,
-                                cme_speed_threshold=cme_speed_threshold)
+        # Get detailed classification reports
+        train_report = classification_report(y_train_true_classes, y_train_pred_classes)
+        test_report = classification_report(y_test_true_classes, y_test_pred_classes)
 
-                            # Log the plot to wandb
-                            for filename in filenames:
-                                log_title = os.path.basename(filename)
-                                wandb.log({f'training_{log_title}': wandb.Image(filename)})
+        print("\nTraining Results:")
+        print(f'Accuracy: {train_accuracy}')
+        print("\nClassification Report:")
+        print(train_report)
 
-                            # Evaluate the model correlation with colored
-                            file_path = plot_repr_corr_dist(
-                                model,
-                                X_train_filtered, y_train_filtered,
-                                title + "_training",
-                                model_type='features_reg'
-                            )
-                            wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
-                            print('file_path: ' + file_path)
+        print("\nTest Results:")
+        print(f'Accuracy: {test_accuracy}')
+        print("\nClassification Report:")
+        print(test_report)
 
-                            file_path = plot_repr_corr_dist(
-                                model,
-                                X_test_filtered, y_test_filtered,
-                                title + "_test",
-                                model_type='features_reg'
-                            )
-                            wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
-                            print('file_path: ' + file_path)
+        # Create metric tables as figures
+        train_metrics_fig = create_metrics_table(y_train_true_classes, y_train_pred_classes, "Train")
+        test_metrics_fig = create_metrics_table(y_test_true_classes, y_test_pred_classes, "Test")
 
-                            # Log t-SNE plot
-                            stage1_file_path = plot_tsne_delta(
-                                model,
-                                X_train_filtered, y_train_filtered, title,
-                                'stage2_training',
-                                model_type='features_reg',
-                                save_tag=current_time, seed=seed)
-                            wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
-                            print('stage1_file_path: ' + stage1_file_path)
+        # Plot posteriors
+        train_posteriors_fig = plot_posteriors(y_train_pred, y_train, "Train Posterior Probabilities vs. Delta")
+        test_posteriors_fig = plot_posteriors(y_test_pred, y_test, "Test Posterior Probabilities vs. Delta")
 
-                            stage1_file_path = plot_tsne_delta(
-                                model,
-                                X_test_filtered, y_test_filtered, title,
-                                'stage2_testing',
-                                model_type='features_reg',
-                                save_tag=current_time, seed=seed)
-                            wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
-                            print('stage1_file_path: ' + stage1_file_path)
+        # Log results to wandb
+        wandb.log({
+            "train_accuracy": train_accuracy,
+            "test_accuracy": test_accuracy,
+            "train+_accuracy": train_plus_accuracy,
+            "train0_accuracy": train_zero_accuracy,
+            "train-_accuracy": train_minus_accuracy,
+            "test+_accuracy": test_plus_accuracy,
+            "test0_accuracy": test_zero_accuracy,
+            "test-_accuracy": test_minus_accuracy,
+            "train_confusion_matrix": wandb.Image(train_cm_fig),
+            "test_confusion_matrix": wandb.Image(test_cm_fig),
+            "train_classification_metrics": wandb.Image(train_metrics_fig),
+            "test_classification_metrics": wandb.Image(test_metrics_fig),
+            "train_posteriors": wandb.Image(train_posteriors_fig),
+            "test_posteriors": wandb.Image(test_posteriors_fig)
+        })
 
-                            # Plot the error histograms
-                            filename = plot_error_hist(
-                                model,
-                                X_train, y_train,
-                                sample_weights=None,
-                                title=title,
-                                prefix='training')
-                            wandb.log({"training_error_hist": wandb.Image(filename)})
+        # Close all figures to free memory
+        plt.close('all')
 
-                            filename = plot_error_hist(
-                                model,
-                                X_test, y_test,
-                                sample_weights=None,
-                                title=title,
-                                prefix='testing')
-                            wandb.log({"testing_error_hist": wandb.Image(filename)})
+        # Evaluate the model correlation with colored
+        file_path = plot_repr_corr_dist(
+            combiner_model,
+            X_train_filtered, y_train_filtered,
+            "combiner_training",
+            model_type='features_cls')
+        wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
 
-                            # Finish the wandb run
-                            wandb.finish()
+        file_path = plot_repr_corr_dist(
+            combiner_model,
+            X_test_filtered, y_test_filtered,
+            "combiner_test",
+            model_type='features_cls')
+        wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
+
+        # Log t-SNE plots
+        stage1_file_path = plot_tsne_delta(
+            combiner_model,
+            X_train_filtered, y_train_filtered,
+            "combiner", 'training',
+            model_type='features_cls',
+            save_tag=current_time, seed=seed)
+        wandb.log({'combiner_tsne_training_plot': wandb.Image(stage1_file_path)})
+
+        stage1_file_path = plot_tsne_delta(
+            combiner_model,
+            X_test_filtered, y_test_filtered,
+            "combiner", 'testing',
+            model_type='features_cls',
+            save_tag=current_time, seed=seed)
+        wandb.log({'combiner_tsne_testing_plot': wandb.Image(stage1_file_path)})
+
+        # Finish the wandb run
+        wandb.finish()
 
 
 if __name__ == '__main__':

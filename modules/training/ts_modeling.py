@@ -982,6 +982,89 @@ def create_metrics_table(y_true: np.ndarray, y_pred: np.ndarray, set_name: str) 
 
     return fig
 
+def plot_posteriors(
+    predictions: np.ndarray,
+    y_delta: np.ndarray,
+    suptitle: Optional[str] = "Posterior Probabilities vs. Delta"
+) -> plt.Figure:
+    """
+    Plot the posterior probabilities for a 3-class combiner model: P(+|x), P(0|x), and P(-|x),
+    each as a function of the delta (y_delta) on the same figure in three side-by-side subplots.
+
+    Args:
+        predictions (np.ndarray):
+            A 2D array of shape (N, 3) representing the posterior probabilities for each sample.
+            The columns should correspond to [P(+|x), P(0|x), P(-|x)] in that order.
+        y_delta (np.ndarray):
+            A 1D array of shape (N,) representing the delta values (Δ) for each sample.
+        suptitle (str, optional):
+            A custom super-title for the entire figure.
+            Defaults to "Posterior Probabilities vs. Delta".
+
+    Returns:
+        matplotlib.figure.Figure:
+            A Matplotlib Figure object containing the three subplots.
+            Each subplot displays a scatter plot of delta vs. a posterior probability.
+    """
+    # Create a figure with 3 subplots (side by side), fixed figure size
+    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(18, 6), sharey=True)
+
+    # -------------------------------------------------
+    # Subplot 1: P(+|x)
+    # -------------------------------------------------
+    axes[0].scatter(
+        y_delta,
+        predictions[:, 0],   # P(+|x) is assumed to be in column 0
+        color='red',
+        alpha=0.6,
+        label='P(+|x)'
+    )
+    axes[0].set_title("P(+|x)", fontsize=14)
+    axes[0].set_xlabel("Delta", fontsize=12)
+    axes[0].set_ylabel("Posterior Probability", fontsize=12)
+    axes[0].set_xlim(-2.5, 2.5)
+    axes[0].set_ylim(0, 1)
+
+    # -------------------------------------------------
+    # Subplot 2: P(0|x)
+    # -------------------------------------------------
+    axes[1].scatter(
+        y_delta,
+        predictions[:, 1],   # P(0|x) is assumed to be in column 1
+        color='gray',
+        alpha=0.6,
+        label='P(0|x)'
+    )
+    axes[1].set_title("P(0|x)", fontsize=14)
+    axes[1].set_xlabel("Delta", fontsize=12)
+    axes[1].set_xlim(-2.5, 2.5)
+    axes[1].set_ylim(0, 1)
+
+    # -------------------------------------------------
+    # Subplot 3: P(-|x)
+    # -------------------------------------------------
+    axes[2].scatter(
+        y_delta,
+        predictions[:, 2],   # P(-|x) is assumed to be in column 2
+        color='blue',
+        alpha=0.6,
+        label='P(-|x)'
+    )
+    axes[2].set_title("P(-|x)", fontsize=14)
+    axes[2].set_xlabel("Delta", fontsize=12)
+    axes[2].set_xlim(-2.5, 2.5)
+    axes[2].set_ylim(0, 1)
+
+
+    # Optional super-title
+    if suptitle:
+        fig.suptitle(suptitle, fontsize=16)
+
+    # Tighten up the layout
+    plt.tight_layout()
+
+    return fig
+
 
 def plot_confusion_matrix(
         y_true: np.ndarray,
