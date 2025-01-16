@@ -146,7 +146,7 @@ PATIENCE_MOE_0 = int(7e3)
 
 LOWER_THRESHOLD_MOE = -0.4
 UPPER_THRESHOLD_MOE = 0.4
-REWEIGHTS_MOE_C = [(0.55, 0.55, 0.0, 0.0)]
+REWEIGHTS_MOE_C = [(0.65, 0.65, 0.0, 0.0)]
 REWEIGHTS_MOE_P = [(0.11, 0.11, 0.0, 0.0)]
 REWEIGHTS_MOE_M = [(0.035, 0.035, 0.0, 0.0)]
 REWEIGHTS_MOE_0 = [(0.4, 0.4, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
@@ -162,8 +162,8 @@ NEG_EXPERT_PATH = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_m
 NZ_EXPERT_PATH = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse0.10_zero_e_20241205-111054_reg.h5'
 COMBINER_PATH = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2_ace0.65_combiner_lpn1.00_lnz1.00_dualsig_20250107-152210.h5'
 COMBINER_PATH_NOC = '/home1/jmoukpe2016/keras-functional-api/final_router_model_weights_mlp2_ace0.60_router_20241218-021242.h5'
-COMBINER_PDC_AE_S1 = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5'
-COMBINER_PDC_AE_S2 = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcaeS2_amse1.00_v8_frFalse_20241121-102817_s2min_reg.h5'
+COMBINER_PDCAE_S1 = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5'
+COMBINER_PDCAE_S2 = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcaeS2_amse1.00_v8_frFalse_20241121-102817_s2min_reg.h5'
 
 
 # assemble hyperparams
