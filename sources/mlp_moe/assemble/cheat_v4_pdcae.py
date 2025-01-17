@@ -105,6 +105,10 @@ def main():
                     # 'combiner': COMBINER_PATH
                 }
 
+                pretraining_paths = {
+                    'combiner': COMBINER_PDCAE_S1,
+                }
+
                 # Initialize wandb
                 wandb.init(project="Jan-Report", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
@@ -145,6 +149,7 @@ def main():
                     'expert0_path': NZ_EXPERT_PATH,
                     'expert-_path': NEG_EXPERT_PATH,
                     'combiner_path': COMBINER_PATH,
+                    'pretraining_paths': pretraining_paths,
                     'asym_type': asym_type
                 })
 

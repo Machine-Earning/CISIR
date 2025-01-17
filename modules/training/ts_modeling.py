@@ -498,11 +498,12 @@ def create_gru(
     return model
 
 
+# TODO: generalize this function to handle 
 def load_partial_weights_from_path(
         pretrained_weights_path: str,
         new_model: Model,
         old_model_params: Dict,
-        pretraining: bool,
+        pretraining: bool = False,
         skip_layers: Optional[List[str]] = None
 ) -> None:
     """
@@ -580,6 +581,8 @@ def load_partial_weights_from_path(
 
     if pretraining:
         old_model = add_proj_head(old_model)
+
+
 
     # Load the old model's weights
     old_model.load_weights(pretrained_weights_path)
