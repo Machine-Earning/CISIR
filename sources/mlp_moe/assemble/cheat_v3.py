@@ -50,7 +50,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_moe_cheat_randinitCombiner'
+                title = f'mlp2_amse{alpha_mse:.2f}_moe_cheat_v3_randInitCombiner'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -363,6 +363,11 @@ def main():
                 final_model_sep.save_weights(f"final_model_moe_weights_{experiment_name}_reg.h5")
                 # print where the model weights are saved
                 print(f"Model weights are saved in final_model_moe_weights_{experiment_name}_reg.h5")
+
+                # Save the combiner sub-model weights
+                combiner_submodel = final_model_sep.get_layer("combiner")
+                combiner_submodel.save_weights(f"combiner_v3_weights_{experiment_name}.h5")
+                print(f"Combiner sub-model weights saved to combiner_v3_weights_{experiment_name}.h5")
 
                 # evaluate the model error on test set
                 error_mae = evaluate_mae(final_model_sep, X_test, y_test)
