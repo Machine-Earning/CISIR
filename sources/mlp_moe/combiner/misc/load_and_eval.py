@@ -29,7 +29,7 @@ def main():
     """
 
     # Path to pre-trained model weights
-    combiner_path = COMBINER_PATH_NOC
+    combiner_path = COMBINER_PATH
 
     for seed in SEEDS:
         # PARAMS
@@ -43,7 +43,7 @@ def main():
         
         # Create a unique experiment name with a timestamp
         current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-        experiment_name = f'combiner_eval_noc_{current_time}'
+        experiment_name = f'combiner_eval_{current_time}'
 
         set_seed(seed)
         
@@ -206,8 +206,8 @@ def main():
         test_metrics_fig = create_metrics_table(y_test_true_classes, y_test_pred_classes, "Test")
 
         # Plot posteriors
-        train_posteriors_fig = plot_posteriors(y_train_pred, y_train, "Train Posterior Probabilities vs. Delta")
-        test_posteriors_fig = plot_posteriors(y_test_pred, y_test, "Test Posterior Probabilities vs. Delta")
+        train_posteriors_fig = plot_posteriors(y_train_pred, y_train, suptitle="Train Posterior Probabilities vs. Delta")
+        test_posteriors_fig = plot_posteriors(y_test_pred, y_test, suptitle="Test Posterior Probabilities vs. Delta")
 
         # Log results to wandb
         wandb.log({

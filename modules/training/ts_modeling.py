@@ -1035,7 +1035,7 @@ def plot_posteriors(
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(16, 12), sharey=False)
 
     # Create smoothing window
-    window = 100
+    window = 64
     
     # -------------------------------------------------
     # Subplot 1: P(+|x)
@@ -1053,7 +1053,7 @@ def plot_posteriors(
     y_smooth = predictions[:, 0][sorted_idx]
     y_smoothed = np.convolve(y_smooth, np.ones(window)/window, mode='valid')
     x_smoothed = x_smooth[window-1:]
-    axes[0,0].plot(x_smoothed, y_smoothed, color='black', linewidth=2)
+    axes[0,0].plot(x_smoothed, y_smoothed, color='black', linewidth=0.9)
     # Add threshold lines
     axes[0,0].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
     axes[0,0].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
@@ -1077,7 +1077,7 @@ def plot_posteriors(
     # Add smooth trend line using moving average
     y_smooth = predictions[:, 2][sorted_idx]
     y_smoothed = np.convolve(y_smooth, np.ones(window)/window, mode='valid')
-    axes[0,1].plot(x_smoothed, y_smoothed, color='black', linewidth=2)
+    axes[0,1].plot(x_smoothed, y_smoothed, color='black', linewidth=0.9)
     # Add threshold lines
     axes[0,1].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
     axes[0,1].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
@@ -1101,7 +1101,7 @@ def plot_posteriors(
     # Add smooth trend line using moving average
     y_smooth = predictions[:, 1][sorted_idx]
     y_smoothed = np.convolve(y_smooth, np.ones(window)/window, mode='valid')
-    axes[1,0].plot(x_smoothed, y_smoothed, color='black', linewidth=2)
+    axes[1,0].plot(x_smoothed, y_smoothed, color='black', linewidth=0.9)
     # Add threshold lines
     axes[1,0].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
     axes[1,0].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
@@ -1126,7 +1126,7 @@ def plot_posteriors(
     # Add smooth trend line using moving average
     y_smooth = diff[sorted_idx]
     y_smoothed = np.convolve(y_smooth, np.ones(window)/window, mode='valid')
-    axes[1,1].plot(x_smoothed, y_smoothed, color='black', linewidth=2)
+    axes[1,1].plot(x_smoothed, y_smoothed, color='black', linewidth=0.9)
     # Add threshold lines
     axes[1,1].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
     axes[1,1].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
