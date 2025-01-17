@@ -24,7 +24,8 @@ from modules.training.ts_modeling import (
     stratified_batch_dataset_cls,
     load_partial_weights_from_path,
     filter_ds,
-    pn_nz_loss
+    pn_nz_loss,
+    plot_posteriors
 )
 
 
@@ -62,7 +63,7 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed)
                 patience = PATIENCE_MOE_C  # higher patience
-                learning_rate = START_LR_MOE_R  # starting learning rate
+                learning_rate = START_LR_MOE_C  # starting learning rate
                 asym_type = ASYM_TYPE_MOE
 
 
@@ -485,6 +486,12 @@ def main():
                 train_metrics_fig = create_metrics_table(y_train_true_classes, y_train_pred_classes, "Train")
                 test_metrics_fig = create_metrics_table(y_test_true_classes, y_test_pred_classes, "Test")
 
+                # Plot posteriors
+                train_posteriors_fig = plot_posteriors(y_train_pred, y_train, 
+                                                       suptitle="Train Posterior Probabilities vs. Delta")
+                test_posteriors_fig = plot_posteriors(y_test_pred, y_test, 
+                                                      suptitle="Test Posterior Probabilities vs. Delta")
+
                 # Update the wandb.log call to include the tables as images and class-specific accuracies
                 wandb.log({
                     "train_accuracy": train_accuracy,
@@ -498,7 +505,9 @@ def main():
                     "train_confusion_matrix": wandb.Image(train_cm_fig),
                     "test_confusion_matrix": wandb.Image(test_cm_fig),
                     "train_classification_metrics": wandb.Image(train_metrics_fig),
-                    "test_classification_metrics": wandb.Image(test_metrics_fig)
+                    "test_classification_metrics": wandb.Image(test_metrics_fig),
+                    "train_posteriors": wandb.Image(train_posteriors_fig),
+                    "test_posteriors": wandb.Image(test_posteriors_fig)
                 })
 
                 # Close all figures to free memory
@@ -506,6 +515,8 @@ def main():
                 plt.close(test_cm_fig)
                 plt.close(train_metrics_fig)
                 plt.close(test_metrics_fig)
+                plt.close(train_posteriors_fig)
+                plt.close(test_posteriors_fig)
 
                 # Evaluate the model correlation with colored
                 file_path = plot_repr_corr_dist(
