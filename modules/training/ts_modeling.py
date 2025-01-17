@@ -4968,28 +4968,30 @@ def pn_nz_loss(
     y_classes = y_true[:, :-1]  # All columns except last
     delta_batch = y_true[:, -1]  # Last column
 
-    # Determine which weight dictionaries to use
-    ce_weight_dict = train_ce_weight_dict if phase_manager.is_training_phase() else val_ce_weight_dict
-    pcc_weight_dict = train_pcc_weight_dict if phase_manager.is_training_phase() else val_pcc_weight_dict
+    loss = 0.0
 
-    # Create weight tensors based on delta_batch
-    ce_weights = create_weight_tensor_fast(delta_batch, ce_weight_dict)
-    pcc_weights = create_weight_tensor_fast(delta_batch, pcc_weight_dict)
+    # Only compute CE loss if weight is non-zero
+    if loss_weights['ce'] > 0:
+        # Determine which weight dictionary to use
+        ce_weight_dict = train_ce_weight_dict if phase_manager.is_training_phase() else val_ce_weight_dict
+        ce_weights = create_weight_tensor_fast(delta_batch, ce_weight_dict)
+        ce = -tf.reduce_mean(ce_weights * tf.reduce_sum(y_classes * tf.math.log(y_pred + K.epsilon()), axis=-1))
+        loss += loss_weights['ce'] * ce
 
-    # Compute Cross Entropy
-    ce = -tf.reduce_mean(ce_weights * tf.reduce_sum(y_classes * tf.math.log(y_pred + K.epsilon()), axis=-1))
+    # Only compute PCC losses if weights are non-zero
+    if loss_weights['pn'] > 0 or loss_weights['nz'] > 0:
+        # Get PCC weights once since both PCC losses use same weights
+        pcc_weight_dict = train_pcc_weight_dict if phase_manager.is_training_phase() else val_pcc_weight_dict
+        pcc_weights = create_weight_tensor_fast(delta_batch, pcc_weight_dict)
 
-    # PCC loss for positive-negative delta
-    # Assuming positive class index=0 and negative class index=2
-    # p(p|x) - p(n|x)
-    # pcc_pn = coreg(delta_batch, y_pred[:, 0] - y_pred[:, 2], pcc_weights)
-    pcc_pn = coreg(pn_staircase(delta_batch), y_pred[:, 0] - y_pred[:, 2], pcc_weights)
-    # PCC loss for zero delta
-    # Assuming zero class index=1, and using a Gaussian kernel
-    # p(z|x)
-    pcc_nz = coreg(nz_hump(delta_batch), y_pred[:, 1], pcc_weights)
+        if loss_weights['pn'] > 0:
+            pcc_pn = coreg(pn_staircase(delta_batch), y_pred[:, 0] - y_pred[:, 2], pcc_weights)
+            loss += loss_weights['pn'] * pcc_pn
 
-    loss = loss_weights['ce'] * ce + loss_weights['pn'] * pcc_pn + loss_weights['nz'] * pcc_nz
+        if loss_weights['nz'] > 0:
+            pcc_nz = coreg(nz_hump(delta_batch), y_pred[:, 1], pcc_weights)
+            loss += loss_weights['nz'] * pcc_nz
+
     return loss
 
 
