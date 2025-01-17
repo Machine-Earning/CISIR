@@ -1026,6 +1026,11 @@ def plot_posteriors(
             Each subplot displays a scatter plot of delta vs. a posterior probability,
             with the last showing the difference P(+|x) - P(-|x).
     """
+    # Ensure y_delta is 1D
+    y_delta = np.squeeze(y_delta)
+    if len(y_delta.shape) != 1:
+        raise ValueError("y_delta must be a 1D array")
+
     # Create a figure with 4 subplots (2x2 grid), fixed figure size
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(16, 12), sharey=False)
 
