@@ -40,7 +40,7 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
-        for alpha_ce, alphaV_ce, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_C:
+        for alpha_ce, alphaV_ce, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_C2:
             for rho in RHO_MOE_C:  # SAM_RHOS:
                 # PARAMS
                 inputs_to_use = INPUTS_TO_USE[0]  # Use first input configuration
@@ -49,7 +49,7 @@ def main():
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]  # Use first threshold value
                 lambda_pn = LAMBDA_PN_CCE
                 lambda_nz = LAMBDA_NZ_CCE
-                lambda_ce = 0 #LAMBDA_CE
+                lambda_ce = 0.0 #LAMBDA_CE
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)

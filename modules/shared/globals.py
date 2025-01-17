@@ -62,7 +62,7 @@ RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 LR_CB_MIN_LR = 1e-5  # minimum learning rate
 LR_CB_FACTOR = 0.95  # factor for reducing learning rate # gradual decay leads to more stable training
 LR_CB_PATIENCE = 50  # patience for reducing learning rate
-LR_CB_MIN_DELTA = 1e-3 # Minimum delta for reducing learning rate
+LR_CB_MIN_DELTA = 1e-5 # Minimum delta for reducing learning rate
 LR_CB_MONITOR = 'loss'  # Monitor validation loss
 
 # Early Stopping
@@ -88,7 +88,7 @@ RHO = [1e-2]
 REWEIGHTS = [(1.0, 0.4, 0.1, 0)]
 LAMBDA_FACTOR = 8
 AE_LAMBDA = 0.9
-CVRG_MIN_DELTA = 1e-3
+CVRG_MIN_DELTA = 1e-5
 CVRG_METRIC = 'loss'
 CVRG_METRIC_WDR = 'val_loss'
 ASYM_TYPE = 'sigmoid'
@@ -164,7 +164,7 @@ COMBINER_PATH = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_we
 COMBINER_PATH_NOC = '/home1/jmoukpe2016/keras-functional-api/final_router_model_weights_mlp2_ace0.60_router_20241218-021242.h5'
 COMBINER_PDCAE_S1 = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5'
 COMBINER_PDCAE_S2 = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcaeS2_amse1.00_v8_frFalse_20241121-102817_s2min_reg.h5'
-
+COMBINER_V3 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.40_moe_cheat_v3_randInitCombiner_20250117-131407.h5'
 
 # assemble hyperparams
 REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]
@@ -175,7 +175,7 @@ LR_CB_MIN_LR_MOE = 1e-5
 LR_CB_FACTOR_MOE = 0.95
 LR_CB_PATIENCE_MOE = 50
 WEIGHT_DECAY_MOE = 1e-4
-PATIENCE_MOE = int(3e3)
+PATIENCE_MOE = int(3.5e3)
 ASYM_TYPE_MOE = None
 
 FREEZE_EXPERT = True
@@ -187,4 +187,5 @@ LAMBDA_PN_CCE = 1
 LAMBDA_NZ_CCE = 1
 LAMBDA_CE = 0.5
 
-START_LR_MOE_C = 1e-4
+START_LR_MOE_C = 3e-4
+REWEIGHTS_MOE_C2 = [(0.65, 0.65, 0.1, 0.1)]
