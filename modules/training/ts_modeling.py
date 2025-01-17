@@ -995,6 +995,8 @@ def create_metrics_table(y_true: np.ndarray, y_pred: np.ndarray, set_name: str) 
 def plot_posteriors(
         predictions: np.ndarray,
         y_delta: np.ndarray,
+        lower_delta_threshold: float = -0.4,
+        upper_delta_threshold: float = 0.4,
         suptitle: Optional[str] = "Posterior Probabilities vs. Delta"
 ) -> plt.Figure:
     """
@@ -1008,6 +1010,12 @@ def plot_posteriors(
             The columns should correspond to [P(+|x), P(0|x), P(-|x)] in that order.
         y_delta (np.ndarray):
             A 1D array of shape (N,) representing the delta values (Δ) for each sample.
+        lower_delta_threshold (float, optional):
+            The lower threshold for the delta values.
+            Defaults to -0.4.
+        upper_delta_threshold (float, optional):
+            The upper threshold for the delta values.
+            Defaults to 0.4.
         suptitle (str, optional):
             A custom super-title for the entire figure.
             Defaults to "Posterior Probabilities vs. Delta".
@@ -1031,6 +1039,14 @@ def plot_posteriors(
         alpha=0.6,
         label='P(+|x)'
     )
+    # Add trend line
+    z = np.polyfit(y_delta, predictions[:, 0], 1)
+    p = np.poly1d(z)
+    axes[0,0].plot(sorted(y_delta), p(sorted(y_delta)), "r--", alpha=0.8)
+    # Add threshold lines
+    axes[0,0].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
+    axes[0,0].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
+    
     axes[0,0].set_title("P(+|x)", fontsize=14)
     axes[0,0].set_xlabel("Delta", fontsize=12)
     axes[0,0].set_ylabel("Posterior Probability", fontsize=12)
@@ -1047,8 +1063,17 @@ def plot_posteriors(
         alpha=0.6,
         label='P(-|x)'
     )
+    # Add trend line
+    z = np.polyfit(y_delta, predictions[:, 2], 1)
+    p = np.poly1d(z)
+    axes[0,1].plot(sorted(y_delta), p(sorted(y_delta)), "b--", alpha=0.8)
+    # Add threshold lines
+    axes[0,1].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
+    axes[0,1].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
+    
     axes[0,1].set_title("P(-|x)", fontsize=14)
     axes[0,1].set_xlabel("Delta", fontsize=12)
+    axes[0,1].set_ylabel("Posterior Probability", fontsize=12)
     axes[0,1].set_xlim(-2.5, 2.5)
     axes[0,1].set_ylim(0, 1)
 
@@ -1062,6 +1087,14 @@ def plot_posteriors(
         alpha=0.6,
         label='P(0|x)'
     )
+    # Add trend line
+    z = np.polyfit(y_delta, predictions[:, 1], 1)
+    p = np.poly1d(z)
+    axes[1,0].plot(sorted(y_delta), p(sorted(y_delta)), "--", color='gray', alpha=0.8)
+    # Add threshold lines
+    axes[1,0].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
+    axes[1,0].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
+    
     axes[1,0].set_title("P(0|x)", fontsize=14)
     axes[1,0].set_xlabel("Delta", fontsize=12)
     axes[1,0].set_ylabel("Posterior Probability", fontsize=12)
@@ -1079,6 +1112,14 @@ def plot_posteriors(
         alpha=0.6,
         label='P(+|x) - P(-|x)'
     )
+    # Add trend line
+    z = np.polyfit(y_delta, diff, 1)
+    p = np.poly1d(z)
+    axes[1,1].plot(sorted(y_delta), p(sorted(y_delta)), "--", color='purple', alpha=0.8)
+    # Add threshold lines
+    axes[1,1].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
+    axes[1,1].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
+    
     axes[1,1].set_title("P(+|x) - P(-|x)", fontsize=14)
     axes[1,1].set_xlabel("Delta", fontsize=12)
     axes[1,1].set_ylabel("Probability Difference", fontsize=12)
