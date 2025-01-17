@@ -582,8 +582,6 @@ def load_partial_weights_from_path(
     if pretraining:
         old_model = add_proj_head(old_model)
 
-
-
     # Load the old model's weights
     old_model.load_weights(pretrained_weights_path)
 
@@ -610,6 +608,7 @@ def load_partial_weights_from_path(
         # else no corresponding old layer by that name, skip
 
     # After this, `new_model` will have partially loaded weights, except for layers that didn't match or were skipped.
+
 
 def create_mlp(
         input_dim: int = 100,
@@ -992,14 +991,16 @@ def create_metrics_table(y_true: np.ndarray, y_pred: np.ndarray, set_name: str) 
 
     return fig
 
+
 def plot_posteriors(
-    predictions: np.ndarray,
-    y_delta: np.ndarray,
-    suptitle: Optional[str] = "Posterior Probabilities vs. Delta"
+        predictions: np.ndarray,
+        y_delta: np.ndarray,
+        suptitle: Optional[str] = "Posterior Probabilities vs. Delta"
 ) -> plt.Figure:
     """
     Plot the posterior probabilities for a 3-class combiner model: P(+|x), P(0|x), and P(-|x),
-    each as a function of the delta (y_delta) on the same figure in three side-by-side subplots.
+    each as a function of the delta (y_delta) on the same figure in four subplots.
+    The fourth subplot shows the difference P(+|x) - P(-|x).
 
     Args:
         predictions (np.ndarray):
@@ -1013,58 +1014,76 @@ def plot_posteriors(
 
     Returns:
         matplotlib.figure.Figure:
-            A Matplotlib Figure object containing the three subplots.
-            Each subplot displays a scatter plot of delta vs. a posterior probability.
+            A Matplotlib Figure object containing the four subplots.
+            Each subplot displays a scatter plot of delta vs. a posterior probability,
+            with the last showing the difference P(+|x) - P(-|x).
     """
-    # Create a figure with 3 subplots (side by side), fixed figure size
-    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(18, 6), sharey=True)
+    # Create a figure with 4 subplots (2x2 grid), fixed figure size
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(16, 12), sharey=False)
 
     # -------------------------------------------------
     # Subplot 1: P(+|x)
     # -------------------------------------------------
-    axes[0].scatter(
+    axes[0,0].scatter(
         y_delta,
-        predictions[:, 0],   # P(+|x) is assumed to be in column 0
+        predictions[:, 0],  # P(+|x) is assumed to be in column 0
         color='red',
         alpha=0.6,
         label='P(+|x)'
     )
-    axes[0].set_title("P(+|x)", fontsize=14)
-    axes[0].set_xlabel("Delta", fontsize=12)
-    axes[0].set_ylabel("Posterior Probability", fontsize=12)
-    axes[0].set_xlim(-2.5, 2.5)
-    axes[0].set_ylim(0, 1)
+    axes[0,0].set_title("P(+|x)", fontsize=14)
+    axes[0,0].set_xlabel("Delta", fontsize=12)
+    axes[0,0].set_ylabel("Posterior Probability", fontsize=12)
+    axes[0,0].set_xlim(-2.5, 2.5)
+    axes[0,0].set_ylim(0, 1)
 
     # -------------------------------------------------
-    # Subplot 2: P(0|x)
+    # Subplot 2: P(-|x)
     # -------------------------------------------------
-    axes[1].scatter(
+    axes[0,1].scatter(
         y_delta,
-        predictions[:, 1],   # P(0|x) is assumed to be in column 1
-        color='gray',
-        alpha=0.6,
-        label='P(0|x)'
-    )
-    axes[1].set_title("P(0|x)", fontsize=14)
-    axes[1].set_xlabel("Delta", fontsize=12)
-    axes[1].set_xlim(-2.5, 2.5)
-    axes[1].set_ylim(0, 1)
-
-    # -------------------------------------------------
-    # Subplot 3: P(-|x)
-    # -------------------------------------------------
-    axes[2].scatter(
-        y_delta,
-        predictions[:, 2],   # P(-|x) is assumed to be in column 2
+        predictions[:, 2],  # P(-|x) is assumed to be in column 2
         color='blue',
         alpha=0.6,
         label='P(-|x)'
     )
-    axes[2].set_title("P(-|x)", fontsize=14)
-    axes[2].set_xlabel("Delta", fontsize=12)
-    axes[2].set_xlim(-2.5, 2.5)
-    axes[2].set_ylim(0, 1)
+    axes[0,1].set_title("P(-|x)", fontsize=14)
+    axes[0,1].set_xlabel("Delta", fontsize=12)
+    axes[0,1].set_xlim(-2.5, 2.5)
+    axes[0,1].set_ylim(0, 1)
 
+    # -------------------------------------------------
+    # Subplot 3: P(0|x)
+    # -------------------------------------------------
+    axes[1,0].scatter(
+        y_delta,
+        predictions[:, 1],  # P(0|x) is assumed to be in column 1
+        color='gray',
+        alpha=0.6,
+        label='P(0|x)'
+    )
+    axes[1,0].set_title("P(0|x)", fontsize=14)
+    axes[1,0].set_xlabel("Delta", fontsize=12)
+    axes[1,0].set_ylabel("Posterior Probability", fontsize=12)
+    axes[1,0].set_xlim(-2.5, 2.5)
+    axes[1,0].set_ylim(0, 1)
+
+    # -------------------------------------------------
+    # Subplot 4: P(+|x) - P(-|x)
+    # -------------------------------------------------
+    diff = predictions[:, 0] - predictions[:, 2]  # P(+|x) - P(-|x)
+    axes[1,1].scatter(
+        y_delta,
+        diff,
+        color='purple',
+        alpha=0.6,
+        label='P(+|x) - P(-|x)'
+    )
+    axes[1,1].set_title("P(+|x) - P(-|x)", fontsize=14)
+    axes[1,1].set_xlabel("Delta", fontsize=12)
+    axes[1,1].set_ylabel("Probability Difference", fontsize=12)
+    axes[1,1].set_xlim(-2.5, 2.5)
+    axes[1,1].set_ylim(-1, 1)
 
     # Optional super-title
     if suptitle:
@@ -2067,6 +2086,7 @@ def stratified_batch_dataset_cls(
 
     return dataset, steps_per_epoch
 
+
 def stratified_batch_dataset_cls2(
         X: np.ndarray,
         y_labels: np.ndarray,
@@ -2136,9 +2156,6 @@ def stratified_batch_dataset_cls2(
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
 
     return dataset, steps_per_epoch
-
-
-
 
 
 # def stratified_batch_dataset(
