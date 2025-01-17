@@ -1034,6 +1034,9 @@ def plot_posteriors(
     # Create a figure with 4 subplots (2x2 grid), fixed figure size
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(16, 12), sharey=False)
 
+    # Create smoothing window
+    window = 100
+    
     # -------------------------------------------------
     # Subplot 1: P(+|x)
     # -------------------------------------------------
@@ -1041,13 +1044,16 @@ def plot_posteriors(
         y_delta,
         predictions[:, 0],  # P(+|x) is assumed to be in column 0
         color='red',
-        alpha=0.6,
+        alpha=0.3,
         label='P(+|x)'
     )
-    # Add trend line
-    z = np.polyfit(y_delta, predictions[:, 0], 1)
-    p = np.poly1d(z)
-    axes[0,0].plot(sorted(y_delta), p(sorted(y_delta)), "r--", alpha=0.8)
+    # Add smooth trend line using moving average
+    sorted_idx = np.argsort(y_delta)
+    x_smooth = y_delta[sorted_idx]
+    y_smooth = predictions[:, 0][sorted_idx]
+    y_smoothed = np.convolve(y_smooth, np.ones(window)/window, mode='valid')
+    x_smoothed = x_smooth[window-1:]
+    axes[0,0].plot(x_smoothed, y_smoothed, color='black', linewidth=2)
     # Add threshold lines
     axes[0,0].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
     axes[0,0].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
@@ -1065,13 +1071,13 @@ def plot_posteriors(
         y_delta,
         predictions[:, 2],  # P(-|x) is assumed to be in column 2
         color='blue',
-        alpha=0.6,
+        alpha=0.3,
         label='P(-|x)'
     )
-    # Add trend line
-    z = np.polyfit(y_delta, predictions[:, 2], 1)
-    p = np.poly1d(z)
-    axes[0,1].plot(sorted(y_delta), p(sorted(y_delta)), "b--", alpha=0.8)
+    # Add smooth trend line using moving average
+    y_smooth = predictions[:, 2][sorted_idx]
+    y_smoothed = np.convolve(y_smooth, np.ones(window)/window, mode='valid')
+    axes[0,1].plot(x_smoothed, y_smoothed, color='black', linewidth=2)
     # Add threshold lines
     axes[0,1].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
     axes[0,1].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
@@ -1089,13 +1095,13 @@ def plot_posteriors(
         y_delta,
         predictions[:, 1],  # P(0|x) is assumed to be in column 1
         color='gray',
-        alpha=0.6,
+        alpha=0.3,
         label='P(0|x)'
     )
-    # Add trend line
-    z = np.polyfit(y_delta, predictions[:, 1], 1)
-    p = np.poly1d(z)
-    axes[1,0].plot(sorted(y_delta), p(sorted(y_delta)), "--", color='gray', alpha=0.8)
+    # Add smooth trend line using moving average
+    y_smooth = predictions[:, 1][sorted_idx]
+    y_smoothed = np.convolve(y_smooth, np.ones(window)/window, mode='valid')
+    axes[1,0].plot(x_smoothed, y_smoothed, color='black', linewidth=2)
     # Add threshold lines
     axes[1,0].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
     axes[1,0].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
@@ -1114,13 +1120,13 @@ def plot_posteriors(
         y_delta,
         diff,
         color='purple',
-        alpha=0.6,
+        alpha=0.3,
         label='P(+|x) - P(-|x)'
     )
-    # Add trend line
-    z = np.polyfit(y_delta, diff, 1)
-    p = np.poly1d(z)
-    axes[1,1].plot(sorted(y_delta), p(sorted(y_delta)), "--", color='purple', alpha=0.8)
+    # Add smooth trend line using moving average
+    y_smooth = diff[sorted_idx]
+    y_smoothed = np.convolve(y_smooth, np.ones(window)/window, mode='valid')
+    axes[1,1].plot(x_smoothed, y_smoothed, color='black', linewidth=2)
     # Add threshold lines
     axes[1,1].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
     axes[1,1].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
