@@ -503,8 +503,9 @@ def load_partial_weights_from_path(
         pretrained_weights_path: str,
         new_model: Model,
         old_model_params: Dict,
-        pretraining: bool = False,
-        skip_layers: Optional[List[str]] = None
+        skip_layers: Optional[List[str]] = None,
+        proj_neck: bool = False,
+        no_head: bool = False
 ) -> None:
     """
     Load weights from a pre-trained model (via a weights file path) into an existing new model,
@@ -539,17 +540,20 @@ def load_partial_weights_from_path(
             'norm': <str>,
             'skip_repr': <bool>,
             'skipped_layers': <int>,
-            'sam_rho': <float>
+            'sam_rho': <float>,
+            'proj_hiddens': <list of ints>
         }
         Make sure these match exactly the parameters used when the pre-trained model was saved.
 
-    pretraining : bool
-        If True, the model is pretraining and the weights are loaded from a PDC/PDS pre-trained model.
-        If False, the model is not pretraining and the weights are loaded from a trained model.
-        
     skip_layers : Optional[List[str]]
         A list of layer names to skip while loading weights. For example, ['forecast_head']
         if the output layer's shape has changed.
+
+    proj_neck : bool
+        If True, the projection neck is added to the model.
+
+    no_head : bool
+        If True, the projection head is added to the model.
 
     Returns
     -------
@@ -579,35 +583,64 @@ def load_partial_weights_from_path(
         sam_rho=old_model_params['sam_rho']
     )
 
-    if pretraining:
-        old_model = add_proj_head(old_model)
+    if proj_neck:
+        old_model = add_proj_head(
+            old_model,
+            output_dim=old_model_params['output_dim'],
+            freeze_features=False,  # don't freeze features when load combiner
+            pretraining=True,  # used PDS/PDC
+            hiddens=old_model_params['proj_hiddens'],
+            dropout=old_model_params['dropout'],
+            activation=old_model_params['activation'],
+            norm=old_model_params['norm'],
+            skipped_layers=old_model_params['skipped_layers'],
+            sam_rho=old_model_params['sam_rho'],
+            name='forecast_head'
+        )
 
     # Load the old model's weights
     old_model.load_weights(pretrained_weights_path)
 
-    # Map old model's layers by name for easy access
-    old_layers_dict = {layer.name: layer for layer in old_model.layers}
+    if no_head:
+        # add a projection head to the old model
+        new_model = add_proj_head(
+            old_model,
+            output_dim=3,
+            freeze_features=False,  # don't freeze features when load combiner
+            pretraining=True,  # used PDS/PDC
+            hiddens=old_model_params['proj_hiddens'],
+            dropout=old_model_params['dropout'],
+            activation=old_model_params['activation'],
+            norm=old_model_params['norm'],
+            skipped_layers=old_model_params['skipped_layers'],
+            sam_rho=old_model_params['sam_rho'],
+            output_activation='softmax',
+            name='combiner'
+        )
+    else:
+        # Map old model's layers by name for easy access
+        old_layers_dict = {layer.name: layer for layer in old_model.layers}
 
-    # Transfer weights from old_model to new_model
-    for new_layer in new_model.layers:
-        if new_layer.name in skip_layers:
-            continue
+        # Transfer weights from old_model to new_model
+        for new_layer in new_model.layers:
+            if new_layer.name in skip_layers:
+                continue
 
-        if new_layer.name in old_layers_dict:
-            old_layer = old_layers_dict[new_layer.name]
-            old_weights = old_layer.get_weights()
-            new_weights = new_layer.get_weights()
+            if new_layer.name in old_layers_dict:
+                old_layer = old_layers_dict[new_layer.name]
+                old_weights = old_layer.get_weights()
+                new_weights = new_layer.get_weights()
 
-            # Ensure the layer has weights and they match in count
-            if len(old_weights) == len(new_weights):
-                # Verify that corresponding weight arrays have the same shape
-                if all(o_w.shape == n_w.shape for o_w, n_w in zip(old_weights, new_weights)):
-                    new_layer.set_weights(old_weights)
-                # else shapes differ, skip loading this layer
-            # else number of weights differ, skip this layer
-        # else no corresponding old layer by that name, skip
+                # Ensure the layer has weights and they match in count
+                if len(old_weights) == len(new_weights):
+                    # Verify that corresponding weight arrays have the same shape
+                    if all(o_w.shape == n_w.shape for o_w, n_w in zip(old_weights, new_weights)):
+                        new_layer.set_weights(old_weights)
+                    # else shapes differ, skip loading this layer
+                # else number of weights differ, skip this layer
+            # else no corresponding old layer by that name, skip
 
-    # After this, `new_model` will have partially loaded weights, except for layers that didn't match or were skipped.
+        # After this, `new_model` will have partially loaded weights, except for layers that didn't match or were skipped.
 
 
 def create_mlp(
