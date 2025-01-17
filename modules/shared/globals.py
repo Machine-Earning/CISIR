@@ -164,7 +164,8 @@ COMBINER_PATH = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_we
 COMBINER_PATH_NOC = '/home1/jmoukpe2016/keras-functional-api/final_router_model_weights_mlp2_ace0.60_router_20241218-021242.h5'
 COMBINER_PDCAE_S1 = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5'
 COMBINER_PDCAE_S2 = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcaeS2_amse1.00_v8_frFalse_20241121-102817_s2min_reg.h5'
-COMBINER_V3 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.40_moe_cheat_v3_randInitCombiner_20250117-131407.h5'
+COMBINER_V3 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.50_moe_cheat_v3_randInitCombiner_20250117-155615.h5'
+COMBINER_PCC_CE = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2_combiner_lce0.50_20250117-133726.h5'
 
 # assemble hyperparams
 REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]
@@ -187,5 +188,5 @@ LAMBDA_PN_CCE = 1
 LAMBDA_NZ_CCE = 1
 LAMBDA_CE = 0.5
 
-START_LR_MOE_C = 3e-4
+START_LR_MOE_C = 3e-3
 REWEIGHTS_MOE_C2 = [(0.65, 0.65, 0.1, 0.1)]
