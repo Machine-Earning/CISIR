@@ -167,12 +167,14 @@ COMBINER_PDCAE_S2 = '/home1/jmoukpe2016/keras-functional-api/final_model_weights
 COMBINER_V3 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.50_moe_cheat_v3_randInitCombiner_20250117-155615.h5'
 COMBINER_PCC_CE = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2_combiner_lce0.50_20250117-133726.h5'
 COMBINER_PCC_CE_S2 = '/home1/jmoukpe2016/keras-functional-api/final_combiner_weights_mlp2_amse0.40_moe_cheat_pcc_ce_20250117-160500.h5'
+COMBINER_V2_PDCAE_S1 = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2pdcaes1_ace0.65_combiner_lpn0.00_lnz0.00_lce1.00_20250118-101801.h5'
+COMBINER_V2_PDCAE_S2 = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2pdcaes2_ace0.65_combiner_lpn0.00_lnz0.00_lce1.00_20250118-101801.h5'
 
 # assemble hyperparams
 REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]
 RHO_MOE = [1e-2]
 LAMBDA_FACTOR_MOE = 8
-START_LR_MOE = 3e-4
+START_LR_MOE = 1e-3
 LR_CB_MIN_LR_MOE = 1e-5
 LR_CB_FACTOR_MOE = 0.95
 LR_CB_PATIENCE_MOE = 50
