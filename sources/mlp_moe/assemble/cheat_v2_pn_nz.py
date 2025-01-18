@@ -50,7 +50,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_moe_cheat_v1'
+                title = f'mlp2_amse{alpha_mse:.2f}_moe_cheat_pcc_ce'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -99,7 +99,7 @@ def main():
                     'plus': POS_EXPERT_PATH,
                     'zero': NZ_EXPERT_PATH,
                     'minus': NEG_EXPERT_PATH,
-                    'combiner': COMBINER_PATH_NOC
+                    'combiner': COMBINER_PCC_CE
                 }
 
                 # Initialize wandb
@@ -141,7 +141,7 @@ def main():
                     'expert+_path': POS_EXPERT_PATH,
                     'expert0_path': NZ_EXPERT_PATH,
                     'expert-_path': NEG_EXPERT_PATH,
-                    'combiner_path': COMBINER_PATH,
+                    'combiner_path': COMBINER_PCC_CE,
                     'asym_type': asym_type
                 })
 
@@ -217,89 +217,89 @@ def main():
 
 
 
-                # # create the model
-                # init_model_sep = create_mlp_moe(
-                #     hiddens=hiddens,
-                #     combiner_hiddens=hiddens,
-                #     input_dim=n_features,
-                #     embed_dim=embed_dim,
-                #     skipped_layers=skipped_layers,
-                #     skip_repr=skip_repr,
-                #     pretraining=PRETRAINING_MOE,
-                #     freeze_experts=FREEZE_EXPERT,
-                #     expert_paths=expert_paths,
-                #     mode=MODE_MOE,
-                #     activation=activation,
-                #     norm=norm,
-                #     sam_rho=rho
-                # )
-                # init_model_sep.summary()
+                # create the model
+                init_model_sep = create_mlp_moe(
+                    hiddens=hiddens,
+                    combiner_hiddens=hiddens,
+                    input_dim=n_features,
+                    embed_dim=embed_dim,
+                    skipped_layers=skipped_layers,
+                    skip_repr=skip_repr,
+                    pretraining=PRETRAINING_MOE,
+                    freeze_experts=FREEZE_EXPERT,
+                    expert_paths=expert_paths,
+                    mode=MODE_MOE,
+                    activation=activation,
+                    norm=norm,
+                    sam_rho=rho
+                )
+                init_model_sep.summary()
 
-                # # Define the EarlyStopping callback
-                # early_stopping = SmoothEarlyStopping(
-                #     monitor=CVRG_METRIC,
-                #     min_delta=CVRG_MIN_DELTA,
-                #     patience=patience,
-                #     verbose=VERBOSE,
-                #     restore_best_weights=ES_CB_RESTORE_WEIGHTS,
-                #     smoothing_method=smoothing_method,  # 'moving_average'
-                #     smoothing_parameters={'window_size': window_size})  # 10
+                # Define the EarlyStopping callback
+                early_stopping = SmoothEarlyStopping(
+                    monitor=CVRG_METRIC,
+                    min_delta=CVRG_MIN_DELTA,
+                    patience=patience,
+                    verbose=VERBOSE,
+                    restore_best_weights=ES_CB_RESTORE_WEIGHTS,
+                    smoothing_method=smoothing_method,  # 'moving_average'
+                    smoothing_parameters={'window_size': window_size})  # 10
 
-                # # Compile the model with the specified learning rate
-                # init_model_sep.compile(
-                #     optimizer=AdamW(
-                #         learning_rate=learning_rate,
-                #         weight_decay=weight_decay,
-                #         beta_1=momentum_beta1
-                #     ),
-                #     loss={
-                #         'forecast_head': lambda y_true, y_pred: cmse(
-                #             y_true, y_pred,
-                #             phase_manager=pm,
-                #             lambda_factor=lambda_factor,
-                #             train_mse_weight_dict=mse_train_weights_dict,
-                #             train_pcc_weight_dict=pcc_train_weights_dict,
-                #             val_mse_weight_dict=mse_test_weights_dict,
-                #             val_pcc_weight_dict=pcc_test_weights_dict,
-                #             asym_type=asym_type
-                #         )
-                #     }
-                # )
+                # Compile the model with the specified learning rate
+                init_model_sep.compile(
+                    optimizer=AdamW(
+                        learning_rate=learning_rate,
+                        weight_decay=weight_decay,
+                        beta_1=momentum_beta1
+                    ),
+                    loss={
+                        'forecast_head': lambda y_true, y_pred: cmse(
+                            y_true, y_pred,
+                            phase_manager=pm,
+                            lambda_factor=lambda_factor,
+                            train_mse_weight_dict=mse_train_weights_dict,
+                            train_pcc_weight_dict=pcc_train_weights_dict,
+                            val_mse_weight_dict=mse_test_weights_dict,
+                            val_pcc_weight_dict=pcc_test_weights_dict,
+                            asym_type=asym_type
+                        )
+                    }
+                )
 
-                # # Step 1: Create stratified dataset for the subtraining and validation set
-                # train_ds, train_steps = stratified_batch_dataset(
-                #     X_train, y_train, batch_size)
-                # test_ds, test_steps = stratified_batch_dataset(
-                #     X_test, y_test, batch_size)
+                # Step 1: Create stratified dataset for the subtraining and validation set
+                train_ds, train_steps = stratified_batch_dataset(
+                    X_train, y_train, batch_size)
+                test_ds, test_steps = stratified_batch_dataset(
+                    X_test, y_test, batch_size)
 
-                # # Map the training dataset to return {'output': y} format
-                # train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
-                # test_ds = test_ds.map(lambda x, y: (x, {'forecast_head': y}))
+                # Map the training dataset to return {'output': y} format
+                train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
+                test_ds = test_ds.map(lambda x, y: (x, {'forecast_head': y}))
 
                 # Train the model with the callback
-                # history = init_model_sep.fit(
-                #     train_ds,
-                #     steps_per_epoch=train_steps,
-                #     epochs=epochs, batch_size=batch_size,
-                #     validation_data=test_ds,
-                #     validation_steps=test_steps,
-                #     callbacks=[
-                #         early_stopping,
-                #         reduce_lr_on_plateau,
-                #         WandbCallback(save_model=WANDB_SAVE_MODEL),
-                #         IsTraining(pm)
-                #     ],
-                #     verbose=VERBOSE
-                # )
+                history = init_model_sep.fit(
+                    train_ds,
+                    steps_per_epoch=train_steps,
+                    epochs=epochs, batch_size=batch_size,
+                    validation_data=test_ds,
+                    validation_steps=test_steps,
+                    callbacks=[
+                        early_stopping,
+                        reduce_lr_on_plateau,
+                        WandbCallback(save_model=WANDB_SAVE_MODEL),
+                        IsTraining(pm)
+                    ],
+                    verbose=VERBOSE
+                )
 
                 # Use the quadratic fit function to find the optimal epoch
-                # optimal_epochs = find_optimal_epoch_by_smoothing(
-                #     history.history[ES_CB_MONITOR],
-                #     smoothing_method=smoothing_method,
-                #     smoothing_parameters={'window_size': val_window_size},
-                #     mode='min')
-                # print(f'optimal_epochs: {optimal_epochs}')
-                # wandb.log({'optimal_epochs': optimal_epochs})
+                optimal_epochs = find_optimal_epoch_by_smoothing(
+                    history.history[ES_CB_MONITOR],
+                    smoothing_method=smoothing_method,
+                    smoothing_parameters={'window_size': val_window_size},
+                    mode='min')
+                print(f'optimal_epochs: {optimal_epochs}')
+                wandb.log({'optimal_epochs': optimal_epochs})
 
                 # Recreate and recompile the model for optimal epoch training
                 final_model_sep = create_mlp_moe(
@@ -318,51 +318,55 @@ def main():
                     sam_rho=rho
                 )
 
-                # final_model_sep.compile(
-                #     optimizer=AdamW(
-                #         learning_rate=learning_rate,
-                #         weight_decay=weight_decay,
-                #         beta_1=momentum_beta1
-                #     ),
-                #     loss={
-                #         'forecast_head': lambda y_true, y_pred: cmse(
-                #             y_true, y_pred,
-                #             phase_manager=pm,
-                #             lambda_factor=lambda_factor,
-                #             train_mse_weight_dict=mse_train_weights_dict,
-                #             train_pcc_weight_dict=pcc_train_weights_dict,
-                #             asym_type=asym_type
-                #         )
-                #     }
-                # )
+                final_model_sep.compile(
+                    optimizer=AdamW(
+                        learning_rate=learning_rate,
+                        weight_decay=weight_decay,
+                        beta_1=momentum_beta1
+                    ),
+                    loss={
+                        'forecast_head': lambda y_true, y_pred: cmse(
+                            y_true, y_pred,
+                            phase_manager=pm,
+                            lambda_factor=lambda_factor,
+                            train_mse_weight_dict=mse_train_weights_dict,
+                            train_pcc_weight_dict=pcc_train_weights_dict,
+                            asym_type=asym_type
+                        )
+                    }
+                )
 
 
                 # Step 1: Create stratified dataset for the subtraining and validation set
-                # train_ds, train_steps = stratified_batch_dataset(
-                #     X_train, y_train, batch_size)
+                train_ds, train_steps = stratified_batch_dataset(
+                    X_train, y_train, batch_size)
 
-                # # Map the training dataset to return {'output': y} format
-                # train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
+                # Map the training dataset to return {'output': y} format
+                train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
 
 
                 # Train to the optimal epoch
-                # final_model_sep.fit(
-                #     train_ds,
-                #     steps_per_epoch=train_steps,
-                #     epochs=optimal_epochs,
-                #     batch_size=batch_size,
-                #     callbacks=[
-                #         reduce_lr_on_plateau,
-                #         WandbCallback(save_model=WANDB_SAVE_MODEL),
-                #         IsTraining(pm)
-                #     ],
-                #     verbose=VERBOSE
-                # )
+                final_model_sep.fit(
+                    train_ds,
+                    steps_per_epoch=train_steps,
+                    epochs=optimal_epochs,
+                    batch_size=batch_size,
+                    callbacks=[
+                        reduce_lr_on_plateau,
+                        WandbCallback(save_model=WANDB_SAVE_MODEL),
+                        IsTraining(pm)
+                    ],
+                    verbose=VERBOSE
+                )
 
-                # Save the final model
+                # Save the final model weights
                 final_model_sep.save_weights(f"final_model_moe_weights_{experiment_name}_reg.h5")
                 # print where the model weights are saved
                 print(f"Model weights are saved in final_model_moe_weights_{experiment_name}_reg.h5")
+
+                # Save the final combiner weights
+                final_model_sep.get_layer('combiner').save_weights(f"final_combiner_weights_{experiment_name}.h5")
+                print(f"Combiner weights are saved in final_combiner_weights_{experiment_name}.h5")
 
                 # evaluate the model error on test set
                 error_mae = evaluate_mae(final_model_sep, X_test, y_test)
