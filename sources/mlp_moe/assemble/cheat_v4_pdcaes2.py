@@ -24,7 +24,6 @@ from modules.training.ts_modeling import (
     create_mlp_moe,
     convert_to_onehot_cls,
     stratified_batch_dataset_cls2,
-    load_partial_weights_from_path
 )
 
 
@@ -39,7 +38,7 @@ def main():
     """
 
     # set the training phase manager - necessary for mse + pcc loss
-    combiner_pretrained_weights = COMBINER_PDCAE_S1
+    combiner_pretrained_weights = COMBINER_PDCAE_S2
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
@@ -54,7 +53,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_moe_cheat_v4'
+                title = f'mlp2pdcaes2_amse{alpha_mse:.2f}_moe_cheat_v4'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -112,7 +111,7 @@ def main():
                 combiner_pretrained_config = {
                     'input_dim': n_features,
                     'hiddens': hiddens,
-                    'output_dim': 0,  # original output dimension
+                    'output_dim': 1,  # original output dimension
                     'pretraining': pretraining,
                     'embed_dim': embed_dim,
                     'dropout': dropout,
@@ -122,8 +121,8 @@ def main():
                     'skipped_layers': skipped_layers,
                     'sam_rho': rho,
                     'proj_hiddens': proj_hiddens,
-                    'proj_neck': False,
-                    'no_head': True
+                    'proj_neck': True,
+                    'no_head': False
                 }
 
                 # Initialize wandb
@@ -417,6 +416,11 @@ def main():
                 final_model_sep.save_weights(f"final_model_moe_weights_{experiment_name}_reg.h5")
                 # print where the model weights are saved
                 print(f"Model weights are saved in final_model_moe_weights_{experiment_name}_reg.h5")
+
+                # Save the combiner sub-model weights
+                combiner_submodel = final_model_sep.get_layer("combiner")
+                combiner_submodel.save_weights(f"combiner_v4_weights_{experiment_name}.h5")
+                print(f"Combiner sub-model weights saved to combiner_v4_weights_{experiment_name}.h5")
 
                 # evaluate the model error on test set
                 error_mae = evaluate_mae(final_model_sep, X_test, y_test)

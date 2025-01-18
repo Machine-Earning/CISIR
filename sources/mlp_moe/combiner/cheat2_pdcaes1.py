@@ -361,6 +361,19 @@ def main():
                     sam_rho=rho,
                     output_activation='softmax'
                 )
+                
+                # Load pre-trained weights if available
+                if pretrained_weights is not None:
+                    print(f"Loading pre-trained weights from {pretrained_weights}")
+                    load_partial_weights_from_path(
+                        pretrained_weights_path=pretrained_weights,
+                        new_model=combiner_model,
+                        old_model_params=old_model_params,
+                        skip_layers=["forecast_head"],  # skip final layer if output_dim differs
+                        proj_neck=False,
+                        no_head=True
+                    )
+
                 # summary of the model
                 combiner_model.summary()
 
@@ -382,18 +395,6 @@ def main():
                         )
                     }
                 )
-
-                # Load pre-trained weights if available
-                if pretrained_weights is not None:
-                    print(f"Loading pre-trained weights from {pretrained_weights}")
-                    load_partial_weights_from_path(
-                        pretrained_weights_path=pretrained_weights,
-                        new_model=combiner_model,
-                        old_model_params=old_model_params,
-                        skip_layers=["forecast_head"],  # skip final layer if output_dim differs
-                        proj_neck=False,
-                        no_head=True
-                    )
 
                 # Train the combiner model for optimal epochs
                 history = combiner_model.fit(
