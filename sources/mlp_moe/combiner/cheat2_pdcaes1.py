@@ -55,7 +55,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2pdcaes2_ace{alpha_ce:.2f}_combiner_lpn{lambda_pn:.2f}_lnz{lambda_nz:.2f}_lce{lambda_ce:.2f}'
+                title = f'mlp2pdcaes1_ace{alpha_ce:.2f}_combiner_lpn{lambda_pn:.2f}_lnz{lambda_nz:.2f}_lce{lambda_ce:.2f}'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -240,6 +240,7 @@ def main():
                     'skip_repr': skip_repr,
                     'skipped_layers': skipped_layers,
                     'sam_rho': rho,
+                    'proj_hiddens': proj_hiddens
                 }
 
                 # Create initial model for finding optimal epochs
