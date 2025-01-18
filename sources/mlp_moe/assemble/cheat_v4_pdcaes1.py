@@ -6,11 +6,12 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow.keras.losses import CategoricalCrossentropy
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
-from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
+
 # from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
+from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
     build_dataset,
     evaluate_mae,
@@ -108,23 +109,6 @@ def main():
                     # 'combiner': COMBINER_PATH
                 }
 
-                combiner_pretrained_config = {
-                    'input_dim': n_features,
-                    'hiddens': hiddens,
-                    'output_dim': 0,  # original output dimension
-                    'pretraining': pretraining,
-                    'embed_dim': embed_dim,
-                    'dropout': dropout,
-                    'activation': activation,
-                    'norm': norm,
-                    'skip_repr': skip_repr,
-                    'skipped_layers': skipped_layers,
-                    'sam_rho': rho,
-                    'proj_hiddens': proj_hiddens,
-                    'proj_neck': False,
-                    'no_head': True
-                }
-
                 # Initialize wandb
                 wandb.init(project="Jan-Report", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
@@ -166,7 +150,6 @@ def main():
                     'expert-_path': NEG_EXPERT_PATH,
                     'combiner_path': COMBINER_PATH,
                     'combiner_pretrained_weights': combiner_pretrained_weights,
-                    'combiner_pretrained_config': combiner_pretrained_config,
                     'asym_type': asym_type,
                     'freeze_experts': freeze_experts
                 })
@@ -181,7 +164,7 @@ def main():
                     outputs_to_use=outputs_to_use,
                     cme_speed_threshold=cme_speed_threshold,
                     shuffle_data=True)
-                
+
                 # Convert y_train to 3 classes based on thresholds
                 y_train_classes = convert_to_onehot_cls(y_train, lower_threshold, upper_threshold)
                 # print the training set shapes
@@ -212,7 +195,7 @@ def main():
                     add_slope=add_slope,
                     outputs_to_use=outputs_to_use,
                     cme_speed_threshold=cme_speed_threshold)
-                
+
                 # Convert y_test to 3 classes based on thresholds
                 y_test_classes = convert_to_onehot_cls(y_test, lower_threshold, upper_threshold)
                 # print the test set shapes
@@ -247,7 +230,22 @@ def main():
                 #     high_threshold=upper_threshold,
                 #     N=N, seed=seed)
 
-
+                combiner_pretrained_config = {
+                    'input_dim': n_features,
+                    'hiddens': hiddens,
+                    'output_dim': 0,  # original output dimension
+                    'pretraining': pretraining,
+                    'embed_dim': embed_dim,
+                    'dropout': dropout,
+                    'activation': activation,
+                    'norm': norm,
+                    'skip_repr': skip_repr,
+                    'skipped_layers': skipped_layers,
+                    'sam_rho': rho,
+                    'proj_hiddens': proj_hiddens,
+                    'proj_neck': False,
+                    'no_head': True
+                }
 
                 # create the model
                 init_model_sep = create_mlp_moe(
@@ -385,7 +383,6 @@ def main():
                     loss_weights={'forecast_head': 0.5, 'combiner': 0.5}
                 )
 
-
                 # Step 1: Create stratified dataset for the subtraining and validation set
                 train_ds, train_steps = stratified_batch_dataset_cls2(
                     X_train, y_train_classes, y_train, batch_size)
@@ -396,7 +393,6 @@ def main():
                         x, {'forecast_head': delta, 'combiner': y_cls}
                     )
                 )
-
 
                 # Train to the optimal epoch
                 final_model_sep.fit(
@@ -421,7 +417,6 @@ def main():
                 combiner_submodel = final_model_sep.get_layer("combiner")
                 combiner_submodel.save_weights(f"combiner_v4_weights_{experiment_name}.h5")
                 print(f"Combiner sub-model weights saved to combiner_v4_weights_{experiment_name}.h5")
-
 
                 # evaluate the model error on test set
                 error_mae = evaluate_mae(final_model_sep, X_test, y_test)
