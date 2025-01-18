@@ -262,7 +262,7 @@ def main():
                 if pretrained_weights is not None:
                     print(f"Loading pre-trained weights from {pretrained_weights}")
                     load_partial_weights_from_path(
-                        pretrained_weights_path=PRE_WEIGHT_PATH,
+                        pretrained_weights_path=pretrained_weights,
                         new_model=initial_model,
                         old_model_params=old_model_params,
                         skip_layers=["forecast_head"],  # skip final layer if output_dim differs
@@ -386,7 +386,7 @@ def main():
                 if pretrained_weights is not None:
                     print(f"Loading pre-trained weights from {pretrained_weights}")
                     load_partial_weights_from_path(
-                        pretrained_weights_path=PRE_WEIGHT_PATH,
+                        pretrained_weights_path=pretrained_weights,
                         new_model=combiner_model,
                         old_model_params=old_model_params,
                         skip_layers=["forecast_head"],  # skip final layer if output_dim differs
