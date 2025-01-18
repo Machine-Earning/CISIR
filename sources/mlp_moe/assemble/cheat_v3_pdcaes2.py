@@ -36,7 +36,7 @@ def main():
     """
 
     # set the training phase manager - necessary for mse + pcc loss'
-    combiner_pretrained_weights = COMBINER_PDCAE_S1
+    combiner_pretrained_weights = COMBINER_PDCAE_S2
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
