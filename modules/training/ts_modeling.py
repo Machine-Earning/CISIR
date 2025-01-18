@@ -1275,7 +1275,8 @@ def create_mlp_moe(
         skipped_layers: int = 1,
         skip_repr: bool = True,
         pretraining: bool = False,
-        pretraining_paths: str = None,
+        combiner_pretrained_weights: str = None,
+        combiner_pretrained_config: dict = None,
         freeze_experts: bool = True,
         expert_paths: dict = None,
         mode: str = 'soft',  # 'soft' or 'hard'
@@ -1292,11 +1293,13 @@ def create_mlp_moe(
     Parameters:
     - input_dim (int): The number of features in the input data.
     - hiddens (list): A list of integers where each integer is the number of units in a hidden layer.
+    - proj_hiddens (list): A list of integers where each integer is the number of units in a hidden layer.
     - skipped_layers (int): Number of layers between residual connections.
     - embed_dim (int): The number of features in the final representation vector.
     - skip_repr (bool): If True and skipped_layers > 0, adds a residual connection to the representation layer.
     - pretraining (bool): If True, the model will use PDS/PDC and have its representations normalized.
-    - pretraining_paths (str): Path to the pre-trained model weights.
+    - combiner_pretrained_weights (str): Path to the pre-trained combiner model weights.
+    - combiner_pretrained_config (dict): Dictionary containing the configuration of the pre-trained combiner model.
     - activation: Optional activation function to use. If None, defaults to LeakyReLU.
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is 'batch_norm'.
     - sam_rho (float): Size of the neighborhood for perturbation in SAM. Default is 0.05. If 0.0, SAM is not used.
@@ -1315,13 +1318,7 @@ def create_mlp_moe(
     Returns:
     - Model: A Keras model instance.
     """
-    if pretraining_paths is None:
-        pretraining_paths = {
-            'combiner': None,
-            'plus': None,
-            'zero': None,
-            'minus': None
-        }
+
 
     if hiddens is None:
         hiddens = MLP_HIDDENS
@@ -1397,9 +1394,22 @@ def create_mlp_moe(
         name='combiner'
     )
 
+    # Load pre-trained weights if available
+    if combiner_pretrained_weights is not None:
+        print(f"Loading pre-trained weights from {combiner_pretrained_weights}")
+        load_partial_weights_from_path(
+            pretrained_weights_path=combiner_pretrained_weights,
+            new_model=combiner,
+            old_model_params=combiner_pretrained_config,
+            skip_layers=["forecast_head"],  # skip final layer if output_dim differs
+            proj_neck=combiner_pretrained_config['proj_neck'],
+            no_head=combiner_pretrained_config['no_head']
+        )
+
+
     # Load weights if paths are provided
     if expert_paths:
-        if 'combiner' in expert_paths:
+        if 'combiner' in expert_paths and combiner_pretrained_weights is None:
             combiner.load_weights(expert_paths['combiner'])
         if 'plus' in expert_paths:
             expert_plus.load_weights(expert_paths['plus'])

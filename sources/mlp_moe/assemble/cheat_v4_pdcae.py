@@ -20,10 +20,11 @@ from modules.training.ts_modeling import (
     cmse,
     # filter_ds,
     # create_mlp,
-    plot_error_hist,
+    # plot_error_hist,
     create_mlp_moe,
     convert_to_onehot_cls,
-    stratified_batch_dataset_cls2
+    stratified_batch_dataset_cls2,
+    load_partial_weights_from_path
 )
 
 
@@ -38,7 +39,7 @@ def main():
     """
 
     # set the training phase manager - necessary for mse + pcc loss
-    pretrained_weights = COMBINER_PDCAE_S1
+    combiner_pretrained_weights = COMBINER_PDCAE_S1
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
@@ -78,6 +79,7 @@ def main():
                 batch_size = BATCH_SIZE  # higher batch size
                 epochs = EPOCHS  # higher epochs
                 hiddens = MLP_HIDDENS  # hidden layers
+                proj_hiddens = PROJ_HIDDENS
 
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 bandwidth = BANDWIDTH
@@ -97,6 +99,8 @@ def main():
                 smoothing_method = SMOOTHING_METHOD
                 window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
                 val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
+                pretraining = True
+                freeze_experts = FREEZE_EXPERT
 
                 expert_paths = {
                     'plus': POS_EXPERT_PATH,
@@ -105,8 +109,21 @@ def main():
                     # 'combiner': COMBINER_PATH
                 }
 
-                pretraining_paths = {
-                    'combiner': COMBINER_PDCAE_S1,
+                combiner_pretrained_config = {
+                    'input_dim': n_features,
+                    'hiddens': hiddens,
+                    'output_dim': 0,  # original output dimension
+                    'pretraining': pretraining,
+                    'embed_dim': embed_dim,
+                    'dropout': dropout,
+                    'activation': activation,
+                    'norm': norm,
+                    'skip_repr': skip_repr,
+                    'skipped_layers': skipped_layers,
+                    'sam_rho': rho,
+                    'proj_hiddens': proj_hiddens,
+                    'proj_neck': False,
+                    'no_head': True
                 }
 
                 # Initialize wandb
@@ -149,8 +166,10 @@ def main():
                     'expert0_path': NZ_EXPERT_PATH,
                     'expert-_path': NEG_EXPERT_PATH,
                     'combiner_path': COMBINER_PATH,
-                    'pretraining_paths': pretraining_paths,
-                    'asym_type': asym_type
+                    'combiner_pretrained_weights': combiner_pretrained_weights,
+                    'combiner_pretrained_config': combiner_pretrained_config,
+                    'asym_type': asym_type,
+                    'freeze_experts': freeze_experts
                 })
 
                 # set the root directory
@@ -239,9 +258,11 @@ def main():
                     embed_dim=embed_dim,
                     skipped_layers=skipped_layers,
                     skip_repr=skip_repr,
-                    pretraining=PRETRAINING_MOE,
-                    freeze_experts=FREEZE_EXPERT,
+                    pretraining=pretraining,
+                    freeze_experts=freeze_experts,
                     expert_paths=expert_paths,
+                    combiner_pretrained_weights=combiner_pretrained_weights,
+                    combiner_pretrained_config=combiner_pretrained_config,
                     mode=MODE_MOE,
                     activation=activation,
                     norm=norm,
@@ -334,9 +355,11 @@ def main():
                     embed_dim=embed_dim,
                     skipped_layers=skipped_layers,
                     skip_repr=skip_repr,
-                    pretraining=PRETRAINING_MOE,
-                    freeze_experts=FREEZE_EXPERT,
+                    pretraining=pretraining,
+                    freeze_experts=freeze_experts,
                     expert_paths=expert_paths,
+                    combiner_pretrained_weights=combiner_pretrained_weights,
+                    combiner_pretrained_config=combiner_pretrained_config,
                     mode=MODE_MOE,
                     activation=activation,
                     norm=norm,
