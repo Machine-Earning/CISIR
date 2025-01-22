@@ -29,7 +29,7 @@ def main():
     """
 
     # Path to pre-trained model weights
-    combiner_path = COMBINER_V3_PDCAE_S2 # COMBINER_PCC_CE_S2 #COMBINER_PATH
+    combiner_path = COMBINER_V3_A0 # COMBINER_V3_PDCAE_S2 # COMBINER_PCC_CE_S2 #COMBINER_PATH
 
     for seed in SEEDS:
         # PARAMS

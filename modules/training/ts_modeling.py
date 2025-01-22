@@ -1334,6 +1334,7 @@ def create_mlp_moe(
         skipped_layers: int = 1,
         skip_repr: bool = True,
         pretraining: bool = False,
+        combiner_output_activation: str = 'norm_relu',
         combiner_pretrained_weights: str = None,
         combiner_pretrained_config: dict = None,
         freeze_experts: bool = True,
@@ -1449,7 +1450,7 @@ def create_mlp_moe(
         norm=norm,
         sam_rho=sam_rho,
         dropout=dropout,
-        output_activation='softmax',  # Use softmax for class probabilities
+        output_activation=combiner_output_activation,  # Use softmax for class probabilities
         name='combiner'
     )
 

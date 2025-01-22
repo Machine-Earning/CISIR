@@ -173,17 +173,18 @@ COMBINER_PN_NZ = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_w
 COMBINER_V2_PDCAE_S1 = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2pdcaes1_ace0.65_combiner_lpn0.00_lnz0.00_lce1.00_20250118-101801.h5'
 COMBINER_V2_PDCAE_S2 = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2pdcaes2_ace0.65_combiner_lpn0.00_lnz0.00_lce1.00_20250118-101801.h5'
 COMBINER_V3_PDCAE_S2 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes2_amse0.40_moe_cheat_v3_randInitCombiner_20250118-124725.h5'
+COMBINER_V3_A0 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.00_moe_cheat_v3_randInitCombiner_20250121-142443.h5'
 
 # assemble hyperparams
-REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]
+REWEIGHTS_MOE = [(0.3, 0.3, 0.0, 0.0)]
 RHO_MOE = [1e-2]
 LAMBDA_FACTOR_MOE = 8
-START_LR_MOE = 3e-4
+START_LR_MOE = 1e-4
 LR_CB_MIN_LR_MOE = 1e-5
 LR_CB_FACTOR_MOE = 0.95
 LR_CB_PATIENCE_MOE = 50
 WEIGHT_DECAY_MOE = 1e-4
-PATIENCE_MOE = int(3.5e3)
+PATIENCE_MOE = int(3e3)
 ASYM_TYPE_MOE = None
 
 FREEZE_EXPERT = True
@@ -195,5 +196,5 @@ LAMBDA_PN_CCE = 1
 LAMBDA_NZ_CCE = 1
 LAMBDA_CE = 0.5
 
-START_LR_MOE_C = 1e-4
+START_LR_MOE_C = 1e-3
 REWEIGHTS_MOE_C2 = [(0.65, 0.65, 0.0, 0.0)]
