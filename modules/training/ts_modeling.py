@@ -37,7 +37,10 @@ from tensorflow.keras.layers import (
     Add,
     Multiply,
     Lambda,
-    Reshape
+    Reshape,
+    ReLU,
+    Layer,
+    Activation
 )
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Optimizer
@@ -643,6 +646,46 @@ def load_partial_weights_from_path(
         # After this, `new_model` will have partially loaded weights, except for layers that didn't match or were skipped.
 
 
+class NormalizedReLU(Layer):
+    """Custom activation layer that applies ReLU followed by L1 normalization.
+    
+    This layer first applies a ReLU activation to ensure non-negative outputs,
+    then normalizes the outputs along the last dimension so they sum to 1.
+    This is useful for cases where you want positive normalized outputs,
+    such as attention weights or routing probabilities.
+
+    Example:
+        ```python
+        x = NormalizedReLU()(inputs)  # outputs will be non-negative and sum to 1
+        ```
+    """
+
+    def __init__(self, **kwargs):
+        """Initialize the NormalizedReLU layer.
+        
+        Args:
+            **kwargs: Additional keyword arguments passed to the Layer base class
+        """
+        super(NormalizedReLU, self).__init__(**kwargs)
+        self.relu = ReLU()  # Create ReLU activation layer
+
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        """Apply ReLU activation followed by L1 normalization.
+        
+        Args:
+            inputs: Input tensor to transform
+            
+        Returns:
+            Tensor with non-negative values that sum to 1 along the last dimension
+        """
+        # First apply ReLU to get non-negative outputs
+        relu_output = self.relu(inputs)
+
+        # Normalize along last dimension so outputs sum to 1
+        # Add small epsilon to prevent division by zero
+        return relu_output / (tf.reduce_sum(relu_output, axis=-1, keepdims=True) + tf.keras.backend.epsilon())
+
+
 def create_mlp(
         input_dim: int = 100,
         output_dim: int = 1,
@@ -675,7 +718,8 @@ def create_mlp(
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None.
     - sam_rho (float): Size of the neighborhood for perturbation in SAM. Default is 0.05. If 0.0, SAM is not used.
     - dropout (float): Dropout rate to apply after activations or residual connections. If 0.0, no dropout is applied.
-    - output_activation: Optional activation function for output layer. Use 'softmax' for multi-class or 'sigmoid' for binary.
+    - output_activation: Optional activation function for output layer. Use 'softmax' for multi-class, 'sigmoid' for binary,
+                        or 'norm_relu' for normalized ReLU outputs that sum to 1.
     
     Returns:
     - Model: A Keras model instance.
@@ -782,7 +826,11 @@ def create_mlp(
 
     # Add output layer if output_dim > 0
     if output_dim > 0:
-        output_layer = Dense(output_dim, activation=output_activation, name='forecast_head')(final_repr_output)
+        dense_output = Dense(output_dim, name='forecast_head')(final_repr_output)
+        if output_activation == 'norm_relu':
+            output_layer = NormalizedReLU()(dense_output)
+        else:
+            output_layer = Activation(output_activation)(dense_output)
         model_output = [final_repr_output, output_layer]
     else:
         model_output = final_repr_output
@@ -891,15 +939,26 @@ def add_proj_head(
             x_proj = Dropout(dropout, name=f"proj_dropout_{dropout_count + i + 1}")(x_proj)
 
     # Add output layer with specified activation
-    output_layer = Dense(output_dim, activation=output_activation, name=f"forecast_head")(x_proj)
+    dense_output = Dense(output_dim, name=f"forecast_head")(x_proj)
+
+    if output_activation == 'norm_relu':
+        output_layer = NormalizedReLU()(dense_output)
+    else:
+        output_layer = Activation(output_activation)(dense_output)
 
     if sam_rho > 0.0:
         # create the new extended SAM model
-        extended_model = SAMModel(inputs=new_base_model.input, outputs=[repr_output, output_layer], rho=sam_rho,
-                                  name=name)
+        extended_model = SAMModel(
+            inputs=new_base_model.input,
+            outputs=[repr_output, output_layer],
+            rho=sam_rho,
+            name=name)
     else:
         # Create the new extended model
-        extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer], name=name)
+        extended_model = Model(
+            inputs=new_base_model.input,
+            outputs=[repr_output, output_layer],
+            name=name)
 
     # If freeze_features is False, make all layers trainable
     if not freeze_features:
@@ -1069,11 +1128,11 @@ def plot_posteriors(
 
     # Create smoothing window
     window = 64
-    
+
     # -------------------------------------------------
     # Subplot 1: P(+|x)
     # -------------------------------------------------
-    axes[0,0].scatter(
+    axes[0, 0].scatter(
         y_delta,
         predictions[:, 0],  # P(+|x) is assumed to be in column 0
         color='red',
@@ -1084,23 +1143,23 @@ def plot_posteriors(
     sorted_idx = np.argsort(y_delta)
     x_smooth = y_delta[sorted_idx]
     y_smooth = predictions[:, 0][sorted_idx]
-    y_smoothed = np.convolve(y_smooth, np.ones(window)/window, mode='valid')
-    x_smoothed = x_smooth[window-1:]
-    axes[0,0].plot(x_smoothed, y_smoothed, color='black', linewidth=0.9)
+    y_smoothed = np.convolve(y_smooth, np.ones(window) / window, mode='valid')
+    x_smoothed = x_smooth[window - 1:]
+    axes[0, 0].plot(x_smoothed, y_smoothed, color='black', linewidth=0.9)
     # Add threshold lines
-    axes[0,0].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
-    axes[0,0].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
-    
-    axes[0,0].set_title("P(+|x)", fontsize=14)
-    axes[0,0].set_xlabel("Delta", fontsize=12)
-    axes[0,0].set_ylabel("Posterior Probability", fontsize=12)
-    axes[0,0].set_xlim(-2.5, 2.5)
-    axes[0,0].set_ylim(0, 1)
+    axes[0, 0].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
+    axes[0, 0].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
+
+    axes[0, 0].set_title("P(+|x)", fontsize=14)
+    axes[0, 0].set_xlabel("Delta", fontsize=12)
+    axes[0, 0].set_ylabel("Posterior Probability", fontsize=12)
+    axes[0, 0].set_xlim(-2.5, 2.5)
+    axes[0, 0].set_ylim(0, 1)
 
     # -------------------------------------------------
     # Subplot 2: P(-|x)
     # -------------------------------------------------
-    axes[0,1].scatter(
+    axes[0, 1].scatter(
         y_delta,
         predictions[:, 2],  # P(-|x) is assumed to be in column 2
         color='blue',
@@ -1109,22 +1168,22 @@ def plot_posteriors(
     )
     # Add smooth trend line using moving average
     y_smooth = predictions[:, 2][sorted_idx]
-    y_smoothed = np.convolve(y_smooth, np.ones(window)/window, mode='valid')
-    axes[0,1].plot(x_smoothed, y_smoothed, color='black', linewidth=0.9)
+    y_smoothed = np.convolve(y_smooth, np.ones(window) / window, mode='valid')
+    axes[0, 1].plot(x_smoothed, y_smoothed, color='black', linewidth=0.9)
     # Add threshold lines
-    axes[0,1].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
-    axes[0,1].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
-    
-    axes[0,1].set_title("P(-|x)", fontsize=14)
-    axes[0,1].set_xlabel("Delta", fontsize=12)
-    axes[0,1].set_ylabel("Posterior Probability", fontsize=12)
-    axes[0,1].set_xlim(-2.5, 2.5)
-    axes[0,1].set_ylim(0, 1)
+    axes[0, 1].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
+    axes[0, 1].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
+
+    axes[0, 1].set_title("P(-|x)", fontsize=14)
+    axes[0, 1].set_xlabel("Delta", fontsize=12)
+    axes[0, 1].set_ylabel("Posterior Probability", fontsize=12)
+    axes[0, 1].set_xlim(-2.5, 2.5)
+    axes[0, 1].set_ylim(0, 1)
 
     # -------------------------------------------------
     # Subplot 3: P(0|x)
     # -------------------------------------------------
-    axes[1,0].scatter(
+    axes[1, 0].scatter(
         y_delta,
         predictions[:, 1],  # P(0|x) is assumed to be in column 1
         color='gray',
@@ -1133,23 +1192,23 @@ def plot_posteriors(
     )
     # Add smooth trend line using moving average
     y_smooth = predictions[:, 1][sorted_idx]
-    y_smoothed = np.convolve(y_smooth, np.ones(window)/window, mode='valid')
-    axes[1,0].plot(x_smoothed, y_smoothed, color='black', linewidth=0.9)
+    y_smoothed = np.convolve(y_smooth, np.ones(window) / window, mode='valid')
+    axes[1, 0].plot(x_smoothed, y_smoothed, color='black', linewidth=0.9)
     # Add threshold lines
-    axes[1,0].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
-    axes[1,0].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
-    
-    axes[1,0].set_title("P(0|x)", fontsize=14)
-    axes[1,0].set_xlabel("Delta", fontsize=12)
-    axes[1,0].set_ylabel("Posterior Probability", fontsize=12)
-    axes[1,0].set_xlim(-2.5, 2.5)
-    axes[1,0].set_ylim(0, 1)
+    axes[1, 0].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
+    axes[1, 0].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
+
+    axes[1, 0].set_title("P(0|x)", fontsize=14)
+    axes[1, 0].set_xlabel("Delta", fontsize=12)
+    axes[1, 0].set_ylabel("Posterior Probability", fontsize=12)
+    axes[1, 0].set_xlim(-2.5, 2.5)
+    axes[1, 0].set_ylim(0, 1)
 
     # -------------------------------------------------
     # Subplot 4: P(+|x) - P(-|x)
     # -------------------------------------------------
     diff = predictions[:, 0] - predictions[:, 2]  # P(+|x) - P(-|x)
-    axes[1,1].scatter(
+    axes[1, 1].scatter(
         y_delta,
         diff,
         color='purple',
@@ -1158,17 +1217,17 @@ def plot_posteriors(
     )
     # Add smooth trend line using moving average
     y_smooth = diff[sorted_idx]
-    y_smoothed = np.convolve(y_smooth, np.ones(window)/window, mode='valid')
-    axes[1,1].plot(x_smoothed, y_smoothed, color='black', linewidth=0.9)
+    y_smoothed = np.convolve(y_smooth, np.ones(window) / window, mode='valid')
+    axes[1, 1].plot(x_smoothed, y_smoothed, color='black', linewidth=0.9)
     # Add threshold lines
-    axes[1,1].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
-    axes[1,1].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
-    
-    axes[1,1].set_title("P(+|x) - P(-|x)", fontsize=14)
-    axes[1,1].set_xlabel("Delta", fontsize=12)
-    axes[1,1].set_ylabel("Probability Difference", fontsize=12)
-    axes[1,1].set_xlim(-2.5, 2.5)
-    axes[1,1].set_ylim(-1, 1)
+    axes[1, 1].axvline(x=lower_delta_threshold, color='green', linestyle='--', alpha=0.5)
+    axes[1, 1].axvline(x=upper_delta_threshold, color='green', linestyle='--', alpha=0.5)
+
+    axes[1, 1].set_title("P(+|x) - P(-|x)", fontsize=14)
+    axes[1, 1].set_xlabel("Delta", fontsize=12)
+    axes[1, 1].set_ylabel("Probability Difference", fontsize=12)
+    axes[1, 1].set_xlim(-2.5, 2.5)
+    axes[1, 1].set_ylim(-1, 1)
 
     # Optional super-title
     if suptitle:
@@ -1319,7 +1378,6 @@ def create_mlp_moe(
     - Model: A Keras model instance.
     """
 
-
     if hiddens is None:
         hiddens = MLP_HIDDENS
 
@@ -1406,7 +1464,6 @@ def create_mlp_moe(
             proj_neck=combiner_pretrained_config['proj_neck'],
             no_head=combiner_pretrained_config['no_head']
         )
-
 
     # Load weights if paths are provided
     if expert_paths:
