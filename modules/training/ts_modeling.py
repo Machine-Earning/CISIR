@@ -1328,6 +1328,7 @@ def create_mlp_moe(
 
     expert_output_dim = 1
     combiner_output_dim = 3
+    expert_pretraining = False
 
     input_layer = Input(shape=(input_dim,))
 
@@ -1339,7 +1340,7 @@ def create_mlp_moe(
         skipped_layers=skipped_layers,
         embed_dim=embed_dim,
         skip_repr=skip_repr,
-        pretraining=pretraining,
+        pretraining=expert_pretraining,
         activation=activation,
         norm=norm,
         sam_rho=sam_rho,
@@ -1354,7 +1355,7 @@ def create_mlp_moe(
         skipped_layers=skipped_layers,
         embed_dim=embed_dim,
         skip_repr=skip_repr,
-        pretraining=pretraining,
+        pretraining=expert_pretraining,
         activation=activation,
         norm=norm,
         sam_rho=sam_rho,
@@ -1369,7 +1370,7 @@ def create_mlp_moe(
         skipped_layers=skipped_layers,
         embed_dim=embed_dim,
         skip_repr=skip_repr,
-        pretraining=pretraining,
+        pretraining=expert_pretraining,
         activation=activation,
         norm=norm,
         sam_rho=sam_rho,
