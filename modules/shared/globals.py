@@ -53,7 +53,7 @@ SKIP_REPR = True  # residual representation
 
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
-START_LR = 1e-3  # starting learning rate
+START_LR = 1e-4  # starting learning rate
 WEIGHT_DECAY = 1e-4  # Higher weight decay
 MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
@@ -178,7 +178,7 @@ COMBINER_V3_NRELU = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights
 
 
 # assemble hyperparams
-REWEIGHTS_MOE = [(0.39, 0.15, 0.0, 0.0)]
+REWEIGHTS_MOE = [(0.0, 0.0, 0.0, 0.0)]
 RHO_MOE = [1e-2]
 LAMBDA_FACTOR_MOE = 8
 START_LR_MOE = 1e-4

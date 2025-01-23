@@ -50,7 +50,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_moe_cheat_v1_coreg'
+                title = f'mlp2_amse{alpha_mse:.2f}_moe_cheat_v1_coreg_pcc_ce'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -99,7 +99,7 @@ def main():
                     'plus': POS_EXPERT_PATH,
                     'zero': NZ_EXPERT_PATH,
                     'minus': NEG_EXPERT_PATH,
-                    'combiner': COMBINER_PATH_NOC
+                    'combiner': COMBINER_PCC_CE
                 }
 
                 # Initialize wandb

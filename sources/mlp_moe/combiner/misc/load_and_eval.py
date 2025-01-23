@@ -29,7 +29,7 @@ def main():
     """
 
     # Path to pre-trained model weights
-    combiner_path = COMBINER_V3_NRELU # COMBINER_V3_PDCAE_S2 # COMBINER_PCC_CE_S2 #COMBINER_PATH
+    combiner_path = COMBINER_PCC_CE_S2 #COMBINER_PATH
 
     for seed in SEEDS:
         # PARAMS
@@ -43,7 +43,7 @@ def main():
         
         # Create a unique experiment name with a timestamp
         current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-        experiment_name = f'combiner_v3_nrelu_eval_{current_time}'
+        experiment_name = f'combiner_pcc_ce_s2_eval_{current_time}'
 
         set_seed(seed)
         

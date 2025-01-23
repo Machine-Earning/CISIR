@@ -698,7 +698,7 @@ def create_mlp(
         norm: str = 'batch_norm',
         sam_rho: float = 1e-2,
         dropout: float = 0.2,
-        output_activation=None,
+        output_activation='linear',
         name: str = 'mlp'
 ) -> Model:
     """

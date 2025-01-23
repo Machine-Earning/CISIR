@@ -5,9 +5,9 @@ import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping
 from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
-from modules.training.smooth_early_stopping import SmoothEarlyStopping
+from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.reweighting.exLinReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.ts_modeling import (
@@ -263,6 +263,64 @@ def main():
                                 validation_steps=test_steps,
                                 callbacks=[
                                     early_stopping,
+                                    reduce_lr_on_plateau,
+                                    WandbCallback(save_model=WANDB_SAVE_MODEL),
+                                    IsTraining(pm)
+                                ],
+                                verbose=VERBOSE
+                            )
+
+                            # Find optimal epoch
+                            optimal_epoch = find_optimal_epoch_by_smoothing(
+                                history.history['val_loss'],
+                                smoothing_method=smoothing_method,
+                                smoothing_parameters={'window_size': val_window_size},
+                                mode='min')
+                            print(f"Optimal epoch found: {optimal_epoch}")
+                            wandb.log({"optimal_epoch": optimal_epoch})
+
+                            # Retrain model to optimal epoch
+                            final_model_sep = create_mlp(
+                                input_dim=n_features,
+                                hiddens=hiddens,
+                                embed_dim=embed_dim,
+                                output_dim=output_dim,
+                                dropout=dropout,
+                                activation=activation,
+                                norm=norm,
+                                skip_repr=skip_repr,
+                                skipped_layers=skipped_layers,
+                                sam_rho=rho
+                            )
+
+                            final_model_sep.compile(
+                                optimizer=AdamW(
+                                    learning_rate=learning_rate,
+                                    weight_decay=weight_decay,
+                                    beta_1=momentum_beta1
+                                ),
+                                loss={
+                                    'forecast_head': lambda y_true, y_pred: cmse(
+                                        y_true, y_pred,
+                                        phase_manager=pm,
+                                        lambda_factor=lambda_factor,
+                                        train_mse_weight_dict=mse_train_weights_dict,
+                                        train_pcc_weight_dict=pcc_train_weights_dict,
+                                        val_mse_weight_dict=mse_test_weights_dict,
+                                        val_pcc_weight_dict=pcc_test_weights_dict,
+                                    )
+                                }
+                            )
+
+                            # Train to optimal epoch
+                            final_model_sep.fit(
+                                train_ds,
+                                steps_per_epoch=train_steps,
+                                epochs=optimal_epoch,
+                                batch_size=batch_size,
+                                validation_data=test_ds,
+                                validation_steps=test_steps,
+                                callbacks=[
                                     reduce_lr_on_plateau,
                                     WandbCallback(save_model=WANDB_SAVE_MODEL),
                                     IsTraining(pm)
