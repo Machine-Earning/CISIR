@@ -826,11 +826,12 @@ def create_mlp(
 
     # Add output layer if output_dim > 0
     if output_dim > 0:
-        dense_output = Dense(output_dim,
-                             activation=output_activation if output_activation != 'norm_relu' else None,
-                             name='forecast_head')(final_repr_output)
+        dense_output = Dense(
+            output_dim,
+            activation=output_activation if output_activation != 'norm_relu' else None,
+            name='forecast_head')(final_repr_output)
         if output_activation == 'norm_relu':
-            dense_output = NormalizedReLU()(dense_output)
+            dense_output = NormalizedReLU(name='forecast_head')(dense_output)
         model_output = [final_repr_output, dense_output]
     else:
         model_output = final_repr_output
