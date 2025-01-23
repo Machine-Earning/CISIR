@@ -10,7 +10,7 @@ from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.reweighting.exLinReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
@@ -24,7 +24,8 @@ from modules.training.ts_modeling import (
     stratified_batch_dataset_cls,
     load_partial_weights_from_path,
     filter_ds,
-    cce
+    pn_nz_loss,
+    plot_posteriors
 )
 
 
@@ -39,20 +40,21 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
-        for alpha_ce, alphaV_ce, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_C:
+        for alpha_ce, alphaV_ce, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_C2:
             for rho in RHO_MOE_C:  # SAM_RHOS:
                 # PARAMS
                 inputs_to_use = INPUTS_TO_USE[0]  # Use first input configuration
                 outputs_to_use = OUTPUTS_TO_USE
                 add_slope = ADD_SLOPE[0]  # Use first add_slope value
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]  # Use first threshold value
-                lambda_1 = LAMBDA_PN_CCE
-                lambda_2 = LAMBDA_NZ_CCE
+                lambda_pn = 0.0 #LAMBDA_PN_CCE
+                lambda_nz = 0.0 #LAMBDA_NZ_CCE
+                lambda_ce = 1.0 #LAMBDA_CE
 
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_ace{alpha_ce:.2f}_combiner_lpn{lambda_1:.2f}_lnz{lambda_2:.2f}'
+                title = f'mlp2_combiner_lpn{lambda_pn:.2f}_lnz{lambda_nz:.2f}_lce{lambda_ce:.2f}'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -61,7 +63,7 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed)
                 patience = PATIENCE_MOE_C  # higher patience
-                learning_rate = START_LR_MOE_R  # starting learning rate
+                learning_rate = START_LR_MOE_C  # starting learning rate
                 asym_type = ASYM_TYPE_MOE
 
 
@@ -111,9 +113,10 @@ def main():
                     "epochs": epochs,
                     # hidden in a more readable format  (wandb does not support lists)
                     "hiddens": hiddens_str,
-                    "loss": 'cce',
-                    "lambda_1": lambda_1,
-                    "lambda_2": lambda_2,
+                    "loss": 'pn_nz_loss',
+                    "lambda_pn": lambda_pn,
+                    "lambda_nz": lambda_nz,
+                    "lambda_ce": lambda_ce,
                     "seed": seed,
                     "alpha_ce": alpha_ce,
                     "alphaV_ce": alphaV_ce,
@@ -273,10 +276,10 @@ def main():
                         beta_1=momentum_beta1
                     ),
                     loss={
-                        'forecast_head': lambda y_true, y_pred: cce(
+                        'forecast_head': lambda y_true, y_pred: pn_nz_loss(
                             y_true, y_pred,
                             phase_manager=pm,
-                            lambda_1=lambda_1, lambda_2=lambda_2,
+                            loss_weights={'pn': lambda_pn, 'nz': lambda_nz, 'ce': lambda_ce},
                             train_ce_weight_dict=ce_train_weights_dict,
                             val_ce_weight_dict=ce_test_weights_dict,
                             train_pcc_weight_dict=pcc_train_weights_dict,
@@ -363,10 +366,10 @@ def main():
                         beta_1=momentum_beta1
                     ),
                     loss={
-                        'forecast_head': lambda y_true, y_pred: cce(
+                        'forecast_head': lambda y_true, y_pred: pn_nz_loss(
                             y_true, y_pred,
                             phase_manager=pm,
-                            lambda_1=lambda_1, lambda_2=lambda_2,
+                            loss_weights={'pn': lambda_pn, 'nz': lambda_nz, 'ce': lambda_ce},
                             train_ce_weight_dict=ce_train_weights_dict,
                             val_ce_weight_dict=ce_test_weights_dict,
                             train_pcc_weight_dict=pcc_train_weights_dict,
@@ -483,6 +486,12 @@ def main():
                 train_metrics_fig = create_metrics_table(y_train_true_classes, y_train_pred_classes, "Train")
                 test_metrics_fig = create_metrics_table(y_test_true_classes, y_test_pred_classes, "Test")
 
+                # Plot posteriors
+                train_posteriors_fig = plot_posteriors(y_train_pred, y_train, 
+                                                       suptitle="Train Posterior Probabilities vs. Delta")
+                test_posteriors_fig = plot_posteriors(y_test_pred, y_test, 
+                                                      suptitle="Test Posterior Probabilities vs. Delta")
+
                 # Update the wandb.log call to include the tables as images and class-specific accuracies
                 wandb.log({
                     "train_accuracy": train_accuracy,
@@ -496,7 +505,9 @@ def main():
                     "train_confusion_matrix": wandb.Image(train_cm_fig),
                     "test_confusion_matrix": wandb.Image(test_cm_fig),
                     "train_classification_metrics": wandb.Image(train_metrics_fig),
-                    "test_classification_metrics": wandb.Image(test_metrics_fig)
+                    "test_classification_metrics": wandb.Image(test_metrics_fig),
+                    "train_posteriors": wandb.Image(train_posteriors_fig),
+                    "test_posteriors": wandb.Image(test_posteriors_fig)
                 })
 
                 # Close all figures to free memory
@@ -504,6 +515,8 @@ def main():
                 plt.close(test_cm_fig)
                 plt.close(train_metrics_fig)
                 plt.close(test_metrics_fig)
+                plt.close(train_posteriors_fig)
+                plt.close(test_posteriors_fig)
 
                 # Evaluate the model correlation with colored
                 file_path = plot_repr_corr_dist(
