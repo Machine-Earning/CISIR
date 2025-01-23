@@ -153,6 +153,7 @@ class exDenseReweightsD:
     avg_reweight = None
     reweights = None
     alpha = None
+    pdf_values = None
 
     def __init__(self, X, y,
                  alpha: float = .9,
@@ -189,8 +190,19 @@ class exDenseReweightsD:
         self.max_y = np.max(self.y_train)
 
         self.kde = gaussian_kde(self.y_train, bw_method=bw)
-        # self.adjust_bandwidth(self.kde, bw_factor)
-        self.reweights = self.preprocess_reweighting(self.y_train)  # for labels, order maintained
+        # Calculate PDF values once
+        self.pdf_values = self.kde.evaluate(self.y_train)
+        self.min_pdf = np.min(self.pdf_values)
+        self.max_pdf = np.max(self.pdf_values)
+        
+        # Calculate reweighting factors once, ensuring no negative values
+        self.reweight_factors = self.alpha * (self.max_pdf - self.pdf_values)
+        
+        # Print debug info
+        print(f"y_train min: {np.min(self.y_train)}, max: {np.max(self.y_train)}, shape: {self.y_train.shape}")
+        print(f"reweight_factors shape: {self.reweight_factors.shape}")
+        self.avg_reweight = np.mean(self.reweight_factors)
+        self.reweights = self.reweight_factors / self.avg_reweight
 
         self.label_reweight_dict = map_labels_to_reweights(self.y_train, self.reweights)
 
@@ -216,7 +228,6 @@ class exDenseReweightsD:
         :return: None. Updates self.min_pdf and self.max_pdf.
         """
         pdf_values = self.pdf(y)
-
         self.min_pdf = np.min(pdf_values)
         self.max_pdf = np.max(pdf_values)
 
@@ -230,11 +241,8 @@ class exDenseReweightsD:
         """
         # Compute the density of y
         density = self.pdf(y)
-
         # Apply linear reweighting: max(pdf) - pdf
-        reweighting_factor = self.max_pdf - density
-
-        return alpha * reweighting_factor
+        return alpha * (self.max_pdf - density)
 
     def find_avg_reweight(self, y: ndarray, alpha: float):
         """
@@ -243,11 +251,8 @@ class exDenseReweightsD:
         :param alpha: Parameter to adjust the reweighting.
         :return: The average reweighting factor.
         """
-
-        total_reweight = np.sum(self.reweight(y, alpha))
-        count = len(y)
-
-        self.avg_reweight = total_reweight / count if count > 0 else 0
+        reweight_factors = self.reweight(y, alpha)
+        self.avg_reweight = np.mean(reweight_factors)
 
     def normalized_reweight(self, y: ndarray, alpha: float) -> ndarray:
         """
@@ -263,25 +268,13 @@ class exDenseReweightsD:
             raise ValueError("Average reweighting factor should not be zero.")
 
         reweight_factor = self.reweight(y, alpha)
-        normalized_factor = reweight_factor / self.avg_reweight
-
-        return normalized_factor
+        return reweight_factor / self.avg_reweight
 
     def preprocess_reweighting(self, y: ndarray) -> ndarray:
         """
-        Preprocess reweighting for a dataset y and returns the normalized reweighting factors.
+        Returns the pre-calculated normalized reweighting factors.
 
         :param y: The target dataset as a NumPy array.
         :return: The normalized reweighting factors as a NumPy array.
         """
-
-        # Step 1: Find min and max pdf values and store them
-        self.find_min_max_pdf(y)
-
-        # Step 2: Find average reweighting factor
-        self.find_avg_reweight(y, self.alpha)
-
-        # Step 3: Calculate normalized reweighting factors for the dataset y
-        normalized_factors = self.normalized_reweight(y, self.alpha)
-
-        return normalized_factors
+        return self.reweights
