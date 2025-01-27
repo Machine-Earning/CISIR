@@ -141,6 +141,52 @@ def get_minus_cls(
     return tuple(filtered)
 
 
+def get_subset_ds(
+        X: np.ndarray,
+        y: np.ndarray,
+        lower_threshold: Optional[float] = None,
+        upper_threshold: Optional[float] = None,
+        *additional_sets
+) -> tuple[np.ndarray, ...]:
+    """
+    Get data samples filtered by optional lower and/or upper thresholds.
+
+    This function allows filtering a dataset based on y values using either:
+    - Only a lower threshold (y <= lower_threshold)
+    - Only an upper threshold (y >= upper_threshold)
+    - Both thresholds (lower_threshold <= y <= upper_threshold)
+    - No thresholds (return full dataset)
+    Args:
+        X (np.ndarray): Input features array of shape (n_samples, n_features)
+        y (np.ndarray): Target values array of shape (n_samples, n_outputs)
+        lower_threshold (Optional[float]): Lower threshold value to filter samples. If None, no lower bound.
+        upper_threshold (Optional[float]): Upper threshold value to filter samples. If None, no upper bound.
+        *additional_sets: Additional arrays to filter using the same mask
+
+    Returns:
+        tuple[np.ndarray, ...]: Filtered X, y and any additional arrays based on the threshold(s)
+    """
+    # Create mask based on provided thresholds
+    if lower_threshold is not None and upper_threshold is not None:
+        # Both thresholds - get samples between them
+        mask = (y[:, 0] >= lower_threshold) & (y[:, 0] <= upper_threshold)
+    elif lower_threshold is not None:
+        # Only lower threshold - get samples below/equal
+        mask = y[:, 0] <= lower_threshold
+    elif upper_threshold is not None:
+        # Only upper threshold - get samples above/equal
+        mask = y[:, 0] >= upper_threshold
+    else:
+        # No thresholds - return full dataset
+        return (X, y) + tuple(additional_sets)
+
+    # Apply mask to all arrays
+    filtered = [X[mask], y[mask]]
+    filtered.extend(arr[mask] for arr in additional_sets)
+    
+    return tuple(filtered)
+
+
 def convert_to_onehot_cls(
         y: np.ndarray,
         lower_threshold: float = LOWER_THRESHOLD_MOE,
@@ -4107,59 +4153,59 @@ def evaluate_pcc(
     return pcc
 
 
-def filter_ds_deprecated(
-        X: np.ndarray, y: np.ndarray,
-        low_threshold: float, high_threshold: float,
-        N: int, seed: int = None) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Filter and sample the dataset based on the threshold values of y with a random seed for reproducibility.
+# def filter_ds_deprecated(
+#         X: np.ndarray, y: np.ndarray,
+#         low_threshold: float, high_threshold: float,
+#         N: int, seed: int = None) -> Tuple[np.ndarray, np.ndarray]:
+#     """
+#     Filter and sample the dataset based on the threshold values of y with a random seed for reproducibility.
 
-    This function creates a subset of the dataset where all samples where y is either
-    below the low_threshold or above the high_threshold are included. Samples where y
-    is between the low_threshold and high_threshold are randomly sampled to have a total
-    of N samples in the resulting dataset, using a specified seed for random number generation.
+#     This function creates a subset of the dataset where all samples where y is either
+#     below the low_threshold or above the high_threshold are included. Samples where y
+#     is between the low_threshold and high_threshold are randomly sampled to have a total
+#     of N samples in the resulting dataset, using a specified seed for random number generation.
 
-    Parameters:
-        X (np.ndarray): The input features of the dataset.
-        y (np.ndarray): The output labels of the dataset.
-        low_threshold (float): The lower bound threshold for selecting high delta values.
-        high_threshold (float): The upper bound threshold for selecting high delta values.
-        N (int): The number of samples to include from the low delta range.
-        seed (int, optional): Seed for the random number generator to ensure reproducibility.
+#     Parameters:
+#         X (np.ndarray): The input features of the dataset.
+#         y (np.ndarray): The output labels of the dataset.
+#         low_threshold (float): The lower bound threshold for selecting high delta values.
+#         high_threshold (float): The upper bound threshold for selecting high delta values.
+#         N (int): The number of samples to include from the low delta range.
+#         seed (int, optional): Seed for the random number generator to ensure reproducibility.
 
-    Returns:
-        Tuple[np.ndarray, np.ndarray]: The filtered and sampled input features and output labels.
-    """
-    # Set the random seed for reproducibility
-    np.random.seed(seed)
+#     Returns:
+#         Tuple[np.ndarray, np.ndarray]: The filtered and sampled input features and output labels.
+#     """
+#     # Set the random seed for reproducibility
+#     np.random.seed(seed)
 
-    # Flatten the output array to ensure mask works properly with input dimensions
-    y_flat = y.flatten()
+#     # Flatten the output array to ensure mask works properly with input dimensions
+#     y_flat = y.flatten()
 
-    # Mask for selecting samples where y is either too low or too high
-    high_deltas_mask = (y_flat <= low_threshold) | (y_flat >= high_threshold)
-    X_high_deltas = X[high_deltas_mask]
-    y_high_deltas = y[high_deltas_mask]
+#     # Mask for selecting samples where y is either too low or too high
+#     high_deltas_mask = (y_flat <= low_threshold) | (y_flat >= high_threshold)
+#     X_high_deltas = X[high_deltas_mask]
+#     y_high_deltas = y[high_deltas_mask]
 
-    # Mask for selecting samples where y is in the middle range
-    low_deltas_mask = (y_flat > low_threshold) & (y_flat < high_threshold)
-    X_low_deltas = X[low_deltas_mask]
-    y_low_deltas = y[low_deltas_mask]
+#     # Mask for selecting samples where y is in the middle range
+#     low_deltas_mask = (y_flat > low_threshold) & (y_flat < high_threshold)
+#     X_low_deltas = X[low_deltas_mask]
+#     y_low_deltas = y[low_deltas_mask]
 
-    # Sample from the low deltas if they exceed the required N samples
-    if len(y_low_deltas) > N:
-        sampled_indices = np.random.choice(len(X_low_deltas), size=N, replace=False)
-        X_low_deltas_sampled = X_low_deltas[sampled_indices]
-        y_low_deltas_sampled = y_low_deltas[sampled_indices]
-    else:
-        X_low_deltas_sampled = X_low_deltas
-        y_low_deltas_sampled = y_low_deltas
+#     # Sample from the low deltas if they exceed the required N samples
+#     if len(y_low_deltas) > N:
+#         sampled_indices = np.random.choice(len(X_low_deltas), size=N, replace=False)
+#         X_low_deltas_sampled = X_low_deltas[sampled_indices]
+#         y_low_deltas_sampled = y_low_deltas[sampled_indices]
+#     else:
+#         X_low_deltas_sampled = X_low_deltas
+#         y_low_deltas_sampled = y_low_deltas
 
-    # Combine the high delta samples and the sampled low delta samples
-    X_combined = np.concatenate([X_high_deltas, X_low_deltas_sampled], axis=0)
-    y_combined = np.concatenate([y_high_deltas, y_low_deltas_sampled], axis=0)
+#     # Combine the high delta samples and the sampled low delta samples
+#     X_combined = np.concatenate([X_high_deltas, X_low_deltas_sampled], axis=0)
+#     y_combined = np.concatenate([y_high_deltas, y_low_deltas_sampled], axis=0)
 
-    return X_combined, y_combined
+#     return X_combined, y_combined
 
 
 def filter_ds(

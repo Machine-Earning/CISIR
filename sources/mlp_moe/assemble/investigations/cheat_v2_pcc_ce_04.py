@@ -39,7 +39,7 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.4, 0.4, 0.0, 0.0)]:
             for rho in RHO_MOE:  # SAM
                 inputs_to_use = INPUTS_TO_USE[0]
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]
@@ -50,7 +50,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_v2_moe_cheat_pcc_ce'
+                title = f'mlp2_amse{alpha_mse:.2f}_v2_moe_cheat_pcc_ce_investigation'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp

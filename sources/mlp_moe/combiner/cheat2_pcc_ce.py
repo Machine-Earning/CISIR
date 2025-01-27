@@ -170,6 +170,15 @@ def main():
                     alpha=alpha_ce, bw=bandwidth,
                     min_norm_weight=min_norm_weight,
                     debug=False).label_reweight_dict
+
+
+                
+
+                # print(f'ce_train_weights_dict: {ce_train_weights_dict}')
+                # Get keys and values for delta >= 0.4, sorted by key in descending order
+                pos_items = sorted([(k,v) for k,v in ce_train_weights_dict.items() if k >= 0.4], reverse=True)
+                print("Delta >= 0.4 (delta, weight):", pos_items)
+                    
                 pcc_train_weights_dict = exDenseReweightsD(
                     X_train, delta_train,
                     alpha=alpha_pcc, bw=bandwidth,

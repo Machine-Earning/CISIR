@@ -18,8 +18,7 @@ from modules.training.ts_modeling import (
     stratified_batch_dataset,
     set_seed,
     cmse,
-    # filter_ds,
-    # create_mlp,
+    get_subset_ds,
     plot_error_hist,
     create_mlp_moe
 )
@@ -39,7 +38,7 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.4, 0.4, 0.0, 0.0)]:
             for rho in RHO_MOE:  # SAM
                 inputs_to_use = INPUTS_TO_USE[0]
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]
@@ -50,7 +49,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_v2_moe_cheat_pcc_ce'
+                title = f'mlp2_amse{alpha_mse:.2f}_v2_moe_cheat_pcc_ce_investigation_A'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -155,6 +154,11 @@ def main():
                     outputs_to_use=outputs_to_use,
                     cme_speed_threshold=cme_speed_threshold,
                     shuffle_data=True)
+                
+                # Get subset of training data with delta <= -0.4 for training
+                X_train_subset, y_train_subset, logI_train_subset, logI_prev_train_subset = get_subset_ds(
+                    X_train, y_train, -0.4, None, logI_train, logI_prev_train)
+                
                 # print the training set shapes
                 print(f'X_train.shape: {X_train.shape}, y_train.shape: {y_train.shape}')
                 # getting the reweights for training set
@@ -183,6 +187,12 @@ def main():
                     add_slope=add_slope,
                     outputs_to_use=outputs_to_use,
                     cme_speed_threshold=cme_speed_threshold)
+
+                # Get subset of test data with delta <= -0.4 for testing
+                X_test_subset, y_test_subset, logI_test_subset, logI_prev_test_subset = get_subset_ds(
+                    X_test, y_test, -0.4, None, logI_test, logI_prev_test)
+
+                    
                 # print the test set shapes
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
                 # getting the reweights for test set
@@ -268,9 +278,9 @@ def main():
 
                 # Step 1: Create stratified dataset for the subtraining and validation set
                 train_ds, train_steps = stratified_batch_dataset(
-                    X_train, y_train, batch_size)
+                    X_train_subset, y_train_subset, batch_size)
                 test_ds, test_steps = stratified_batch_dataset(
-                    X_test, y_test, batch_size)
+                    X_test_subset, y_test_subset, batch_size)
 
                 # Map the training dataset to return {'output': y} format
                 train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
@@ -339,7 +349,7 @@ def main():
 
                 # Step 1: Create stratified dataset for the subtraining and validation set
                 train_ds, train_steps = stratified_batch_dataset(
-                    X_train, y_train, batch_size)
+                    X_train_subset, y_train_subset, batch_size)
 
                 # Map the training dataset to return {'output': y} format
                 train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
@@ -360,13 +370,13 @@ def main():
                 )
 
                 # Save the final model weights
-                final_model_sep.save_weights(f"final_model_moe_weights_{experiment_name}_reg.h5")
+                final_model_sep.save_weights(f"inv_model_moe_weights_{experiment_name}_reg.h5")
                 # print where the model weights are saved
-                print(f"Model weights are saved in final_model_moe_weights_{experiment_name}_reg.h5")
+                print(f"Model weights are saved in inv_model_moe_weights_{experiment_name}_reg.h5")
 
                 # Save the final combiner weights
-                final_model_sep.get_layer('combiner').save_weights(f"final_combiner_weights_{experiment_name}.h5")
-                print(f"Combiner weights are saved in final_combiner_weights_{experiment_name}.h5")
+                final_model_sep.get_layer('combiner').save_weights(f"inv_combiner_weights_{experiment_name}.h5")
+                print(f"Combiner weights are saved in inv_combiner_weights_{experiment_name}.h5")
 
                 # evaluate the model error on test set
                 error_mae = evaluate_mae(final_model_sep, X_test, y_test)
