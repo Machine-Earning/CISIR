@@ -49,7 +49,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_v2_moe_cheat_pcc_ce_investigation_A'
+                title = f'mlp2_amse{alpha_mse:.2f}_v2_moe_cheat_pcc_ce_investigation_C'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -71,7 +71,7 @@ def main():
 
                 weight_decay = WEIGHT_DECAY_MOE  # 1e-5 # higher weight decay
                 momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                batch_size = BATCH_SIZE_MOE  # higher batch size
+                batch_size = BATCH_SIZE  # higher batch size
                 epochs = EPOCHS  # higher epochs
                 hiddens = MLP_HIDDENS  # hidden layers
 
@@ -155,9 +155,9 @@ def main():
                     cme_speed_threshold=cme_speed_threshold,
                     shuffle_data=True)
                 
-                # Get subset of training data with delta <= -0.4 for training
+                # Get subset of training data with delta <= 0.4 for training
                 X_train_subset, y_train_subset, logI_train_subset, logI_prev_train_subset = get_subset_ds(
-                    X_train, y_train, -0.4, None, logI_train, logI_prev_train)
+                    X_train, y_train, 0.4, None, logI_train, logI_prev_train)
                 
                 # print the training set shapes
                 print(f'X_train.shape: {X_train.shape}, y_train.shape: {y_train.shape}')
@@ -188,9 +188,9 @@ def main():
                     outputs_to_use=outputs_to_use,
                     cme_speed_threshold=cme_speed_threshold)
 
-                # Get subset of test data with delta <= -0.4 for testing
+                # Get subset of test data with delta <= 0.4 for testing
                 X_test_subset, y_test_subset, logI_test_subset, logI_prev_test_subset = get_subset_ds(
-                    X_test, y_test, -0.4, None, logI_test, logI_prev_test)
+                    X_test, y_test, 0.4, None, logI_test, logI_prev_test)
 
                     
                 # print the test set shapes
