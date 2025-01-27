@@ -1469,14 +1469,15 @@ def create_mlp_moe(
 
     # Load weights if paths are provided
     if expert_paths:
-        if 'combiner' in expert_paths and combiner_pretrained_weights is None:
-            combiner.load_weights(expert_paths['combiner'])
         if 'plus' in expert_paths:
             expert_plus.load_weights(expert_paths['plus'])
         if 'zero' in expert_paths:
             expert_zero.load_weights(expert_paths['zero'])
         if 'minus' in expert_paths:
             expert_minus.load_weights(expert_paths['minus'])
+        if 'combiner' in expert_paths and combiner_pretrained_weights is None:
+            combiner.load_weights(expert_paths['combiner'])
+        
 
         if freeze_experts:
             for expert in [expert_plus, expert_zero, expert_minus]:
