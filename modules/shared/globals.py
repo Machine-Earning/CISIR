@@ -177,6 +177,15 @@ COMBINER_V3_A0 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_ml
 COMBINER_V3_NRELU = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.10_moe_cheat_v3nrelu_randInitCombiner_20250122-162810.h5'
 COMBINER_V3_PDCAE_S2_NRELU = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_randInitCombiner_20250123-133559.h5'
 COMBINER_V2_PCC_CE_S2_A0 = '/home1/jmoukpe2016/keras-functional-api/final_combiner_weights_mlp2_amse0.00_moe_cheat_pcc_ce_20250123-144353.h5'
+# weights for investigation
+COMBINER_V2_PCC_CE_S2_A0_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.00_v2_moe_cheat_pcc_ce_investigation_A_20250127-113654.h5'
+COMBINER_V2_PCC_CE_S2_B0_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.00_v2_moe_cheat_pcc_ce_investigation_B_20250127-114150.h5'
+COMBINER_V2_PCC_CE_S2_C0_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.00_v2_moe_cheat_pcc_ce_investigation_C_20250127-114528.h5'
+COMBINER_V2_PCC_CE_S2_D0_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/final_combiner_weights_mlp2_amse0.00_v2_moe_cheat_pcc_ce_investigation_20250127-105424.h5'
+COMBINER_V2_PCC_CE_S2_A04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_A_20250127-113651.h5'
+COMBINER_V2_PCC_CE_S2_B04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_B_20250127-114151.h5'
+COMBINER_V2_PCC_CE_S2_C04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_C_20250127-114523.h5'
+COMBINER_V2_PCC_CE_S2_D04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/final_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_20250127-105424.h5'
 
 # assemble hyperparams
 REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]

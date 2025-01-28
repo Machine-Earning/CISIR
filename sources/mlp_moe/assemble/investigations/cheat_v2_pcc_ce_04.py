@@ -50,7 +50,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_v2_moe_cheat_pcc_ce_investigation'
+                title = f'mlp2_amse{alpha_mse:.2f}_v2_moe_cheat_pcc_ce_investigation_softmax'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -227,6 +227,7 @@ def main():
                     skip_repr=skip_repr,
                     pretraining=PRETRAINING_MOE,
                     freeze_experts=FREEZE_EXPERT,
+                    combiner_output_activation='softmax',
                     expert_paths=expert_paths,
                     mode=MODE_MOE,
                     activation=activation,
@@ -311,6 +312,7 @@ def main():
                     skip_repr=skip_repr,
                     pretraining=PRETRAINING_MOE,
                     freeze_experts=FREEZE_EXPERT,
+                    combiner_output_activation='softmax',
                     expert_paths=expert_paths,
                     mode=MODE_MOE,
                     activation=activation,

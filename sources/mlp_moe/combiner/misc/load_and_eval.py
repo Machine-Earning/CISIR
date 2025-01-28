@@ -29,7 +29,7 @@ def main():
     """
 
     # Path to pre-trained model weights
-    combiner_path = COMBINER_V2_PCC_CE_S2_A0 #COMBINER_PATH
+    combiner_path = COMBINER_V2_PCC_CE_S2_D0_INVESTIGATION
 
     for seed in SEEDS:
         # PARAMS
@@ -43,7 +43,7 @@ def main():
         
         # Create a unique experiment name with a timestamp
         current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-        experiment_name = f'combiner_v2_pcc_ce_s2_a0_eval_{current_time}'
+        experiment_name = f'combiner_v2_pcc_ce_s2_a0_investigation_D_{current_time}'
 
         set_seed(seed)
         
@@ -118,7 +118,7 @@ def main():
             skip_repr=skip_repr,
             skipped_layers=skipped_layers,
             sam_rho=rho,
-            output_activation='softmax'
+            output_activation='norm_relu'
         )
 
         # Load trained weights
