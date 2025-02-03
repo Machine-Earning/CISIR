@@ -1530,38 +1530,64 @@ def create_mlp_moe(
                 for layer in expert.layers:
                     layer.trainable = False
 
-    # Get expert outputs
-    plus_output = expert_plus(input_layer)
-    zero_output = expert_zero(input_layer)
-    minus_output = expert_minus(input_layer)
-    combiner_output = combiner(input_layer)
+    # Get outputs from each expert model
+    plus_output = expert_plus(input_layer)   # Shape: (batch_size, output_dim)
+    zero_output = expert_zero(input_layer)   # Shape: (batch_size, output_dim)
+    minus_output = expert_minus(input_layer) # Shape: (batch_size, output_dim)
+    combiner_output = combiner(input_layer)  # Shape: (batch_size, num_experts)
 
-    # Extract routing probabilities
+    # Extract routing probabilities from combiner output
     routing_probs = combiner_output[1]  # Shape: (batch_size, 3)
 
-    if mode == 'soft':
-        # Soft mixture - weighted combination of experts
-        plus_prob = Lambda(lambda x: x[:, PLUS_INDEX:PLUS_INDEX + 1])(routing_probs)
-        zero_prob = Lambda(lambda x: x[:, MID_INDEX:MID_INDEX + 1])(routing_probs)
-        minus_prob = Lambda(lambda x: x[:, MINUS_INDEX:MINUS_INDEX + 1])(routing_probs)
+    # Stack expert outputs along a new axis to create shape (batch_size, num_experts, output_dim)
+    expert_outputs = tf.stack([plus_output[1], zero_output[1], minus_output[1]], axis=1)
 
-        plus_weighted = Multiply()([plus_output[1], plus_prob])
-        zero_weighted = Multiply()([zero_output[1], zero_prob])
-        minus_weighted = Multiply()([minus_output[1], minus_prob])
-        forecast_head = Add(name='forecast_head')([plus_weighted, zero_weighted, minus_weighted])
-    else:
-        # Hard selection - choose expert with highest probability
-        expert_selector = Lambda(lambda x: tf.argmax(x, axis=1))(routing_probs)
-        forecast_head = Lambda(lambda args: tf.case({
-            tf.equal(args[0], PLUS_INDEX): lambda: args[1],
-            tf.equal(args[0], MID_INDEX): lambda: args[2],
-            tf.equal(args[0], MINUS_INDEX): lambda: args[3]
-        }, exclusive=True), name='forecast_head')(
-            [expert_selector, plus_output[1], zero_output[1], minus_output[1]]
-        )
+    # Apply linear combination using custom layer
+    forecast_head = LinearCombination(name='forecast_head')([expert_outputs, routing_probs])
 
-    model = Model(inputs=input_layer, outputs=[routing_probs, forecast_head], name=name)
+    # Create final model with routing probabilities and combined forecast outputs
+    model = Model(
+        inputs=input_layer, 
+        outputs=[routing_probs, forecast_head], 
+        name=name
+    )
     return model
+
+
+class LinearCombination(Layer):
+    """
+    Custom layer that performs a weighted linear combination of expert outputs based on routing probabilities.
+    
+    This layer takes two inputs:
+    1. Expert outputs tensor of shape (batch_size, num_experts, output_dim)
+    2. Routing probabilities tensor of shape (batch_size, num_experts)
+    
+    And returns a weighted sum of shape (batch_size, output_dim)
+    """
+    
+    def call(self, inputs: Tuple[tf.Tensor, tf.Tensor]) -> tf.Tensor:
+        """
+        Performs the linear combination operation.
+        
+        Args:
+            inputs: Tuple of (expert_outputs, routing_probs)
+                - expert_outputs: Tensor of shape (batch_size, num_experts, output_dim)
+                - routing_probs: Tensor of shape (batch_size, num_experts)
+                
+        Returns:
+            tf.Tensor: Weighted sum of expert outputs, shape (batch_size, output_dim)
+        """
+        expert_outputs, routing_probs = inputs
+        
+        # Reshape routing probs to (batch_size, num_experts, 1) for broadcasting
+        # This allows multiplication with expert outputs of shape (batch_size, num_experts, output_dim)
+        routing_probs = tf.expand_dims(routing_probs, axis=-1)
+        
+        # Multiply each expert output by its corresponding routing probability
+        # Then sum across the experts dimension
+        weighted_sum = tf.reduce_sum(expert_outputs * routing_probs, axis=1)
+        
+        return weighted_sum
 
 
 def create_hybrid_model(
@@ -4963,12 +4989,12 @@ def coreg(y_true, y_pred, pcc_weights=None):
     # Compute covariance
     cov = tf.reduce_sum(pcc_weights * y_true_centered * y_pred_centered)
 
-    # Compute standard deviations
-    std_y_true = tf.sqrt(tf.reduce_sum(pcc_weights * tf.square(y_true_centered)))
-    std_y_pred = tf.sqrt(tf.reduce_sum(pcc_weights * tf.square(y_pred_centered)))
+    # Compute variances
+    var_y_true = tf.reduce_sum(pcc_weights * tf.square(y_true_centered))
+    var_y_pred = tf.reduce_sum(pcc_weights * tf.square(y_pred_centered))
 
-    # Compute PCC
-    pcc = cov / (std_y_true * std_y_pred + K.epsilon())
+    # Compute PCC using single sqrt
+    pcc = cov / (tf.sqrt(var_y_true * var_y_pred) + K.epsilon())
 
     # Return 1-PCC
     return 1.0 - pcc

@@ -71,9 +71,10 @@ def main():
 
                 weight_decay = WEIGHT_DECAY_MOE  # 1e-5 # higher weight decay
                 momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                batch_size = BATCH_SIZE_MOE  # higher batch size
+                batch_size = BATCH_SIZE_NEG # BATCH_SIZE_MOE  # higher batch size
                 epochs = EPOCHS  # higher epochs
                 hiddens = MLP_HIDDENS  # hidden layers
+
 
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 bandwidth = BANDWIDTH
@@ -156,9 +157,10 @@ def main():
                     shuffle_data=True)
                 
                 # Get subset of training data with delta <= -0.4 for training
-                X_train_subset, y_train_subset, logI_train_subset, logI_prev_train_subset = get_subset_ds(
+                X_train_subset, y_train_subset, _, _ = get_subset_ds(
                     X_train, y_train, -0.4, None, logI_train, logI_prev_train)
                 
+
                 # print the training set shapes
                 print(f'X_train.shape: {X_train.shape}, y_train.shape: {y_train.shape}')
                 # getting the reweights for training set
@@ -189,10 +191,11 @@ def main():
                     cme_speed_threshold=cme_speed_threshold)
 
                 # Get subset of test data with delta <= -0.4 for testing
-                X_test_subset, y_test_subset, logI_test_subset, logI_prev_test_subset = get_subset_ds(
+                X_test_subset, y_test_subset, _, _ = get_subset_ds(
                     X_test, y_test, -0.4, None, logI_test, logI_prev_test)
 
                     
+
                 # print the test set shapes
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
                 # getting the reweights for test set
