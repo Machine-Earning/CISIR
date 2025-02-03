@@ -7,7 +7,7 @@ from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 # from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.reweighting.exCosReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.ts_modeling import (
@@ -39,7 +39,7 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.0, 0.0, 0.0, 0.0)]:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_C2:
             for rho in RHO_MOE:  # SAM
                 inputs_to_use = INPUTS_TO_USE[0]
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]
@@ -50,7 +50,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_v2_moe_cheat_pcc_ce_investigation'
+                title = f'mlp2_amse{alpha_mse:.2f}_moe_cheat_v3cos_randInitCombiner'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -99,7 +99,7 @@ def main():
                     'plus': POS_EXPERT_PATH,
                     'zero': NZ_EXPERT_PATH,
                     'minus': NEG_EXPERT_PATH,
-                    'combiner': COMBINER_PCC_CE
+                    # 'combiner': COMBINER_PATH
                 }
 
                 # Initialize wandb
@@ -141,7 +141,7 @@ def main():
                     'expert+_path': POS_EXPERT_PATH,
                     'expert0_path': NZ_EXPERT_PATH,
                     'expert-_path': NEG_EXPERT_PATH,
-                    'combiner_path': COMBINER_PCC_CE,
+                    'combiner_path': COMBINER_PATH,
                     'asym_type': asym_type
                 })
 
@@ -258,9 +258,9 @@ def main():
                             phase_manager=pm,
                             lambda_factor=lambda_factor,
                             train_mse_weight_dict=mse_train_weights_dict,
-                            train_pcc_weight_dict=pcc_train_weights_dict,
+                            train_pcc_weight_dict=None,
                             val_mse_weight_dict=mse_test_weights_dict,
-                            val_pcc_weight_dict=pcc_test_weights_dict,
+                            val_pcc_weight_dict=None,
                             asym_type=asym_type
                         )
                     }
@@ -330,7 +330,7 @@ def main():
                             phase_manager=pm,
                             lambda_factor=lambda_factor,
                             train_mse_weight_dict=mse_train_weights_dict,
-                            train_pcc_weight_dict=pcc_train_weights_dict,
+                            train_pcc_weight_dict=None,
                             asym_type=asym_type
                         )
                     }
@@ -359,14 +359,15 @@ def main():
                     verbose=VERBOSE
                 )
 
-                # Save the final model weights
+                # Save the final model
                 final_model_sep.save_weights(f"final_model_moe_weights_{experiment_name}_reg.h5")
                 # print where the model weights are saved
                 print(f"Model weights are saved in final_model_moe_weights_{experiment_name}_reg.h5")
 
-                # Save the final combiner weights
-                final_model_sep.get_layer('combiner').save_weights(f"final_combiner_weights_{experiment_name}.h5")
-                print(f"Combiner weights are saved in final_combiner_weights_{experiment_name}.h5")
+                # Save the combiner sub-model weights
+                combiner_submodel = final_model_sep.get_layer("combiner")
+                combiner_submodel.save_weights(f"combiner_v3_weights_{experiment_name}.h5")
+                print(f"Combiner sub-model weights saved to combiner_v3_weights_{experiment_name}.h5")
 
                 # evaluate the model error on test set
                 error_mae = evaluate_mae(final_model_sep, X_test, y_test)

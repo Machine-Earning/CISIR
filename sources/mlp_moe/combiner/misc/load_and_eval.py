@@ -29,7 +29,7 @@ def main():
     """
 
     # Path to pre-trained model weights
-    combiner_path = COMBINER_V2_PCC_CE_S2_D0_INVESTIGATION
+    combiner_path = COMBINER_V3_COS
 
     for seed in SEEDS:
         # PARAMS
@@ -43,7 +43,7 @@ def main():
         
         # Create a unique experiment name with a timestamp
         current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-        experiment_name = f'combiner_v2_pcc_ce_s2_a0_investigation_D_{current_time}'
+        experiment_name = f'combiner_v3_cos_{current_time}'
 
         set_seed(seed)
         
