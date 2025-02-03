@@ -12,6 +12,41 @@ from numpy import ndarray
 from scipy.stats import gaussian_kde
 
 
+def plot_importance(label_reweight_dict: dict, save_path: Optional[str] = None) -> str:
+    """
+    Plot the importance (reweight) values against sorted labels.
+    
+    Parameters:
+    - label_reweight_dict (dict): Dictionary mapping labels to their reweight values
+    - save_path (Optional[str]): Path where to save the plot. If None, saves to a default location.
+    
+    Returns:
+    - str: Path where the plot was saved
+    """
+    # Sort the dictionary by labels
+    sorted_items = sorted(label_reweight_dict.items())
+    labels = [item[0] for item in sorted_items]
+    reweights = [item[1] for item in sorted_items]
+    
+    # Create the plot
+    plt.figure(figsize=(10, 6))
+    plt.plot(labels, reweights, 'b-')
+    plt.xlabel('Delta')
+    plt.ylabel('Importance')
+    plt.title('Delta Importance Distribution')
+    plt.grid(True)
+    
+    # Use provided path or generate default
+    if save_path is None:
+        save_path = f'delta_importance_distribution_{len(label_reweight_dict)}.png'
+    
+    # Save the plot
+    plt.savefig(save_path)
+    plt.close()
+    
+    return save_path
+
+
 def adjust_bandwidth(kde: gaussian_kde, factor: Union[float, int]) -> None:
     """
     Adjust the bandwidth of a given KDE object by a multiplicative factor.
