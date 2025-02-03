@@ -159,6 +159,9 @@ def main():
                 # Get subset of training data with delta <= -0.4 for training
                 X_train_subset, y_train_subset, _, _ = get_subset_ds(
                     X_train, y_train, -0.4, None, logI_train, logI_prev_train)
+
+                # print the subset training set shapes
+                print(f'X_train_subset.shape: {X_train_subset.shape}, y_train_subset.shape: {y_train_subset.shape}')
                 
 
                 # print the training set shapes
@@ -194,7 +197,8 @@ def main():
                 X_test_subset, y_test_subset, _, _ = get_subset_ds(
                     X_test, y_test, -0.4, None, logI_test, logI_prev_test)
 
-                    
+                # print the subset test set shapes
+                print(f'X_test_subset.shape: {X_test_subset.shape}, y_test_subset.shape: {y_test_subset.shape}')
 
                 # print the test set shapes
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
