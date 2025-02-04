@@ -3,7 +3,7 @@ from datetime import datetime
 
 import numpy as np
 import wandb
-
+from modules.evaluate.evaluation import find_knns
 from modules.shared.globals import *
 from modules.training.ts_modeling import (
     build_dataset,
@@ -15,6 +15,7 @@ from modules.training.ts_modeling import (
     create_mlp_moe,
     set_seed
 )
+
 
 
 def main():
@@ -284,8 +285,21 @@ def main():
                           f"p-:{combiner_probs[idx][2]:.4f}")
                     print(f"Pred error: {errors[idx]:.4f}")
                     print(f"Neg expert error: {neg_expert_errors[idx]:.4f}")
+                    
+                    # Find k nearest neighbors for this sample
+                    neighbors = find_knns(
+                        X_train, y_train, 
+                        k_neighbors=5, 
+                        predictions=combiner_probs, 
+                        set_to_check=X_train_subset[idx:idx+1], 
+                        log_results=False)
+                    print("\nNearest neighbors:")
+                    for _, _, _, neighbor_list in neighbors:
+                        for dist, n_idx, n_true, n_pred in neighbor_list:
+                            print(f"  Distance: {dist:.4f}, Index: {n_idx}, Ground truth: {n_true:.4f}")
+                            if n_pred is not None:
+                                print(f"  Neighbor probs: p+:{n_pred[0]:.4f}, p0:{n_pred[1]:.4f}, p-:{n_pred[2]:.4f}")
                 print("-" * 80)
-
 
                 # Evaluate the model error on subset test set
                 expert_plus_preds_test = expert_plus.predict(X_test_subset)[1]
@@ -315,7 +329,6 @@ def main():
                 print("\nAnalysis of test subset samples (sorted by error, largest to smallest):")
                 print("-" * 80)
                 for idx in sorted_indices_test:
-
                     print(f"\nSample {idx + 1} (Error: {errors_test[idx]:.4f}):")
                     print(f"Ground truth: {y_test_subset[idx][0]:.4f}")
                     print(f"MoE preds: {moe_preds_test[idx][0]:.4f}")
@@ -328,11 +341,21 @@ def main():
                           f"p-:{combiner_probs_test[idx][2]:.4f}")
                     print(f"Pred error: {errors_test[idx]:.4f}")
                     print(f"Neg expert error: {neg_expert_errors_test[idx]:.4f}")
+                    
+                    # Find k nearest neighbors for this test sample
+                    neighbors = find_knns(
+                        X_test, y_test, 
+                        k_neighbors=5,
+                        predictions=combiner_probs_test, 
+                        set_to_check=X_test_subset[idx:idx+1], 
+                        log_results=False)
+                    print("\nNearest neighbors:")
+                    for _, _, _, neighbor_list in neighbors:
+                        for dist, n_idx, n_true, n_pred in neighbor_list:
+                            print(f"  Distance: {dist:.4f}, Index: {n_idx}, Ground truth: {n_true:.4f}")
+                            if n_pred is not None:
+                                print(f"  Neighbor probs: p+:{n_pred[0]:.4f}, p0:{n_pred[1]:.4f}, p-:{n_pred[2]:.4f}")
                 print("-" * 80)
-
-
-
-
 
                 # evaluate the model error on test set
                 error_mae = evaluate_mae(moe_model, X_test, y_test)

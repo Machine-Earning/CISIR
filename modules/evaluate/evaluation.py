@@ -19,94 +19,130 @@ from sklearn.neighbors import NearestNeighbors
 from tensorflow.keras import Model
 
 from modules.training.cme_modeling import error
-import logging
 
 
-def find_k_nearest_neighbors(
+
+def find_knns(
         X_test: np.ndarray,
         y_test: np.ndarray,
-        predictions: np.ndarray,
         k_neighbors: int = 3,
-        threshold: float = 0.5,
+        predictions: Optional[np.ndarray] = None,  # Shape: (batch_size, 3) for pos,zero,neg classes
+        set_to_check: Optional[np.ndarray] = None,
+        lower_threshold: Optional[float] = None,
+        upper_threshold: Optional[float] = None,
         max_samples: Optional[int] = None,
         log_results: bool = True,
-        logger: Optional[logging.Logger] = None
-) -> List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]:
+) -> List[Tuple[int, float, List[float], List[Tuple[float, int, float, List[float]]]]]:
     """
-    Find the k nearest neighbors for each point in the test set with target labels greater than the threshold.
+    Find the k nearest neighbors for each point in the test set with target labels within specified thresholds.
     Results are sorted in ascending order of the test points' actual target labels before logging.
 
     Args:
         X_test (np.ndarray): Test data features.
         y_test (np.ndarray): Test data target labels (1D array).
-        predictions (np.ndarray): Model predictions for the test data (1D array).
         k_neighbors (int): Number of nearest neighbors to find.
-        threshold (float): Threshold for selecting positive samples.
+        predictions (Optional[np.ndarray]): Model predictions for the test data (shape: batch_size x 3).
+                                          Index 0=positive class, 1=zero class, 2=negative class
+        set_to_check (Optional[np.ndarray]): If provided, find neighbors for these samples instead of full test set.
+        lower_threshold (Optional[float]): Lower threshold for filtering samples. If None, no lower bound.
+        upper_threshold (Optional[float]): Upper threshold for filtering samples. If None, no upper bound.
         max_samples (Optional[int]): Maximum number of samples to process.
         log_results (bool): Whether to log the results.
-        logger (Optional[logging.Logger]): Logger object to use. If None, a new logger will be created.
 
     Returns:
-        List[Tuple[int, float, float, List[Tuple[float, int, float, float]]]]: Sorted list of tuples containing:
+        List[Tuple[int, float, List[float], List[Tuple[float, int, float, List[float]]]]]: Sorted list of tuples containing:
             - Test point index
             - Actual target label
-            - Predicted label
+            - Predicted class probabilities [pos, zero, neg] (None if predictions not provided)
             - List of tuples for each neighbor:
                 - Distance
                 - Neighbor index
                 - Neighbor's target label
-                - Neighbor's predicted label
+                - Neighbor's predicted class probabilities [pos, zero, neg] (None if predictions not provided)
     """
+    # Check if k_neighbors is valid
     if k_neighbors >= len(X_test):
         raise ValueError(f"k ({k_neighbors}) must be less than the number of test samples ({len(X_test)})")
 
-    if len(X_test) != len(y_test) or len(X_test) != len(predictions):
-        raise ValueError("Inconsistent lengths of input arrays")
-
-    if log_results and logger is None:
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.INFO)
-        if not logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
+    if len(X_test) != len(y_test):
+        raise ValueError("Inconsistent lengths of X_test and y_test arrays")
+    
+    if predictions is not None and len(X_test) != len(predictions):
+        raise ValueError("Inconsistent lengths of X_test and predictions arrays")
 
     # k+1 because the point itself is included
-    nbrs = NearestNeighbors(n_neighbors=k_neighbors + 1, algorithm='auto').fit(X_test)
+    nbrs = NearestNeighbors(n_neighbors=k_neighbors + (1 if set_to_check is None else 0), algorithm='auto').fit(X_test)
 
     y_test = y_test.flatten()
-    predictions = predictions.flatten()
 
-    large_positives_indices = np.where(y_test > threshold)[0]
-    if max_samples:
-        large_positives_indices = large_positives_indices[:max_samples]
+    # Determine which samples to find neighbors for
+    if set_to_check is not None:
+        samples_to_check = set_to_check
+    else:
+        # Filter indices based on thresholds
+        if lower_threshold is not None and upper_threshold is not None:
+            filtered_indices = np.where((y_test >= lower_threshold) & (y_test <= upper_threshold))[0]
+        elif lower_threshold is not None:
+            filtered_indices = np.where(y_test >= lower_threshold)[0]
+        elif upper_threshold is not None:
+            filtered_indices = np.where(y_test <= upper_threshold)[0]
+        else:
+            filtered_indices = np.arange(len(y_test))
+
+        if max_samples:
+            filtered_indices = filtered_indices[:max_samples]
+            
+        samples_to_check = X_test[filtered_indices]
 
     if log_results:
-        logger.info(f"Processing {len(large_positives_indices)} samples with target labels > {threshold}")
+        threshold_str = ""
+        if lower_threshold is not None:
+            threshold_str += f">= {lower_threshold}"
+        if upper_threshold is not None:
+            if threshold_str:
+                threshold_str += " and "
+            threshold_str += f"<= {upper_threshold}"
+        if not threshold_str:
+            threshold_str = "all values"
+        print(f"Processing {len(samples_to_check)} samples with target labels {threshold_str}")
 
     results = []
-    for idx in large_positives_indices:
-        distances, indices = nbrs.kneighbors([X_test[idx]])
-        # Remove the first neighbor (which is the point itself)
+    for idx, sample in enumerate(samples_to_check):
+        distances, indices = nbrs.kneighbors([sample])
+        # Only remove first neighbor if searching within test set (not set_to_check)
+        if set_to_check is None:
+            distances = distances[0][1:]  # Remove self distance
+            indices = indices[0][1:]  # Remove self index
+        else:
+            distances = distances[0]
+            indices = indices[0]
+            
         neighbors = [
-            (float(dist), int(neighbor_idx), float(y_test[neighbor_idx]), float(predictions[neighbor_idx]))
-            for dist, neighbor_idx in zip(distances[0][1:], indices[0][1:])
+            (float(dist), int(neighbor_idx), float(y_test[neighbor_idx]), 
+             predictions[neighbor_idx].tolist() if predictions is not None else None)
+            for dist, neighbor_idx in zip(distances, indices)
         ]
-        result = (int(idx), float(y_test[idx]), float(predictions[idx]), neighbors)
+        
+        sample_idx = filtered_indices[idx] if set_to_check is None else -1
+        sample_pred = predictions[sample_idx].tolist() if predictions is not None and set_to_check is None else None
+        result = (int(sample_idx), float(y_test[sample_idx]) if set_to_check is None else None, sample_pred, neighbors)
         results.append(result)
 
     # Sort results based on the actual target labels of test points
-    sorted_results = sorted(results, key=lambda x: x[1])
+    sorted_results = sorted(results, key=lambda x: x[1] if x[1] is not None else float('-inf'))
 
     if log_results:
-        logger.info(f"Processed and sorted {len(sorted_results)} samples")
-        logger.info("Results sorted in ascending order of test points' actual target labels")
-        for idx, true_label, pred_label, neighbors in sorted_results:
-            logger.info(f"Test point {idx}: true={true_label:.2f}, pred={pred_label:.2f}")
-            for i, (dist, neighbor_idx, neighbor_true, neighbor_pred) in enumerate(neighbors):
-                logger.info(
-                    f"  Neighbor {i + 1}: idx={neighbor_idx}, dist={dist:.4f}, true={neighbor_true:.2f}, pred={neighbor_pred:.2f}")
+        print(f"Processed and sorted {len(sorted_results)} samples")
+        print("Results sorted in ascending order of test points' actual target labels")
+        for idx, true_label, pred_probs, neighbors in sorted_results:
+            if set_to_check is None:
+                pred_str = f"[pos={pred_probs[0]:.2f}, zero={pred_probs[1]:.2f}, neg={pred_probs[2]:.2f}]" if pred_probs else "N/A"
+                print(f"Test point {idx}: true={true_label:.2f}, pred={pred_str}")
+            for i, (dist, neighbor_idx, neighbor_true, neighbor_pred_probs) in enumerate(neighbors):
+                neighbor_pred_str = f"[pos={neighbor_pred_probs[0]:.2f}, zero={neighbor_pred_probs[1]:.2f}, neg={neighbor_pred_probs[2]:.2f}]" if neighbor_pred_probs else "N/A"
+                print(
+                    f"  Neighbor {i + 1}: idx={neighbor_idx}, dist={dist:.4f}, true={neighbor_true:.2f}, "
+                    f"pred={neighbor_pred_str}")
 
     return sorted_results
 
