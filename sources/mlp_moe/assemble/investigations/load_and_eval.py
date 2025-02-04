@@ -253,7 +253,12 @@ def main():
                 combiner_probs = combiner.predict(X_train_subset)[1]
                 moe_probs, moe_preds = moe_model.predict(X_train_subset)
 
-                # Calculate weighted sum
+                # Squeeze the extra dimension from expert predictions so shapes match
+                expert_plus_preds = np.squeeze(expert_plus_preds, axis=-1)
+                expert_zero_preds = np.squeeze(expert_zero_preds, axis=-1)
+                expert_minus_preds = np.squeeze(expert_minus_preds, axis=-1)
+
+                # Calculate weighted sum (now expert_outputs has shape (batch_size, 3))
                 expert_outputs = np.stack([expert_plus_preds, expert_zero_preds, expert_minus_preds], axis=1)
                 weighted_sum = np.sum(expert_outputs * combiner_probs, axis=1)
 
@@ -269,42 +274,47 @@ def main():
                     print(f"Ground truth: {y_train_subset[idx][0]:.4f}")
                     print(f"MoE prediction: {moe_preds[idx][0]:.4f}")
                     print(f"Weighted sum: {weighted_sum[idx]:.4f}")
-                    print(f"Expert outputs: +{expert_plus_preds[idx][0]:.4f}, "
-                          f"0:{expert_zero_preds[idx][0]:.4f}, "
-                          f"-{expert_minus_preds[idx][0]:.4f}")
+                    print(f"Expert outputs: +{expert_plus_preds[idx]:.4f}, "
+                          f"0:{expert_zero_preds[idx]:.4f}, "
+                          f"-{expert_minus_preds[idx]:.4f}")
                     print(f"Combiner probabilities: +{combiner_probs[idx][0]:.4f}, "
                           f"0:{combiner_probs[idx][1]:.4f}, "
                           f"-{combiner_probs[idx][2]:.4f}")
                     print(f"Prediction error: {errors[idx]:.4f}")
                 print("-" * 80)
 
-                # evaluate the model error on subset test set
+                # Evaluate the model error on subset test set
                 expert_plus_preds_test = expert_plus.predict(X_test_subset)[1]
                 expert_zero_preds_test = expert_zero.predict(X_test_subset)[1]
                 expert_minus_preds_test = expert_minus.predict(X_test_subset)[1]
                 combiner_probs_test = combiner.predict(X_test_subset)[1]
                 moe_probs_test, moe_preds_test = moe_model.predict(X_test_subset)
 
-                # Calculate weighted sum
+                # Squeeze the extra dimension from test expert predictions
+                expert_plus_preds_test = np.squeeze(expert_plus_preds_test, axis=-1)
+                expert_zero_preds_test = np.squeeze(expert_zero_preds_test, axis=-1)
+                expert_minus_preds_test = np.squeeze(expert_minus_preds_test, axis=-1)
+
+                # Calculate weighted sum for test set
                 expert_outputs_test = np.stack(
                     [expert_plus_preds_test, expert_zero_preds_test, expert_minus_preds_test], axis=1)
                 weighted_sum_test = np.sum(expert_outputs_test * combiner_probs_test, axis=1)
 
-                # Calculate errors and create sorted indices
+                # Calculate errors and create sorted indices for test set
                 errors_test = np.abs(moe_preds_test[:, 0] - y_test_subset[:, 0])
                 sorted_indices_test = np.argsort(errors_test)[::-1]  # Sort in descending order
 
-                # Print results for each sample, sorted by error
-                print("\nAnalysis of subset samples (sorted by error, largest to smallest):")
+                # Print results for each test sample, sorted by error
+                print("\nAnalysis of test subset samples (sorted by error, largest to smallest):")
                 print("-" * 80)
                 for idx in sorted_indices_test:
                     print(f"\nSample {idx + 1} (Error: {errors_test[idx]:.4f}):")
                     print(f"Ground truth: {y_test_subset[idx][0]:.4f}")
                     print(f"MoE prediction: {moe_preds_test[idx][0]:.4f}")
                     print(f"Weighted sum: {weighted_sum_test[idx]:.4f}")
-                    print(f"Expert outputs: +{expert_plus_preds_test[idx][0]:.4f}, "
-                          f"0:{expert_zero_preds_test[idx][0]:.4f}, "
-                          f"-{expert_minus_preds_test[idx][0]:.4f}")
+                    print(f"Expert outputs: +{expert_plus_preds_test[idx]:.4f}, "
+                          f"0:{expert_zero_preds_test[idx]:.4f}, "
+                          f"-{expert_minus_preds_test[idx]:.4f}")
                     print(f"Combiner probabilities: +{combiner_probs_test[idx][0]:.4f}, "
                           f"0:{combiner_probs_test[idx][1]:.4f}, "
                           f"-{combiner_probs_test[idx][2]:.4f}")
