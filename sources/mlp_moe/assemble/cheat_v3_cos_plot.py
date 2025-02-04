@@ -7,7 +7,7 @@ from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 # from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
-from modules.reweighting.exCosReweightsD import exDenseReweightsD
+from modules.reweighting.exDenseReweightsD import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.ts_modeling import (
@@ -21,7 +21,8 @@ from modules.training.ts_modeling import (
     # filter_ds,
     # create_mlp,
     plot_error_hist,
-    create_mlp_moe
+    create_mlp_moe,
+    plot_importance
 )
 
 
@@ -39,7 +40,7 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_C2:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1, 1, 1, 1)]:
             for rho in RHO_MOE:  # SAM
                 inputs_to_use = INPUTS_TO_USE[0]
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]
@@ -176,6 +177,9 @@ def main():
                 # get the number of input features
                 n_features = X_train.shape[1]
                 print(f'n_features: {n_features}')
+
+                # plot the importance on delta
+                plot_importance(mse_train_weights_dict)
 
                 X_test, y_test, logI_test, logI_prev_test = build_dataset(
                     root_dir + '/testing',
