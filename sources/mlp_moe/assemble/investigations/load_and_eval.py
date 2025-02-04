@@ -252,6 +252,7 @@ def main():
                 expert_zero_preds = expert_zero.predict(X_train_subset)[1]
                 expert_minus_preds = expert_minus.predict(X_train_subset)[1]
                 combiner_probs = combiner.predict(X_train_subset)[1]
+                combiner_probs_all = combiner.predict(X_train)[1]
                 moe_probs, moe_preds = moe_model.predict(X_train_subset)
 
                 # Squeeze the extra dimension from expert predictions so shapes match
@@ -290,7 +291,7 @@ def main():
                     neighbors = find_knns(
                         X_train, y_train, 
                         k_neighbors=5, 
-                        predictions=combiner_probs, 
+                        predictions=combiner_probs_all, 
                         set_to_check=X_train_subset[idx:idx+1], 
                         log_results=False)
                     print("\nNearest neighbors:")
@@ -306,6 +307,7 @@ def main():
                 expert_zero_preds_test = expert_zero.predict(X_test_subset)[1]
                 expert_minus_preds_test = expert_minus.predict(X_test_subset)[1]
                 combiner_probs_test = combiner.predict(X_test_subset)[1]
+                combiner_probs_all_test = combiner.predict(X_test)[1]
                 moe_probs_test, moe_preds_test = moe_model.predict(X_test_subset)
 
                 # Squeeze the extra dimension from test expert predictions
@@ -346,7 +348,7 @@ def main():
                     neighbors = find_knns(
                         X_test, y_test, 
                         k_neighbors=5,
-                        predictions=combiner_probs_test, 
+                        predictions=combiner_probs_all_test, 
                         set_to_check=X_test_subset[idx:idx+1], 
                         log_results=False)
                     print("\nNearest neighbors:")
