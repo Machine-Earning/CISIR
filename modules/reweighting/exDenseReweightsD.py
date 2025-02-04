@@ -156,7 +156,7 @@ class exDenseReweightsD:
 
     def __init__(self, X, y,
                  alpha: float = .9,
-                 bw: [float, str] = .9,
+                 bw: Union[float, str] = .9,
                  min_norm_weight: Optional[float] = None,
                  tag: Optional[str] = None,
                  debug: bool = False) -> None:

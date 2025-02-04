@@ -206,6 +206,18 @@ class exDenseReweightsD:
         self.avg_reweight = np.mean(self.reweight_factors)
         self.reweights = self.reweight_factors / self.avg_reweight
 
+        # Scale reweights to desired range if min_norm_weight is provided
+        if self.min_norm_weight is not None:
+            # Current min and max of reweights
+            curr_min = np.min(self.reweights)
+            curr_max = np.max(self.reweights)
+            
+            # Scale reweights to range [min_norm_weight, 500]
+            self.reweights = (self.reweights - curr_min) / (curr_max - curr_min) * (500 - self.min_norm_weight) + self.min_norm_weight
+            
+            if self.debug:
+                print(f"Scaled reweights range: [{np.min(self.reweights)}, {np.max(self.reweights)}]")
+
         self.label_reweight_dict = map_labels_to_reweights(self.y_train, self.reweights)
 
         if self.debug:
