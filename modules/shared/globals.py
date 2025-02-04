@@ -188,7 +188,8 @@ COMBINER_V2_PCC_CE_S2_B04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-a
 COMBINER_V2_PCC_CE_S2_C04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_C_20250127-114523.h5'
 COMBINER_V2_PCC_CE_S2_D04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/final_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_20250128-142357.h5'
 
-COMBINER_V2_PCC_CE_S2_A04_INVESTIGATION_BS64 = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.00_v2_moe_cheat_pcc_ce_investigation_A_20250203-115542.h5'
+COMBINER_V2_PCC_CE_S2_A04_INVESTIGATION_BS64 = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_A_20250203-115542.h5'
+COMBINER_V2_PCC_CE_S2_A04_INVESTIGATION_BS82 = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_A_20250204-133928.h5'
 
 MOE_V2_PCC_CE_S2_A04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_model_moe_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_A_20250127-113651_reg.h5'
 
@@ -215,4 +216,4 @@ LAMBDA_CE = 0.5
 
 START_LR_MOE_C = 1e-4
 REWEIGHTS_MOE_C2 = [(1.0, 1.0, 1.0, 1.0)]
-BATCH_SIZE_NEG = 77
+BATCH_SIZE_NEG = 70

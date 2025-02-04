@@ -43,7 +43,7 @@ def main():
         
         # Create a unique experiment name with a timestamp
         current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-        experiment_name = f'combiner_v3_cos_{current_time}'
+        experiment_name = f'combiner_v3_pcc_ce_s2_a04_bs64_{current_time}'
 
         set_seed(seed)
         
