@@ -268,10 +268,16 @@ def main():
                 errors = np.abs(moe_preds[:, 0] - y_train_subset[:, 0])
                 # Calculate errors for negative expert alone
                 neg_expert_errors = np.abs(expert_minus_preds - y_train_subset[:, 0])
-                sorted_indices = np.argsort(errors)[::-1]  # Sort in descending order
+                
+                # Toggle between sorting by error or by label
+                sort_by_error = False  # Set to False to sort by label instead
+                if sort_by_error:
+                    sorted_indices = np.argsort(errors)[::-1]  # Sort by error in descending order
+                    print("\nAnalysis of subset samples (sorted by error, largest to smallest):")
+                else:
+                    sorted_indices = np.argsort(y_train_subset[:, 0])  # Sort by label in ascending order
+                    print("\nAnalysis of subset samples (sorted by label, smallest to largest):")
 
-                # Print results for each sample, sorted by error
-                print("\nAnalysis of subset samples (sorted by error, largest to smallest):")
                 print("-" * 80)
                 for idx in sorted_indices:
                     print(f"\nSample {idx + 1} (Error: {errors[idx]:.4f}):")
@@ -322,13 +328,17 @@ def main():
 
                 # Calculate errors and create sorted indices for test set
                 errors_test = np.abs(moe_preds_test[:, 0] - y_test_subset[:, 0])
-                sorted_indices_test = np.argsort(errors_test)[::-1]  # Sort in descending order
-
                 # Calculate errors for negative expert alone for test set
                 neg_expert_errors_test = np.abs(expert_minus_preds_test - y_test_subset[:, 0])
 
-                # Print results for each test sample, sorted by error
-                print("\nAnalysis of test subset samples (sorted by error, largest to smallest):")
+                # Sort test samples using same sorting method as training
+                if sort_by_error:
+                    sorted_indices_test = np.argsort(errors_test)[::-1]  # Sort by error in descending order
+                    print("\nAnalysis of test subset samples (sorted by error, largest to smallest):")
+                else:
+                    sorted_indices_test = np.argsort(y_test_subset[:, 0])  # Sort by label in ascending order
+                    print("\nAnalysis of test subset samples (sorted by label, smallest to largest):")
+
                 print("-" * 80)
                 for idx in sorted_indices_test:
                     print(f"\nSample {idx + 1} (Error: {errors_test[idx]:.4f}):")
