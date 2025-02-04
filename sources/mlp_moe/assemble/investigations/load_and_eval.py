@@ -272,15 +272,15 @@ def main():
                 for idx in sorted_indices:
                     print(f"\nSample {idx + 1} (Error: {errors[idx]:.4f}):")
                     print(f"Ground truth: {y_train_subset[idx][0]:.4f}")
-                    print(f"MoE prediction: {moe_preds[idx][0]:.4f}")
+                    print(f"MoE preds: {moe_preds[idx][0]:.4f}")
                     print(f"Weighted sum: {weighted_sum[idx]:.4f}")
-                    print(f"Expert outputs: +{expert_plus_preds[idx]:.4f}, "
-                          f"0:{expert_zero_preds[idx]:.4f}, "
-                          f"-{expert_minus_preds[idx]:.4f}")
-                    print(f"Combiner probabilities: +{combiner_probs[idx][0]:.4f}, "
-                          f"0:{combiner_probs[idx][1]:.4f}, "
-                          f"-{combiner_probs[idx][2]:.4f}")
-                    print(f"Prediction error: {errors[idx]:.4f}")
+                    print(f"Expert preds: y+:{expert_plus_preds[idx]:.4f}, "
+                          f"y0:{expert_zero_preds[idx]:.4f}, "
+                          f"y-:{expert_minus_preds[idx]:.4f}")
+                    print(f"Combiner probs: p+:{combiner_probs[idx][0]:.4f}, "
+                          f"p0:{combiner_probs[idx][1]:.4f}, "
+                          f"p-:{combiner_probs[idx][2]:.4f}")
+                    print(f"Pred error: {errors[idx]:.4f}")
                 print("-" * 80)
 
                 # Evaluate the model error on subset test set
@@ -310,16 +310,18 @@ def main():
                 for idx in sorted_indices_test:
                     print(f"\nSample {idx + 1} (Error: {errors_test[idx]:.4f}):")
                     print(f"Ground truth: {y_test_subset[idx][0]:.4f}")
-                    print(f"MoE prediction: {moe_preds_test[idx][0]:.4f}")
+                    print(f"MoE preds: {moe_preds_test[idx][0]:.4f}")
                     print(f"Weighted sum: {weighted_sum_test[idx]:.4f}")
-                    print(f"Expert outputs: +{expert_plus_preds_test[idx]:.4f}, "
-                          f"0:{expert_zero_preds_test[idx]:.4f}, "
-                          f"-{expert_minus_preds_test[idx]:.4f}")
-                    print(f"Combiner probabilities: +{combiner_probs_test[idx][0]:.4f}, "
-                          f"0:{combiner_probs_test[idx][1]:.4f}, "
-                          f"-{combiner_probs_test[idx][2]:.4f}")
-                    print(f"Prediction error: {errors_test[idx]:.4f}")
+                    print(f"Expert preds: y+:{expert_plus_preds_test[idx]:.4f}, "
+                          f"y0:{expert_zero_preds_test[idx]:.4f}, "
+                          f"y-:{expert_minus_preds_test[idx]:.4f}")
+                    print(f"Combiner probs: p+:{combiner_probs_test[idx][0]:.4f}, "
+                          f"p0:{combiner_probs_test[idx][1]:.4f}, "
+                          f"p-:{combiner_probs_test[idx][2]:.4f}")
+                    print(f"Pred error: {errors_test[idx]:.4f}")
                 print("-" * 80)
+
+
 
                 # evaluate the model error on test set
                 error_mae = evaluate_mae(moe_model, X_test, y_test)
