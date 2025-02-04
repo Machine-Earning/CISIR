@@ -1,13 +1,10 @@
 import os
 from datetime import datetime
 
-import wandb
 import numpy as np
-import tensorflow as tf
-from tensorflow_addons.optimizers import AdamW
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+import wandb
+
 from modules.shared.globals import *
-from modules.training.phase_manager import TrainingPhaseManager
 from modules.training.ts_modeling import (
     build_dataset,
     evaluate_mae,
@@ -27,7 +24,7 @@ def main():
     """
 
     eval_threshold = -1
-    moe_model_path = MOE_V2_PCC_CE_S2_A04_INVESTIGATION
+    # moe_model_path = MOE_V2_PCC_CE_S2_A04_INVESTIGATION
     combiner_path = COMBINER_V2_PCC_CE_S2_A04_INVESTIGATION
     pos_expert_path = POS_EXPERT_PATH
     neg_expert_path = NEG_EXPERT_PATH
@@ -47,7 +44,7 @@ def main():
                 title = title.replace(' ', '_').replace(':', '_')
                 current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
                 experiment_name = f'{title}_{current_time}'
-                
+
                 set_seed(seed)
                 patience = PATIENCE_MOE
                 learning_rate = START_LR_MOE
@@ -76,7 +73,6 @@ def main():
                     'minus': neg_expert_path,
                     'combiner': combiner_path
                 }
-
 
                 # Initialize wandb
                 wandb.init(project="Jan-Report", name=experiment_name, config={
@@ -114,7 +110,7 @@ def main():
                     'expert0_path': zero_expert_path,
                     'expert-_path': neg_expert_path,
                     'combiner_path': combiner_path,
-                    'moe_model_path': moe_model_path,
+                    # 'moe_model_path': moe_model_path,
                     'asym_type': asym_type
                 })
 
@@ -131,7 +127,6 @@ def main():
                 # Get subset of training data
                 X_train_subset, y_train_subset, _, _ = get_subset_ds(
                     X_train, y_train, eval_threshold, None, logI_train, logI_prev_train)
-
 
                 # print the subset training set shapes
                 print(f'X_train_subset.shape: {X_train_subset.shape}, y_train_subset.shape: {y_train_subset.shape}')
@@ -152,7 +147,7 @@ def main():
                 # Get subset of test data with delta <= -0.4 for testing
                 X_test_subset, y_test_subset, _, _ = get_subset_ds(
                     X_test, y_test, eval_threshold, None, logI_test, logI_prev_test)
-                
+
                 # print the subset test set shapes
                 print(f'X_test_subset.shape: {X_test_subset.shape}, y_test_subset.shape: {y_test_subset.shape}')
                 # print the test set shapes
@@ -175,7 +170,6 @@ def main():
                 expert_plus.load_weights(pos_expert_path)
                 expert_plus.summary()
 
-
                 expert_zero = create_mlp(
                     input_dim=n_features,
                     output_dim=1,
@@ -191,8 +185,6 @@ def main():
                 )
                 expert_zero.load_weights(zero_expert_path)
                 expert_zero.summary()
-
-
 
                 expert_minus = create_mlp(
                     input_dim=n_features,
@@ -228,7 +220,6 @@ def main():
                 combiner.load_weights(combiner_path)
                 combiner.summary()
 
-
                 # Create and load full MoE model
                 moe_model = create_mlp_moe(
                     hiddens=hiddens,
@@ -246,16 +237,15 @@ def main():
                     sam_rho=rho
                 )
                 moe_model.summary()
-                moe_model.load_weights(moe_model_path)
 
                 # evaluation of the subset training set and reporting to wandb
                 # per each sample, 
-                    # 3 output values from experts
-                    # 3 posteriors from combiner
-                    # 1 weighted sum from the model
-                    # 1 ground truth label 
-                    # 1 pred vs actual error (expected positive errors)
-                    # Sort the values by error and sort by largest error to lowest.
+                # 3 output values from experts
+                # 3 posteriors from combiner
+                # 1 weighted sum from the model
+                # 1 ground truth label
+                # 1 pred vs actual error (expected positive errors)
+                # Sort the values by error and sort by largest error to lowest.
                 # Get predictions for subset
                 expert_plus_preds = expert_plus.predict(X_train_subset)[1]
                 expert_zero_preds = expert_zero.predict(X_train_subset)[1]
@@ -275,7 +265,7 @@ def main():
                 print("\nAnalysis of subset samples (sorted by error, largest to smallest):")
                 print("-" * 80)
                 for idx in sorted_indices:
-                    print(f"\nSample {idx+1} (Error: {errors[idx]:.4f}):")
+                    print(f"\nSample {idx + 1} (Error: {errors[idx]:.4f}):")
                     print(f"Ground truth: {y_train_subset[idx][0]:.4f}")
                     print(f"MoE prediction: {moe_preds[idx][0]:.4f}")
                     print(f"Weighted sum: {weighted_sum[idx]:.4f}")
@@ -288,7 +278,6 @@ def main():
                     print(f"Prediction error: {errors[idx]:.4f}")
                 print("-" * 80)
 
-
                 # evaluate the model error on subset test set
                 expert_plus_preds_test = expert_plus.predict(X_test_subset)[1]
                 expert_zero_preds_test = expert_zero.predict(X_test_subset)[1]
@@ -297,18 +286,19 @@ def main():
                 moe_probs_test, moe_preds_test = moe_model.predict(X_test_subset)
 
                 # Calculate weighted sum
-                expert_outputs_test = np.stack([expert_plus_preds_test, expert_zero_preds_test, expert_minus_preds_test], axis=1)
+                expert_outputs_test = np.stack(
+                    [expert_plus_preds_test, expert_zero_preds_test, expert_minus_preds_test], axis=1)
                 weighted_sum_test = np.sum(expert_outputs_test * combiner_probs_test, axis=1)
 
                 # Calculate errors and create sorted indices
                 errors_test = np.abs(moe_preds_test[:, 0] - y_test_subset[:, 0])
                 sorted_indices_test = np.argsort(errors_test)[::-1]  # Sort in descending order
-                
+
                 # Print results for each sample, sorted by error
                 print("\nAnalysis of subset samples (sorted by error, largest to smallest):")
                 print("-" * 80)
                 for idx in sorted_indices_test:
-                    print(f"\nSample {idx+1} (Error: {errors_test[idx]:.4f}):")
+                    print(f"\nSample {idx + 1} (Error: {errors_test[idx]:.4f}):")
                     print(f"Ground truth: {y_test_subset[idx][0]:.4f}")
                     print(f"MoE prediction: {moe_preds_test[idx][0]:.4f}")
                     print(f"Weighted sum: {weighted_sum_test[idx]:.4f}")
@@ -326,36 +316,30 @@ def main():
                 print(f'mae error: {error_mae}')
                 wandb.log({"mae": error_mae})
 
-
                 # evaluate the model error on training set
                 error_mae_train = evaluate_mae(moe_model, X_train, y_train)
                 print(f'mae error train: {error_mae_train}')
                 wandb.log({"train_mae": error_mae_train})
-
 
                 # evaluate the model correlation on test set
                 error_pcc = evaluate_pcc(moe_model, X_test, y_test)
                 print(f'pcc error: {error_pcc}')
                 wandb.log({"pcc": error_pcc})
 
-
                 # evaluate the model correlation on training set
                 error_pcc_train = evaluate_pcc(moe_model, X_train, y_train)
                 print(f'pcc error train: {error_pcc_train}')
                 wandb.log({"train_pcc": error_pcc_train})
-
 
                 # evaluate the model correlation on test set based on logI and logI_prev
                 error_pcc_logI = evaluate_pcc(moe_model, X_test, y_test, logI_test, logI_prev_test)
                 print(f'pcc error logI: {error_pcc_logI}')
                 wandb.log({"pcc_I": error_pcc_logI})
 
-
                 # evaluate the model correlation on training set based on logI and logI_prev
                 error_pcc_logI_train = evaluate_pcc(moe_model, X_train, y_train, logI_train, logI_prev_train)
                 print(f'pcc error logI train: {error_pcc_logI_train}')
                 wandb.log({"train_pcc_I": error_pcc_logI_train})
-
 
                 # evaluate the model on test cme_files
                 above_threshold = mae_plus_threshold
@@ -372,20 +356,17 @@ def main():
                 print(f'mae error delta >= {above_threshold} train: {error_mae_cond_train}')
                 wandb.log({"train_mae+": error_mae_cond_train})
 
-
                 # evaluate the model correlation for rare samples on test set
                 error_pcc_cond = evaluate_pcc(
                     moe_model, X_test, y_test, above_threshold=above_threshold)
                 print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
                 wandb.log({"pcc+": error_pcc_cond})
 
-
                 # evaluate the model correlation for rare samples on training set
                 error_pcc_cond_train = evaluate_pcc(
                     moe_model, X_train, y_train, above_threshold=above_threshold)
                 print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
                 wandb.log({"train_pcc+": error_pcc_cond_train})
-
 
                 # evaluate the model correlation for rare samples on test set based on logI and logI_prev
                 error_pcc_cond_logI = evaluate_pcc(
