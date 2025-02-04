@@ -68,7 +68,8 @@ def find_knns(
         raise ValueError("Inconsistent lengths of X_test and y_test arrays")
     
     if predictions is not None and len(X_test) != len(predictions):
-        raise ValueError("Inconsistent lengths of X_test and predictions arrays")
+        # raise ValueError("Inconsistent lengths of X_test and predictions arrays")
+        print(f"Inconsistent lengths of X_test and predictions arrays: {len(X_test)} != {len(predictions)}, shape of X_test: {X_test.shape}, shape of predictions: {predictions.shape}")
 
     # k+1 because the point itself is included
     nbrs = NearestNeighbors(n_neighbors=k_neighbors + (1 if set_to_check is None else 0), algorithm='auto').fit(X_test)
