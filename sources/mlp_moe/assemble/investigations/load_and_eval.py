@@ -264,6 +264,8 @@ def main():
 
                 # Calculate errors and create sorted indices
                 errors = np.abs(moe_preds[:, 0] - y_train_subset[:, 0])
+                # Calculate errors for negative expert alone
+                neg_expert_errors = np.abs(expert_minus_preds - y_train_subset[:, 0])
                 sorted_indices = np.argsort(errors)[::-1]  # Sort in descending order
 
                 # Print results for each sample, sorted by error
@@ -281,7 +283,9 @@ def main():
                           f"p0:{combiner_probs[idx][1]:.4f}, "
                           f"p-:{combiner_probs[idx][2]:.4f}")
                     print(f"Pred error: {errors[idx]:.4f}")
+                    print(f"Neg expert error: {neg_expert_errors[idx]:.4f}")
                 print("-" * 80)
+
 
                 # Evaluate the model error on subset test set
                 expert_plus_preds_test = expert_plus.predict(X_test_subset)[1]
@@ -304,10 +308,14 @@ def main():
                 errors_test = np.abs(moe_preds_test[:, 0] - y_test_subset[:, 0])
                 sorted_indices_test = np.argsort(errors_test)[::-1]  # Sort in descending order
 
+                # Calculate errors for negative expert alone for test set
+                neg_expert_errors_test = np.abs(expert_minus_preds_test - y_test_subset[:, 0])
+
                 # Print results for each test sample, sorted by error
                 print("\nAnalysis of test subset samples (sorted by error, largest to smallest):")
                 print("-" * 80)
                 for idx in sorted_indices_test:
+
                     print(f"\nSample {idx + 1} (Error: {errors_test[idx]:.4f}):")
                     print(f"Ground truth: {y_test_subset[idx][0]:.4f}")
                     print(f"MoE preds: {moe_preds_test[idx][0]:.4f}")
@@ -319,7 +327,10 @@ def main():
                           f"p0:{combiner_probs_test[idx][1]:.4f}, "
                           f"p-:{combiner_probs_test[idx][2]:.4f}")
                     print(f"Pred error: {errors_test[idx]:.4f}")
+                    print(f"Neg expert error: {neg_expert_errors_test[idx]:.4f}")
                 print("-" * 80)
+
+
 
 
 
