@@ -5034,6 +5034,35 @@ def coreg(y_true, y_pred, pcc_weights=None):
     return 1.0 - pcc
 
 
+def bias_penalty(
+        y_true: tf.Tensor,
+        y_pred: tf.Tensor
+) -> tf.Tensor:
+    """
+    Helper function to enforce unbiased estimation by adding a penalty term to the loss.
+    The penalty is based on the squared difference between the mean of residuals and zero.
+    This encourages the model to produce predictions that are unbiased overall.
+
+    For example, if predictions are systematically too high or too low compared to ground truth,
+    this penalty will increase the loss to discourage such systematic bias.
+
+    Args:
+    - y_true (tf.Tensor): Ground truth labels
+    - y_pred (tf.Tensor): Predicted labels from the model
+
+    Returns:
+    - tf.Tensor: The calculated bias penalty term (mean squared residual)
+    """
+    # Calculate mean residual (average difference between predictions and truth)
+    # A non-zero mean residual indicates systematic bias in predictions
+    residual_mean = tf.reduce_mean(y_pred - y_true)
+
+    # Square the mean residual to get positive penalty that grows quadratically with bias
+    bias_penalty_term = tf.square(residual_mean)
+
+    return bias_penalty_term
+
+
 def cmse(
         y_true: tf.Tensor, y_pred: tf.Tensor,
         lambda_factor: float,
@@ -5043,6 +5072,7 @@ def cmse(
         train_pcc_weight_dict: Optional[Dict[float, float]] = None,
         val_pcc_weight_dict: Optional[Dict[float, float]] = None,
         asym_type: Optional[str] = None,  # New parameter to choose asymmetric weight type
+        bias_penalty_factor: Optional[float] = None,  # New parameter for bias penalty scaling
 ) -> tf.Tensor:
     """
     Custom loss function combining Mean Squared Error (MSE) and Pearson Correlation Coefficient (PCC)
@@ -5059,6 +5089,7 @@ def cmse(
     - train_pcc_weight_dict (dict, optional): Dictionary mapping label values to weights for training PCC samples.
     - val_pcc_weight_dict (dict, optional): Dictionary mapping label values to weights for validation PCC samples.
     - asym_type (str, optional): Type of asymmetric weight to use ('silu' or 'sigmoid').
+    - bias_penalty_factor (float, optional): Scaling factor for the bias penalty term. If None, no bias penalty is applied.
 
     Returns:
     - tf.Tensor: The calculated loss value as a single scalar.
@@ -5087,6 +5118,10 @@ def cmse(
 
     # Combine the weighted MSE and weighted PCC with lambda_factor
     loss = mse + lambda_factor * pcc_loss
+
+    # Add bias penalty if factor is provided
+    if bias_penalty_factor is not None:
+        loss = loss + bias_penalty_factor * bias_penalty(y_true, y_pred)
 
     # Return the final loss as a single scalar value
     return loss
