@@ -38,14 +38,14 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.4, 0.4, 0.0, 0.0)]:
-            for rho in RHO_MOE:  # SAM
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in IMPORTANCE_MOE_INV:
+            for rho in RHO_MOE_INV:  # SAM
                 inputs_to_use = INPUTS_TO_USE[0]
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]
                 add_slope = ADD_SLOPE[0]
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = LAMBDA_FACTOR_MOE  # lambda for the loss
+                lambda_factor = LAMBDA_FACTOR_MOE_INV  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
@@ -57,9 +57,9 @@ def main():
                 experiment_name = f'{title}_{current_time}'
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed)
-                patience = PATIENCE_MOE  # higher patience
-                learning_rate = START_LR_MOE  # starting learning rate
-                asym_type = ASYM_TYPE_MOE
+                patience = PATIENCE_MOE_INV  # higher patience
+                learning_rate = START_LR_MOE_INV  # starting learning rate
+                asym_type = ASYM_TYPE_MOE_INV
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -71,7 +71,7 @@ def main():
 
                 weight_decay = WEIGHT_DECAY_MOE  # 1e-5 # higher weight decay
                 momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                batch_size = BATCH_SIZE  # higher batch size
+                batch_size = BATCH_SIZE_MOE_INV  # higher batch size
                 epochs = EPOCHS  # higher epochs
                 hiddens = MLP_HIDDENS  # hidden layers
 
