@@ -153,10 +153,10 @@ REWEIGHTS_MOE_0 = [(0.4, 0.4, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
 LAMBDA_FACTOR_MOE_P = 6
 LAMBDA_FACTOR_MOE_M = 6
 
-START_LR_MOE_M = 1e-3
+START_LR_MOE_M = 5e-4
 START_LR_MOE_P = 1e-3
 
-FOP_FACTOR = 1.7  # 1 full penalty, 0 no penalty
+FOP_FACTOR = 1.5  # 1 full penalty, 0 no penalty
 
 ASYM_TYPE_0 = None
 PDC_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcStratInj_bs6000_v8_20241203-194954.h5"
@@ -197,6 +197,7 @@ COMBINER_V2_PCC_CE_S2_D04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-a
 COMBINER_V2_PCC_CE_S2_A04_INVESTIGATION_BS64 = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_A_20250203-115542.h5'
 COMBINER_V2_PCC_CE_S2_A04_INVESTIGATION_BS82 = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_A_20250204-133928.h5'
 
+COMBINER_V2_PCC_CE_S2_B04_INVESTIGATION_BS1800 = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_B_20250206-122228.h5'
 MOE_V2_PCC_CE_S2_A04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_model_moe_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_A_20250127-113651_reg.h5'
 
 # assemble hyperparams
