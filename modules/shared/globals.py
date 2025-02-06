@@ -88,7 +88,7 @@ RHO = [1e-2]
 REWEIGHTS = [(1.0, 0.4, 0.1, 0)]
 LAMBDA_FACTOR = 8
 AE_LAMBDA = 0.9
-CVRG_MIN_DELTA = 1e-3
+CVRG_MIN_DELTA = 1e-5
 CVRG_METRIC = 'loss'
 CVRG_METRIC_WDR = 'val_loss'
 ASYM_TYPE = 'sigmoid'
@@ -156,7 +156,7 @@ LAMBDA_FACTOR_MOE_M = 6
 START_LR_MOE_M = 1e-3
 START_LR_MOE_P = 1e-3
 
-FOP_FACTOR = 1  # 1 full penalty, 0 no penalty
+FOP_FACTOR = 1.7  # 1 full penalty, 0 no penalty
 
 ASYM_TYPE_0 = None
 PDC_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcStratInj_bs6000_v8_20241203-194954.h5"
@@ -232,4 +232,4 @@ RHO_MOE_INV = [1e-2]
 LAMBDA_FACTOR_MOE_INV = 8
 PATIENCE_MOE_INV = int(3e3)
 ASYM_TYPE_MOE_INV = None
-BATCH_SIZE_MOE_INV = 3000
+BATCH_SIZE_MOE_INV = 3600
