@@ -50,10 +50,12 @@ def main():
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
                 lambda_factor = LAMBDA_FACTOR_MOE_M  # lambda for the loss
+                fop_factor = FOP_FACTOR
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 # inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_minus_e'
+
+                title = f'mlp2_amse{alpha_mse:.2f}_minus_e_fop{fop_factor}'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -142,8 +144,10 @@ def main():
                     'lower_threshold': lower_threshold,
                     'upper_threshold': upper_threshold,
                     'cvrg_metric': CVRG_METRIC,
-                    'pretrained_weights': pretrained_weights
+                    'pretrained_weights': pretrained_weights,
+                    'fop_factor': fop_factor
                 })
+
 
                 # set the root directory
                 root_dir = DS_PATH
@@ -257,10 +261,12 @@ def main():
                             train_pcc_weight_dict=pcc_train_weights_dict,
                             val_mse_weight_dict=mse_test_weights_dict,
                             val_pcc_weight_dict=pcc_test_weights_dict,
-                            asym_type=asym_type
+                            asym_type=asym_type,
+                            bias_penalty_factor=fop_factor
                         )
                     }
                 )
+
 
                 # Step 1: Create stratified dataset for the training set only
                 train_ds, train_steps = stratified_batch_dataset(
@@ -328,10 +334,12 @@ def main():
                             lambda_factor=lambda_factor,
                             train_mse_weight_dict=mse_train_weights_dict,
                             train_pcc_weight_dict=pcc_train_weights_dict,
-                            asym_type=asym_type
+                            asym_type=asym_type,
+                            bias_penalty_factor=fop_factor
                         )
                     },
                 )  # Compile the model just like before
+
 
                 train_ds, train_steps = stratified_batch_dataset(
                     X_train, y_train, batch_size)

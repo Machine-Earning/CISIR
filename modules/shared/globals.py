@@ -148,13 +148,19 @@ LOWER_THRESHOLD_MOE = -0.4
 UPPER_THRESHOLD_MOE = 0.4
 REWEIGHTS_MOE_C = [(0.65, 0.65, 0.0, 0.0)]
 REWEIGHTS_MOE_P = [(0.11, 0.11, 0.0, 0.0)]
-REWEIGHTS_MOE_M = [(0.035, 0.035, 0.0, 0.0)]
+REWEIGHTS_MOE_M = [(0.03, 0.03, 0.0, 0.0)]
 REWEIGHTS_MOE_0 = [(0.4, 0.4, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
 LAMBDA_FACTOR_MOE_P = 6
 LAMBDA_FACTOR_MOE_M = 6
 
+START_LR_MOE_M = 1e-3
+START_LR_MOE_P = 1e-3
+
+FOP_FACTOR = 1  # 1 full penalty, 0 no penalty
+
 ASYM_TYPE_0 = None
 PDC_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcStratInj_bs6000_v8_20241203-194954.h5"
+
 PRE_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.00_v8_updated_20241120-180201_reg.h5"
 # Model paths
 POS_EXPERT_PATH = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse0.10_plus_e_20241212-140850_reg.h5'
