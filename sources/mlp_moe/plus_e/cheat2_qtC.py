@@ -20,7 +20,7 @@ from modules.training.ts_modeling import (
     cmse,
     filter_ds,
     create_mlp,
-    get_minus_cls
+    get_plus_cls
 )
 
 
@@ -30,7 +30,7 @@ from modules.training.ts_modeling import (
 
 def main():
     """
-    Main function to run the E-MLP model for data with labels <= lower threshold
+    Main function to run the E-MLP model for data with labels >= upper threshold
     :return:
     """
 
@@ -45,27 +45,24 @@ def main():
     pretrained_weights = None #PRE_WEIGHT_PATH
 
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.25, 0.25, 0.25, 0.25)]:
-            for rho in RHO_MOE_M:  # SAM_RHOS:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.2, 0.2, 0.2, 0.2)]:
+            for rho in RHO_MOE_P:  # SAM_RHOS:
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = LAMBDA_FACTOR_MOE_M  # lambda for the loss
-
-
+                lambda_factor = LAMBDA_FACTOR_MOE_P  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 # inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_minus_e_qtC'
+                title = f'mlp2_amse{alpha_mse:.2f}_plus_e_qtC'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
-
                 current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
                 experiment_name = f'{title}_{current_time}'
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed)
-                patience = PATIENCE_MOE_M  # higher patience
-                learning_rate = START_LR_MOE_M  # starting learning rate
+                patience = PATIENCE_MOE_P  # higher patience
+                learning_rate = START_LR_MOE_P  # starting learning rate
                 asym_type = ASYM_TYPE_MOE
                 lr_cb_min_lr = LR_CB_MIN_LR
                 lr_cb_factor = LR_CB_FACTOR
@@ -73,7 +70,6 @@ def main():
                 lr_cb_min_delta = LR_CB_MIN_DELTA
                 cvrg_metric = CVRG_METRIC
                 cvrg_min_delta = CVRG_MIN_DELTA
-
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -121,7 +117,6 @@ def main():
                     "momentum_beta1": momentum_beta1,
                     "batch_size": batch_size,
                     "epochs": epochs,
-                    "importance_type": 'cosine',
                     # hidden in a more readable format  (wandb does not support lists)
                     "hiddens": hiddens_str,
                     "loss": 'mse_pcc',
@@ -149,8 +144,8 @@ def main():
                     'val_window_size': val_window_size,
                     'skip_repr': skip_repr,
                     'asym_type': asym_type,
-                    'lower_threshold': lower_threshold,
                     'upper_threshold': upper_threshold,
+                    'lower_threshold': lower_threshold,
                     'cvrg_metric': cvrg_metric,
                     'cvrg_min_delta': cvrg_min_delta,
                     'pretrained_weights': pretrained_weights,
@@ -171,9 +166,9 @@ def main():
                     cme_speed_threshold=cme_speed_threshold,
                     shuffle_data=True)
 
-                # Filter training data to only include samples where label <= lower_threshold
-                X_train, y_train, logI_train, logI_prev_train = get_minus_cls(
-                    X_train, y_train, lower_threshold, logI_train, logI_prev_train)
+                # Filter training data to only include samples where label >= upper_threshold
+                X_train, y_train, logI_train, logI_prev_train = get_plus_cls(
+                    X_train, y_train, upper_threshold, logI_train, logI_prev_train)
 
                 # print the training set shapes
                 print(f'X_train.shape: {X_train.shape}, y_train.shape: {y_train.shape}')
@@ -204,12 +199,13 @@ def main():
                     outputs_to_use=outputs_to_use,
                     cme_speed_threshold=cme_speed_threshold)
 
-                # Filter test data to only include samples where label <= lower_threshold
-                X_test, y_test, logI_test, logI_prev_test = get_minus_cls(
-                    X_test, y_test, lower_threshold, logI_test, logI_prev_test)
+                # Filter test data to only include samples where label >= upper_threshold
+                X_test, y_test, logI_test, logI_prev_test = get_plus_cls(
+                    X_test, y_test, upper_threshold, logI_test, logI_prev_test)
 
                 # print the test set shapes
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
+
 
                 # Compute the sample weights for test set
                 delta_test = y_test[:, 0]
@@ -273,7 +269,6 @@ def main():
                             val_mse_weight_dict=mse_test_weights_dict,
                             val_pcc_weight_dict=None,
                             asym_type=asym_type
-
                         )
                     }
                 )
@@ -404,7 +399,6 @@ def main():
                 print(f'pcc error logI train: {error_pcc_logI_train}')
                 wandb.log({"train_pcc_I": error_pcc_logI_train})
 
-
                 # Process SEP event files in the specified directory
                 test_directory = root_dir + '/testing'
                 filenames = process_sep_events(
@@ -441,7 +435,6 @@ def main():
                 for filename in filenames:
                     log_title = os.path.basename(filename)
                     wandb.log({f'training_{log_title}': wandb.Image(filename)})
-
 
                 # Finish the wandb run
                 wandb.finish()
