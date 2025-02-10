@@ -1,5 +1,8 @@
 import os
-from modules.reweighting.exQtCReweightsD import exDenseReweightsD
+from modules.reweighting.exQtCReweightsD import exDenseReweightsD as qtc
+from modules.reweighting.exCosReweightsD import exDenseReweightsD as cos
+from modules.reweighting.exDenseReweightsD import exDenseReweightsD as recip
+
 from modules.shared.globals import *
 from modules.training.ts_modeling import build_dataset, plot_importance
 
@@ -19,7 +22,7 @@ def main():
     alpha_mse = 0.9
     bandwidth = BANDWIDTH
     min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
-    mse_train_weights_dict = exDenseReweightsD(
+    mse_train_weights_dict = qtc(
         X_train,
         delta_train,
         alpha=alpha_mse,
