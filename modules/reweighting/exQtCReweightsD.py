@@ -198,8 +198,8 @@ class exDenseReweightsD:
         normalized_densities = self.pdf_values / (self.max_pdf + epsilon)
         
         # Calculate reweighting factors using power function
-        # y = [1- x^(alpha/2)]^(2/alpha) where x is normalized density
-        self.reweight_factors = np.power(1 - np.power(normalized_densities, self.alpha/2), 2/self.alpha)
+        # y = [1- x^(alpha)]^(1/alpha) where x is normalized density
+        self.reweight_factors = np.power(1 - np.power(normalized_densities, self.alpha), 1/self.alpha)
         
         # Print debug info
         print(f"y_train min: {np.min(self.y_train)}, max: {np.max(self.y_train)}, shape: {self.y_train.shape}")

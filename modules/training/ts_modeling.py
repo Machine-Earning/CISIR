@@ -1372,12 +1372,13 @@ def focal_loss(gamma: float = 3.0, alpha: float = 0.25):
 
     return focal_loss_fn
 
-def plot_importance(label_reweight_dict: dict, save_path: Optional[str] = None) -> str:
+def plot_importance(label_reweight_dict: dict, tag: str, save_path: Optional[str] = None) -> str:
     """
     Plot the importance (reweight) values against sorted labels.
     
     Parameters:
     - label_reweight_dict (dict): Dictionary mapping labels to their reweight values
+    - tag (str): Tag for the plot
     - save_path (Optional[str]): Path where to save the plot. If None, saves to a default location.
     
     Returns:
@@ -1385,6 +1386,7 @@ def plot_importance(label_reweight_dict: dict, save_path: Optional[str] = None) 
     """
     # Sort the dictionary by labels
     sorted_items = sorted(label_reweight_dict.items())
+
     labels = [item[0] for item in sorted_items]
     reweights = [item[1] for item in sorted_items]
     
@@ -1402,7 +1404,7 @@ def plot_importance(label_reweight_dict: dict, save_path: Optional[str] = None) 
         plots_dir = 'plots'
         if not os.path.exists(plots_dir):
             os.makedirs(plots_dir)
-        save_path = os.path.join(plots_dir, f'delta_importance_distribution_{len(label_reweight_dict)}.png')
+        save_path = os.path.join(plots_dir, f'delta_importance_distribution_{tag}_{len(label_reweight_dict)}.png')
     
     # Save the plot
     plt.savefig(save_path)
