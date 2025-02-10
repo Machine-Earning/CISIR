@@ -6,8 +6,11 @@ from modules.reweighting.exDenseReweightsD import exDenseReweightsD as recip
 from modules.shared.globals import *
 from modules.training.ts_modeling import build_dataset, plot_importance
 
+
 def main():
     # Build the training dataset
+    print("Building the training dataset. Please wait...")
+
     X_train, y_train, _, _ = build_dataset(
         DS_PATH + '/training',
         inputs_to_use=INPUTS_TO_USE[0],
@@ -16,13 +19,15 @@ def main():
         cme_speed_threshold=CME_SPEED_THRESHOLD[0],
         shuffle_data=True
     )
-    
+
+    print("Training dataset built successfully.")
+
     # Compute delta and prepare reweights
     delta_train = y_train[:, 0]
-    alpha_mse = 0.9
+    alpha_mse = 0.1
     bandwidth = BANDWIDTH
     min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
-    mse_train_weights_dict = qtc(
+    mse_train_weights_dict = recip(
         X_train,
         delta_train,
         alpha=alpha_mse,
@@ -30,9 +35,13 @@ def main():
         min_norm_weight=min_norm_weight,
         debug=False
     ).label_reweight_dict
+    print("Weights computed successfully.")
 
     # Plot the importance
     plot_importance(mse_train_weights_dict)
+
+    print("Done.")
+
 
 if __name__ == '__main__':
     main()

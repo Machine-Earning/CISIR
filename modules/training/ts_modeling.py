@@ -1396,9 +1396,13 @@ def plot_importance(label_reweight_dict: dict, save_path: Optional[str] = None) 
     plt.title('Delta Importance Distribution')
     plt.grid(True)
     
-    # Use provided path or generate default
+    # Use provided path or generate default in plots directory
     if save_path is None:
-        save_path = f'delta_importance_distribution_{len(label_reweight_dict)}.png'
+        # Create plots directory if it doesn't exist
+        plots_dir = 'plots'
+        if not os.path.exists(plots_dir):
+            os.makedirs(plots_dir)
+        save_path = os.path.join(plots_dir, f'delta_importance_distribution_{len(label_reweight_dict)}.png')
     
     # Save the plot
     plt.savefig(save_path)
