@@ -51,7 +51,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2pdcaes2_amse{alpha_mse:.2f}_moe_cheat_v3nrelu_randInitCombiner'
+                title = f'mlp2pdcaes2_amse{alpha_mse:.2f}_moe_cheat_v3nrelu'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -62,18 +62,24 @@ def main():
                 patience = PATIENCE_MOE  # higher patience
                 learning_rate = START_LR_MOE  # starting learning rate
                 asym_type = ASYM_TYPE_MOE
+                lr_cb_patience = LR_CB_PATIENCE_MOE
+                lr_cb_factor = LR_CB_FACTOR_MOE
+                lr_cb_min_lr = LR_CB_MIN_LR_MOE
+                lr_cb_min_delta = LR_CB_MIN_DELTA
+                cvrg_metric = CVRG_METRIC
+                cvrg_min_delta = CVRG_MIN_DELTA
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
-                    factor=LR_CB_FACTOR_MOE,
-                    patience=LR_CB_PATIENCE_MOE,
+                    factor=lr_cb_factor,
+                    patience=lr_cb_patience,
                     verbose=VERBOSE,
-                    min_delta=LR_CB_MIN_DELTA,
-                    min_lr=LR_CB_MIN_LR_MOE)
+                    min_delta=lr_cb_min_delta,
+                    min_lr=lr_cb_min_lr)
 
                 weight_decay = WEIGHT_DECAY_MOE  # 1e-5 # higher weight decay
                 momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
-                batch_size = BATCH_SIZE  # higher batch size
+                batch_size = BATCH_SIZE_MOE_S2  # higher batch size
                 epochs = EPOCHS  # higher epochs
                 hiddens = MLP_HIDDENS  # hidden layers
                 proj_hiddens = PROJ_HIDDENS
@@ -148,7 +154,13 @@ def main():
                     'combiner_path': COMBINER_PATH,
                     'combiner_pretrained_weights': combiner_pretrained_weights,
                     'asym_type': asym_type,
-                    'freeze_experts': freeze_experts
+                    'freeze_experts': freeze_experts,
+                    'lr_cb_patience': lr_cb_patience,
+                    'lr_cb_factor': lr_cb_factor,
+                    'lr_cb_min_lr': lr_cb_min_lr,
+                    'lr_cb_min_delta': lr_cb_min_delta,
+                    'cvrg_metric': cvrg_metric,
+                    'cvrg_min_delta': cvrg_min_delta
                 })
 
                 # set the root directory
@@ -261,8 +273,8 @@ def main():
 
                 # Define the EarlyStopping callback
                 early_stopping = SmoothEarlyStopping(
-                    monitor=CVRG_METRIC,
-                    min_delta=CVRG_MIN_DELTA,
+                    monitor=cvrg_metric,
+                    min_delta=cvrg_min_delta,
                     patience=patience,
                     verbose=VERBOSE,
                     restore_best_weights=ES_CB_RESTORE_WEIGHTS,
