@@ -41,7 +41,7 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(2, 2, 2, 2)]:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.9, 0.9, 0.9, 0.9)]:
             for rho in RHO_MOE:  # SAM
                 inputs_to_use = INPUTS_TO_USE[0]
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]

@@ -45,7 +45,7 @@ def main():
     pretrained_weights = None #PRE_WEIGHT_PATH
 
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(2, 2, 2, 2)]:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(3, 3, 3, 3)]:
             for rho in RHO_MOE_M:  # SAM_RHOS:
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE

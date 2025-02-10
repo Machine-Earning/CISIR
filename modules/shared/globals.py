@@ -198,6 +198,8 @@ COMBINER_V2_PCC_CE_S2_A04_INVESTIGATION_BS64 = '/home1/jmoukpe2016/keras-functio
 COMBINER_V2_PCC_CE_S2_A04_INVESTIGATION_BS82 = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_A_20250204-133928.h5'
 
 COMBINER_V2_PCC_CE_S2_B04_INVESTIGATION_BS1800 = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_B_20250206-122228.h5'
+COMBINER_V2_PCC_CE_S2_C04_INVESTIGATION_BS800 = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_C_20250206-133229.h5'
+
 MOE_V2_PCC_CE_S2_A04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_model_moe_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_A_20250127-113651_reg.h5'
 
 # assemble hyperparams
@@ -233,4 +235,4 @@ RHO_MOE_INV = [1e-2]
 LAMBDA_FACTOR_MOE_INV = 8
 PATIENCE_MOE_INV = int(3e3)
 ASYM_TYPE_MOE_INV = None
-BATCH_SIZE_MOE_INV = 3600
+BATCH_SIZE_MOE_INV = 2800
