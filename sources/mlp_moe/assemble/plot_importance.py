@@ -24,7 +24,7 @@ def main():
 
     # Compute delta and prepare reweights
     delta_train = y_train[:, 0]
-    alpha_mse = 0.25
+    alpha_mse = 0.15
     bandwidth = BANDWIDTH
     min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
     mse_train_weights_dict = qtc(
@@ -38,7 +38,7 @@ def main():
     print("Weights computed successfully.")
 
     # create tag based on alpha_mse and the type of importance function
-    tag = f"alpha_{alpha_mse}_{'qtc'}_importance"
+    tag = f"alpha_{alpha_mse}_{('qtc')}_importance"
 
     # Plot the importance
     plot_importance(mse_train_weights_dict, tag=tag)

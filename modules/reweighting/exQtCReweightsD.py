@@ -161,7 +161,7 @@ class exDenseReweightsD:
                  min_norm_weight: Optional[float] = None,
                  tag: Optional[str] = None,
                  debug: bool = False,
-                 epsilon: float = 1e-4) -> None:
+                 epsilon: float = 1e-2) -> None:
         """
         Create a synthetic regression dataset with power-based reweighting.
         The reweighting uses y = [1- x^(alpha/2)]^(2/alpha) where x is normalized density.
