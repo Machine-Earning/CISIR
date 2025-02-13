@@ -3,7 +3,7 @@ from datetime import datetime
 
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
-from tensorflow.keras.optimizers import Adam
+from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
 # from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
@@ -137,7 +137,7 @@ def main():
                     "dropout": dropout,
                     "activation": 'LeakyReLU',
                     "norm": norm,
-                    'optimizer': 'adam',
+                    'optimizer': 'adamw',
                     'output_dim': output_dim,
                     'architecture': 'mlp_moe',
                     'cme_speed_threshold': cme_speed_threshold,
@@ -277,9 +277,9 @@ def main():
 
                 # Compile the model with the specified learning rate
                 init_model_sep.compile(
-                    optimizer=Adam(
+                    optimizer=AdamW(
                         learning_rate=learning_rate,
-                        # weight_decay=weight_decay,
+                        weight_decay=weight_decay,
                         beta_1=momentum_beta1
                     ),
                     loss={
