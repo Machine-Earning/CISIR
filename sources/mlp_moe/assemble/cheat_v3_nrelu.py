@@ -3,11 +3,11 @@ from datetime import datetime
 
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
-from tensorflow_addons.optimizers import AdamW
+from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 # from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
-from modules.reweighting.ImportanceWeighting import exDenseReweightsD
+from modules.reweighting.ImportanceWeighting import ReciprocalImportance
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.ts_modeling import (
@@ -20,7 +20,7 @@ from modules.training.ts_modeling import (
     cmse,
     # filter_ds,
     # create_mlp,
-    plot_error_hist,
+    # plot_error_hist,
     create_mlp_moe
 )
 
@@ -50,7 +50,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2_amse{alpha_mse:.2f}_moe_cheat_v3nrelu'
+                title = f'mlp2_amse{alpha_mse:.2f}_moe_cheat_v3nrelu_of'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -133,7 +133,7 @@ def main():
                     "dropout": dropout,
                     "activation": 'LeakyReLU',
                     "norm": norm,
-                    'optimizer': 'adamw',
+                    'optimizer': 'adam',
                     'output_dim': output_dim,
                     'architecture': 'mlp_moe',
                     'cme_speed_threshold': cme_speed_threshold,
@@ -173,17 +173,14 @@ def main():
                 delta_train = y_train[:, 0]
                 print(f'delta_train.shape: {delta_train.shape}')
                 print(f'rebalancing the training set...')
-                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
-                mse_train_weights_dict = exDenseReweightsD(
+                mse_train_weights_dict = ReciprocalImportance(
                     X_train, delta_train,
-                    alpha=alpha_mse, bw=bandwidth,
-                    min_norm_weight=min_norm_weight,
-                    debug=False).label_reweight_dict
-                pcc_train_weights_dict = exDenseReweightsD(
+                    alpha=alpha_mse, 
+                    bandwidth=bandwidth).label_importance_map
+                pcc_train_weights_dict = ReciprocalImportance(
                     X_train, delta_train,
-                    alpha=alpha_pcc, bw=bandwidth,
-                    min_norm_weight=min_norm_weight,
-                    debug=False).label_reweight_dict
+                    alpha=alpha_pcc, 
+                    bandwidth=bandwidth).label_importance_map
                 print(f'training set rebalanced.')
                 # get the number of input features
                 n_features = X_train.shape[1]
@@ -201,17 +198,14 @@ def main():
                 delta_test = y_test[:, 0]
                 print(f'delta_test.shape: {delta_test.shape}')
                 print(f'rebalancing the test set...')
-                min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_test)
-                mse_test_weights_dict = exDenseReweightsD(
+                mse_test_weights_dict = ReciprocalImportance(
                     X_test, delta_test,
-                    alpha=alphaV_mse, bw=bandwidth,
-                    min_norm_weight=min_norm_weight,
-                    debug=False).label_reweight_dict
-                pcc_test_weights_dict = exDenseReweightsD(
+                    alpha=alphaV_mse, 
+                    bandwidth=bandwidth).label_importance_map
+                pcc_test_weights_dict = ReciprocalImportance(
                     X_test, delta_test,
-                    alpha=alphaV_pcc, bw=bandwidth,
-                    min_norm_weight=min_norm_weight,
-                    debug=False).label_reweight_dict
+                    alpha=alphaV_pcc, 
+                    bandwidth=bandwidth).label_importance_map
                 print(f'test set rebalanced.')
 
                 # NOTE: no need for filtering for moe since cannot run t-SNE and repr correlation
@@ -260,9 +254,9 @@ def main():
 
                 # Compile the model with the specified learning rate
                 init_model_sep.compile(
-                    optimizer=AdamW(
+                    optimizer=Adam(
                         learning_rate=learning_rate,
-                        weight_decay=weight_decay,
+                        # weight_decay=weight_decay,
                         beta_1=momentum_beta1
                     ),
                     loss={
@@ -306,77 +300,80 @@ def main():
                 )
 
                 # Use the quadratic fit function to find the optimal epoch
-                optimal_epochs = find_optimal_epoch_by_smoothing(
-                    history.history[ES_CB_MONITOR],
-                    smoothing_method=smoothing_method,
-                    smoothing_parameters={'window_size': val_window_size},
-                    mode='min')
-                print(f'optimal_epochs: {optimal_epochs}')
-                wandb.log({'optimal_epochs': optimal_epochs})
+                # optimal_epochs = find_optimal_epoch_by_smoothing(
+                #     history.history[ES_CB_MONITOR],
+                #     smoothing_method=smoothing_method,
+                #     smoothing_parameters={'window_size': val_window_size},
+                #     mode='min')
+                # print(f'optimal_epochs: {optimal_epochs}')
+                # wandb.log({'optimal_epochs': optimal_epochs})
 
-                # Recreate and recompile the model for optimal epoch training
-                final_model_sep = create_mlp_moe(
-                    hiddens=hiddens,
-                    combiner_hiddens=hiddens,
-                    input_dim=n_features,
-                    embed_dim=embed_dim,
-                    skipped_layers=skipped_layers,
-                    skip_repr=skip_repr,
-                    pretraining=PRETRAINING_MOE,
-                    freeze_experts=FREEZE_EXPERT,
-                    combiner_output_activation='norm_relu',
-                    expert_paths=expert_paths,
-                    mode=MODE_MOE,
-                    activation=activation,
-                    norm=norm,
-                    sam_rho=rho
-                )
+                # # Recreate and recompile the model for optimal epoch training
+                # final_model_sep = create_mlp_moe(
+                #     hiddens=hiddens,
+                #     combiner_hiddens=hiddens,
+                #     input_dim=n_features,
+                #     embed_dim=embed_dim,
+                #     skipped_layers=skipped_layers,
+                #     skip_repr=skip_repr,
+                #     pretraining=PRETRAINING_MOE,
+                #     freeze_experts=FREEZE_EXPERT,
+                #     combiner_output_activation='norm_relu',
+                #     expert_paths=expert_paths,
+                #     mode=MODE_MOE,
+                #     activation=activation,
+                #     norm=norm,
+                #     sam_rho=rho
+                # )
 
-                final_model_sep.compile(
-                    optimizer=AdamW(
-                        learning_rate=learning_rate,
-                        weight_decay=weight_decay,
-                        beta_1=momentum_beta1
-                    ),
-                    loss={
-                        'forecast_head': lambda y_true, y_pred: cmse(
-                            y_true, y_pred,
-                            phase_manager=pm,
-                            lambda_factor=lambda_factor,
-                            train_mse_weight_dict=mse_train_weights_dict,
-                            train_pcc_weight_dict=pcc_train_weights_dict,
-                            asym_type=asym_type
-                        )
-                    }
-                )
-
-
-                # Step 1: Create stratified dataset for the subtraining and validation set
-                train_ds, train_steps = stratified_batch_dataset(
-                    X_train, y_train, batch_size)
-
-                # Map the training dataset to return {'output': y} format
-                train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
+                # final_model_sep.compile(
+                #     optimizer=Adam(
+                #         learning_rate=learning_rate,
+                #         weight_decay=weight_decay,
+                #         beta_1=momentum_beta1
+                #     ),
+                #     loss={
+                #         'forecast_head': lambda y_true, y_pred: cmse(
+                #             y_true, y_pred,
+                #             phase_manager=pm,
+                #             lambda_factor=lambda_factor,
+                #             train_mse_weight_dict=mse_train_weights_dict,
+                #             train_pcc_weight_dict=pcc_train_weights_dict,
+                #             asym_type=asym_type
+                #         )
+                #     }
+                # )
 
 
-                # Train to the optimal epoch
-                final_model_sep.fit(
-                    train_ds,
-                    steps_per_epoch=train_steps,
-                    epochs=optimal_epochs,
-                    batch_size=batch_size,
-                    callbacks=[
-                        reduce_lr_on_plateau,
-                        WandbCallback(save_model=WANDB_SAVE_MODEL),
-                        IsTraining(pm)
-                    ],
-                    verbose=VERBOSE
-                )
+                # # Step 1: Create stratified dataset for the subtraining and validation set
+                # train_ds, train_steps = stratified_batch_dataset(
+                #     X_train, y_train, batch_size)
 
-                # Save the final model
-                final_model_sep.save_weights(f"final_model_moe_weights_{experiment_name}_reg.h5")
-                # print where the model weights are saved
-                print(f"Model weights are saved in final_model_moe_weights_{experiment_name}_reg.h5")
+                # # Map the training dataset to return {'output': y} format
+                # train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
+
+
+                # # Train to the optimal epoch
+                # final_model_sep.fit(
+                #     train_ds,
+                #     steps_per_epoch=train_steps,
+                #     epochs=optimal_epochs,
+                #     batch_size=batch_size,
+                #     callbacks=[
+                #         reduce_lr_on_plateau,
+                #         WandbCallback(save_model=WANDB_SAVE_MODEL),
+                #         IsTraining(pm)
+                #     ],
+                #     verbose=VERBOSE
+                # )
+
+                # since i am trying to overfit, i don't need to find the optimal epoch
+                final_model_sep = init_model_sep
+
+                # # Save the final model
+                # final_model_sep.save_weights(f"final_model_moe_weights_{experiment_name}_reg.h5")
+                # # print where the model weights are saved
+                # print(f"Model weights are saved in final_model_moe_weights_{experiment_name}_reg.h5")
 
                 # Save the combiner sub-model weights
                 combiner_submodel = final_model_sep.get_layer("combiner")

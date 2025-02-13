@@ -137,9 +137,60 @@ def map_labels_to_importance_weights(labels: np.ndarray, importance_weights: np.
     return label_to_importance_weight_mapping
 
 
+def smooth_kde_tails(x: np.ndarray, density: np.ndarray, threshold: float = 2.0) -> np.ndarray:
+    """
+    TODO: figure out how to smooth the tails of the KDE without losing the shape of the KDE
+    Smooths density values within the threshold range by detecting and interpolating outliers.
+    An outlier is defined as a density value that is significantly lower than its neighbors.
+
+    Parameters:
+    - x: np.ndarray
+      The input points where density is evaluated.
+    - density: np.ndarray
+      The original KDE density values.
+    - threshold: float
+      The absolute value threshold defining the range to consider for outlier detection.
+
+    Returns:
+    - np.ndarray
+      Density values with outliers replaced by linear interpolation of neighbors.
+    """
+    smoothed_density = density.copy()
+    
+    # Get indices within threshold range
+    mask = (x <= -threshold) | (x >= threshold)
+    indices = np.where(mask)[0]
+    
+    if len(indices) < 3:  # Need at least 3 points for outlier detection
+        return smoothed_density
+        
+    # Calculate density differences with neighbors
+    density_diffs = np.abs(density[indices[1:-1]] - np.mean([density[indices[:-2]], density[indices[2:]]], axis=0))
+    
+    # Define outliers as points with density < 2x average of neighbors
+    outlier_indices = indices[1:-1][density_diffs < 2.0 * np.mean([density[indices[:-2]], density[indices[2:]]], axis=0)]
+    
+    # Replace outliers with linear interpolation of valid neighbors
+    for idx in outlier_indices:
+        # Find valid left neighbor (not an outlier)
+        left_idx = idx - 1
+        while left_idx in outlier_indices and left_idx > 0:
+            left_idx -= 1
+            
+        # Find valid right neighbor (not an outlier)  
+        right_idx = idx + 1
+        while right_idx in outlier_indices and right_idx < len(x) - 1:
+            right_idx += 1
+            
+        smoothed_density[idx] = np.interp(x[idx], [x[left_idx], x[right_idx]], 
+                                        [density[left_idx], density[right_idx]])
+    
+    return smoothed_density
+
 class ReciprocalImportance:
     """
-    Class for generating importance weights based on the reciprocal of the PDF.
+    Class for generating importance weights based on the reciprocal of the PDF,
+    with smoothed tails to prevent noisy importance weights at the extremes.
     """
     def __init__(
             self, 
@@ -152,11 +203,12 @@ class ReciprocalImportance:
         """
         Initialize the ReciprocalImportanceWeighting class.
 
-        :param features: Training instances.
-        :param labels: Training labels.
-        :param bandwidth: bandwidth for the KDE.
-        :param alpha: importance weight coefficient
-        :param epsilon: small value added to max_pdf for normalization
+        Parameters:
+        - features: np.ndarray - Training instances
+        - labels: np.ndarray - Training labels
+        - bandwidth: Union[float, str] - Bandwidth for the KDE
+        - alpha: float - Importance weight coefficient
+        - epsilon: float - Small value added to max_pdf for normalization
         """
         self.alpha = alpha
         self.features = features
