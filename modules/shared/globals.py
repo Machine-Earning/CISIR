@@ -130,7 +130,7 @@ LEAKY_RELU_ALPHA = 0.3
 
 # MOE
 COMBINER_OUTPUT_DIM = 3  # 3 classes for routing
-BATCH_SIZE_MOE = 32  # Batch size for Moe
+BATCH_SIZE_MOE = 20  # Batch size for Moe
 BATCH_SIZE_MOE_0 = 2048  # Batch size for Moe
 PLUS_INDEX = 0
 MID_INDEX = 1
@@ -140,9 +140,9 @@ RHO_MOE_0 = [1e-1]
 RHO_MOE_P = [5e-1]
 RHO_MOE_M = [5e-1]
 PATIENCE_MOE_C = int(2e3)
-PATIENCE_MOE_M = int(7e3)
-PATIENCE_MOE_P = int(7e3)
-PATIENCE_MOE_0 = int(7e3)
+PATIENCE_MOE_M = int(3.3e3)
+PATIENCE_MOE_P = int(3.3e3)
+PATIENCE_MOE_0 = int(3.3e3)
 
 LOWER_THRESHOLD_MOE = -0.4
 UPPER_THRESHOLD_MOE = 0.4
@@ -153,8 +153,8 @@ REWEIGHTS_MOE_0 = [(0.4, 0.4, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
 LAMBDA_FACTOR_MOE_P = 6
 LAMBDA_FACTOR_MOE_M = 6
 
-START_LR_MOE_M = 5e-4
-START_LR_MOE_P = 1e-3
+START_LR_MOE_M = 1e-4
+START_LR_MOE_P = 1e-4
 
 FOP_FACTOR = 1.5  # 1 full penalty, 0 no penalty
 
@@ -201,19 +201,20 @@ COMBINER_V2_PCC_CE_S2_B04_INVESTIGATION_BS1800 = '/home1/jmoukpe2016/keras-funct
 COMBINER_V2_PCC_CE_S2_C04_INVESTIGATION_BS800 = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_C_20250206-133229.h5'
 
 MOE_V2_PCC_CE_S2_A04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_model_moe_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_A_20250127-113651_reg.h5'
+MOE_V2_PCC_CE_S2_BS1024 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.40_moe_cheat_v3nrelu_20250210-145340.h5'
 
 # assemble hyperparams
 REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]
 RHO_MOE = [1e-2]
 LAMBDA_FACTOR_MOE = 8
 START_LR_MOE = 1e-4
-LR_CB_MIN_LR_MOE = 1e-5
+LR_CB_MIN_LR_MOE = 2e-5
 LR_CB_FACTOR_MOE = 0.95
 LR_CB_PATIENCE_MOE = 50
 WEIGHT_DECAY_MOE = 1e-4
 PATIENCE_MOE = int(3e3)
 ASYM_TYPE_MOE = None
-BATCH_SIZE_MOE_S2 = 3200
+BATCH_SIZE_MOE_S2 = 1200
 
 FREEZE_EXPERT = True
 PRETRAINING_MOE = False
