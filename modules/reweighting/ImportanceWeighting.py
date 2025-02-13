@@ -130,9 +130,9 @@ def map_labels_to_importance_weights(labels: np.ndarray, importance_weights: np.
     for label, importance_weight in zip(labels, importance_weights):
         label_to_importance_weight_mapping[float(label)] = float(importance_weight)
 
-    print(f"length of labels: {len(labels)}")
-    print(f"length of importance_weights: {len(importance_weights)}")
-    print(f'length of label_to_importance_weight_mapping: {len(label_to_importance_weight_mapping)}')
+    # print(f"length of labels: {len(labels)}")
+    # print(f"length of importance_weights: {len(importance_weights)}")
+    # print(f'length of label_to_importance_weight_mapping: {len(label_to_importance_weight_mapping)}')
 
     return label_to_importance_weight_mapping
 
@@ -222,6 +222,10 @@ class ReciprocalImportance:
 
         # Calculate normalized PDF so PDF is between 0 and 1 using vectorized ops
         normalized_densities = np.divide(self.densities, self.max_density + epsilon)
+
+        # # print the min and max of the normalized densities
+        # print(f"min of normalized densities: {np.min(normalized_densities)}")
+        # print(f"max of normalized densities: {np.max(normalized_densities)}")
 
         # Calculate reweighting factors using vectorized ops
         importance_weights = np.power(np.reciprocal(normalized_densities + 1e-8), alpha)
