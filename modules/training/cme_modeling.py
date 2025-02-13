@@ -26,7 +26,7 @@ from tensorflow.keras.layers import (
 )
 from tensorflow_addons.optimizers import AdamW
 
-from modules.reweighting.ImportanceWeighting import exDenseReweightsD
+# from modules.reweighting.ImportanceWeighting import exDenseReweightsD
 from modules.shared.globals import TARGET_MIN_NORM_WEIGHT, ES_CB_MONITOR
 from modules.training.normlayer import NormalizeLayer
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining, create_weight_tensor_fast
@@ -826,173 +826,173 @@ class ModelBuilder:
 
         return history
 
-    def train_pds_folds(
-            self,
-            model: tf.keras.Model,
-            X_train: np.ndarray,
-            y_train: np.ndarray,
-            train_label_weights_dict: Optional[Dict[float, float]] = None,
-            alpha: float = 0.5,
-            alphaV: float = 1,
-            seed: int = 42,
-            bandwidth: float = 0.1,
-            learning_rate: float = 1e-3,
-            epochs: int = 100,
-            batch_size: int = 32,
-            patience: int = 9,
-            weight_decay: float = 0.0,
-            momentum_beta1: float = 0.9,
-            save_tag: Optional[str] = None,
-            callbacks_list=None,
-            verbose: int = 1
-    ) -> None:
-        """
-        Custom training loop to stage2 the model and returns the training history.
+    # def train_pds_folds(
+    #         self,
+    #         model: tf.keras.Model,
+    #         X_train: np.ndarray,
+    #         y_train: np.ndarray,
+    #         train_label_weights_dict: Optional[Dict[float, float]] = None,
+    #         alpha: float = 0.5,
+    #         alphaV: float = 1,
+    #         seed: int = 42,
+    #         bandwidth: float = 0.1,
+    #         learning_rate: float = 1e-3,
+    #         epochs: int = 100,
+    #         batch_size: int = 32,
+    #         patience: int = 9,
+    #         weight_decay: float = 0.0,
+    #         momentum_beta1: float = 0.9,
+    #         save_tag: Optional[str] = None,
+    #         callbacks_list=None,
+    #         verbose: int = 1
+    # ) -> None:
+    #     """
+    #     Custom training loop to stage2 the model and returns the training history.
 
-        :param model: The TensorFlow model to train.
-        :param X_train: training and validation sets together
-        :param y_train: labels of training and validation sets together
-        :param alpha: The alpha value for the PDS validation loss
-        :param alphaV: The alpha value for the PDS validation loss
-        :param seed: The seed for the random number generator.
-        :param bandwidth: The bandwidth for the PDS label reweighting.
-        :param train_label_weights_dict: Dictionary containing label weights for the training set.
-        :param learning_rate: The learning rate for the Adam optimizer.
-        :param epochs: The maximum number of epochs for training.
-        :param batch_size: The batch size for training.
-        :param patience: The number of epochs with no improvement to wait before early stopping.
-        :param weight_decay: The L2 regularization factor.
-        :param momentum_beta1: The beta1 parameter for the Adam optimizer.
-        :param save_tag: Tag to use for saving experiments.
-        :param callbacks_list: List of callback instances to apply during training.
-        :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
-        """
+    #     :param model: The TensorFlow model to train.
+    #     :param X_train: training and validation sets together
+    #     :param y_train: labels of training and validation sets together
+    #     :param alpha: The alpha value for the PDS validation loss
+    #     :param alphaV: The alpha value for the PDS validation loss
+    #     :param seed: The seed for the random number generator.
+    #     :param bandwidth: The bandwidth for the PDS label reweighting.
+    #     :param train_label_weights_dict: Dictionary containing label weights for the training set.
+    #     :param learning_rate: The learning rate for the Adam optimizer.
+    #     :param epochs: The maximum number of epochs for training.
+    #     :param batch_size: The batch size for training.
+    #     :param patience: The number of epochs with no improvement to wait before early stopping.
+    #     :param weight_decay: The L2 regularization factor.
+    #     :param momentum_beta1: The beta1 parameter for the Adam optimizer.
+    #     :param save_tag: Tag to use for saving experiments.
+    #     :param callbacks_list: List of callback instances to apply during training.
+    #     :param verbose: Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
+    #     """
 
-        pm = TrainingPhaseManager()
+    #     pm = TrainingPhaseManager()
 
-        if callbacks_list is None:
-            callbacks_list = []
+    #     if callbacks_list is None:
+    #         callbacks_list = []
 
-        # Add the IsTraining callback to the list
-        callbacks_list.append(IsTraining(pm))
+    #     # Add the IsTraining callback to the list
+    #     callbacks_list.append(IsTraining(pm))
 
-        # Initialize early stopping and model checkpointing for subtraining
-        early_stopping_cb = tf.keras.callbacks.EarlyStopping(
-            monitor='val_loss',
-            patience=patience,
-            restore_best_weights=False
-        )
-        checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
-            filepath=f"model_weights_{str(save_tag)}.h5",
-            monitor='val_loss',
-            save_best_only=True,
-            save_weights_only=True
-        )
+    #     # Initialize early stopping and model checkpointing for subtraining
+    #     early_stopping_cb = tf.keras.callbacks.EarlyStopping(
+    #         monitor='val_loss',
+    #         patience=patience,
+    #         restore_best_weights=False
+    #     )
+    #     checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
+    #         filepath=f"model_weights_{str(save_tag)}.h5",
+    #         monitor='val_loss',
+    #         save_best_only=True,
+    #         save_weights_only=True
+    #     )
 
-        # Append the early stopping and checkpoint callbacks to the custom callbacks list
-        subtrain_callbacks_list = callbacks_list + [early_stopping_cb, checkpoint_cb]
+    #     # Append the early stopping and checkpoint callbacks to the custom callbacks list
+    #     subtrain_callbacks_list = callbacks_list + [early_stopping_cb, checkpoint_cb]
 
-        # Save initial weights for retraining on full training set after best epoch found
-        initial_weights = model.get_weights()
+    #     # Save initial weights for retraining on full training set after best epoch found
+    #     initial_weights = model.get_weights()
 
-        # 4-fold cross-validation
-        folds_optimal_epochs = []
-        for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
-                stratified_4fold_split(X_train, y_train, seed=seed, shuffle=True)):
-            print(f'Fold: {fold_idx}')
-            # print all cme_files shapes
-            print(f'X_subtrain.shape: {X_subtrain.shape}, y_subtrain.shape: {y_subtrain.shape}')
-            print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val.shape}')
+    #     # 4-fold cross-validation
+    #     folds_optimal_epochs = []
+    #     for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
+    #             stratified_4fold_split(X_train, y_train, seed=seed, shuffle=True)):
+    #         print(f'Fold: {fold_idx}')
+    #         # print all cme_files shapes
+    #         print(f'X_subtrain.shape: {X_subtrain.shape}, y_subtrain.shape: {y_subtrain.shape}')
+    #         print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val.shape}')
 
-            # Compute the sample weights for subtraining
-            delta_subtrain = y_subtrain[:, 0]
-            print(f'delta_subtrain.shape: {delta_subtrain.shape}')
-            print(f'rebalancing the subtraining set...')
-            min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
-            subtrain_weights_dict = exDenseReweightsD(
-                X_subtrain, delta_subtrain,
-                alpha=alpha, bw=bandwidth,
-                min_norm_weight=min_norm_weight,
-                debug=False).label_reweight_dict
-            print(f'subtraining set rebalanced.')
+    #         # Compute the sample weights for subtraining
+    #         delta_subtrain = y_subtrain[:, 0]
+    #         print(f'delta_subtrain.shape: {delta_subtrain.shape}')
+    #         print(f'rebalancing the subtraining set...')
+    #         min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_subtrain)
+    #         subtrain_weights_dict = exDenseReweightsD(
+    #             X_subtrain, delta_subtrain,
+    #             alpha=alpha, bw=bandwidth,
+    #             min_norm_weight=min_norm_weight,
+    #             debug=False).label_reweight_dict
+    #         print(f'subtraining set rebalanced.')
 
-            # Compute the sample weights for validation
-            delta_val = y_val[:, 0]
-            print(f'delta_val.shape: {delta_val.shape}')
-            print(f'rebalancing the validation set...')
-            min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
-            val_weights_dict = exDenseReweightsD(
-                X_val, delta_val,
-                alpha=alphaV, bw=bandwidth,
-                min_norm_weight=min_norm_weight,
-                debug=False).label_reweight_dict
-            print(f'validation set rebalanced.')
+    #         # Compute the sample weights for validation
+    #         delta_val = y_val[:, 0]
+    #         print(f'delta_val.shape: {delta_val.shape}')
+    #         print(f'rebalancing the validation set...')
+    #         min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_val)
+    #         val_weights_dict = exDenseReweightsD(
+    #             X_val, delta_val,
+    #             alpha=alphaV, bw=bandwidth,
+    #             min_norm_weight=min_norm_weight,
+    #             debug=False).label_reweight_dict
+    #         print(f'validation set rebalanced.')
 
-            # Optimizer and history initialization
-            model.compile(
-                optimizer=AdamW(
-                    learning_rate=learning_rate,
-                    weight_decay=weight_decay,
-                    beta_1=momentum_beta1
-                ),
-                loss=lambda y_true, y_pred: self.pds_loss_vec(
-                    y_true, y_pred,
-                    phase_manager=pm,
-                    train_sample_weights=subtrain_weights_dict,
-                    val_sample_weights=val_weights_dict,
-                )
-            )
+    #         # Optimizer and history initialization
+    #         model.compile(
+    #             optimizer=AdamW(
+    #                 learning_rate=learning_rate,
+    #                 weight_decay=weight_decay,
+    #                 beta_1=momentum_beta1
+    #             ),
+    #             loss=lambda y_true, y_pred: self.pds_loss_vec(
+    #                 y_true, y_pred,
+    #                 phase_manager=pm,
+    #                 train_sample_weights=subtrain_weights_dict,
+    #                 val_sample_weights=val_weights_dict,
+    #             )
+    #         )
 
-            history = model.fit(
-                X_subtrain, y_subtrain,
-                epochs=epochs,
-                batch_size=batch_size if batch_size > 0 else len(y_subtrain),
-                validation_data=(X_val, y_val),
-                validation_batch_size=batch_size if batch_size > 0 else len(y_val),
-                callbacks=subtrain_callbacks_list,
-                verbose=verbose
-            )
+    #         history = model.fit(
+    #             X_subtrain, y_subtrain,
+    #             epochs=epochs,
+    #             batch_size=batch_size if batch_size > 0 else len(y_subtrain),
+    #             validation_data=(X_val, y_val),
+    #             validation_batch_size=batch_size if batch_size > 0 else len(y_val),
+    #             callbacks=subtrain_callbacks_list,
+    #             verbose=verbose
+    #         )
 
-            # optimal epoch for fold
-            folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
-            # wandb log the fold's optimal
-            print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
-            wandb.log({f'fold_{fold_idx}_best_epoch': folds_optimal_epochs[-1]})
+    #         # optimal epoch for fold
+    #         folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
+    #         # wandb log the fold's optimal
+    #         print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
+    #         wandb.log({f'fold_{fold_idx}_best_epoch': folds_optimal_epochs[-1]})
 
-            # Reset model weights to initial state before retraining
-            model.set_weights(initial_weights)
+    #         # Reset model weights to initial state before retraining
+    #         model.set_weights(initial_weights)
 
-        # determine the optimal number of epochs from the folds
-        optimal_epochs = int(np.mean(folds_optimal_epochs))
-        print(f'optimal_epochs: {optimal_epochs}')
-        wandb.log({'optimal_epochs': optimal_epochs})
+    #     # determine the optimal number of epochs from the folds
+    #     optimal_epochs = int(np.mean(folds_optimal_epochs))
+    #     print(f'optimal_epochs: {optimal_epochs}')
+    #     wandb.log({'optimal_epochs': optimal_epochs})
 
-        model.compile(
-            optimizer=AdamW(
-                learning_rate=learning_rate,
-                weight_decay=weight_decay,
-                beta_1=momentum_beta1
-            ),
-            loss=lambda y_true, y_pred: self.pds_loss_vec(
-                y_true, y_pred,
-                phase_manager=pm,
-                train_sample_weights=train_label_weights_dict,
-                val_sample_weights=None
-            )
-        )
+    #     model.compile(
+    #         optimizer=AdamW(
+    #             learning_rate=learning_rate,
+    #             weight_decay=weight_decay,
+    #             beta_1=momentum_beta1
+    #         ),
+    #         loss=lambda y_true, y_pred: self.pds_loss_vec(
+    #             y_true, y_pred,
+    #             phase_manager=pm,
+    #             train_sample_weights=train_label_weights_dict,
+    #             val_sample_weights=None
+    #         )
+    #     )
 
-        model.fit(
-            X_train, y_train,
-            epochs=optimal_epochs,
-            batch_size=batch_size if batch_size > 0 else len(y_train),
-            callbacks=callbacks_list,
-            verbose=verbose
-        )
+    #     model.fit(
+    #         X_train, y_train,
+    #         epochs=optimal_epochs,
+    #         batch_size=batch_size if batch_size > 0 else len(y_train),
+    #         callbacks=callbacks_list,
+    #         verbose=verbose
+    #     )
 
-        # Save the final model
-        model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
-        # print where the model weights are saved
-        print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
+    #     # Save the final model
+    #     model.save_weights(f"final_model_weights_{str(save_tag)}.h5")
+    #     # print where the model weights are saved
+    #     print(f"Model weights are saved in final_model_weights_{str(save_tag)}.h5")
 
     def overtrain_pds_dl(self,
                          model: tf.keras.Model,
