@@ -1372,12 +1372,12 @@ def focal_loss(gamma: float = 3.0, alpha: float = 0.25):
 
     return focal_loss_fn
 
-def plot_importance(label_reweight_dict: dict, tag: str, save_path: Optional[str] = None) -> str:
+def plot_importance(label_importance_map: dict, tag: str, save_path: Optional[str] = None) -> str:
     """
     Plot the importance (reweight) values against sorted labels.
     
     Parameters:
-    - label_reweight_dict (dict): Dictionary mapping labels to their reweight values
+    - label_importance_map (dict): Dictionary mapping labels to their importance values
     - tag (str): Tag for the plot
     - save_path (Optional[str]): Path where to save the plot. If None, saves to a default location.
     
@@ -1385,17 +1385,17 @@ def plot_importance(label_reweight_dict: dict, tag: str, save_path: Optional[str
     - str: Path where the plot was saved
     """
     # Sort the dictionary by labels
-    sorted_items = sorted(label_reweight_dict.items())
+    sorted_items = sorted(label_importance_map.items())
 
     labels = [item[0] for item in sorted_items]
-    reweights = [item[1] for item in sorted_items]
+    importance_weights = [item[1] for item in sorted_items]
     
     # Create the plot
     plt.figure(figsize=(10, 6))
-    plt.plot(labels, reweights, 'b-')
-    plt.xlabel('Delta')
+    plt.plot(labels, importance_weights, 'b-')
+    plt.xlabel('Label')
     plt.ylabel('Importance')
-    plt.title('Delta Importance Distribution')
+    plt.title('Label Importance Distribution')
     plt.grid(True)
     
     # Use provided path or generate default in plots directory
@@ -1404,7 +1404,7 @@ def plot_importance(label_reweight_dict: dict, tag: str, save_path: Optional[str
         plots_dir = 'plots'
         if not os.path.exists(plots_dir):
             os.makedirs(plots_dir)
-        save_path = os.path.join(plots_dir, f'delta_importance_distribution_{tag}_{len(label_reweight_dict)}.png')
+        save_path = os.path.join(plots_dir, f'{tag}.png')
     
     # Save the plot
     plt.savefig(save_path)

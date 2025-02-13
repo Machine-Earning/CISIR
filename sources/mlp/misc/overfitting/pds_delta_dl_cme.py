@@ -14,7 +14,7 @@ from wandb.keras import WandbCallback
 from modules.training import cme_modeling
 from modules.training.cme_modeling import pds_space_norm
 from modules.training.ts_modeling import build_dataset, create_mlp, reshape_X, filter_ds
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.reweighting.ImportanceWeighting import exDenseReweightsD
 
 # from tensorflow.keras.mixed_precision import experimental as mixed_precision
 #

@@ -75,7 +75,7 @@ N_FILTERED = 500  # Number of samples to keep outside the threshold
 LOWER_THRESHOLD = -0.5  # Lower threshold for delta_p
 UPPER_THRESHOLD = 0.5  # Upper threshold for delta_p
 MAE_PLUS_THRESHOLD = 0.5  # Threshold for measuring raising edges in delta
-BANDWIDTH = 4.42e-2  # Bandwidth for rebalancing
+BANDWIDTH = 7e-2 #4.42e-2  # Bandwidth for rebalancing
 TARGET_MIN_NORM_WEIGHT = 0.01  # Minimum weight for the target normalization
 
 # Smoothing Parameters
@@ -88,7 +88,7 @@ RHO = [1e-2]
 REWEIGHTS = [(1.0, 0.4, 0.1, 0)]
 LAMBDA_FACTOR = 8
 AE_LAMBDA = 0.9
-CVRG_MIN_DELTA = 1e-5
+CVRG_MIN_DELTA = 1e-3
 CVRG_METRIC = 'loss'
 CVRG_METRIC_WDR = 'val_loss'
 ASYM_TYPE = 'sigmoid'
