@@ -26,7 +26,7 @@ from tensorflow.keras.layers import (
 )
 from tensorflow_addons.optimizers import AdamW
 
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.reweighting.ImportanceWeighting import exDenseReweightsD
 from modules.shared.globals import TARGET_MIN_NORM_WEIGHT, ES_CB_MONITOR
 from modules.training.normlayer import NormalizeLayer
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining, create_weight_tensor_fast

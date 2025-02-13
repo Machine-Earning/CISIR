@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.reweighting.ImportanceWeighting import exDenseReweightsD
 
 # Set the environment variable for CUDA (in case it is necessary)
 os.environ['CUDA_VISIBLE_DEVICES'] = '2'

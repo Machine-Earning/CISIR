@@ -15,7 +15,7 @@ from modules.evaluate.utils import (
     plot_repr_corr_density,
     evaluate_pcc_repr
 )
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.reweighting.ImportanceWeighting import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training import cme_modeling
 from modules.training.cme_modeling import pds_space_norm

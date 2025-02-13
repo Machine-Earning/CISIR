@@ -1,7 +1,8 @@
 import os
-from modules.reweighting.exQtCReweightsD import exDenseReweightsD as qtc
-from modules.reweighting.exCosReweightsD import exDenseReweightsD as cos
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD as recip
+from modules.reweighting.ImportanceWeighting import LinearImportance as linear
+from modules.reweighting.ImportanceWeighting import CosineImportance as cosine
+from modules.reweighting.ImportanceWeighting import QUCImportance as quc
+from modules.reweighting.ImportanceWeighting import ReciprocalImportance as reciprocal
 
 from modules.shared.globals import *
 from modules.training.ts_modeling import build_dataset, plot_importance
@@ -16,33 +17,52 @@ def main():
         inputs_to_use=INPUTS_TO_USE[0],
         add_slope=ADD_SLOPE[0],
         outputs_to_use=OUTPUTS_TO_USE,
-        cme_speed_threshold=CME_SPEED_THRESHOLD[0],
-        shuffle_data=True
+        cme_speed_threshold=CME_SPEED_THRESHOLD[0]
     )
 
     print("Training dataset built successfully.")
 
     # Compute delta and prepare reweights
     delta_train = y_train[:, 0]
-    alpha_mse = 0.15
+    alpha_mse = 0.4
     bandwidth = BANDWIDTH
-    min_norm_weight = TARGET_MIN_NORM_WEIGHT / len(delta_train)
-    mse_train_weights_dict = qtc(
+
+    # Calculate weights for each importance type
+    linear_weights = linear(
         X_train,
         delta_train,
         alpha=alpha_mse,
-        bw=bandwidth,
-        min_norm_weight=min_norm_weight,
-        debug=False
-    ).label_reweight_dict
+        bandwidth=bandwidth
+    ).label_importance_map
+
+    cosine_weights = cosine(
+        X_train,
+        delta_train,
+        alpha=alpha_mse,
+        bandwidth=bandwidth
+    ).label_importance_map
+
+    quc_weights = quc(
+        X_train,
+        delta_train,
+        alpha=alpha_mse,
+        bandwidth=bandwidth
+    ).label_importance_map
+
+    reciprocal_weights = reciprocal(
+        X_train,
+        delta_train,
+        alpha=alpha_mse,
+        bandwidth=bandwidth
+    ).label_importance_map
+
     print("Weights computed successfully.")
 
-    # create tag based on alpha_mse and the type of importance function
-    tag = f"alpha_{alpha_mse}_{('qtc')}_importance"
-
-    # Plot the importance
-    plot_importance(mse_train_weights_dict, tag=tag)
-
+    # Plot importance for each type
+    plot_importance(linear_weights, tag=f"alpha_{alpha_mse}_linear_importance")
+    plot_importance(cosine_weights, tag=f"alpha_{alpha_mse}_cosine_importance") 
+    plot_importance(quc_weights, tag=f"alpha_{alpha_mse}_quc_importance")
+    plot_importance(reciprocal_weights, tag=f"alpha_{alpha_mse}_reciprocal_importance")
 
     print("Done.")
 

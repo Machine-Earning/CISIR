@@ -8,7 +8,7 @@ from sklearn.metrics import classification_report, accuracy_score
 from tensorflow_addons.optimizers import AdamW
 
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.reweighting.ImportanceWeighting import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.ts_modeling import (
     build_dataset,

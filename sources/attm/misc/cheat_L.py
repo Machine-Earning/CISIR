@@ -7,7 +7,7 @@ from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import plot_tsne_delta, plot_repr_corr_dist
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.reweighting.ImportanceWeighting import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping

@@ -7,7 +7,7 @@ from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
 # from modules.evaluate.metrics import MAEPlusMetric, PCCPlusMetric
-from modules.reweighting.exDenseReweightsD import exDenseReweightsD
+from modules.reweighting.ImportanceWeighting import exDenseReweightsD
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.ts_modeling import (
