@@ -187,6 +187,9 @@ def smooth_kde_tails(x: np.ndarray, density: np.ndarray, threshold: float = 2.0)
     
     return smoothed_density
 
+
+# TODO: fix the fact that the importance weights are not normalized to sum to 1
+
 class ReciprocalImportance:
     """
     Class for generating importance weights based on the reciprocal of the PDF,
