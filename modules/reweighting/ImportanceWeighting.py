@@ -233,11 +233,9 @@ class ReciprocalImportance:
         # Calculate reweighting factors using vectorized ops
         importance_weights = np.power(np.reciprocal(normalized_densities + 1e-8), alpha)
 
-        # Normalize importance weights to sum to 1 and have mean 1 using numpy ops
-        self.importance_weights = np.multiply(
-            np.divide(importance_weights, np.sum(importance_weights)), 
-            importance_weights.size
-        )
+        # Normalize importance weights to sum to 1 using numpy ops
+        self.importance_weights = np.divide(importance_weights, np.sum(importance_weights))
+
         # Create mapping dictionary
         self.label_importance_map = map_labels_to_importance_weights(
             self.labels, self.importance_weights)
@@ -285,13 +283,10 @@ class QUCImportance:
         
         # Calculate reweighting factors using power function
         # y = [1- x^(alpha)]^(1/alpha) where x is normalized density
-        self.reweight_factors = np.power(1 - np.power(normalized_densities, alpha), 1.0 / alpha)
+        self.importance_weights = np.power(1 - np.power(normalized_densities, alpha), 1.0 / alpha)
         
-        # Normalize importance weights to sum to 1 and have mean 1 using numpy ops
-        self.importance_weights = np.multiply(
-            np.divide(self.reweight_factors, np.sum(self.reweight_factors)), 
-            self.reweight_factors.size
-        )
+        # Normalize importance weights to sum to 1 using numpy ops
+        self.importance_weights = np.divide(self.importance_weights, np.sum(self.importance_weights))
 
         # Create mapping dictionary
         self.label_importance_map = map_labels_to_importance_weights(
@@ -337,11 +332,8 @@ class LinearImportance:
         # Calculate reweighting factors once, ensuring no negative values
         self.importance_weights = alpha * (self.max_density - self.densities)
         
-        # Normalize importance weights to sum to 1 and have mean 1 using numpy ops
-        self.importance_weights = np.multiply(
-            np.divide(self.importance_weights, np.sum(self.importance_weights)), 
-            self.importance_weights.size
-        )
+        # Normalize importance weights to sum to 1 using numpy ops
+        self.importance_weights = np.divide(self.importance_weights, np.sum(self.importance_weights))
 
         self.label_importance_map = map_labels_to_importance_weights(
             self.labels, self.importance_weights)
@@ -397,11 +389,9 @@ class CosineImportance:
         # Calculate importance weights using cosine
         self.importance_weights = np.power(np.cos(normalized_densities), alpha)
         
-        # Normalize importance weights to sum to 1 and have mean 1 using numpy ops
-        self.importance_weights = np.multiply(
-            np.divide(self.importance_weights, np.sum(self.importance_weights)), 
-            self.importance_weights.size
-        )
+        # Normalize importance weights to sum to 1 using numpy ops
+        self.importance_weights = np.divide(self.importance_weights, np.sum(self.importance_weights))
+
 
         self.label_importance_map = map_labels_to_importance_weights(
             self.labels, self.importance_weights)
