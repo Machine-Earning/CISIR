@@ -8,7 +8,7 @@ from sklearn.metrics import classification_report, accuracy_score
 from tensorflow_addons.optimizers import AdamW
 
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
-from modules.reweighting.ImportanceWeighting import exDenseReweightsD
+# from modules.reweighting.ImportanceWeighting impo
 from modules.shared.globals import *
 from modules.training.ts_modeling import (
     build_dataset,
@@ -29,7 +29,7 @@ def main():
     """
 
     # Path to pre-trained model weights
-    combiner_path = MOE_V2_PCC_CE_S2_BS1024
+    combiner_path = COMBINER_V3_OF
 
     for seed in SEEDS:
         # PARAMS
@@ -43,7 +43,7 @@ def main():
         
         # Create a unique experiment name with a timestamp
         current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-        experiment_name = f'combiner_v3_pcc_ce_s2_c04_bs800_{current_time}'
+        experiment_name = f'combiner_v3_bs1200_of_{current_time}'
 
         set_seed(seed)
         
@@ -61,6 +61,7 @@ def main():
         lower_threshold = LOWER_THRESHOLD_MOE  # lower threshold for the delta_p
         upper_threshold = UPPER_THRESHOLD_MOE  # upper threshold for the delta_p
         rho = RHO_MOE_C[0]
+        pretraining = False
 
         # Initialize wandb
         wandb.init(project="Jan-moe-router-Report", name=experiment_name)
@@ -113,6 +114,7 @@ def main():
             embed_dim=embed_dim,
             output_dim=output_dim,
             dropout=dropout,
+            pretraining=pretraining,
             activation=activation,
             norm=norm,
             skip_repr=skip_repr,

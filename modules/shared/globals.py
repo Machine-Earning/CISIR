@@ -91,7 +91,7 @@ AE_LAMBDA = 0.9
 CVRG_MIN_DELTA = 1e-3
 CVRG_METRIC = 'loss'
 CVRG_METRIC_WDR = 'val_loss'
-ASYM_TYPE = 'sigmoid'
+ASYM_TYPE = None #'sigmoid'
 
 # ATTM AREA
 BLOCKS_HIDDENS = [128 for _ in range(3)]
@@ -202,6 +202,10 @@ COMBINER_V2_PCC_CE_S2_C04_INVESTIGATION_BS800 = '/home1/jmoukpe2016/keras-functi
 
 MOE_V2_PCC_CE_S2_A04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_model_moe_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_A_20250127-113651_reg.h5'
 MOE_V2_PCC_CE_S2_BS1024 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.40_moe_cheat_v3nrelu_20250210-145340.h5'
+
+COMBINER_V3_AE_OF = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250213-131806.h5'
+COMBINER_V3_OF = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.40_moe_cheat_v3nrelu_of_20250213-133238.h5'
+
 
 # assemble hyperparams
 REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]
