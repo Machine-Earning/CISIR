@@ -322,76 +322,76 @@ def main():
                     verbose=VERBOSE
                 )
 
-                # # Use the quadratic fit function to find the optimal epoch
-                # optimal_epochs = find_optimal_epoch_by_smoothing(
-                #     history.history[ES_CB_MONITOR],
-                #     smoothing_method=smoothing_method,
-                #     smoothing_parameters={'window_size': val_window_size},
-                #     mode='min')
-                # print(f'optimal_epochs: {optimal_epochs}')
-                # wandb.log({'optimal_epochs': optimal_epochs})
+                # Use the quadratic fit function to find the optimal epoch
+                optimal_epochs = find_optimal_epoch_by_smoothing(
+                    history.history[ES_CB_MONITOR],
+                    smoothing_method=smoothing_method,
+                    smoothing_parameters={'window_size': val_window_size},
+                    mode='min')
+                print(f'optimal_epochs: {optimal_epochs}')
+                wandb.log({'optimal_epochs': optimal_epochs})
 
-                # # Recreate and recompile the model for optimal epoch training
-                # final_model_sep = create_mlp_moe(
-                #     hiddens=hiddens,
-                #     combiner_hiddens=hiddens,
-                #     input_dim=n_features,
-                #     embed_dim=embed_dim,
-                #     skipped_layers=skipped_layers,
-                #     skip_repr=skip_repr,
-                #     pretraining=pretraining,
-                #     freeze_experts=freeze_experts,
-                #     expert_paths=expert_paths,
-                #     combiner_output_activation='norm_relu',
-                #     combiner_pretrained_weights=combiner_pretrained_weights,
-                #     combiner_pretrained_config=combiner_pretrained_config,
-                #     mode=MODE_MOE,
-                #     activation=activation,
-                #     norm=norm,
-                #     sam_rho=rho
-                # )
+                # Recreate and recompile the model for optimal epoch training
+                final_model_sep = create_mlp_moe(
+                    hiddens=hiddens,
+                    combiner_hiddens=hiddens,
+                    input_dim=n_features,
+                    embed_dim=embed_dim,
+                    skipped_layers=skipped_layers,
+                    skip_repr=skip_repr,
+                    pretraining=pretraining,
+                    freeze_experts=freeze_experts,
+                    expert_paths=expert_paths,
+                    combiner_output_activation='norm_relu',
+                    combiner_pretrained_weights=combiner_pretrained_weights,
+                    combiner_pretrained_config=combiner_pretrained_config,
+                    mode=MODE_MOE,
+                    activation=activation,
+                    norm=norm,
+                    sam_rho=rho
+                )
 
-                # final_model_sep.compile(
-                #     optimizer=AdamW(
-                #         learning_rate=learning_rate,
-                #         weight_decay=weight_decay,
-                #         beta_1=momentum_beta1
-                #     ),
-                #     loss={
-                #         'forecast_head': lambda y_true, y_pred: cmse(
-                #             y_true, y_pred,
-                #             phase_manager=pm,
-                #             lambda_factor=lambda_factor,
-                #             train_mse_weight_dict=mse_train_weights_dict,
-                #             train_pcc_weight_dict=pcc_train_weights_dict,
-                #             asym_type=asym_type
-                #         )
-                #     }
-                # )
+                final_model_sep.compile(
+                    optimizer=AdamW(
+                        learning_rate=learning_rate,
+                        weight_decay=weight_decay,
+                        beta_1=momentum_beta1
+                    ),
+                    loss={
+                        'forecast_head': lambda y_true, y_pred: cmse(
+                            y_true, y_pred,
+                            phase_manager=pm,
+                            lambda_factor=lambda_factor,
+                            train_mse_weight_dict=mse_train_weights_dict,
+                            train_pcc_weight_dict=pcc_train_weights_dict,
+                            asym_type=asym_type
+                        )
+                    }
+                )
 
-                # # Step 1: Create stratified dataset for the subtraining and validation set
-                # train_ds, train_steps = stratified_batch_dataset(
-                #     X_train, y_train, batch_size)
+                # Step 1: Create stratified dataset for the subtraining and validation set
+                train_ds, train_steps = stratified_batch_dataset(
+                    X_train, y_train, batch_size)
 
-                # # Map the training dataset to return {'output': y} format
-                # train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
+                # Map the training dataset to return {'output': y} format
+                train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
 
-                # # Train to the optimal epoch
-                # final_model_sep.fit(
-                #     train_ds,
-                #     steps_per_epoch=train_steps,
-                #     epochs=optimal_epochs,
-                #     batch_size=batch_size,
-                #     callbacks=[
-                #         reduce_lr_on_plateau,
-                #         WandbCallback(save_model=WANDB_SAVE_MODEL),
-                #         IsTraining(pm)
-                #     ],
-                #     verbose=VERBOSE
-                # )
+                # Train to the optimal epoch
+                final_model_sep.fit(
+                    train_ds,
+                    steps_per_epoch=train_steps,
+                    epochs=optimal_epochs,
+                    batch_size=batch_size,
+                    callbacks=[
+                        reduce_lr_on_plateau,
+                        WandbCallback(save_model=WANDB_SAVE_MODEL),
+                        IsTraining(pm)
+                    ],
+                    verbose=VERBOSE
+                )
 
                 # since i am trying to overfit, i don't need to find the optimal epoch
-                final_model_sep = init_model_sep
+                # final_model_sep = init_model_sep
 
                 # # Save the final model
                 # final_model_sep.save_weights(f"final_model_moe_weights_{experiment_name}_reg.h5")

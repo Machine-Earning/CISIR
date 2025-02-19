@@ -53,7 +53,7 @@ SKIP_REPR = True  # residual representation
 
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
-START_LR = 1e-4  # starting learning rate
+START_LR = 3e-4  # starting learning rate
 WEIGHT_DECAY = 1e-4  # Higher weight decay
 MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
@@ -80,8 +80,8 @@ TARGET_MIN_NORM_WEIGHT = 0.01  # Minimum weight for the target normalization
 
 # Smoothing Parameters
 SMOOTHING_METHOD = 'moving_average'
-VAL_WINDOW_SIZE = 101  # NOTE: must be odd
-WINDOW_SIZE = 101  # NOTE: must be odd
+VAL_WINDOW_SIZE = 101 #5  # NOTE: must be odd
+WINDOW_SIZE = 101 #121  # NOTE: must be odd
 
 # Additional Parameters
 RHO = [1e-2]
@@ -206,19 +206,19 @@ MOE_V2_PCC_CE_S2_BS1024 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_w
 COMBINER_V3_AE_OF = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250213-131806.h5'
 COMBINER_V3_OF = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.40_moe_cheat_v3nrelu_of_20250213-133238.h5'
 
-
+COMBINER_V3_AE_NOF_1 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250218-132139.h5'
 # assemble hyperparams
 REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]
 RHO_MOE = [1e-2]
 LAMBDA_FACTOR_MOE = 8
-START_LR_MOE = 5e-4
+START_LR_MOE = 1e-4
 LR_CB_MIN_LR_MOE = 2e-5
 LR_CB_FACTOR_MOE = 0.95
 LR_CB_PATIENCE_MOE = 50
 WEIGHT_DECAY_MOE = 1e-4
 PATIENCE_MOE = int(3e3)
 ASYM_TYPE_MOE = None
-BATCH_SIZE_MOE_S2 = 1200
+BATCH_SIZE_MOE_S2 = 2400
 
 FREEZE_EXPERT = True
 PRETRAINING_MOE = False

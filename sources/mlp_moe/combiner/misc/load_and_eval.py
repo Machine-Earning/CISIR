@@ -29,7 +29,7 @@ def main():
     """
 
     # Path to pre-trained model weights
-    combiner_path = COMBINER_V3_OF
+    combiner_path = COMBINER_V3_AE_NOF_1
 
     for seed in SEEDS:
         # PARAMS
@@ -61,7 +61,7 @@ def main():
         lower_threshold = LOWER_THRESHOLD_MOE  # lower threshold for the delta_p
         upper_threshold = UPPER_THRESHOLD_MOE  # upper threshold for the delta_p
         rho = RHO_MOE_C[0]
-        pretraining = False
+        pretraining = True
 
         # Initialize wandb
         wandb.init(project="Jan-moe-router-Report", name=experiment_name)

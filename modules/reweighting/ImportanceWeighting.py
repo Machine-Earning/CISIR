@@ -231,10 +231,10 @@ class ReciprocalImportance:
         # print(f"max of normalized densities: {np.max(normalized_densities)}")
 
         # Calculate reweighting factors using vectorized ops
-        importance_weights = np.power(np.reciprocal(normalized_densities + 1e-8), alpha)
+        self.importance_weights = np.power(np.reciprocal(normalized_densities + 1e-8), alpha)
 
         # Normalize importance weights to sum to 1 using numpy ops
-        self.importance_weights = np.divide(importance_weights, np.sum(importance_weights))
+        self.importance_weights = np.divide(self.importance_weights, np.sum(self.importance_weights))
 
         # Create mapping dictionary
         self.label_importance_map = map_labels_to_importance_weights(
