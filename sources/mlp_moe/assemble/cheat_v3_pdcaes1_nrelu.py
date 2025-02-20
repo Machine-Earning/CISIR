@@ -47,7 +47,7 @@ def main():
                 add_slope = ADD_SLOPE[0]
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = LAMBDA_FACTOR_MOE  # lambda for the loss
+                lambda_factor = 8 # LAMBDA_FACTOR_MOE  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
@@ -100,8 +100,8 @@ def main():
                 # upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                 smoothing_method = SMOOTHING_METHOD
-                window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
-                val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
+                window_size = 101  # WINDOW_SIZE  # allows margin of error of 10 epochs
+                val_window_size = 5  # VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
                 pretraining = True
                 freeze_experts = FREEZE_EXPERT
 

@@ -53,7 +53,7 @@ SKIP_REPR = True  # residual representation
 
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
-START_LR = 3e-4  # starting learning rate
+START_LR = 1e-4  # starting learning rate
 WEIGHT_DECAY = 1e-4  # Higher weight decay
 MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
@@ -66,7 +66,7 @@ LR_CB_MIN_DELTA = 1e-5 # Minimum delta for reducing learning rate
 LR_CB_MONITOR = 'loss'  # Monitor validation loss
 
 # Early Stopping
-PATIENCE = int(3e3)  # Higher patience
+PATIENCE = int(4e3)  # Higher patience
 ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
 ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 
@@ -206,7 +206,9 @@ MOE_V2_PCC_CE_S2_BS1024 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_w
 COMBINER_V3_AE_OF = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250213-131806.h5'
 COMBINER_V3_OF = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.40_moe_cheat_v3nrelu_of_20250213-133238.h5'
 
-COMBINER_V3_AE_NOF_1 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250218-132139.h5'
+COMBINER_V3_AE_NOF_1 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250218-231845.h5'
+
+COMBINER_V3_AE_NOF_2 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250218-231650.h5'
 # assemble hyperparams
 REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]
 RHO_MOE = [1e-2]

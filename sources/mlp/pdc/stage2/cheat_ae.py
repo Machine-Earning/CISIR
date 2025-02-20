@@ -49,7 +49,7 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.1, 0.1, 0.1, 0.1)]:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.95, 0.95, 0.95, 0.95)]:
             for freeze in [False]:
                 for rho in RHO:
                     inputs_to_use = INPUTS_TO_USE[0]
@@ -59,7 +59,7 @@ def main():
                     outputs_to_use = OUTPUTS_TO_USE
                     # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                     inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
-                    lambda_ = LAMBDA_FACTOR  # LAMBDA
+                    lambda_ = 5e-5  # LAMBDA_FACTOR  # LAMBDA
                     # Construct the title
                     title = f'mlp2_pdcaeS2_Reciprocal_alpha{alpha_mse:.2f}_fr{freeze}'
 
