@@ -137,11 +137,10 @@ def map_labels_to_importance_weights(labels: np.ndarray, importance_weights: np.
     return label_to_importance_weight_mapping
 
 
-def smooth_kde_tails(x: np.ndarray, density: np.ndarray, threshold: float = 2.0) -> np.ndarray:
+def smooth_blip(x: np.ndarray, density: np.ndarray, threshold: float = 2.0) -> np.ndarray:
     """
-    TODO: figure out how to smooth the tails of the KDE without losing the shape of the KDE
-    Smooths density values within the threshold range by detecting and interpolating outliers.
-    An outlier is defined as a density value that is significantly lower than its neighbors.
+    Smooths density values above threshold to the minimum density value found above threshold.
+    This prevents jumps in density values for extreme outliers.
 
     Parameters:
     - x: np.ndarray
@@ -149,46 +148,27 @@ def smooth_kde_tails(x: np.ndarray, density: np.ndarray, threshold: float = 2.0)
     - density: np.ndarray
       The original KDE density values.
     - threshold: float
-      The absolute value threshold defining the range to consider for outlier detection.
+      The threshold above which to smooth density values.
 
     Returns:
     - np.ndarray
-      Density values with outliers replaced by linear interpolation of neighbors.
+      Density values with high outliers smoothed to minimum density above threshold.
     """
     smoothed_density = density.copy()
     
-    # Get indices within threshold range
-    mask = (x <= -threshold) | (x >= threshold)
-    indices = np.where(mask)[0]
-    
-    if len(indices) < 3:  # Need at least 3 points for outlier detection
+    # Get indices above threshold
+    mask = x >= threshold
+    if not np.any(mask):
         return smoothed_density
         
-    # Calculate density differences with neighbors
-    density_diffs = np.abs(density[indices[1:-1]] - np.mean([density[indices[:-2]], density[indices[2:]]], axis=0))
+    # Find minimum density value above threshold
+    min_density_above = np.min(density[mask])
     
-    # Define outliers as points with density < 2x average of neighbors
-    outlier_indices = indices[1:-1][density_diffs < 2.0 * np.mean([density[indices[:-2]], density[indices[2:]]], axis=0)]
-    
-    # Replace outliers with linear interpolation of valid neighbors
-    for idx in outlier_indices:
-        # Find valid left neighbor (not an outlier)
-        left_idx = idx - 1
-        while left_idx in outlier_indices and left_idx > 0:
-            left_idx -= 1
-            
-        # Find valid right neighbor (not an outlier)  
-        right_idx = idx + 1
-        while right_idx in outlier_indices and right_idx < len(x) - 1:
-            right_idx += 1
-            
-        smoothed_density[idx] = np.interp(x[idx], [x[left_idx], x[right_idx]], 
-                                        [density[left_idx], density[right_idx]])
+    # Set all densities above threshold to minimum value
+    smoothed_density[mask] = min_density_above
     
     return smoothed_density
 
-
-# TODO: fix the fact that the importance weights are not normalized to sum to 1
 
 class ReciprocalImportance:
     """
@@ -220,15 +200,15 @@ class ReciprocalImportance:
         # Create KDE and get PDF values
         self.kde = gaussian_kde(self.labels, bw_method=bandwidth)
         self.densities = self.kde.evaluate(self.labels)
+        
+        # Smooth the density values for high outliers
+        self.densities = smooth_blip(self.labels, self.densities)
+        
         self.min_density = np.min(self.densities)
         self.max_density = np.max(self.densities)
 
         # Calculate normalized PDF so PDF is between 0 and 1 using vectorized ops
         normalized_densities = np.divide(self.densities, self.max_density + epsilon)
-
-        # # print the min and max of the normalized densities
-        # print(f"min of normalized densities: {np.min(normalized_densities)}")
-        # print(f"max of normalized densities: {np.max(normalized_densities)}")
 
         # Calculate reweighting factors using vectorized ops
         self.importance_weights = np.power(np.reciprocal(normalized_densities + 1e-8), alpha)
@@ -275,6 +255,10 @@ class QUCImportance:
         # Create KDE and get PDF values
         self.kde = gaussian_kde(self.labels, bw_method=bandwidth)
         self.densities = self.kde.evaluate(self.labels)
+
+        # Smooth the density values for high outliers
+        self.densities = smooth_blip(self.labels, self.densities)
+
         self.min_density = np.min(self.densities)
         self.max_density = np.max(self.densities)
         
@@ -323,6 +307,10 @@ class LinearImportance:
         self.kde = gaussian_kde(self.labels, bw_method=bandwidth)
         # Calculate PDF values once
         self.densities = self.kde.evaluate(self.labels)
+
+        # Smooth the density values for high outliers
+        self.densities = smooth_blip(self.labels, self.densities)
+
         self.min_density = np.min(self.densities)
         self.max_density = np.max(self.densities)
 
@@ -371,6 +359,10 @@ class CosineImportance:
         self.kde = gaussian_kde(self.labels, bw_method=bandwidth)
         # Calculate PDF values once
         self.densities = self.kde.evaluate(self.labels)
+
+        # Smooth the density values for high outliers
+        self.densities = smooth_blip(self.labels, self.densities)
+
         self.min_density = np.min(self.densities)
         self.max_density = np.max(self.densities)
         
