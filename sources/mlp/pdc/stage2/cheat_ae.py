@@ -49,7 +49,7 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.95, 0.95, 0.95, 0.95)]:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.75, 0.75, 0.75, 0.75)]:
             for freeze in [False]:
                 for rho in RHO:
                     inputs_to_use = INPUTS_TO_USE[0]
@@ -61,7 +61,7 @@ def main():
                     inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                     lambda_ = 5e-5  # LAMBDA_FACTOR  # LAMBDA
                     # Construct the title
-                    title = f'mlp2_pdcaeS2_Reciprocal_alpha{alpha_mse:.2f}_fr{freeze}'
+                    title = f'mlp2_pdcaeS2_Reciprocal_alpha{alpha_mse:.2f}_fr{freeze}_of'
 
                     # Replace any other characters that are not suitable for filenames (if any)
                     title = title.replace(' ', '_').replace(':', '_')
@@ -309,84 +309,87 @@ def main():
                         verbose=VERBOSE
                     )
 
-                    # optimal epoch for fold
-                    # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
-                    # Use the quadratic fit function to find the optimal epoch
-                    optimal_epochs = find_optimal_epoch_by_smoothing(
-                        history.history[ES_CB_MONITOR],
-                        smoothing_method=smoothing_method,
-                        smoothing_parameters={'window_size': val_window_size},
-                        mode='min')
+                    # # optimal epoch for fold
+                    # # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
+                    # # Use the quadratic fit function to find the optimal epoch
+                    # optimal_epochs = find_optimal_epoch_by_smoothing(
+                    #     history.history[ES_CB_MONITOR],
+                    #     smoothing_method=smoothing_method,
+                    #     smoothing_parameters={'window_size': val_window_size},
+                    #     mode='min')
                     
-                    print(f'optimal_epochs: {optimal_epochs}')
-                    wandb.log({'optimal_epochs': optimal_epochs})
+                    # print(f'optimal_epochs: {optimal_epochs}')
+                    # wandb.log({'optimal_epochs': optimal_epochs})
 
-                    final_model_sep_stage1 = create_mlp(
-                        input_dim=n_features,
-                        hiddens=hiddens,
-                        output_dim=0,
-                        pretraining=pretraining,
-                        embed_dim=embed_dim,
-                        dropout=dropout,
-                        activation=activation,
-                        norm=norm,
-                        skip_repr=skip_repr,
-                        skipped_layers=skipped_layers
-                    )
-                    final_model_sep_stage1.load_weights(weight_path)
+                    # final_model_sep_stage1 = create_mlp(
+                    #     input_dim=n_features,
+                    #     hiddens=hiddens,
+                    #     output_dim=0,
+                    #     pretraining=pretraining,
+                    #     embed_dim=embed_dim,
+                    #     dropout=dropout,
+                    #     activation=activation,
+                    #     norm=norm,
+                    #     skip_repr=skip_repr,
+                    #     skipped_layers=skipped_layers
+                    # )
+                    # final_model_sep_stage1.load_weights(weight_path)
 
-                    # Recreate the model architecture for final_model_sep
-                    final_model_sep = mb.add_proj_head(
-                        final_model_sep_stage1,
-                        output_dim=output_dim,
-                        freeze_features=freeze,
-                        pretraining=pretraining,
-                        hiddens=proj_hiddens,
-                        dropout=dropout,
-                        activation=activation,
-                        norm=norm,
-                        skipped_layers=skipped_layers,
-                        name='mlp',
-                        sam_rho=rho
-                    )
+                    # # Recreate the model architecture for final_model_sep
+                    # final_model_sep = mb.add_proj_head(
+                    #     final_model_sep_stage1,
+                    #     output_dim=output_dim,
+                    #     freeze_features=freeze,
+                    #     pretraining=pretraining,
+                    #     hiddens=proj_hiddens,
+                    #     dropout=dropout,
+                    #     activation=activation,
+                    #     norm=norm,
+                    #     skipped_layers=skipped_layers,
+                    #     name='mlp',
+                    #     sam_rho=rho
+                    # )
 
-                    final_model_sep.compile(
-                        optimizer=AdamW(
-                            learning_rate=learning_rate,
-                            weight_decay=weight_decay,
-                            beta_1=momentum_beta1
-                        ),
-                        loss={
-                            'forecast_head': lambda y_true, y_pred: cmse(
-                                y_true, y_pred,
-                                phase_manager=pm,
-                                lambda_factor=lambda_,
-                                train_mse_weight_dict=mse_train_weights_dict,
-                                train_pcc_weight_dict=None,
-                                asym_type=asym_type
-                            )
-                        },
-                    )  # Compile the model just like before
+                    # final_model_sep.compile(
+                    #     optimizer=AdamW(
+                    #         learning_rate=learning_rate,
+                    #         weight_decay=weight_decay,
+                    #         beta_1=momentum_beta1
+                    #     ),
+                    #     loss={
+                    #         'forecast_head': lambda y_true, y_pred: cmse(
+                    #             y_true, y_pred,
+                    #             phase_manager=pm,
+                    #             lambda_factor=lambda_,
+                    #             train_mse_weight_dict=mse_train_weights_dict,
+                    #             train_pcc_weight_dict=None,
+                    #             asym_type=asym_type
+                    #         )
+                    #     },
+                    # )  # Compile the model just like before
 
-                    train_ds, train_steps = stratified_batch_dataset(
-                        X_train, y_train, batch_size)
+                    # train_ds, train_steps = stratified_batch_dataset(
+                    #     X_train, y_train, batch_size)
 
-                    # Map the training dataset to return {'output': y} format
-                    train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
+                    # # Map the training dataset to return {'output': y} format
+                    # train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
 
-                    # Train on the full dataset
-                    final_model_sep.fit(
-                        train_ds,
-                        steps_per_epoch=train_steps,
-                        epochs=optimal_epochs,
-                        batch_size=batch_size,
-                        callbacks=[
-                            reduce_lr_on_plateau,
-                            WandbCallback(save_model=WANDB_SAVE_MODEL),
-                            IsTraining(pm)
-                        ],
-                        verbose=VERBOSE
-                    )
+                    # # Train on the full dataset
+                    # final_model_sep.fit(
+                    #     train_ds,
+                    #     steps_per_epoch=train_steps,
+                    #     epochs=optimal_epochs,
+                    #     batch_size=batch_size,
+                    #     callbacks=[
+                    #         reduce_lr_on_plateau,
+                    #         WandbCallback(save_model=WANDB_SAVE_MODEL),
+                    #         IsTraining(pm)
+                    #     ],
+                    #     verbose=VERBOSE
+                    # )
+
+                    # since i am trying to overfit, i don't need to find the optimal epoch
+                    final_model_sep = model_sep
 
                     # Save the final model
                     final_model_sep.save_weights(f"final_model_weights_{experiment_name}_s2min_reg.h5")
