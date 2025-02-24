@@ -2014,7 +2014,7 @@ class ModelBuilder:
     ) -> tf.Tensor:
         """
         Computes the PDC loss with diagonal terms excluded, using a single operation
-        for computing all pairwise differences.
+        for computing all pairwise differences. (The default PDC for now)
 
         Args:
             y_true: A batch of true label values, shape of [batch_size, 1]
