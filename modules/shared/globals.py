@@ -19,7 +19,7 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 # Pretraining configurations
 BATCH_SIZE_PRE = 7000  # Batch size for PDS
 START_LR_PRE = 6e-4  # starting learning rate for pretraining
-LR_CB_MIN_LR_PRE = 6e-8  # Minimum learning rate for pretraining
+LR_CB_MIN_LR_PRE = 6e-6  # Minimum learning rate for pretraining
 LR_CB_FACTOR_PRE = 0.99  # factor for reducing learning rate in pretraining
 LR_CB_PATIENCE_PRE = 50  # patience for reducing learning rate in pretraining
 PATIENCE_PRE = int(1e4)  # Higher patience for pretraining

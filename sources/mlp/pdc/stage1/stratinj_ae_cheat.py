@@ -47,7 +47,7 @@ def main():
     pm = TrainingPhaseManager()  # Training phase manager
 
     for seed in SEEDS:
-        for alpha, alphaV in REWEIGHTS_PRE:
+        for alpha, alphaV in [(0.75, 0.75)]:  # REWEIGHTS_PRE:
             for rho in RHO_PRE:
                 # PARAMS
                 inputs_to_use = INPUTS_TO_USE[0]
