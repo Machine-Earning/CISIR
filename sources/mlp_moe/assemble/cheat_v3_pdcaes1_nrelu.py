@@ -68,6 +68,7 @@ def main():
                 lr_cb_min_delta = LR_CB_MIN_DELTA
                 cvrg_metric = CVRG_METRIC
                 cvrg_min_delta = CVRG_MIN_DELTA
+                normalized_weights = NORMALIZED_WEIGHTS
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -160,7 +161,8 @@ def main():
                     'lr_cb_min_lr': lr_cb_min_lr,
                     'lr_cb_min_delta': lr_cb_min_delta,
                     'cvrg_metric': cvrg_metric,
-                    'cvrg_min_delta': cvrg_min_delta
+                    'cvrg_min_delta': cvrg_min_delta,
+                    'normalized_weights': normalized_weights
                 })
 
                 # set the root directory
@@ -291,6 +293,7 @@ def main():
                             train_pcc_weight_dict=pcc_train_weights_dict,
                             val_mse_weight_dict=mse_test_weights_dict,
                             val_pcc_weight_dict=pcc_test_weights_dict,
+                            normalized_weights=normalized_weights,
                             asym_type=asym_type
                         )
                     }
@@ -364,6 +367,7 @@ def main():
                             lambda_factor=lambda_factor,
                             train_mse_weight_dict=mse_train_weights_dict,
                             train_pcc_weight_dict=pcc_train_weights_dict,
+                            normalized_weights=normalized_weights,
                             asym_type=asym_type
                         )
                     }

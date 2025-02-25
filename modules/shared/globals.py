@@ -59,6 +59,7 @@ START_LR = 1e-4  # starting learning rate
 WEIGHT_DECAY = 1e-4  # Higher weight decay
 MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
+NORMALIZED_WEIGHTS = True  # Use normalized weights
 
 # Learning Rate Scheduling
 LR_CB_MIN_LR = 1e-5  # minimum learning rate

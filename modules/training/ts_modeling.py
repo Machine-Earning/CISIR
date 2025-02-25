@@ -4993,7 +4993,7 @@ def asymmetric_weight_sigmoid(y_true: tf.Tensor, y_pred: tf.Tensor, eta: float =
     return 2 * (1 - eta) * sigmoid + eta
 
 
-def coreg(y_true, y_pred, pcc_weights=None):
+def coreg(y_true: tf.Tensor, y_pred: tf.Tensor, pcc_weights: Optional[tf.Tensor] = None) -> tf.Tensor:
     """
     Correlation based regularizer:
     Compute 1 minus the Pearson Correlation Coefficient (PCC) between two sets of predictions.
@@ -5077,6 +5077,7 @@ def cmse(
         val_mse_weight_dict: Optional[Dict[float, float]] = None,
         train_pcc_weight_dict: Optional[Dict[float, float]] = None,
         val_pcc_weight_dict: Optional[Dict[float, float]] = None,
+        normalized_weights: Optional[bool] = False,
         asym_type: Optional[str] = None,  # New parameter to choose asymmetric weight type
         bias_penalty_factor: Optional[float] = None,  # New parameter for bias penalty scaling
 ) -> tf.Tensor:
@@ -5094,6 +5095,7 @@ def cmse(
     - val_mse_weight_dict (dict, optional): Dictionary mapping label values to weights for validation MSE samples.
     - train_pcc_weight_dict (dict, optional): Dictionary mapping label values to weights for training PCC samples.
     - val_pcc_weight_dict (dict, optional): Dictionary mapping label values to weights for validation PCC samples.
+    - normalized_weights (bool, optional): If True, weights are already normalized and we use sum instead of mean.
     - asym_type (str, optional): Type of asymmetric weight to use ('silu' or 'sigmoid').
     - bias_penalty_factor (float, optional): Scaling factor for the bias penalty term. If None, no bias penalty is applied.
 
@@ -5117,7 +5119,11 @@ def cmse(
         asym_weights = 1.0  # No asymmetric weighting if not specified
 
     # Compute the Mean Squared Error (MSE) with asymmetric weights
-    mse = tf.reduce_mean(asym_weights * mse_weights * tf.square(y_pred - y_true))
+    # If weights are normalized, use sum instead of mean
+    if normalized_weights:
+        mse = tf.reduce_sum(asym_weights * mse_weights * tf.square(y_pred - y_true))
+    else:
+        mse = tf.reduce_mean(asym_weights * mse_weights * tf.square(y_pred - y_true))
 
     # Compute the correlation regularization term using coreg
     pcc_loss = coreg(y_true, y_pred, pcc_weights)
