@@ -3,7 +3,8 @@ from datetime import datetime
 
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
-from tensorflow_addons.optimizers import AdamW
+# from tensorflow_addons.optimizers import AdamW
+from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
 # from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
@@ -47,7 +48,7 @@ def main():
                 add_slope = ADD_SLOPE[0]
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = 1 # LAMBDA_FACTOR_MOE  # lambda for the loss
+                lambda_factor = 5e-5 # LAMBDA_FACTOR_MOE  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
@@ -101,7 +102,7 @@ def main():
                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                 smoothing_method = SMOOTHING_METHOD
                 window_size = 101  # WINDOW_SIZE  # allows margin of error of 10 epochs
-                val_window_size = 101  # VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
+                val_window_size = 5  # VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
                 pretraining = False
                 freeze_experts = FREEZE_EXPERT
 
@@ -277,9 +278,9 @@ def main():
 
                 # Compile the model with the specified learning rate
                 init_model_sep.compile(
-                    optimizer=AdamW(
+                    optimizer=Adam(
                         learning_rate=learning_rate,
-                        weight_decay=weight_decay,
+                        # weight_decay=weight_decay,
                         beta_1=momentum_beta1
                     ),
                     loss={
@@ -352,9 +353,9 @@ def main():
                 )
 
                 final_model_sep.compile(
-                    optimizer=AdamW(
+                    optimizer=Adam(
                         learning_rate=learning_rate,
-                        weight_decay=weight_decay,
+                        # weight_decay=weight_decay,
                         beta_1=momentum_beta1
                     ),
                     loss={

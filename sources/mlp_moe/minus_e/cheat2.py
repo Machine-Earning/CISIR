@@ -42,7 +42,7 @@ def main():
     add_slope = ADD_SLOPE[0]  # Use first element
 
     # Path to pre-trained model weights
-    pretrained_weights = None #PRE_WEIGHT_PATH
+    pretrained_weights = BETTER_REPR_FOR_COMBINER
 
     for seed in SEEDS:
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in REWEIGHTS_MOE_M:

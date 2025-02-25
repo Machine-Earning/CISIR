@@ -18,17 +18,19 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 
 # Pretraining configurations
 BATCH_SIZE_PRE = 7000  # Batch size for PDS
-START_LR_PRE = 6e-4  # starting learning rate for pretraining
-LR_CB_MIN_LR_PRE = 6e-6  # Minimum learning rate for pretraining
+START_LR_PRE = 3e-4 # starting learning rate for pretraining
+LR_CB_MIN_LR_PRE = 1e-5  # Minimum learning rate for pretraining
 LR_CB_FACTOR_PRE = 0.99  # factor for reducing learning rate in pretraining
 LR_CB_PATIENCE_PRE = 50  # patience for reducing learning rate in pretraining
-PATIENCE_PRE = int(1e4)  # Higher patience for pretraining
-RHO_PRE = [0.2]  # Pretraining rho parameter
-REWEIGHTS_PRE = [(1.0, 0.4)]  # Pretraining reweighting parameters
+PATIENCE_PRE = int(3e3)  # Higher patience for pretraining
+RHO_PRE = [2e-1]  # Pretraining rho parameter
+REWEIGHTS_PRE = [(0.8, 0.8)]  # Pretraining reweighting parameters
 WEIGHT_DECAY_PRE = 1e-4  # Higher weight decay for projection layers
-WINDOW_SIZE_PDC = 151  # NOTE: must be odd
-VAL_WINDOW_SIZE_PDC = 151  # NOTE: must be odd
+WINDOW_SIZE_PRE = 151  # NOTE: must be odd
+VAL_WINDOW_SIZE_PRE = 51  # NOTE: must be odd
 DROPOUT_PRE = 1e-2  # Dropout rate for pretraining
+LAMBDA_PRE = 5e-5  # lambda for cmse with reciprocal importances
+AE_LAMBDA = 1e3
 
 # PDS 
 START_LR_PDS = 1e-3
@@ -87,7 +89,6 @@ WINDOW_SIZE = 101 #121  # NOTE: must be odd
 RHO = [1e-2]
 REWEIGHTS = [(1.0, 0.4, 0.1, 0)]
 LAMBDA_FACTOR = 8
-AE_LAMBDA = 0.9
 CVRG_MIN_DELTA = 1e-3
 CVRG_METRIC = 'loss'
 CVRG_METRIC_WDR = 'val_loss'
@@ -209,6 +210,11 @@ COMBINER_V3_OF = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_ml
 COMBINER_V3_AE_NOF_1 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250218-231845.h5'
 
 COMBINER_V3_AE_NOF_2 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250218-231650.h5'
+
+BETTER_REPR_FOR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.00_v8_updated_20241119-210406_reg.h5'
+
+BETTER_REPR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250225-135335.h5'
+
 # assemble hyperparams
 REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]
 RHO_MOE = [1e-2]

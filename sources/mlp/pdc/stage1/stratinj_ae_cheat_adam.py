@@ -4,7 +4,7 @@ from datetime import datetime
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
-from tensorflow_addons.optimizers import AdamW
+from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import (
@@ -47,8 +47,8 @@ def main():
     pm = TrainingPhaseManager()  # Training phase manager
 
     for seed in SEEDS:
-        for alpha, alphaV in [(0.8, 0.8)]:  # REWEIGHTS_PRE:
-            for rho in RHO_PRE:
+        for alpha, alphaV in [(0, 0)]:  # REWEIGHTS_PRE:
+            for rho in [0.0]:  # RHO_PRE:
                 # PARAMS
                 inputs_to_use = INPUTS_TO_USE[0]
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]
@@ -62,7 +62,7 @@ def main():
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'mlp2ae_pdcStratInj_bs{batch_size}_cheat_nom'
+                title = f'mlp2ae_pdcStratInj_bs{batch_size}_cheat_adam'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -72,10 +72,10 @@ def main():
                 experiment_name = f'{title}_{current_time}'
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed)
-                epochs = EPOCHS
-                patience = PATIENCE_PRE
-                learning_rate = START_LR_PRE
-                weight_decay = WEIGHT_DECAY_PRE
+                epochs = 30000  # EPOCHS
+                patience = 3000  # PATIENCE_PRE
+                learning_rate = 1e-3  # START_LR_PRE
+                weight_decay = 0  # WEIGHT_DECAY_PRE
 
                 hiddens = MLP_HIDDENS
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
@@ -85,12 +85,12 @@ def main():
                 activation = ACTIVATION
                 norm = NORM
                 skip_repr = SKIP_REPR
-                lr_cb_patience = LR_CB_PATIENCE_PRE
-                lr_cb_factor = LR_CB_FACTOR_PRE
+                lr_cb_patience = LR_CB_PATIENCE
+                lr_cb_factor = LR_CB_FACTOR
                 lr_cb_min_lr = LR_CB_MIN_LR_PRE
                 lr_cb_min_delta = LR_CB_MIN_DELTA
                 cvrg_metric = CVRG_METRIC
-                cvrg_min_delta = CVRG_MIN_DELTA
+                cvrg_min_delta = 1e-3  # CVRG_MIN_DELTA
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -131,7 +131,7 @@ def main():
                     'dropout': dropout,
                     'activation': 'LeakyReLU',
                     'norm': norm,
-                    'optimizer': 'adamw',
+                    'optimizer': 'adam',
                     'architecture': 'mlp',
                     'alpha': alpha,
                     'alphaVal': alphaV,
@@ -261,9 +261,9 @@ def main():
                     smoothing_parameters={'window_size': window_size})  # 10
 
                 model_sep.compile(
-                    optimizer=AdamW(
+                    optimizer=Adam(
                         learning_rate=learning_rate,
-                        weight_decay=weight_decay,
+                        # weight_decay=weight_decay,
                     ),
                     loss=[
                         lambda y_true, y_pred: mb.pdc_loss_linear_vec(
@@ -308,85 +308,89 @@ def main():
                     verbose=VERBOSE
                 )
 
-                # optimal epoch for fold
-                # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
-                # Use the quadratic fit function to find the optimal epoch
-                optimal_epochs = find_optimal_epoch_by_smoothing(
-                    history.history[ES_CB_MONITOR],
-                    smoothing_method=smoothing_method,
-                    smoothing_parameters={'window_size': val_window_size},
-                    mode='min')
+                # # optimal epoch for fold
+                # # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
+                # # Use the quadratic fit function to find the optimal epoch
+                # optimal_epochs = find_optimal_epoch_by_smoothing(
+                #     history.history[ES_CB_MONITOR],
+                #     smoothing_method=smoothing_method,
+                #     smoothing_parameters={'window_size': val_window_size},
+                #     mode='min')
 
-                print(f'optimal_epochs: {optimal_epochs}')
-                wandb.log({'optimal_epochs': optimal_epochs})
+                # print(f'optimal_epochs: {optimal_epochs}')
+                # wandb.log({'optimal_epochs': optimal_epochs})
 
-                # create the model
-                final_encoder = create_mlp(
-                    input_dim=n_features,
-                    hiddens=hiddens,
-                    output_dim=0,
-                    pretraining=pretraining,
-                    embed_dim=embed_dim,
-                    dropout=dropout,
-                    activation=activation,
-                    norm=norm,
-                    skip_repr=skip_repr,
-                    skipped_layers=skipped_layers,
-                    sam_rho=rho,
-                )
+                # # create the model
+                # final_encoder = create_mlp(
+                #     input_dim=n_features,
+                #     hiddens=hiddens,
+                #     output_dim=0,
+                #     pretraining=pretraining,
+                #     embed_dim=embed_dim,
+                #     dropout=dropout,
+                #     activation=activation,
+                #     norm=norm,
+                #     skip_repr=skip_repr,
+                #     skipped_layers=skipped_layers,
+                #     sam_rho=rho,
+                # )
 
-                # Add decoder to create the autoencoder model
-                final_model_sep = add_decoder(
-                    encoder_model=final_encoder,
-                    hiddens=hiddens,
-                    activation=activation,
-                    norm=norm,
-                    dropout=dropout,
-                    skip_connections=(skipped_layers > 0)
-                )
+                # # Add decoder to create the autoencoder model
+                # final_model_sep = add_decoder(
+                #     encoder_model=final_encoder,
+                #     hiddens=hiddens,
+                #     activation=activation,
+                #     norm=norm,
+                #     dropout=dropout,
+                #     skip_connections=(skipped_layers > 0)
+                # )
 
-                final_model_sep.compile(
-                    optimizer=AdamW(
-                        learning_rate=learning_rate,
-                        weight_decay=weight_decay,
-                    ),
-                    loss=[
-                        lambda y_true, y_pred: mb.pdc_loss_linear_vec(
-                            y_true, y_pred,
-                            phase_manager=pm,
-                            train_sample_weights=train_weights_dict,
-                        ),
-                        lambda y_true, y_pred: cmse(
-                            y_true, y_pred,
-                            phase_manager=pm,
-                            lambda_factor=lambda_,
-                            train_mse_weight_dict=train_weights_dict,
-                        )
-                    ],
-                    loss_weights=[
-                        1.0,
-                        reconstruction_loss_weight
-                    ]
-                )
+                # final_model_sep.compile(
+                #     optimizer=Adam(
+                #         learning_rate=learning_rate,
+                #         # weight_decay=weight_decay,
+                #     ),
+                #     loss=[
+                #         lambda y_true, y_pred: mb.pdc_loss_linear_vec(
+                #             y_true, y_pred,
+                #             phase_manager=pm,
+                #             train_sample_weights=train_weights_dict,
+                #         ),
+                #         lambda y_true, y_pred: cmse(
+                #             y_true, y_pred,
+                #             phase_manager=pm,
+                #             lambda_factor=lambda_,
+                #             train_mse_weight_dict=train_weights_dict,
+                #         )
+                #     ],
+                #     loss_weights=[
+                #         1.0,
+                #         reconstruction_loss_weight
+                #     ]
+                # )
 
-                train_ds, train_steps = stratified_batch_dataset(
-                    X_train, y_train, batch_size)
+                # train_ds, train_steps = stratified_batch_dataset(
+                #     X_train, y_train, batch_size)
 
-                # Adjust the dataset to include both y_train and X_train for reconstruction
-                train_ds = train_ds.map(lambda x, y: (x, (y, x)))
+                # # Adjust the dataset to include both y_train and X_train for reconstruction
+                # train_ds = train_ds.map(lambda x, y: (x, (y, x)))
 
-                final_model_sep.fit(
-                    train_ds,
-                    steps_per_epoch=train_steps,
-                    epochs=optimal_epochs,
-                    batch_size=batch_size,
-                    callbacks=[
-                        reduce_lr_on_plateau,
-                        WandbCallback(save_model=WANDB_SAVE_MODEL),
-                        IsTraining(pm)
-                    ],
-                    verbose=VERBOSE
-                )
+                # final_model_sep.fit(
+                #     train_ds,
+                #     steps_per_epoch=train_steps,
+                #     epochs=optimal_epochs,
+                #     batch_size=batch_size,
+                #     callbacks=[
+                #         reduce_lr_on_plateau,
+                #         WandbCallback(save_model=WANDB_SAVE_MODEL),
+                #         IsTraining(pm)
+                #     ],
+                #     verbose=VERBOSE
+                # )
+
+                #since i want to overfit the model, i will save the model as final model
+                final_encoder = encoder_model
+
 
                 # Save the final model
                 final_encoder.save_weights(f"final_model_weights_{str(experiment_name)}.h5")
