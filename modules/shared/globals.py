@@ -93,7 +93,7 @@ RHO = [1e-2]
 REWEIGHTS = [(1.0, 0.4, 0.1, 0)]
 LAMBDA_FACTOR = 1
 CVRG_MIN_DELTA = 1e-3
-CVRG_METRIC = 'loss'
+CVRG_METRIC = 'val_loss'
 ASYM_TYPE = None #'sigmoid'
 
 # ATTM AREA
