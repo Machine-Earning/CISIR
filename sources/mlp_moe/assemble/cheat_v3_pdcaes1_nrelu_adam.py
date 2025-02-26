@@ -48,7 +48,7 @@ def main():
                 add_slope = ADD_SLOPE[0]
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = 5e-5 # LAMBDA_FACTOR_MOE  # lambda for the loss
+                lambda_factor = LAMBDA_FACTOR_MOE  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
@@ -105,6 +105,8 @@ def main():
                 val_window_size = 5  # VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
                 pretraining = False
                 freeze_experts = FREEZE_EXPERT
+                freeze_combiner = True  # freeze the combiner
+                normalized_weights = NORMALIZED_WEIGHTS
 
                 expert_paths = {
                     'plus': POS_EXPERT_PATH,
@@ -161,7 +163,9 @@ def main():
                     'lr_cb_min_lr': lr_cb_min_lr,
                     'lr_cb_min_delta': lr_cb_min_delta,
                     'cvrg_metric': cvrg_metric,
-                    'cvrg_min_delta': cvrg_min_delta
+                    'cvrg_min_delta': cvrg_min_delta,
+                    'normalized_weights': normalized_weights,
+                    'freeze_combiner': freeze_combiner
                 })
 
                 # set the root directory
@@ -242,7 +246,8 @@ def main():
                     'sam_rho': rho,
                     'proj_hiddens': proj_hiddens,
                     'proj_neck': False,
-                    'no_head': False
+                    'no_head': False,
+                    'freeze_combiner': freeze_combiner
                 }
 
                 # create the model
@@ -292,6 +297,7 @@ def main():
                             train_pcc_weight_dict=pcc_train_weights_dict,
                             val_mse_weight_dict=mse_test_weights_dict,
                             val_pcc_weight_dict=pcc_test_weights_dict,
+                            normalized_weights=normalized_weights,
                             asym_type=asym_type
                         )
                     }
@@ -365,6 +371,7 @@ def main():
                             lambda_factor=lambda_factor,
                             train_mse_weight_dict=mse_train_weights_dict,
                             train_pcc_weight_dict=pcc_train_weights_dict,
+                            normalized_weights=normalized_weights,
                             asym_type=asym_type
                         )
                     }

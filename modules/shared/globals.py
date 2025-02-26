@@ -221,7 +221,7 @@ BETTER_REPR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weig
 # assemble hyperparams
 REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]
 RHO_MOE = [1e-2]
-LAMBDA_FACTOR_MOE = 8
+LAMBDA_FACTOR_MOE = 1
 START_LR_MOE = 1e-4
 LR_CB_MIN_LR_MOE = 2e-5
 LR_CB_FACTOR_MOE = 0.95

@@ -554,7 +554,8 @@ def load_partial_weights_from_path(
         old_model_params: Dict,
         skip_layers: Optional[List[str]] = None,
         proj_neck: bool = False,
-        no_head: bool = False
+        no_head: bool = False,
+        freeze_combiner: bool = False
 ) -> None:
     """
     Load weights from a pre-trained model (via a weights file path) into an existing new model,
@@ -603,6 +604,9 @@ def load_partial_weights_from_path(
 
     no_head : bool
         If True, the projection head is added to the model.
+
+    freeze_combiner : bool
+        If True, the combiner is frozen and only the combiner head is trained.
 
     Returns
     -------
@@ -655,7 +659,7 @@ def load_partial_weights_from_path(
         new_model = add_proj_head(
             old_model,
             output_dim=3,
-            freeze_features=False,  # don't freeze features when load combiner
+            freeze_features=freeze_combiner,  # don't freeze features when load combiner
             pretraining=True,  # used PDS/PDC
             hiddens=old_model_params['proj_hiddens'],
             dropout=old_model_params['dropout'],
@@ -690,6 +694,24 @@ def load_partial_weights_from_path(
             # else no corresponding old layer by that name, skip
 
         # After this, `new_model` will have partially loaded weights, except for layers that didn't match or were skipped.
+        
+        # If freeze_combiner is True, freeze all layers except the output layer (forecast_head)
+        if freeze_combiner:
+            # Identify layers that should remain trainable (typically the output layer and any projection layers)
+            trainable_layer_names = ['forecast_head']
+            if proj_neck:
+                # Add projection neck layer names to trainable layers
+                for layer in new_model.layers:
+                    if 'proj_' in layer.name:
+                        trainable_layer_names.append(layer.name)
+            
+            # Freeze all layers except those in trainable_layer_names
+            for layer in new_model.layers:
+                if layer.name not in trainable_layer_names:
+                    layer.trainable = False
+                    print(f"Freezing layer: {layer.name}")
+                else:
+                    print(f"Keeping layer trainable: {layer.name}")
 
 
 class NormalizedReLU(Layer):
@@ -1550,7 +1572,8 @@ def create_mlp_moe(
             old_model_params=combiner_pretrained_config,
             skip_layers=["forecast_head"],  # skip final layer if output_dim differs
             proj_neck=combiner_pretrained_config['proj_neck'],
-            no_head=combiner_pretrained_config['no_head']
+            no_head=combiner_pretrained_config['no_head'],
+            freeze_combiner=combiner_pretrained_config['freeze_combiner']
         )
 
     # Load weights if paths are provided
