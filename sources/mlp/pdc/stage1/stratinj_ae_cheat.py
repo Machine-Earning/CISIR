@@ -4,7 +4,8 @@ from datetime import datetime
 import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
-from tensorflow_addons.optimizers import AdamW
+# from tensorflow_addons.optimizers import AdamW
+from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import (
@@ -76,6 +77,7 @@ def main():
                 patience = PATIENCE_PRE
                 learning_rate = START_LR_PRE
                 weight_decay = WEIGHT_DECAY_PRE
+                normalized_weights = NORMALIZED_WEIGHTS
 
                 hiddens = MLP_HIDDENS
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
@@ -261,9 +263,9 @@ def main():
                     smoothing_parameters={'window_size': window_size})  # 10
 
                 model_sep.compile(
-                    optimizer=AdamW(
+                    optimizer=Adam(
                         learning_rate=learning_rate,
-                        weight_decay=weight_decay,
+                        # weight_decay=weight_decay,
                     ),
                     loss=[
                         lambda y_true, y_pred: mb.pdc_loss_linear_vec(
@@ -278,6 +280,7 @@ def main():
                             lambda_factor=lambda_,
                             train_mse_weight_dict=train_weights_dict,
                             val_mse_weight_dict=test_weights_dict,
+                            normalized_weights=normalized_weights
                         )
                     ],
                     loss_weights=[
@@ -346,9 +349,9 @@ def main():
                 )
 
                 final_model_sep.compile(
-                    optimizer=AdamW(
+                    optimizer=Adam(
                         learning_rate=learning_rate,
-                        weight_decay=weight_decay,
+                        # weight_decay=weight_decay,
                     ),
                     loss=[
                         lambda y_true, y_pred: mb.pdc_loss_linear_vec(
@@ -361,6 +364,7 @@ def main():
                             phase_manager=pm,
                             lambda_factor=lambda_,
                             train_mse_weight_dict=train_weights_dict,
+                            normalized_weights=normalized_weights
                         )
                     ],
                     loss_weights=[
