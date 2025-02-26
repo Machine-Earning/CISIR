@@ -5,7 +5,7 @@ import numpy as np
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
-# from tensorflow_addons.optimizers import AdamW
+from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import plot_tsne_delta, plot_repr_corr_dist
@@ -29,9 +29,6 @@ from modules.training.ts_modeling import (
 )
 from modules.training.utils import get_weight_path
 
-# Set the environment variable for CUDA (in case it is necessary)
-# os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-
 
 # Define the lookup dictionary
 weight_paths = {
@@ -49,9 +46,9 @@ def main():
     mb = ModelBuilder()
     pm = TrainingPhaseManager()
 
-    for seed in SEEDS:
+    for seed in TRIAL_SEEDS:
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.65, 0.65, 0.65, 0.65)]:
-            for freeze in [False]:
+            for freeze in FREEZING:
                 for rho in RHO:
                     inputs_to_use = INPUTS_TO_USE[0]
                     cme_speed_threshold = CME_SPEED_THRESHOLD[0]
@@ -60,9 +57,10 @@ def main():
                     outputs_to_use = OUTPUTS_TO_USE
                     # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                     inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
-                    lambda_ = 5e-5  # LAMBDA_FACTOR  # LAMBDA
+                    lambda_factor = LAMBDA_FACTOR
+                    normalized_weights = NORMALIZED_WEIGHTS
                     # Construct the title
-                    title = f'mlp2_pdcaeS2_Reciprocal_alpha{alpha_mse:.2f}_fr{freeze}_adamES'
+                    title = f'mlp2_pdcaeS2_Reciprocal_alpha{alpha_mse:.2f}_fr{freeze}_adam'
 
                     # Replace any other characters that are not suitable for filenames (if any)
                     title = title.replace(' ', '_').replace(':', '_')
@@ -92,7 +90,6 @@ def main():
                         min_lr=lr_cb_min_lr)
 
                     weight_decay = 0.0  # WEIGHT_DECAY  # higher weight decay
-                    momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                     batch_size = BATCH_SIZE  # higher batch size
                     epochs = EPOCHS  # higher epochs
                     hiddens = MLP_HIDDENS
@@ -125,12 +122,11 @@ def main():
                         "learning_rate": learning_rate,
                         'min_lr': LR_CB_MIN_LR,
                         "weight_decay": weight_decay,
-                        "momentum_beta1": momentum_beta1,
                         "batch_size": batch_size,
                         "epochs": epochs,
                         # hidden in a more readable format  (wandb does not support lists)
                         "hiddens": hiddens_str,
-                        "lambda": lambda_,
+                        "lambda": lambda_factor,
                         "seed": seed,
                         "alpha_mse": alpha_mse,
                         "alpha_pcc": alpha_pcc,
@@ -163,7 +159,8 @@ def main():
                         'lr_cb_min_lr': lr_cb_min_lr,
                         'lr_cb_min_delta': lr_cb_min_delta,
                         'cvrg_metric': cvrg_metric,
-                        'cvrg_min_delta': cvrg_min_delta
+                        'cvrg_min_delta': cvrg_min_delta,
+                        'normalized_weights': normalized_weights
                     })
 
                     # set the root directory
@@ -259,7 +256,7 @@ def main():
                         min_delta=cvrg_min_delta,
                         patience=patience,
                         verbose=VERBOSE,
-                        restore_best_weights=False,  # ES_CB_RESTORE_WEIGHTS,
+                        restore_best_weights=ES_CB_RESTORE_WEIGHTS,
                         smoothing_method=smoothing_method,  # 'moving_average'
                         smoothing_parameters={'window_size': window_size})  # 10
 
@@ -268,17 +265,17 @@ def main():
                         optimizer=Adam(
                             learning_rate=learning_rate,
                             # weight_decay=weight_decay,
-                            beta_1=momentum_beta1
                         ),
                         loss={
                             'forecast_head': lambda y_true, y_pred: cmse(
                                 y_true, y_pred,
                                 phase_manager=pm,
-                                lambda_factor=lambda_,
+                                lambda_factor=lambda_factor,
                                 train_mse_weight_dict=mse_train_weights_dict,
                                 train_pcc_weight_dict=None,
                                 val_mse_weight_dict=mse_test_weights_dict,
                                 val_pcc_weight_dict=None,
+                                normalized_weights=normalized_weights,
                                 asym_type=asym_type
                             )
                         }
@@ -355,15 +352,15 @@ def main():
                         optimizer=Adam(
                             learning_rate=learning_rate,
                             # weight_decay=weight_decay,
-                            beta_1=momentum_beta1
                         ),
                         loss={
                             'forecast_head': lambda y_true, y_pred: cmse(
                                 y_true, y_pred,
                                 phase_manager=pm,
-                                lambda_factor=lambda_,
+                                lambda_factor=lambda_factor,
                                 train_mse_weight_dict=mse_train_weights_dict,
                                 train_pcc_weight_dict=None,
+                                normalized_weights=normalized_weights,
                                 asym_type=asym_type
                             )
                         },

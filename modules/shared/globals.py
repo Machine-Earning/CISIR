@@ -9,12 +9,14 @@ ADD_SLOPE = [False]  # Add slope to the inputs
 CME_SPEED_THRESHOLD = [0]  # CME speed threshold
 
 # Training configurations
-SEEDS = [456789]  # , 42, 1234, 0, 9999]  # Seeds for reproducibility
+SEEDS = [456789] # Seeds for reproducibility
+TRIAL_SEEDS = [456789, 42, 123, 0, 9999] # Seeds for trial
 BATCH_SIZE = 2500  # Batch size
 EPOCHS = int(1e5)  # Number of epochs
 VERBOSE = 1  # Verbose
 SAVE_BEST = False  # Save best model
 WANDB_SAVE_MODEL = False  # Save model to wandb
+FREEZING = [False]
 
 # Pretraining configurations
 BATCH_SIZE_PRE = 7000  # Batch size for PDS
@@ -83,13 +85,13 @@ TARGET_MIN_NORM_WEIGHT = 0.01  # Minimum weight for the target normalization
 
 # Smoothing Parameters
 SMOOTHING_METHOD = 'moving_average'
-VAL_WINDOW_SIZE = 101 #5  # NOTE: must be odd
-WINDOW_SIZE = 101 #121  # NOTE: must be odd
+VAL_WINDOW_SIZE = 101 # NOTE: must be odd
+WINDOW_SIZE = 51  # NOTE: must be odd
 
 # Additional Parameters
 RHO = [1e-2]
 REWEIGHTS = [(1.0, 0.4, 0.1, 0)]
-LAMBDA_FACTOR = 8
+LAMBDA_FACTOR = 1
 CVRG_MIN_DELTA = 1e-3
 CVRG_METRIC = 'loss'
 CVRG_METRIC_WDR = 'val_loss'
