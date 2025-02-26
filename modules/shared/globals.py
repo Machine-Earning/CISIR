@@ -31,7 +31,7 @@ WEIGHT_DECAY_PRE = 1e-4  # Higher weight decay for projection layers
 WINDOW_SIZE_PRE = 151  # NOTE: must be odd
 VAL_WINDOW_SIZE_PRE = 51  # NOTE: must be odd
 DROPOUT_PRE = 1e-2  # Dropout rate for pretraining
-LAMBDA_PRE = 5e-5  # lambda for cmse with reciprocal importances
+LAMBDA_PRE = 1  # lambda for cmse with reciprocal importances
 AE_LAMBDA = 1e3
 
 # PDS 
