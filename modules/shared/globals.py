@@ -20,19 +20,19 @@ FREEZING = [False]
 
 # Pretraining configurations
 BATCH_SIZE_PRE = 7000  # Batch size for PDS
-START_LR_PRE = 3e-4 # starting learning rate for pretraining
+START_LR_PRE = 1e-2 # starting learning rate for pretraining
 LR_CB_MIN_LR_PRE = 1e-5  # Minimum learning rate for pretraining
-LR_CB_FACTOR_PRE = 0.99  # factor for reducing learning rate in pretraining
-LR_CB_PATIENCE_PRE = 50  # patience for reducing learning rate in pretraining
+LR_CB_FACTOR_PRE = 0.5 # factor for reducing learning rate in pretraining
+LR_CB_PATIENCE_PRE = 250  # patience for reducing learning rate in pretraining
 PATIENCE_PRE = int(3e3)  # Higher patience for pretraining
-RHO_PRE = [2e-1]  # Pretraining rho parameter
+RHO_PRE = [0]  # Pretraining rho parameter
 REWEIGHTS_PRE = [(0.8, 0.8)]  # Pretraining reweighting parameters
 WEIGHT_DECAY_PRE = 1e-4  # Higher weight decay for projection layers
 WINDOW_SIZE_PRE = 151  # NOTE: must be odd
 VAL_WINDOW_SIZE_PRE = 51  # NOTE: must be odd
-DROPOUT_PRE = 1e-2  # Dropout rate for pretraining
-LAMBDA_PRE = 5e-5  # lambda for cmse with reciprocal importances
-AE_LAMBDA = 1e3
+DROPOUT_PRE = 0.2  # Dropout rate for pretraining
+LAMBDA_PRE = 1 # lambda for cmse with reciprocal importances
+AE_LAMBDA = 1
 
 # PDS 
 START_LR_PDS = 1e-3
