@@ -57,16 +57,16 @@ SKIP_REPR = True  # residual representation
 
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
-START_LR = 1e-4  # starting learning rate
+START_LR = 1e-2  # starting learning rate
 WEIGHT_DECAY = 1e-4  # Higher weight decay
 MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 NORMALIZED_WEIGHTS = True  # Use normalized weights
 
 # Learning Rate Scheduling
-LR_CB_MIN_LR = 1e-5  # minimum learning rate
-LR_CB_FACTOR = 0.95  # factor for reducing learning rate # gradual decay leads to more stable training
-LR_CB_PATIENCE = 100  # patience for reducing learning rate
+LR_CB_MIN_LR = 5e-5  # minimum learning rate
+LR_CB_FACTOR = 0.5  # factor for reducing learning rate # gradual decay leads to more stable training
+LR_CB_PATIENCE = 250  # patience for reducing learning rate
 LR_CB_MIN_DELTA = 1e-5 # Minimum delta for reducing learning rate
 LR_CB_MONITOR = 'loss'  # Monitor validation loss
 
