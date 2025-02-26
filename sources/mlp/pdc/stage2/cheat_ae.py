@@ -57,7 +57,7 @@ def main():
                     outputs_to_use = OUTPUTS_TO_USE
                     # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                     inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
-                    lambda_factor = 0.5 # LAMBDA_FACTOR
+                    lambda_factor = 1 # LAMBDA_FACTOR
                     normalized_weights = NORMALIZED_WEIGHTS
                     # Construct the title
                     title = f'mlp2_pdcaeS2_Reciprocal_alpha{alpha_mse:.2f}_fr{freeze}_adam'
@@ -77,7 +77,7 @@ def main():
                     lr_cb_factor = LR_CB_FACTOR
                     lr_cb_min_lr = LR_CB_MIN_LR
                     lr_cb_min_delta = LR_CB_MIN_DELTA
-                    cvrg_metric = CVRG_METRIC
+                    cvrg_metric = 'val_loss' # CVRG_METRIC
                     cvrg_min_delta = CVRG_MIN_DELTA
 
 
