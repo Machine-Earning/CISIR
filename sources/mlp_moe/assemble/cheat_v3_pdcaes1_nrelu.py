@@ -47,7 +47,7 @@ def main():
                 add_slope = ADD_SLOPE[0]
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = 1 # LAMBDA_FACTOR_MOE  # lambda for the loss
+                lambda_factor = 8 # LAMBDA_FACTOR_MOE  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title

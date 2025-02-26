@@ -48,11 +48,11 @@ def main():
                 add_slope = ADD_SLOPE[0]
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = 5e-5 # LAMBDA_FACTOR_MOE  # lambda for the loss
+                lambda_factor = 8 # LAMBDA_FACTOR_MOE  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2pdcaes1_amse{alpha_mse:.2f}_moe_cheat_v3nrelu_of'
+                title = f'mlp2pdcaes1_amse{alpha_mse:.2f}_moe_cheat_v3nrelu_of_adam'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -69,6 +69,7 @@ def main():
                 lr_cb_min_delta = LR_CB_MIN_DELTA
                 cvrg_metric = CVRG_METRIC
                 cvrg_min_delta = CVRG_MIN_DELTA
+                normalized_weights = NORMALIZED_WEIGHTS
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -161,7 +162,8 @@ def main():
                     'lr_cb_min_lr': lr_cb_min_lr,
                     'lr_cb_min_delta': lr_cb_min_delta,
                     'cvrg_metric': cvrg_metric,
-                    'cvrg_min_delta': cvrg_min_delta
+                    'cvrg_min_delta': cvrg_min_delta,
+                    'normalized_weights': normalized_weights
                 })
 
                 # set the root directory
@@ -292,7 +294,8 @@ def main():
                             train_pcc_weight_dict=pcc_train_weights_dict,
                             val_mse_weight_dict=mse_test_weights_dict,
                             val_pcc_weight_dict=pcc_test_weights_dict,
-                            asym_type=asym_type
+                            asym_type=asym_type,
+                            normalized_weights=normalized_weights
                         )
                     }
                 )
@@ -365,6 +368,7 @@ def main():
                             lambda_factor=lambda_factor,
                             train_mse_weight_dict=mse_train_weights_dict,
                             train_pcc_weight_dict=pcc_train_weights_dict,
+                            normalized_weights=normalized_weights,
                             asym_type=asym_type
                         )
                     }

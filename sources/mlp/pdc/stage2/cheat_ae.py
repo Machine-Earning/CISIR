@@ -46,7 +46,7 @@ def main():
     mb = ModelBuilder()
     pm = TrainingPhaseManager()
 
-    for seed in TRIAL_SEEDS:
+    for seed in SEEDS:
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.65, 0.65, 0.65, 0.65)]:
             for freeze in FREEZING:
                 for rho in RHO:
@@ -57,7 +57,7 @@ def main():
                     outputs_to_use = OUTPUTS_TO_USE
                     # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                     inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
-                    lambda_factor = LAMBDA_FACTOR
+                    lambda_factor = 0.5 # LAMBDA_FACTOR
                     normalized_weights = NORMALIZED_WEIGHTS
                     # Construct the title
                     title = f'mlp2_pdcaeS2_Reciprocal_alpha{alpha_mse:.2f}_fr{freeze}_adam'

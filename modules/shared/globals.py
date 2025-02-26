@@ -11,7 +11,7 @@ CME_SPEED_THRESHOLD = [0]  # CME speed threshold
 # Training configurations
 SEEDS = [456789] # Seeds for reproducibility
 TRIAL_SEEDS = [456789, 42, 123, 0, 9999] # Seeds for trial
-BATCH_SIZE = 2500  # Batch size
+BATCH_SIZE = 2400  # Batch size
 EPOCHS = int(1e5)  # Number of epochs
 VERBOSE = 1  # Verbose
 SAVE_BEST = False  # Save best model
@@ -66,7 +66,7 @@ NORMALIZED_WEIGHTS = True  # Use normalized weights
 # Learning Rate Scheduling
 LR_CB_MIN_LR = 1e-5  # minimum learning rate
 LR_CB_FACTOR = 0.95  # factor for reducing learning rate # gradual decay leads to more stable training
-LR_CB_PATIENCE = 50  # patience for reducing learning rate
+LR_CB_PATIENCE = 100  # patience for reducing learning rate
 LR_CB_MIN_DELTA = 1e-5 # Minimum delta for reducing learning rate
 LR_CB_MONITOR = 'loss'  # Monitor validation loss
 
@@ -94,7 +94,6 @@ REWEIGHTS = [(1.0, 0.4, 0.1, 0)]
 LAMBDA_FACTOR = 1
 CVRG_MIN_DELTA = 1e-3
 CVRG_METRIC = 'loss'
-CVRG_METRIC_WDR = 'val_loss'
 ASYM_TYPE = None #'sigmoid'
 
 # ATTM AREA
