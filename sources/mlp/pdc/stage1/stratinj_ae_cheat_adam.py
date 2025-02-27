@@ -112,7 +112,7 @@ def main():
                 window_size = WINDOW_SIZE_PRE  # allows margin of error of 10 epochs
                 val_window_size = VAL_WINDOW_SIZE_PRE  # allows margin of error of 10 epochs
                 # Set the reconstruction loss weight
-                reconstruction_loss_weight = 1e-2 #AE_LAMBDA  # Adjust as needed
+                reconstruction_loss_weight = 0.0 #AE_LAMBDA  # Adjust as needed
 
                 # Initialize wandb
                 wandb.init(project='Repr-Jan-Report', name=experiment_name, config={
@@ -262,18 +262,21 @@ def main():
                     smoothing_method=smoothing_method,  # 'moving_average'
                     smoothing_parameters={'window_size': window_size})  # 10
 
+                # Compile the model with separate losses for encoder and decoder
                 model_sep.compile(
                     optimizer=Adam(
                         learning_rate=learning_rate,
                         # weight_decay=weight_decay,
                     ),
                     loss=[
+                        # PDC loss for encoder (predicting y from encoded representation)
                         lambda y_true, y_pred: mb.pdc_loss_linear_vec(
                             y_true, y_pred,
                             phase_manager=pm,
                             train_sample_weights=train_weights_dict,
                             val_sample_weights=test_weights_dict,
                         ),
+                        # CMSE loss for decoder (reconstructing X from encoded representation)
                         lambda y_true, y_pred: cmse(
                             y_true, y_pred,
                             phase_manager=pm,
@@ -284,8 +287,8 @@ def main():
                         )
                     ],
                     loss_weights=[
-                        1.0,
-                        reconstruction_loss_weight
+                        1.0,  # Weight for PDC loss (encoder)
+                        reconstruction_loss_weight  # Weight for reconstruction loss (decoder)
                     ]
                 )
 
@@ -293,6 +296,7 @@ def main():
                     X_train, y_train, batch_size)
 
                 # Adjust the datasets to include both y and X for reconstruction
+                # First output is y for PDC loss, second output is X for reconstruction loss
                 train_ds = train_ds.map(lambda x, y: (x, (y, x)))
                 val_data = (X_test, (y_test, X_test))
 
