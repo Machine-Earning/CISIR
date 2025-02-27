@@ -52,7 +52,7 @@ def main():
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2pdcaes1_amse{alpha_mse:.2f}_moe_cheat_v3nrelu_of_adam'
+                title = f'mlp2pdcaes1_amse{alpha_mse:.2f}_moe_cheat_v3nrelu_adam'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -80,7 +80,7 @@ def main():
                     min_lr=lr_cb_min_lr)
 
                 weight_decay = WEIGHT_DECAY_MOE  # 1e-5 # higher weight decay
-                momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
+                # momentum_beta1 = MOMENTUM_BETA1  # higher momentum beta1
                 batch_size = BATCH_SIZE_MOE_S2  # higher batch size
                 epochs = EPOCHS  # higher epochs
                 hiddens = MLP_HIDDENS  # hidden layers
@@ -124,7 +124,7 @@ def main():
                     "learning_rate": learning_rate,
                     'min_lr': LR_CB_MIN_LR_MOE,
                     "weight_decay": weight_decay,
-                    "momentum_beta1": momentum_beta1,
+                    # "momentum_beta1": momentum_beta1,
                     "batch_size": batch_size,
                     "epochs": epochs,
                     # hidden in a more readable format  (wandb does not support lists)
@@ -287,7 +287,7 @@ def main():
                     optimizer=Adam(
                         learning_rate=learning_rate,
                         # weight_decay=weight_decay,
-                        beta_1=momentum_beta1
+                    
                     ),
                     loss={
                         'forecast_head': lambda y_true, y_pred: cmse(
@@ -362,8 +362,7 @@ def main():
                 final_model_sep.compile(
                     optimizer=Adam(
                         learning_rate=learning_rate,
-                        # weight_decay=weight_decay,
-                        beta_1=momentum_beta1
+                        # weight_decay=weight_decay
                     ),
                     loss={
                         'forecast_head': lambda y_true, y_pred: cmse(

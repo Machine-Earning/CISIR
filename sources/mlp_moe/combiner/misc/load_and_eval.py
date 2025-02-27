@@ -29,7 +29,7 @@ def main():
     """
 
     # Path to pre-trained model weights
-    combiner_path = BETTER_REPR_COMBINER
+    combiner_path = FROZEN_REPR_COMBINER
 
     for seed in SEEDS:
         # PARAMS

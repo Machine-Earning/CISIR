@@ -547,7 +547,6 @@ def create_gru(
     return model
 
 
-# TODO: generalize this function to handle 
 def load_partial_weights_from_path(
         pretrained_weights_path: str,
         new_model: Model,
@@ -652,7 +651,12 @@ def load_partial_weights_from_path(
         )
 
     # Load the old model's weights
-    old_model.load_weights(pretrained_weights_path)
+    try:
+        old_model.load_weights(pretrained_weights_path)
+        print(f"Successfully loaded weights from {pretrained_weights_path}")
+    except Exception as e:
+        print(f"Error loading weights from {pretrained_weights_path}: {e}")
+        raise e
 
     if no_head:
         # add a projection head to the old model
@@ -689,29 +693,48 @@ def load_partial_weights_from_path(
                     # Verify that corresponding weight arrays have the same shape
                     if all(o_w.shape == n_w.shape for o_w, n_w in zip(old_weights, new_weights)):
                         new_layer.set_weights(old_weights)
-                    # else shapes differ, skip loading this layer
-                # else number of weights differ, skip this layer
-            # else no corresponding old layer by that name, skip
+                        print(f"Loaded weights for layer: {new_layer.name}")
+                    else:
+                        print(f"Shape mismatch for layer {new_layer.name}, skipping")
+                else:
+                    print(f"Weight count mismatch for layer {new_layer.name}, skipping")
+            else:
+                print(f"No matching layer found for {new_layer.name}, skipping")
 
         # After this, `new_model` will have partially loaded weights, except for layers that didn't match or were skipped.
         
-        # If freeze_combiner is True, freeze all layers except the output layer (forecast_head)
+        # If freeze_combiner is True, freeze all layers up to and including the representation layer
         if freeze_combiner:
-            # Identify layers that should remain trainable (typically the output layer and any projection layers)
+            # Find the representation layer
+            repr_layer_name = 'repr_layer'
+            repr_layer_found = False
+            
+            # Identify layers that should remain trainable
             trainable_layer_names = ['forecast_head']
+            
+            # Add projection neck layer names to trainable layers if needed
             if proj_neck:
-                # Add projection neck layer names to trainable layers
                 for layer in new_model.layers:
                     if 'proj_' in layer.name:
                         trainable_layer_names.append(layer.name)
             
-            # Freeze all layers except those in trainable_layer_names
+            # Freeze all layers up to and including the representation layer
             for layer in new_model.layers:
-                if layer.name not in trainable_layer_names:
+                # Once we've found the representation layer, mark it
+                if layer.name == repr_layer_name:
+                    repr_layer_found = True
+                    layer.trainable = False
+                    print(f"Freezing representation layer: {layer.name}")
+                # Freeze all layers before the representation layer
+                elif not repr_layer_found and layer.name not in trainable_layer_names:
                     layer.trainable = False
                     print(f"Freezing layer: {layer.name}")
-                else:
+                # Keep trainable the layers after the representation layer and specific trainable layers
+                elif repr_layer_found or layer.name in trainable_layer_names:
                     print(f"Keeping layer trainable: {layer.name}")
+                else:
+                    layer.trainable = False
+                    print(f"Freezing layer: {layer.name}")
 
 
 class NormalizedReLU(Layer):

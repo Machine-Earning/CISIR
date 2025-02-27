@@ -12,7 +12,7 @@ CME_SPEED_THRESHOLD = [0]  # CME speed threshold
 SEEDS = [456789] # Seeds for reproducibility
 TRIAL_SEEDS = [456789, 42, 123, 0, 9999] # Seeds for trial
 BATCH_SIZE = 2400  # Batch size
-EPOCHS = int(1e5)  # Number of epochs
+EPOCHS = int(2e5)  # Number of epochs
 VERBOSE = 1  # Verbose
 SAVE_BEST = False  # Save best model
 WANDB_SAVE_MODEL = False  # Save model to wandb
@@ -20,10 +20,10 @@ FREEZING = [False]
 
 # Pretraining configurations
 BATCH_SIZE_PRE = 7000  # Batch size for PDS
-START_LR_PRE = 1e-2 # starting learning rate for pretraining
+START_LR_PRE = 1e-3 # starting learning rate for pretraining
 LR_CB_MIN_LR_PRE = 1e-5  # Minimum learning rate for pretraining
-LR_CB_FACTOR_PRE = 0.5 # factor for reducing learning rate in pretraining
-LR_CB_PATIENCE_PRE = 250  # patience for reducing learning rate in pretraining
+LR_CB_FACTOR_PRE = 0.99 # factor for reducing learning rate in pretraining
+LR_CB_PATIENCE_PRE = 50  # patience for reducing learning rate in pretraining
 PATIENCE_PRE = int(3e3)  # Higher patience for pretraining
 RHO_PRE = [0]  # Pretraining rho parameter
 REWEIGHTS_PRE = [(0.8, 0.8)]  # Pretraining reweighting parameters
@@ -57,16 +57,16 @@ SKIP_REPR = True  # residual representation
 
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
-START_LR = 1e-2  # starting learning rate
+START_LR = 1e-4  # starting learning rate
 WEIGHT_DECAY = 1e-4  # Higher weight decay
 MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 RECIPROCAL_WEIGHTS = False  # Use reciprocal weights
 NORMALIZED_WEIGHTS = True  # Use normalized weights
 
 # Learning Rate Scheduling
-LR_CB_MIN_LR = 5e-5  # minimum learning rate
-LR_CB_FACTOR = 0.5  # factor for reducing learning rate # gradual decay leads to more stable training
-LR_CB_PATIENCE = 250  # patience for reducing learning rate
+LR_CB_MIN_LR = 1e-5  # minimum learning rate
+LR_CB_FACTOR = 0.95  # factor for reducing learning rate # gradual decay leads to more stable training
+LR_CB_PATIENCE = 50  # patience for reducing learning rate
 LR_CB_MIN_DELTA = 1e-5 # Minimum delta for reducing learning rate
 LR_CB_MONITOR = 'loss'  # Monitor validation loss
 
@@ -85,8 +85,8 @@ TARGET_MIN_NORM_WEIGHT = 0.01  # Minimum weight for the target normalization
 
 # Smoothing Parameters
 SMOOTHING_METHOD = 'moving_average'
-VAL_WINDOW_SIZE = 101 # NOTE: must be odd
-WINDOW_SIZE = 51  # NOTE: must be odd
+VAL_WINDOW_SIZE = 121 # NOTE: must be odd
+WINDOW_SIZE = 21  # NOTE: must be odd
 
 # Additional Parameters
 RHO = [1e-2]
@@ -216,6 +216,8 @@ COMBINER_V3_AE_NOF_2 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weig
 BETTER_REPR_FOR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.00_v8_updated_20241119-210406_reg.h5'
 
 BETTER_REPR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250225-135335.h5'
+
+FROZEN_REPR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_adam_20250226-160856.h5'
 
 # assemble hyperparams
 REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]

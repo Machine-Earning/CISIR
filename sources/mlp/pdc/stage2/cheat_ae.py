@@ -46,8 +46,8 @@ def main():
     mb = ModelBuilder()
     pm = TrainingPhaseManager()
 
-    for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.65, 0.65, 0.65, 0.65)]:
+    for seed in TRIAL_SEEDS:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.8, 0.8, 0.8, 0.8)]:
             for freeze in FREEZING:
                 for rho in RHO:
                     inputs_to_use = INPUTS_TO_USE[0]
@@ -77,7 +77,7 @@ def main():
                     lr_cb_factor = LR_CB_FACTOR
                     lr_cb_min_lr = LR_CB_MIN_LR
                     lr_cb_min_delta = LR_CB_MIN_DELTA
-                    cvrg_metric = 'val_loss' # CVRG_METRIC
+                    cvrg_metric = CVRG_METRIC
                     cvrg_min_delta = CVRG_MIN_DELTA
 
 
