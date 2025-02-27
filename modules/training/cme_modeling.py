@@ -247,114 +247,114 @@ class ModelBuilder:
 
         return model
 
-    def add_proj_head(self,
-                      model: Model,
-                      output_dim: int = 1,
-                      hiddens: Optional[List[int]] = None,
-                      freeze_features: bool = True,
-                      pretraining: bool = False,
-                      dropout: float = 0.0,
-                      activation=None,
-                      norm: str = None,
-                      skipped_layers: int = 2,
-                      name: str = 'mlp',
-                      sam_rho: float = 0.05) -> Model:
-        """
-        Add a regression head with one output unit and a projection layer to an existing model,
-        replacing the existing prediction layer and optionally the decoder layer.
+    # def add_proj_head(self,
+    #                   model: Model,
+    #                   output_dim: int = 1,
+    #                   hiddens: Optional[List[int]] = None,
+    #                   freeze_features: bool = True,
+    #                   pretraining: bool = False,
+    #                   dropout: float = 0.0,
+    #                   activation=None,
+    #                   norm: str = None,
+    #                   skipped_layers: int = 2,
+    #                   name: str = 'mlp',
+    #                   sam_rho: float = 0.05) -> Model:
+    #     """
+    #     Add a regression head with one output unit and a projection layer to an existing model,
+    #     replacing the existing prediction layer and optionally the decoder layer.
 
-        :param model: The existing model
-        :param output_dim: The dimensionality of the output of the regression head.
-        :param freeze_features: Whether to freeze the layers of the base model or not.
-        :param hiddens: List of integers representing the hidden layers for the projection.
-        :param pretraining: Whether to adapt the model for pretraining representations.
-        :param dropout: Dropout rate for adding dropout layers.
-        :param activation: Activation function to use. If None, defaults to LeakyReLU.
-        :param norm: Type of normalization ('batch_norm' or 'layer_norm').
-        :param skipped_layers: Number of layers between residual connections.
-        :param name: Name of the model.
-        :param sam_rho: Rho value for sharpness-aware minimization (SAM). Default is 0.05. if 0.0, SAM is not used.
-        :return: The modified model with a projection layer and a regression head.
-        """
+    #     :param model: The existing model
+    #     :param output_dim: The dimensionality of the output of the regression head.
+    #     :param freeze_features: Whether to freeze the layers of the base model or not.
+    #     :param hiddens: List of integers representing the hidden layers for the projection.
+    #     :param pretraining: Whether to adapt the model for pretraining representations.
+    #     :param dropout: Dropout rate for adding dropout layers.
+    #     :param activation: Activation function to use. If None, defaults to LeakyReLU.
+    #     :param norm: Type of normalization ('batch_norm' or 'layer_norm').
+    #     :param skipped_layers: Number of layers between residual connections.
+    #     :param name: Name of the model.
+    #     :param sam_rho: Rho value for sharpness-aware minimization (SAM). Default is 0.05. if 0.0, SAM is not used.
+    #     :return: The modified model with a projection layer and a regression head.
+    #     """
 
-        if hiddens is None:
-            hiddens = [6]
+    #     if hiddens is None:
+    #         hiddens = [6]
 
-        if activation is None:
-            activation = LeakyReLU()
+    #     if activation is None:
+    #         activation = LeakyReLU()
 
-        residual = True if skipped_layers > 0 else False
+    #     residual = True if skipped_layers > 0 else False
 
-        print(f'Features are frozen: {freeze_features}')
+    #     print(f'Features are frozen: {freeze_features}')
 
-        # Determine the layer to be kept based on whether pretraining representations are used
-        layer_to_keep = 'normalize_layer' if pretraining else 'repr_layer'
+    #     # Determine the layer to be kept based on whether pretraining representations are used
+    #     layer_to_keep = 'normalize_layer' if pretraining else 'repr_layer'
 
-        # Remove the last layer(s) to keep only the representation layer
-        new_base_model = Model(inputs=model.input, outputs=model.get_layer(layer_to_keep).output)
+    #     # Remove the last layer(s) to keep only the representation layer
+    #     new_base_model = Model(inputs=model.input, outputs=model.get_layer(layer_to_keep).output)
 
-        # If freeze_features is True, freeze the layers of the new base model
-        if freeze_features:
-            for layer in new_base_model.layers:
-                layer.trainable = False
+    #     # If freeze_features is True, freeze the layers of the new base model
+    #     if freeze_features:
+    #         for layer in new_base_model.layers:
+    #             layer.trainable = False
 
-        # Count existing dropout layers to avoid naming conflicts
-        dropout_count = sum(1 for layer in model.layers if isinstance(layer, Dropout))
+    #     # Count existing dropout layers to avoid naming conflicts
+    #     dropout_count = sum(1 for layer in model.layers if isinstance(layer, Dropout))
 
-        # Extract the output of the last layer of the new base model (representation layer)
-        repr_output = new_base_model.output
+    #     # Extract the output of the last layer of the new base model (representation layer)
+    #     repr_output = new_base_model.output
 
-        # Projection Layer(s)
-        x_proj = repr_output
-        residual_layer = None
+    #     # Projection Layer(s)
+    #     x_proj = repr_output
+    #     residual_layer = None
 
-        for i, nodes in enumerate(hiddens):
-            if i % skipped_layers == 0 and i > 0 and residual:
-                if residual_layer is not None:
-                    # Check if projection is needed
-                    if x_proj.shape[-1] != residual_layer.shape[-1]:
-                        # Correct projection to match 'x_proj' dimensions
-                        residual_layer = Dense(x_proj.shape[-1], use_bias=False)(residual_layer)
-                    x_proj = Add()([x_proj, residual_layer])
-                residual_layer = x_proj  # Update the starting point for the next residual connection
-            else:
-                if i % skipped_layers == 0 or residual_layer is None:
-                    residual_layer = x_proj
+    #     for i, nodes in enumerate(hiddens):
+    #         if i % skipped_layers == 0 and i > 0 and residual:
+    #             if residual_layer is not None:
+    #                 # Check if projection is needed
+    #                 if x_proj.shape[-1] != residual_layer.shape[-1]:
+    #                     # Correct projection to match 'x_proj' dimensions
+    #                     residual_layer = Dense(x_proj.shape[-1], use_bias=False)(residual_layer)
+    #                 x_proj = Add()([x_proj, residual_layer])
+    #             residual_layer = x_proj  # Update the starting point for the next residual connection
+    #         else:
+    #             if i % skipped_layers == 0 or residual_layer is None:
+    #                 residual_layer = x_proj
 
-            x_proj = Dense(
-                nodes,
-                name=f"projection_layer_{i + 1}")(x_proj)
+    #         x_proj = Dense(
+    #             nodes,
+    #             name=f"projection_layer_{i + 1}")(x_proj)
 
-            if norm == 'batch_norm':
-                x_proj = BatchNormalization(name=f"batch_norm_{i + 1}")(x_proj)
-            elif norm == 'layer_norm':
-                x_proj = LayerNormalization(name=f"layer_norm_{i + 1}")(x_proj)
+    #         if norm == 'batch_norm':
+    #             x_proj = BatchNormalization(name=f"batch_norm_{i + 1}")(x_proj)
+    #         elif norm == 'layer_norm':
+    #             x_proj = LayerNormalization(name=f"layer_norm_{i + 1}")(x_proj)
 
-            if callable(activation):
-                x_proj = activation(x_proj)
-            else:
-                x_proj = LeakyReLU(name=f"activation_{i + 1}")(x_proj)
+    #         if callable(activation):
+    #             x_proj = activation(x_proj)
+    #         else:
+    #             x_proj = LeakyReLU(name=f"activation_{i + 1}")(x_proj)
 
-            if dropout > 0.0:
-                x_proj = Dropout(dropout, name=f"proj_dropout_{dropout_count + i + 1}")(x_proj)
+    #         if dropout > 0.0:
+    #             x_proj = Dropout(dropout, name=f"proj_dropout_{dropout_count + i + 1}")(x_proj)
 
-        # Add a Dense layer with one output unit for regression
-        output_layer = Dense(output_dim, activation='linear', name=f"forecast_head")(x_proj)
+    #     # Add a Dense layer with one output unit for regression
+    #     output_layer = Dense(output_dim, activation='linear', name=f"forecast_head")(x_proj)
 
-        if sam_rho > 0.0:
-            # create the new extended SAM model
-            extended_model = SAMModel(inputs=new_base_model.input, outputs=[repr_output, output_layer], rho=sam_rho,
-                                      name=name)
-        else:
-            # Create the new extended model
-            extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer], name=name)
+    #     if sam_rho > 0.0:
+    #         # create the new extended SAM model
+    #         extended_model = SAMModel(inputs=new_base_model.input, outputs=[repr_output, output_layer], rho=sam_rho,
+    #                                   name=name)
+    #     else:
+    #         # Create the new extended model
+    #         extended_model = Model(inputs=new_base_model.input, outputs=[repr_output, output_layer], name=name)
 
-        # If freeze_features is False, make all layers trainable
-        if not freeze_features:
-            for layer in extended_model.layers:
-                layer.trainable = True
+    #     # If freeze_features is False, make all layers trainable
+    #     if not freeze_features:
+    #         for layer in extended_model.layers:
+    #             layer.trainable = True
 
-        return extended_model
+    #     return extended_model
 
     def overtrain_pds(self,
                       model: Model,
