@@ -776,7 +776,6 @@ class NormalizedReLU(Layer):
         # Add small epsilon to prevent division by zero
         return relu_output / (tf.reduce_sum(relu_output, axis=-1, keepdims=True) + tf.keras.backend.epsilon())
 
-
 def create_mlp(
         input_dim: int = 100,
         output_dim: int = 1,
@@ -790,7 +789,8 @@ def create_mlp(
         sam_rho: float = 1e-2,
         dropout: float = 0.2,
         output_activation='linear',
-        name: str = 'mlp'
+        name: str = 'mlp',
+        weight_decay: float = 0.0
 ) -> Model:
     """
     Create an MLP model with fully connected dense layers and configurable activation functions.
@@ -811,6 +811,8 @@ def create_mlp(
     - dropout (float): Dropout rate to apply after activations or residual connections. If 0.0, no dropout is applied.
     - output_activation: Optional activation function for output layer. Use 'softmax' for multi-class, 'sigmoid' for binary,
                         or 'norm_relu' for normalized ReLU outputs that sum to 1.
+    - name (str): Name of the model.
+    - weight_decay (float): L2 regularization factor for kernel weights. Default is 0.0 (no regularization).
     
     Returns:
     - Model: A Keras model instance.
@@ -828,12 +830,15 @@ def create_mlp(
             f"skipped_layers ({skipped_layers}) must be less than the number of hidden layers ({len(hiddens)})"
         )
 
+    # Configure kernel regularizer if weight decay is enabled
+    kernel_regularizer = tf.keras.regularizers.l2(weight_decay) if weight_decay > 0.0 else None
+
     # Create input layer
     input_layer = Input(shape=(input_dim,))
     has_residuals = skipped_layers > 0
 
     # First block (special case to ensure proper skip from input)
-    x = Dense(hiddens[0])(input_layer)
+    x = Dense(hiddens[0], kernel_regularizer=kernel_regularizer)(input_layer)
     if norm == 'batch_norm':
         x = BatchNormalization()(x)
     x = activation(x) if callable(activation) else LeakyReLU()(x)
@@ -841,7 +846,7 @@ def create_mlp(
     # First skip connection (from input)
     if has_residuals:
         if x.shape[-1] != input_layer.shape[-1]:
-            residual_proj = Dense(x.shape[-1], use_bias=False)(input_layer)
+            residual_proj = Dense(x.shape[-1], use_bias=False, kernel_regularizer=kernel_regularizer)(input_layer)
         else:
             residual_proj = input_layer
         x = Add()([x, residual_proj])
@@ -858,7 +863,7 @@ def create_mlp(
     # Remaining hidden layers
     for i, units in enumerate(hiddens[1:], start=1):
         # Dense + Norm + Activation block
-        x = Dense(units)(x)
+        x = Dense(units, kernel_regularizer=kernel_regularizer)(x)
         if norm == 'batch_norm':
             x = BatchNormalization()(x)
         x = activation(x) if callable(activation) else LeakyReLU()(x)
@@ -867,7 +872,7 @@ def create_mlp(
         if has_residuals and i % skipped_layers == 0:
             # Project the residual layer if needed
             if x.shape[-1] != residual_layer.shape[-1]:
-                residual_proj = Dense(x.shape[-1], use_bias=False)(residual_layer)
+                residual_proj = Dense(x.shape[-1], use_bias=False, kernel_regularizer=kernel_regularizer)(residual_layer)
             else:
                 residual_proj = residual_layer
             x = Add()([x, residual_proj])
@@ -881,7 +886,7 @@ def create_mlp(
             x = Dropout(dropout)(x)
 
     # Create final representation layer
-    x = Dense(embed_dim)(x)
+    x = Dense(embed_dim, kernel_regularizer=kernel_regularizer)(x)
     if norm == 'batch_norm':
         x = BatchNormalization()(x)
 
@@ -894,7 +899,7 @@ def create_mlp(
     # Add final skip connection if enabled
     if skip_repr and has_residuals:
         if x.shape[-1] != residual_layer.shape[-1]:
-            residual_proj = Dense(embed_dim, use_bias=False)(residual_layer)
+            residual_proj = Dense(embed_dim, use_bias=False, kernel_regularizer=kernel_regularizer)(residual_layer)
         else:
             residual_proj = residual_layer
         x = Add(name='repr_layer')([x, residual_proj])
@@ -920,6 +925,7 @@ def create_mlp(
         dense_output = Dense(
             output_dim,
             activation=output_activation if output_activation != 'norm_relu' else None,
+            kernel_regularizer=kernel_regularizer,
             name='forecast_head')(final_repr_output)
         if output_activation == 'norm_relu':
             dense_output = NormalizedReLU()(dense_output)
@@ -948,7 +954,8 @@ def add_proj_head(
         skipped_layers: int = 2,
         name: str = 'mlp',
         sam_rho: float = 0.05,
-        output_activation: str = 'linear'
+        output_activation: str = 'linear',
+        weight_decay: float = 0.0
 ) -> Model:
     """
     Add a projection head with output layer to an existing model,
@@ -966,6 +973,7 @@ def add_proj_head(
     :param name: Name of the model.
     :param sam_rho: Rho value for sharpness-aware minimization (SAM). Default is 0.05. if 0.0, SAM is not used.
     :param output_activation: Activation function for output layer. Default 'linear' for regression, use 'softmax' for classification.
+    :param weight_decay: L2 regularization factor for kernel weights. Default is 0.0 (no regularization).
     :return: The modified model with a projection layer and output layer.
     """
 
@@ -976,6 +984,9 @@ def add_proj_head(
         activation = LeakyReLU()
 
     residual = True if skipped_layers > 0 else False
+    
+    # Configure kernel regularizer if weight decay is enabled
+    kernel_regularizer = tf.keras.regularizers.l2(weight_decay) if weight_decay > 0.0 else None
 
     print(f'Features are frozen: {freeze_features}')
 
@@ -1006,7 +1017,7 @@ def add_proj_head(
                 # Check if projection is needed
                 if x_proj.shape[-1] != residual_layer.shape[-1]:
                     # Correct projection to match 'x_proj' dimensions
-                    residual_layer = Dense(x_proj.shape[-1], use_bias=False)(residual_layer)
+                    residual_layer = Dense(x_proj.shape[-1], use_bias=False, kernel_regularizer=kernel_regularizer)(residual_layer)
                 x_proj = Add()([x_proj, residual_layer])
             residual_layer = x_proj  # Update the starting point for the next residual connection
         else:
@@ -1015,6 +1026,7 @@ def add_proj_head(
 
         x_proj = Dense(
             nodes,
+            kernel_regularizer=kernel_regularizer,
             name=f"projection_layer_{i + 1}")(x_proj)
 
         if norm == 'batch_norm':
@@ -1031,7 +1043,7 @@ def add_proj_head(
             x_proj = Dropout(dropout, name=f"proj_dropout_{dropout_count + i + 1}")(x_proj)
 
     # Add output layer with specified activation
-    dense_output = Dense(output_dim, name=f"forecast_head")(x_proj)
+    dense_output = Dense(output_dim, kernel_regularizer=kernel_regularizer, name=f"forecast_head")(x_proj)
 
     if output_activation == 'norm_relu':
         output_layer = NormalizedReLU()(dense_output)
