@@ -1045,7 +1045,9 @@ def add_proj_head(
     # Add output layer with specified activation
     dense_output = Dense(output_dim, kernel_regularizer=kernel_regularizer, name=f"forecast_head")(x_proj)
 
-    if output_activation == 'norm_relu':
+    if output_activation == 'linear':
+        output_layer = dense_output
+    elif output_activation == 'norm_relu':
         output_layer = NormalizedReLU()(dense_output)
     else:
         output_layer = Activation(output_activation)(dense_output)
