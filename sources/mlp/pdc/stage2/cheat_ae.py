@@ -26,6 +26,7 @@ from modules.training.ts_modeling import (
     stratified_batch_dataset,
     load_stratified_folds,
     create_mlp,
+    add_proj_head,
 )
 from modules.training.utils import get_weight_path
 
@@ -46,8 +47,8 @@ def main():
     mb = ModelBuilder()
     pm = TrainingPhaseManager()
 
-    for seed in TRIAL_SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.8, 0.8, 0.8, 0.8)]:
+    for seed in SEEDS:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.75, 0.75, 0.75, 0.75)]:
             for freeze in FREEZING:
                 for rho in RHO:
                     inputs_to_use = INPUTS_TO_USE[0]
@@ -89,7 +90,7 @@ def main():
                         min_delta=lr_cb_min_delta,
                         min_lr=lr_cb_min_lr)
 
-                    weight_decay = 0.0  # WEIGHT_DECAY  # higher weight decay
+                    weight_decay = WEIGHT_DECAY  # higher weight decay
                     batch_size = BATCH_SIZE  # higher batch size
                     epochs = EPOCHS  # higher epochs
                     hiddens = MLP_HIDDENS

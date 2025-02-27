@@ -359,6 +359,11 @@ def main():
                     sam_rho=rho
                 )
 
+                # save the combiner before training under a different name
+                combiner_submodel = final_model_sep.get_layer("combiner")
+                combiner_submodel.save_weights(f"combiner_v3_weights_before_training_{experiment_name}.h5")
+                print(f"Combiner sub-model weights saved to combiner_v3_weights_before_training_{experiment_name}.h5")
+
                 final_model_sep.compile(
                     optimizer=Adam(
                         learning_rate=learning_rate,
