@@ -632,7 +632,8 @@ def load_partial_weights_from_path(
         norm=old_model_params['norm'],
         skip_repr=old_model_params['skip_repr'],
         skipped_layers=old_model_params['skipped_layers'],
-        sam_rho=old_model_params['sam_rho']
+        sam_rho=old_model_params['sam_rho'],
+        weight_decay=old_model_params['weight_decay']
     )
 
     if proj_neck:
@@ -647,6 +648,7 @@ def load_partial_weights_from_path(
             norm=old_model_params['norm'],
             skipped_layers=old_model_params['skipped_layers'],
             sam_rho=old_model_params['sam_rho'],
+            weight_decay=old_model_params['weight_decay'],
             name='forecast_head'
         )
 
@@ -671,6 +673,7 @@ def load_partial_weights_from_path(
             norm=old_model_params['norm'],
             skipped_layers=old_model_params['skipped_layers'],
             sam_rho=old_model_params['sam_rho'],
+            weight_decay=old_model_params['weight_decay'],
             output_activation='softmax',
             name='combiner'
         )
@@ -1490,6 +1493,7 @@ def create_mlp_moe(
         norm: str = 'batch_norm',
         sam_rho: float = 1e-2,
         dropout: float = 0.2,
+        weight_decay: float = 0.0,
         name: str = 'mlp_moe',
 
 ) -> Model:
@@ -1510,6 +1514,7 @@ def create_mlp_moe(
     - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is 'batch_norm'.
     - sam_rho (float): Size of the neighborhood for perturbation in SAM. Default is 0.05. If 0.0, SAM is not used.
     - dropout (float): Dropout rate to apply after activations or residual connections. If 0.0, no dropout is applied.
+    - weight_decay (float): L2 regularization factor for kernel weights. Default is 0.0 (no regularization).
     - expert_paths (dict): Dictionary containing paths to expert model weights:
         {
             'combiner': path to combiner model weights,
@@ -1550,6 +1555,7 @@ def create_mlp_moe(
         norm=norm,
         sam_rho=sam_rho,
         dropout=dropout,
+        weight_decay=weight_decay,
         name='expert_p'
     )
 
@@ -1565,6 +1571,7 @@ def create_mlp_moe(
         norm=norm,
         sam_rho=sam_rho,
         dropout=dropout,
+        weight_decay=weight_decay,
         name='expert_nz'
     )
 
@@ -1580,6 +1587,7 @@ def create_mlp_moe(
         norm=norm,
         sam_rho=sam_rho,
         dropout=dropout,
+        weight_decay=weight_decay,
         name='expert_m'
     )
 
@@ -1597,6 +1605,7 @@ def create_mlp_moe(
         sam_rho=sam_rho,
         dropout=dropout,
         output_activation=combiner_output_activation,  # Use softmax for class probabilities
+        weight_decay=weight_decay,
         name='combiner'
     )
 
