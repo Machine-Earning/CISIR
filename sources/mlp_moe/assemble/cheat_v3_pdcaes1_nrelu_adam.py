@@ -3,7 +3,6 @@ from datetime import datetime
 
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
-# from tensorflow_addons.optimizers import AdamW
 from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
@@ -102,12 +101,11 @@ def main():
                 # upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                 smoothing_method = SMOOTHING_METHOD
-                window_size = 101  # WINDOW_SIZE  # allows margin of error of 10 epochs
-                val_window_size = 5  # VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
+                window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
+                val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
                 pretraining = False
                 freeze_experts = FREEZE_EXPERT
                 freeze_combiner = True  # freeze the combiner
-                normalized_weights = NORMALIZED_WEIGHTS
 
                 expert_paths = {
                     'plus': POS_EXPERT_PATH,
@@ -240,6 +238,7 @@ def main():
                     'pretraining': pretraining,
                     'embed_dim': embed_dim,
                     'dropout': dropout,
+                    'weight_decay': weight_decay,
                     'activation': activation,
                     'norm': norm,
                     'skip_repr': skip_repr,
@@ -262,6 +261,7 @@ def main():
                     pretraining=pretraining,
                     freeze_experts=freeze_experts,
                     expert_paths=expert_paths,
+                    weight_decay=weight_decay,
                     combiner_output_activation='norm_relu',
                     combiner_pretrained_weights=combiner_pretrained_weights,
                     combiner_pretrained_config=combiner_pretrained_config,
@@ -350,6 +350,7 @@ def main():
                     pretraining=pretraining,
                     freeze_experts=freeze_experts,
                     expert_paths=expert_paths,
+                    weight_decay=weight_decay,
                     combiner_output_activation='norm_relu',
                     combiner_pretrained_weights=combiner_pretrained_weights,
                     combiner_pretrained_config=combiner_pretrained_config,
