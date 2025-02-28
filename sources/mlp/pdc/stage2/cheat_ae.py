@@ -5,13 +5,10 @@ import numpy as np
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
-from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
-from modules.evaluate.utils import plot_tsne_delta, plot_repr_corr_dist
 from modules.reweighting.ImportanceWeighting import ReciprocalImportance
 from modules.shared.globals import *
-from modules.training.cme_modeling import ModelBuilder
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
@@ -20,11 +17,8 @@ from modules.training.ts_modeling import (
     evaluate_pcc,
     process_sep_events,
     cmse,
-    filter_ds,
-    plot_error_hist,
     set_seed,
     stratified_batch_dataset,
-    load_stratified_folds,
     create_mlp,
     add_proj_head,
 )
@@ -44,13 +38,12 @@ def main():
     Main function to run the E-MLP model
     :return:
     """
-    mb = ModelBuilder()
     pm = TrainingPhaseManager()
 
-    for seed in SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.75, 0.75, 0.75, 0.75)]:
+    for seed in TRIAL_SEEDS:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.7, 0.7, 0.7, 0.7)]:
             for freeze in FREEZING:
-                for rho in RHO:
+                for rho in [1e-2]: # RHO:
                     inputs_to_use = INPUTS_TO_USE[0]
                     cme_speed_threshold = CME_SPEED_THRESHOLD[0]
                     add_slope = ADD_SLOPE[0]
@@ -61,7 +54,7 @@ def main():
                     lambda_factor = 1 # LAMBDA_FACTOR
                     normalized_weights = NORMALIZED_WEIGHTS
                     # Construct the title
-                    title = f'mlp2_pdcaeS2_Reciprocal_alpha{alpha_mse:.2f}_fr{freeze}_adam'
+                    title = f'mlp2_pdcaeS2_Reciprocal_alpha{alpha_mse:.2f}_fr{freeze}_tabl'
 
                     # Replace any other characters that are not suitable for filenames (if any)
                     title = title.replace(' ', '_').replace(':', '_')
@@ -90,7 +83,7 @@ def main():
                         min_delta=lr_cb_min_delta,
                         min_lr=lr_cb_min_lr)
 
-                    weight_decay = WEIGHT_DECAY  # higher weight decay
+                    weight_decay = 0.1 # WEIGHT_DECAY  # higher weight decay
                     batch_size = BATCH_SIZE  # higher batch size
                     epochs = EPOCHS  # higher epochs
                     hiddens = MLP_HIDDENS
@@ -99,7 +92,7 @@ def main():
                     bandwidth = BANDWIDTH
                     embed_dim = EMBED_DIM
                     output_dim = len(outputs_to_use)
-                    dropout = DROPOUT
+                    dropout = 0.2 # DROPOUT
                     activation = ACTIVATION
                     norm = NORM
                     pretraining = True
@@ -226,7 +219,8 @@ def main():
                         activation=activation,
                         norm=norm,
                         skip_repr=skip_repr,
-                        skipped_layers=skipped_layers
+                        skipped_layers=skipped_layers,
+                        weight_decay=weight_decay
                     )
                     model_sep_stage1.summary()
 
@@ -236,7 +230,7 @@ def main():
                     # print the save
                     print(f'weights loaded successfully from: {weight_path}')
 
-                    model_sep = mb.add_proj_head(
+                    model_sep = add_proj_head(
                         model_sep_stage1,
                         output_dim=output_dim,
                         freeze_features=freeze,
@@ -247,7 +241,8 @@ def main():
                         norm=norm,
                         skipped_layers=skipped_layers,
                         name='mlp',
-                        sam_rho=rho
+                        sam_rho=rho,
+                        weight_decay=weight_decay
                     )
                     model_sep.summary()
 
@@ -265,7 +260,6 @@ def main():
                     model_sep.compile(
                         optimizer=Adam(
                             learning_rate=learning_rate,
-                            # weight_decay=weight_decay,
                         ),
                         loss={
                             'forecast_head': lambda y_true, y_pred: cmse(
@@ -330,12 +324,13 @@ def main():
                         activation=activation,
                         norm=norm,
                         skip_repr=skip_repr,
-                        skipped_layers=skipped_layers
+                        skipped_layers=skipped_layers,
+                        weight_decay=weight_decay
                     )
                     final_model_sep_stage1.load_weights(weight_path)
 
                     # Recreate the model architecture for final_model_sep
-                    final_model_sep = mb.add_proj_head(
+                    final_model_sep = add_proj_head(
                         final_model_sep_stage1,
                         output_dim=output_dim,
                         freeze_features=freeze,
@@ -346,13 +341,13 @@ def main():
                         norm=norm,
                         skipped_layers=skipped_layers,
                         name='mlp',
-                        sam_rho=rho
+                        sam_rho=rho,
+                        weight_decay=weight_decay
                     )
 
                     final_model_sep.compile(
                         optimizer=Adam(
                             learning_rate=learning_rate,
-                            # weight_decay=weight_decay,
                         ),
                         loss={
                             'forecast_head': lambda y_true, y_pred: cmse(
