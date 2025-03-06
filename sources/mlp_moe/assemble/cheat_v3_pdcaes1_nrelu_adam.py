@@ -6,7 +6,7 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
-# from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
+from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 from modules.reweighting.ImportanceWeighting import ReciprocalImportance
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
@@ -19,7 +19,7 @@ from modules.training.ts_modeling import (
     stratified_batch_dataset,
     set_seed,
     cmse,
-    # filter_ds,
+    filter_ds,
     # create_mlp,
     create_mlp_moe
 )
@@ -48,11 +48,11 @@ def main():
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
                 lambda_factor = LAMBDA_FACTOR_MOE  # lambda for the loss
-                freeze_combiner = False  # freeze the combiner
+                freeze_combiner = True  # freeze the combiner
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2pdcaes1_amse{alpha_mse:.2f}_moe_cheat_combiner_frozen{freeze_combiner}_scratch'
+                title = f'mlp2pdcaes1_amse{alpha_mse:.2f}_moe_cheat_combiner_frozen{freeze_combiner}_plotRepr'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -97,9 +97,9 @@ def main():
                 skip_repr = SKIP_REPR
                 skipped_layers = SKIPPED_LAYERS
                 # NOTE: no need for filtering for moe since cannot run t-SNE and repr correlation
-                # N = N_FILTERED  # number of samples to keep outside the threshold
-                # lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
-                # upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
+                N = N_FILTERED  # number of samples to keep outside the threshold
+                lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
+                upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                 smoothing_method = SMOOTHING_METHOD
                 window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
@@ -219,18 +219,17 @@ def main():
                     bandwidth=bandwidth).label_importance_map
                 print(f'test set rebalanced.')
 
-                # NOTE: no need for filtering for moe since cannot run t-SNE and repr correlation
-                # # filtering training and test sets for additional results
-                # X_train_filtered, y_train_filtered = filter_ds(
-                #     X_train, y_train,
-                #     low_threshold=lower_threshold,
-                #     high_threshold=upper_threshold,
-                #     N=N, seed=seed)
-                # X_test_filtered, y_test_filtered = filter_ds(
-                #     X_test, y_test,
-                #     low_threshold=lower_threshold,
-                #     high_threshold=upper_threshold,
-                #     N=N, seed=seed)
+                # filtering training and test sets for additional results
+                X_train_filtered, y_train_filtered = filter_ds(
+                    X_train, y_train,
+                    low_threshold=lower_threshold,
+                    high_threshold=upper_threshold,
+                    N=N, seed=seed)
+                X_test_filtered, y_test_filtered = filter_ds(
+                    X_test, y_test,
+                    low_threshold=lower_threshold,
+                    high_threshold=upper_threshold,
+                    N=N, seed=seed)
 
                 combiner_pretrained_config = {
                     'input_dim': n_features,
@@ -272,6 +271,31 @@ def main():
                     sam_rho=rho
                 )
                 init_model_sep.summary()
+            
+                print(f'Loading combiner to visualize its representation space')
+                init_combiner = init_model_sep.get_layer("combiner")
+                init_combiner.summary()
+
+                # Log t-SNE plot 
+                # Log the training t-SNE plot to wandb
+                stage1_file_path = plot_tsne_delta(
+                    init_combiner,
+                    X_train_filtered, y_train_filtered, title,
+                    'stage1_training',
+                    model_type='features_cls',
+                    save_tag=current_time, seed=seed)
+                wandb.log({'stage1_tsne_training_plot': wandb.Image(stage1_file_path)})
+                print('stage1_file_path: ' + stage1_file_path)
+
+                # Log the testing t-SNE plot to wandb
+                stage1_file_path = plot_tsne_delta(
+                    init_combiner,
+                    X_test_filtered, y_test_filtered, title,
+                    'stage1_testing',
+                    model_type='features_cls',
+                    save_tag=current_time, seed=seed)
+                wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
+                print('stage1_file_path: ' + stage1_file_path)
 
                 # Define the EarlyStopping callback
                 early_stopping = SmoothEarlyStopping(

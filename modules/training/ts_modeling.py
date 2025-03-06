@@ -616,10 +616,6 @@ def load_partial_weights_from_path(
     if skip_layers is None:
         skip_layers = []
 
-    # Import the same create_mlp function used to create the old model
-    # Ensure that this matches the original environment:
-    # from your_module import create_mlp
-
     # Create the old model with identical parameters used originally
     old_model = create_mlp(
         input_dim=old_model_params['input_dim'],
@@ -678,14 +674,38 @@ def load_partial_weights_from_path(
             name='combiner'
         )
     else:
+        # FIXED: Properly handle the representation layer
         # Map old model's layers by name for easy access
         old_layers_dict = {layer.name: layer for layer in old_model.layers}
-
-        # Transfer weights from old_model to new_model
+        
+        # Extract all layer names from old model
+        old_layer_names = [layer.name for layer in old_model.layers]
+        
+        # Get indices of important layers in the old model
+        if 'normalize_layer' in old_layer_names:
+            normalize_idx = old_layer_names.index('normalize_layer')
+            repr_idx = old_layer_names.index('repr_layer')
+            feature_layers_end_idx = normalize_idx  # Use normalize_layer as the endpoint
+        elif 'repr_layer' in old_layer_names:
+            repr_idx = old_layer_names.index('repr_layer')
+            feature_layers_end_idx = repr_idx  # Use repr_layer as the endpoint
+        else:
+            # If neither layer exists, find the last layer before forecast_head
+            forecast_head_idx = old_layer_names.index('forecast_head') if 'forecast_head' in old_layer_names else -1
+            feature_layers_end_idx = forecast_head_idx - 1 if forecast_head_idx > 0 else len(old_layer_names) - 2
+        
+        # Transfer weights for all layers up to and including the representation layer
         for new_layer in new_model.layers:
+            # Skip layers that are explicitly marked to skip
             if new_layer.name in skip_layers:
+                print(f"Skipping layer as requested: {new_layer.name}")
                 continue
-
+            
+            # Skip the output layer (forecast_head)
+            if new_layer.name == 'forecast_head':
+                print(f"Skipping output layer: {new_layer.name}")
+                continue
+                
             if new_layer.name in old_layers_dict:
                 old_layer = old_layers_dict[new_layer.name]
                 old_weights = old_layer.get_weights()
@@ -708,11 +728,11 @@ def load_partial_weights_from_path(
         
         # If freeze_combiner is True, freeze all layers up to and including the representation layer
         if freeze_combiner:
-            # Find the representation layer
+            # Identify the key layers
             repr_layer_name = 'repr_layer'
-            repr_layer_found = False
+            normalize_layer_name = 'normalize_layer'
             
-            # Identify layers that should remain trainable
+            # Identify layers that should always remain trainable
             trainable_layer_names = ['forecast_head']
             
             # Add projection neck layer names to trainable layers if needed
@@ -721,23 +741,61 @@ def load_partial_weights_from_path(
                     if 'proj_' in layer.name:
                         trainable_layer_names.append(layer.name)
             
-            # Freeze all layers up to and including the representation layer
-            for layer in new_model.layers:
-                # Once we've found the representation layer, mark it
+            # Find the representation layer and normalized layer indices
+            repr_layer_idx = -1
+            normalize_layer_idx = -1
+            for i, layer in enumerate(new_model.layers):
                 if layer.name == repr_layer_name:
-                    repr_layer_found = True
-                    layer.trainable = False
-                    print(f"Freezing representation layer: {layer.name}")
-                # Freeze all layers before the representation layer
-                elif not repr_layer_found and layer.name not in trainable_layer_names:
-                    layer.trainable = False
-                    print(f"Freezing layer: {layer.name}")
-                # Keep trainable the layers after the representation layer and specific trainable layers
-                elif repr_layer_found or layer.name in trainable_layer_names:
-                    print(f"Keeping layer trainable: {layer.name}")
-                else:
-                    layer.trainable = False
-                    print(f"Freezing layer: {layer.name}")
+                    repr_layer_idx = i
+                elif layer.name == normalize_layer_name:
+                    normalize_layer_idx = i
+            
+            # Determine the cutoff index - layers before this should be frozen
+            # If normalize_layer exists, it processes the repr_layer output, so use that
+            cutoff_idx = normalize_layer_idx if normalize_layer_idx >= 0 else repr_layer_idx
+            
+            # If we found a cutoff point, freeze all layers up to and including that point
+            if cutoff_idx >= 0:
+                # First pass: Find all layers that contribute to the representation
+                # For a model with residual connections, we need to identify all contributor layers
+                
+                # Start by freezing sequential layers up to the representation layer
+                for i, layer in enumerate(new_model.layers):
+                    if i <= cutoff_idx and layer.name not in trainable_layer_names:
+                        # Freeze this layer as it contributes to representation
+                        layer.trainable = False
+                        print(f"Freezing layer: {layer.name}")
+                    elif layer.name in trainable_layer_names:
+                        # Explicitly mark output/projection layers as trainable
+                        layer.trainable = True
+                        print(f"Keeping layer trainable (explicit): {layer.name}")
+                    elif i > cutoff_idx:
+                        # Layers after cutoff are trainable unless explicitly frozen
+                        layer.trainable = True
+                        print(f"Keeping layer trainable (after repr): {layer.name}")
+                
+                # Special case for residual connections
+                if old_model_params.get('skip_repr', False) and old_model_params.get('skipped_layers', 0) > 0:
+                    print("Model contains residual connections - ensuring all representation contributors are frozen")
+                    
+                    # When using residual connections, ensure Dense layers that create
+                    # projections for residual connections are also frozen
+                    # (These might not be sequential and thus missed by the index-based approach)
+                    for layer in new_model.layers:
+                        # Look for projection layers used in residual connections
+                        if (isinstance(layer, Dense) and 
+                            ('residual_proj' in layer.name or layer.name.startswith('dense')) and
+                            layer.trainable):
+                            # Check if this layer feeds into a layer before cutoff
+                            for other_layer in new_model.layers[:cutoff_idx+1]:
+                                if hasattr(other_layer, '_inbound_nodes') and layer in [
+                                    node.inbound_layers for node in other_layer._inbound_nodes
+                                ]:
+                                    layer.trainable = False
+                                    print(f"Freezing residual contributor: {layer.name}")
+                                    break
+            else:
+                print("Warning: Could not find representation layer for freezing!")
 
 
 class NormalizedReLU(Layer):
