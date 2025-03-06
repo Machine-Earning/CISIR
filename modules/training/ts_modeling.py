@@ -739,18 +739,18 @@ def load_partial_weights_from_path(
                     layer.trainable = True
                     print(f"Keeping layer trainable: {layer.name}")
         
-        # Replace the new_model with the combined model (in Python we can't reassign the reference
-        # within the function, but we can modify the object's internal state)
-        # This approach works because Keras models are mutable Python objects
+        # # Replace the new_model with the combined model (in Python we can't reassign the reference
+        # # within the function, but we can modify the object's internal state)
+        # # This approach works because Keras models are mutable Python objects
         
-        # Reset the layers, config, inputs and outputs of new_model to match combined_model
-        new_model._layers = combined_model._layers
-        new_model._config = combined_model._config
-        new_model._name = combined_model._name
-        new_model._output_layers = combined_model._output_layers
-        new_model._input_layers = combined_model._input_layers
-        new_model.outputs = combined_model.outputs
-        new_model.inputs = combined_model.inputs
+        # # Reset the layers, config, inputs and outputs of new_model to match combined_model
+        # new_model._layers = combined_model._layers
+        # new_model._config = combined_model._config
+        # new_model._name = combined_model._name
+        # new_model._output_layers = combined_model._output_layers
+        # new_model._input_layers = combined_model._input_layers
+        # new_model.outputs = combined_model.outputs
+        # new_model.inputs = combined_model.inputs
 
 
 class NormalizedReLU(Layer):
