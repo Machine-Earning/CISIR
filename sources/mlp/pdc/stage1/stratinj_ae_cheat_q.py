@@ -62,7 +62,7 @@ def main():
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'mlp2ae_pdcStratInj_bs{batch_size}_cheat_adam'
+                title = f'mlp2ae_pdcStratInj_bs{batch_size}_cheat_q'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -272,7 +272,7 @@ def main():
                     ),
                     loss=[
                         # PDC loss for encoder (predicting y from encoded representation)
-                        lambda y_true, y_pred: mb.pdc_loss_linear_vec(
+                        lambda y_true, y_pred: mb.pdc_loss_vec(
                             y_true, y_pred,
                             phase_manager=pm,
                             train_sample_weights=train_weights_dict,

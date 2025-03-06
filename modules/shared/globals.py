@@ -19,18 +19,18 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 FREEZING = [False]
 
 # Pretraining configurations
-BATCH_SIZE_PRE = 7000  # Batch size for PDS
-START_LR_PRE = 1e-4 # starting learning rate for pretraining
+BATCH_SIZE_PRE = 3000  # Batch size for PDS
+START_LR_PRE = 6e-4 # starting learning rate for pretraining
 LR_CB_MIN_LR_PRE = 1e-5  # Minimum learning rate for pretraining
-LR_CB_FACTOR_PRE = 0.99 # factor for reducing learning rate in pretraining
-LR_CB_PATIENCE_PRE = 100  # patience for reducing learning rate in pretraining
+LR_CB_FACTOR_PRE = 0.95 # factor for reducing learning rate in pretraining
+LR_CB_PATIENCE_PRE = 50 # patience for reducing learning rate in pretraining
 PATIENCE_PRE = int(3e3)  # Higher patience for pretraining
-RHO_PRE = [0]  # Pretraining rho parameter
-REWEIGHTS_PRE = [(0.5, 0.5)]  # Pretraining reweighting parameters
-WEIGHT_DECAY_PRE = 1e-4  # Higher weight decay for projection layers
+RHO_PRE = [0.0]  # Pretraining rho parameter
+REWEIGHTS_PRE = [(0.85, 0.85)]  # Pretraining reweighting parameters
+WEIGHT_DECAY_PRE = 0.01 # Higher weight decay for projection layers
 WINDOW_SIZE_PRE = 151  # NOTE: must be odd
 VAL_WINDOW_SIZE_PRE = 51  # NOTE: must be odd
-DROPOUT_PRE = 0.1  # Dropout rate for pretraining
+DROPOUT_PRE = 0.4  # Dropout rate for pretraining
 LAMBDA_PRE = 1 # lambda for cmse with reciprocal importances
 AE_LAMBDA = 1
 
@@ -45,6 +45,7 @@ VAL_WINDOW_SIZE_PDS = 25  # NOTE: must be odd
 
 # Model Architecture
 MLP_HIDDENS = [2048, 128, 1024, 128, 512, 128, 256, 128]  # Hidden layers
+
 # MLP_HIDDENS = [2048, 1024, 512, 256, 128]  # Hidden layers
 PROJ_HIDDENS = [64]  # Projection hidden layers
 EMBED_DIM = 128  # Representation dimension
@@ -217,7 +218,7 @@ BETTER_REPR_FOR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/final_model_
 
 BETTER_REPR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250225-135335.h5'
 
-FROZEN_REPR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_adam_20250226-160856.h5'
+FROZEN_REPR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_before_training_mlp2pdcaes1_amse0.40_moe_cheat_combiner_frozenTrue_20250228-082101.h5'
 
 # assemble hyperparams
 REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]

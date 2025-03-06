@@ -1077,7 +1077,15 @@ def add_proj_head(
     return extended_model
 
 
-def add_decoder(encoder_model, hiddens, activation=None, norm=None, dropout=0.0, skip_connections=False):
+def add_decoder(
+        encoder_model, 
+        hiddens, 
+        activation=None, 
+        norm=None, 
+        dropout=0.0, 
+        skip_connections=False, 
+        weight_decay=0.0
+    ):
     """
     Adds a decoder to the given encoder model, reversing the encoder architecture.
 
@@ -1088,6 +1096,7 @@ def add_decoder(encoder_model, hiddens, activation=None, norm=None, dropout=0.0,
     - norm (str): Normalization type to use ('batch_norm' or 'layer_norm').
     - dropout (float): Dropout rate to apply in the decoder.
     - skip_connections (bool): Whether to include skip connections in the decoder.
+    - weight_decay (float): L2 regularization factor for kernel weights. Default is 0.0 (no regularization).
 
     Returns:
     - autoencoder_model: A new model that includes both the encoder and the decoder.
@@ -1105,13 +1114,16 @@ def add_decoder(encoder_model, hiddens, activation=None, norm=None, dropout=0.0,
     residual_layer = x
     has_residuals = skip_connections
     skipped_layers = encoder_model.skipped_layers if hasattr(encoder_model, 'skipped_layers') else 0
+    
+    # Set up kernel regularizer if weight decay is specified
+    kernel_regularizer = tf.keras.regularizers.l2(weight_decay) if weight_decay > 0.0 else None
 
     # Reverse the hiddens list for the decoder
     decoder_hiddens = hiddens[::-1]
 
     # Build the decoder
     for i, units in enumerate(decoder_hiddens):
-        x = Dense(units)(x)
+        x = Dense(units, kernel_regularizer=kernel_regularizer)(x)
         if norm == 'batch_norm':
             x = BatchNormalization()(x)
         x = activation(x) if callable(activation) else LeakyReLU()(x)
@@ -1119,7 +1131,7 @@ def add_decoder(encoder_model, hiddens, activation=None, norm=None, dropout=0.0,
         # Add skip connections if enabled
         if has_residuals and skipped_layers > 0 and i % skipped_layers == 0 and i > 0:
             if x.shape[-1] != residual_layer.shape[-1]:
-                residual_proj = Dense(x.shape[-1], use_bias=False)(residual_layer)
+                residual_proj = Dense(x.shape[-1], use_bias=False, kernel_regularizer=kernel_regularizer)(residual_layer)
             else:
                 residual_proj = residual_layer
             x = Add()([x, residual_proj])
@@ -1132,7 +1144,7 @@ def add_decoder(encoder_model, hiddens, activation=None, norm=None, dropout=0.0,
             x = Dropout(dropout)(x)
 
     # Output layer to reconstruct the input
-    reconstructed = Dense(encoder_input.shape[-1], name='reconstructed')(x)
+    reconstructed = Dense(encoder_input.shape[-1], name='reconstructed', kernel_regularizer=kernel_regularizer)(x)
 
     # Create the autoencoder model
     autoencoder_model = Model(inputs=encoder_input, outputs=[representation, reconstructed])
@@ -5642,12 +5654,13 @@ def build_dataset_from_numpy(x, y, batch_size, options=None):
     return dataset
 
 
-def set_seed(seed: int) -> None:
+def set_seed(seed: int, use_deterministic: bool = True) -> None:
     """
     Set the seed for reproducibility.
 
     Args:
         seed (int): The seed value to use.
+        use_deterministic (bool): Whether to use deterministic operations.
     """
     random.seed(seed)
     np.random.seed(seed)
@@ -5655,4 +5668,7 @@ def set_seed(seed: int) -> None:
     os.environ['PYTHONHASHSEED'] = str(seed)
 
     # Set TensorFlow to use deterministic operations
-    os.environ['TF_DETERMINISTIC_OPS'] = '1'
+    if use_deterministic:
+        os.environ['TF_DETERMINISTIC_OPS'] = '1'
+    else:
+        os.environ['TF_DETERMINISTIC_OPS'] = '0'

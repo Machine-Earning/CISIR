@@ -36,7 +36,7 @@ def main():
     """
 
     # set the training phase manager - necessary for mse + pcc loss'
-    combiner_pretrained_weights = BETTER_REPR_FOR_COMBINER
+    combiner_pretrained_weights = None #BETTER_REPR_FOR_COMBINER
     pm = TrainingPhaseManager()
 
     for seed in SEEDS:
@@ -48,10 +48,11 @@ def main():
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
                 lambda_factor = LAMBDA_FACTOR_MOE  # lambda for the loss
+                freeze_combiner = False  # freeze the combiner
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp2pdcaes1_amse{alpha_mse:.2f}_moe_cheat_v3nrelu_adam'
+                title = f'mlp2pdcaes1_amse{alpha_mse:.2f}_moe_cheat_combiner_frozen{freeze_combiner}_scratch'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -105,7 +106,7 @@ def main():
                 val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
                 pretraining = False
                 freeze_experts = FREEZE_EXPERT
-                freeze_combiner = True  # freeze the combiner
+               
 
                 expert_paths = {
                     'plus': POS_EXPERT_PATH,

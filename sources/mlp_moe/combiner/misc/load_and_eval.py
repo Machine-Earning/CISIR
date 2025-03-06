@@ -43,7 +43,7 @@ def main():
         
         # Create a unique experiment name with a timestamp
         current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-        experiment_name = f'combiner_v3_better_repr_{current_time}'
+        experiment_name = f'combiner_v3_better_repr_{current_time}-frozenTrue'
 
         set_seed(seed)
         

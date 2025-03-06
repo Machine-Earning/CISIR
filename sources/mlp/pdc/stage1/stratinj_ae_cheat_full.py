@@ -48,7 +48,7 @@ def main():
 
     for seed in SEEDS:
         for alpha, alphaV in REWEIGHTS_PRE:
-            for rho in RHO_PRE:
+            for rho in [1e-4]:  # RHO_PRE:
                 # PARAMS
                 inputs_to_use = INPUTS_TO_USE[0]
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]

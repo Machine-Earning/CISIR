@@ -48,7 +48,7 @@ def main():
 
     for seed in SEEDS:
         for alpha, alphaV in REWEIGHTS_PRE:
-            for rho in RHO_PRE:
+            for rho in RHO_PRE:  # RHO_PRE:
                 # PARAMS
                 inputs_to_use = INPUTS_TO_USE[0]
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]
@@ -62,7 +62,7 @@ def main():
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'mlp2ae_pdcStratInj_bs{batch_size}_cheat_adam'
+                title = f'mlp2ae_pdcStratInj_bs{batch_size}_cheat_b'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -78,7 +78,7 @@ def main():
                 weight_decay = WEIGHT_DECAY_PRE
                 normalized_weights = NORMALIZED_WEIGHTS
 
-                hiddens = MLP_HIDDENS
+                hiddens = MLP_HIDDENS_B
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 pretraining = True
                 embed_dim = EMBED_DIM
@@ -91,7 +91,7 @@ def main():
                 lr_cb_min_lr = LR_CB_MIN_LR_PRE
                 lr_cb_min_delta = LR_CB_MIN_DELTA
                 cvrg_metric = 'loss' #CVRG_METRIC
-                cvrg_min_delta = 1e-5 # CVRG_MIN_DELTA
+                cvrg_min_delta = CVRG_MIN_DELTA
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -109,8 +109,8 @@ def main():
                 upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                 smoothing_method = SMOOTHING_METHOD
-                window_size = 11 # WINDOW_SIZE_PRE  # allows margin of error of 10 epochs
-                val_window_size = 11 # VAL_WINDOW_SIZE_PRE  # allows margin of error of 10 epochs
+                window_size = 21 # WINDOW_SIZE_PRE  # allows margin of error of 10 epochs
+                val_window_size = VAL_WINDOW_SIZE_PRE  # allows margin of error of 10 epochs
                 # Set the reconstruction loss weight
                 reconstruction_loss_weight = 0.0 #AE_LAMBDA  # Adjust as needed
 

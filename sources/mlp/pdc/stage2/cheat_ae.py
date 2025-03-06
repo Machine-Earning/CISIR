@@ -41,7 +41,7 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in TRIAL_SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.7, 0.7, 0.7, 0.7)]:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1.0, 1.0, 1.0, 1.0)]:
             for freeze in FREEZING:
                 for rho in [1e-2]: # RHO:
                     inputs_to_use = INPUTS_TO_USE[0]
