@@ -37,7 +37,7 @@ def main():
                 add_slope = ADD_SLOPE[0]
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                title = f'mlp2_amse{alpha_mse:.2f}_better_repr_for_combiner'
+                title = f'mlp2_amse{alpha_mse:.2f}_better_repr_for_combiner_wd'
                 title = title.replace(' ', '_').replace(':', '_')
                 current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
                 experiment_name = f'{title}_{current_time}'
@@ -122,7 +122,8 @@ def main():
                     norm=norm,
                     skip_repr=skip_repr,
                     skipped_layers=skipped_layers,
-                    sam_rho=rho
+                    sam_rho=rho,
+                    weight_decay=0.1
                 )
 
                 # Load the weights
