@@ -563,8 +563,9 @@ def load_partial_weights_from_path(
     This utility:
     - Creates the old model using the provided parameters in `old_model_params`.
     - Loads the old model's weights from `pretrained_weights_path`.
-    - Copies matching layer weights into `new_model`.
-    - Skips loading weights for layers specified in `skip_layers` or any that are incompatible by shape.
+    - Takes all layers up to the representation layer from the old model (with loaded weights)
+    - Takes the forecast_head structure (but not weights) from the new model
+    - Creates a combined model and replaces the new_model with it
 
     Parameters
     ----------
@@ -572,8 +573,7 @@ def load_partial_weights_from_path(
         Path to the file containing the pre-trained model's weights. Typically something like 'model_weights.h5'.
 
     new_model : Model
-        The new Keras model instance into which compatible weights will be loaded.
-        This model may have a different output dimension than the original model.
+        The new Keras model instance to be replaced with the combined model.
 
     old_model_params : Dict
         A dictionary containing the parameters needed to recreate the old model.
@@ -610,8 +610,7 @@ def load_partial_weights_from_path(
     Returns
     -------
     None
-        The function modifies `new_model` in-place by setting the weights of its matching layers
-        to those of the old model where compatible.
+        The function modifies `new_model` in-place by setting it to the combined model.
     """
     if skip_layers is None:
         skip_layers = []
@@ -673,129 +672,85 @@ def load_partial_weights_from_path(
             output_activation='softmax',
             name='combiner'
         )
-    else:
-        # FIXED: Properly handle the representation layer
-        # Map old model's layers by name for easy access
-        old_layers_dict = {layer.name: layer for layer in old_model.layers}
         
-        # Extract all layer names from old model
+    else:
+        # Identify representation layer in old model
         old_layer_names = [layer.name for layer in old_model.layers]
         
-        # Get indices of important layers in the old model
+        # Determine which layer to use as the representation layer
+        repr_layer_name = None
         if 'normalize_layer' in old_layer_names:
-            normalize_idx = old_layer_names.index('normalize_layer')
-            repr_idx = old_layer_names.index('repr_layer')
-            feature_layers_end_idx = normalize_idx  # Use normalize_layer as the endpoint
+            repr_layer_name = 'normalize_layer'
         elif 'repr_layer' in old_layer_names:
-            repr_idx = old_layer_names.index('repr_layer')
-            feature_layers_end_idx = repr_idx  # Use repr_layer as the endpoint
-        else:
-            # If neither layer exists, find the last layer before forecast_head
-            forecast_head_idx = old_layer_names.index('forecast_head') if 'forecast_head' in old_layer_names else -1
-            feature_layers_end_idx = forecast_head_idx - 1 if forecast_head_idx > 0 else len(old_layer_names) - 2
-        
-        # Transfer weights for all layers up to and including the representation layer
-        for new_layer in new_model.layers:
-            # Skip layers that are explicitly marked to skip
-            if new_layer.name in skip_layers:
-                print(f"Skipping layer as requested: {new_layer.name}")
-                continue
-            
-            # Skip the output layer (forecast_head)
-            if new_layer.name == 'forecast_head':
-                print(f"Skipping output layer: {new_layer.name}")
-                continue
-                
-            if new_layer.name in old_layers_dict:
-                old_layer = old_layers_dict[new_layer.name]
-                old_weights = old_layer.get_weights()
-                new_weights = new_layer.get_weights()
-
-                # Ensure the layer has weights and they match in count
-                if len(old_weights) == len(new_weights):
-                    # Verify that corresponding weight arrays have the same shape
-                    if all(o_w.shape == n_w.shape for o_w, n_w in zip(old_weights, new_weights)):
-                        new_layer.set_weights(old_weights)
-                        print(f"Loaded weights for layer: {new_layer.name}")
-                    else:
-                        print(f"Shape mismatch for layer {new_layer.name}, skipping")
-                else:
-                    print(f"Weight count mismatch for layer {new_layer.name}, skipping")
-            else:
-                print(f"No matching layer found for {new_layer.name}, skipping")
-
-        # After this, `new_model` will have partially loaded weights, except for layers that didn't match or were skipped.
-        
-        # If freeze_combiner is True, freeze all layers up to and including the representation layer
-        if freeze_combiner:
-            # Identify the key layers
             repr_layer_name = 'repr_layer'
-            normalize_layer_name = 'normalize_layer'
-            
-            # Identify layers that should always remain trainable
-            trainable_layer_names = ['forecast_head']
-            
-            # Add projection neck layer names to trainable layers if needed
-            if proj_neck:
-                for layer in new_model.layers:
-                    if 'proj_' in layer.name:
-                        trainable_layer_names.append(layer.name)
-            
-            # Find the representation layer and normalized layer indices
-            repr_layer_idx = -1
-            normalize_layer_idx = -1
-            for i, layer in enumerate(new_model.layers):
-                if layer.name == repr_layer_name:
-                    repr_layer_idx = i
-                elif layer.name == normalize_layer_name:
-                    normalize_layer_idx = i
-            
-            # Determine the cutoff index - layers before this should be frozen
-            # If normalize_layer exists, it processes the repr_layer output, so use that
-            cutoff_idx = normalize_layer_idx if normalize_layer_idx >= 0 else repr_layer_idx
-            
-            # If we found a cutoff point, freeze all layers up to and including that point
-            if cutoff_idx >= 0:
-                # First pass: Find all layers that contribute to the representation
-                # For a model with residual connections, we need to identify all contributor layers
-                
-                # Start by freezing sequential layers up to the representation layer
-                for i, layer in enumerate(new_model.layers):
-                    if i <= cutoff_idx and layer.name not in trainable_layer_names:
-                        # Freeze this layer as it contributes to representation
-                        layer.trainable = False
-                        print(f"Freezing layer: {layer.name}")
-                    elif layer.name in trainable_layer_names:
-                        # Explicitly mark output/projection layers as trainable
-                        layer.trainable = True
-                        print(f"Keeping layer trainable (explicit): {layer.name}")
-                    elif i > cutoff_idx:
-                        # Layers after cutoff are trainable unless explicitly frozen
-                        layer.trainable = True
-                        print(f"Keeping layer trainable (after repr): {layer.name}")
-                
-                # Special case for residual connections
-                if old_model_params.get('skip_repr', False) and old_model_params.get('skipped_layers', 0) > 0:
-                    print("Model contains residual connections - ensuring all representation contributors are frozen")
-                    
-                    # When using residual connections, ensure Dense layers that create
-                    # projections for residual connections are also frozen
-                    # (These might not be sequential and thus missed by the index-based approach)
-                    for layer in new_model.layers:
-                        # Look for projection layers used in residual connections
-                        if (isinstance(layer, Dense) and 
-                            ('residual_proj' in layer.name or layer.name.startswith('dense')) and
-                            layer.trainable):
-                            # Check if this layer feeds into a layer before cutoff
-                            for other_layer in new_model.layers[:cutoff_idx+1]:
-                                if hasattr(other_layer, '_inbound_nodes') and layer in [
-                                    node.inbound_layers for node in other_layer._inbound_nodes
-                                ]:
-                                    layer.trainable = False
-                                    print(f"Freezing residual contributor: {layer.name}")
-                                    break
+        
+        if repr_layer_name is None:
+            # If neither specific layer exists, find the last layer before forecast_head
+            forecast_head_idx = old_layer_names.index('forecast_head') if 'forecast_head' in old_layer_names else -1
+            if forecast_head_idx > 0:
+                repr_layer_name = old_model.layers[forecast_head_idx - 1].name
             else:
-                print("Warning: Could not find representation layer for freezing!")
+                # If all else fails, use the second-to-last layer
+                repr_layer_name = old_model.layers[-2].name
+                print(f"Warning: Could not find representation layer, using layer: {repr_layer_name}")
+        
+        # Get the representation layer output
+        repr_layer = old_model.get_layer(repr_layer_name).output
+        
+        # Create a new dense layer with the same configuration as new_model's forecast_head
+        # but with new random weights (untrained)
+        forecast_head_layer = None
+        for layer in new_model.layers:
+            if layer.name == 'forecast_head':
+                forecast_head_layer = layer
+                break
+        
+        if forecast_head_layer is None:
+            raise ValueError("Could not find forecast_head layer in the new model")
+        
+        # Create a new layer with the same configuration but new random weights
+        output_dim = forecast_head_layer.output_shape[-1]
+        
+        # Create fresh forecast_head with random initialization and NormalizedReLU activation
+        forecast_output = Dense(
+            output_dim,
+            activation=None,  # No activation in the Dense layer itself
+            name='forecast_head'
+        )(repr_layer)
+        
+        # Apply NormalizedReLU activation after the Dense layer
+        forecast_output = NormalizedReLU()(forecast_output)
+        
+        # Create combined model
+        combined_model = Model(
+            inputs=old_model.input,
+            outputs=[repr_layer, forecast_output],
+            name=new_model.name
+        )
+        
+        # If freeze_combiner is True, freeze all layers except forecast_head
+        if freeze_combiner:
+            print("Freezing all layers except forecast_head")
+            for layer in combined_model.layers:
+                if layer.name != 'forecast_head':
+                    layer.trainable = False
+                    print(f"Freezing layer: {layer.name}")
+                else:
+                    layer.trainable = True
+                    print(f"Keeping layer trainable: {layer.name}")
+        
+        # Replace the new_model with the combined model (in Python we can't reassign the reference
+        # within the function, but we can modify the object's internal state)
+        # This approach works because Keras models are mutable Python objects
+        
+        # Reset the layers, config, inputs and outputs of new_model to match combined_model
+        new_model._layers = combined_model._layers
+        new_model._config = combined_model._config
+        new_model._name = combined_model._name
+        new_model._output_layers = combined_model._output_layers
+        new_model._input_layers = combined_model._input_layers
+        new_model.outputs = combined_model.outputs
+        new_model.inputs = combined_model.inputs
 
 
 class NormalizedReLU(Layer):
