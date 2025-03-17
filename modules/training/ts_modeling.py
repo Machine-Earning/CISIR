@@ -912,17 +912,22 @@ def create_mlp(
             residual_proj = Dense(embed_dim, use_bias=False, kernel_regularizer=kernel_regularizer)(residual_layer)
         else:
             residual_proj = residual_layer
+        
+        # Apply dropout before the representation layer
+        if dropout > 0:
+            x = Dropout(dropout)(x)
+            
+        # Create representation layer without dropout after it
         x = Add(name='repr_layer')([x, residual_proj])
         if norm == 'layer_norm':
             x = LayerNormalization()(x)
-        # Add dropout after final residual connection if dropout > 0
-        if dropout > 0:
-            x = Dropout(dropout)(x)
-    elif dropout > 0:  # No residuals, add dropout after activation
+        # Remove dropout here to avoid affecting the representation
+    elif dropout > 0:  # No residuals
+        # Apply dropout before the representation layer is defined
         x = Dropout(dropout)(x)
+        # No dropout after this point if this is the representation layer
     elif norm == 'layer_norm':
         x = LayerNormalization()(x)
-        x = Dropout(dropout)(x)
 
     # Handle PDS normalization if needed
     if pretraining:
