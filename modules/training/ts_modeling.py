@@ -674,84 +674,78 @@ def load_partial_weights_from_path(
         )
         
     else:
-        # Identify representation layer in old model
-        old_layer_names = [layer.name for layer in old_model.layers]
+        # Remove forecast head from old model
+        model_no_head = remove_forecast_head(old_model)
         
-        # Determine which layer to use as the representation layer
-        repr_layer_name = None
-        if 'normalize_layer' in old_layer_names:
-            repr_layer_name = 'normalize_layer'
-        elif 'repr_layer' in old_layer_names:
-            repr_layer_name = 'repr_layer'
-        
-        if repr_layer_name is None:
-            # If neither specific layer exists, find the last layer before forecast_head
-            forecast_head_idx = old_layer_names.index('forecast_head') if 'forecast_head' in old_layer_names else -1
-            if forecast_head_idx > 0:
-                repr_layer_name = old_model.layers[forecast_head_idx - 1].name
-            else:
-                # If all else fails, use the second-to-last layer
-                repr_layer_name = old_model.layers[-2].name
-                print(f"Warning: Could not find representation layer, using layer: {repr_layer_name}")
-        
-        # Get the representation layer output
-        repr_layer = old_model.get_layer(repr_layer_name).output
-        
-        # Create a new dense layer with the same configuration as new_model's forecast_head
-        # but with new random weights (untrained)
-        forecast_head_layer = None
-        for layer in new_model.layers:
-            if layer.name == 'forecast_head':
-                forecast_head_layer = layer
-                break
-        
-        if forecast_head_layer is None:
-            raise ValueError("Could not find forecast_head layer in the new model")
-        
-        # Create a new layer with the same configuration but new random weights
-        output_dim = forecast_head_layer.output_shape[-1]
-        
-        # Create fresh forecast_head with random initialization and NormalizedReLU activation
-        forecast_output = Dense(
-            output_dim,
-            activation=None,  # No activation in the Dense layer itself
-            name='forecast_head'
-        )(repr_layer)
-        
-        # Apply NormalizedReLU activation after the Dense layer
-        forecast_output = NormalizedReLU()(forecast_output)
-        
-        # Create combined model
-        combined_model = Model(
-            inputs=old_model.input,
-            outputs=[repr_layer, forecast_output],
-            name=new_model.name
+        # Add projection head with the same configuration as new_model's forecast_head
+        new_model = add_proj_head(
+            model_no_head,
+            output_dim=3,
+            freeze_features=freeze_combiner,
+            pretraining=False,
+            hiddens=old_model_params['proj_hiddens'],
+            dropout=old_model_params['dropout'],
+            activation=old_model_params['activation'],
+            norm=old_model_params['norm'],
+            skipped_layers=old_model_params['skipped_layers'],
+            sam_rho=old_model_params['sam_rho'],
+            weight_decay=old_model_params['weight_decay'],
+            output_activation='softmax',
+            name='combiner_ext'
         )
-        
-        # If freeze_combiner is True, freeze all layers except forecast_head
-        if freeze_combiner:
-            print("Freezing all layers except forecast_head")
-            for layer in combined_model.layers:
-                if layer.name != 'forecast_head':
-                    layer.trainable = False
-                    print(f"Freezing layer: {layer.name}")
-                else:
-                    layer.trainable = True
-                    print(f"Keeping layer trainable: {layer.name}")
-        
-        # # Replace the new_model with the combined model (in Python we can't reassign the reference
-        # # within the function, but we can modify the object's internal state)
-        # # This approach works because Keras models are mutable Python objects
-        
-        # # Reset the layers, config, inputs and outputs of new_model to match combined_model
-        # new_model._layers = combined_model._layers
-        # new_model._config = combined_model._config
-        # new_model._name = combined_model._name
-        # new_model._output_layers = combined_model._output_layers
-        # new_model._input_layers = combined_model._input_layers
-        # new_model.outputs = combined_model.outputs
-        # new_model.inputs = combined_model.inputs
 
+    return new_model
+
+
+def remove_forecast_head(model: Model) -> Model:
+    """
+    Remove the forecast head from a model created by create_mlp.
+    
+    This function creates a new model that keeps all layers up to the representation layer
+    but removes the forecast head.
+    
+    Parameters
+    ----------
+    model : Model
+        The model from which to remove the forecast head. Should be created using create_mlp.
+        
+    Returns
+    -------
+    Model
+        A new model with the same input layer and architecture up to the representation layer,
+        but without the forecast head.
+    """
+    # Identify representation layer in the model
+    layer_names = [layer.name for layer in model.layers]
+    
+    # Determine which layer to use as the representation layer
+    repr_layer_name = None
+    if 'normalize_layer' in layer_names:
+        repr_layer_name = 'normalize_layer'
+    elif 'repr_layer' in layer_names:
+        repr_layer_name = 'repr_layer'
+    
+    if repr_layer_name is None:
+        # If neither specific layer exists, find the last layer before forecast_head
+        forecast_head_idx = layer_names.index('forecast_head') if 'forecast_head' in layer_names else -1
+        if forecast_head_idx > 0:
+            repr_layer_name = model.layers[forecast_head_idx - 1].name
+        else:
+            # If all else fails, use the second-to-last layer
+            repr_layer_name = model.layers[-2].name
+            print(f"Warning: Could not find representation layer, using layer: {repr_layer_name}")
+    
+    # Get the representation layer
+    repr_layer = model.get_layer(repr_layer_name).output
+    
+    # Create a new model without the forecast head
+    new_model = Model(
+        inputs=model.input,
+        outputs=repr_layer,
+        name=f"{model.name}_no_head"
+    )
+    
+    return new_model
 
 class NormalizedReLU(Layer):
     """Custom activation layer that applies ReLU followed by L1 normalization.
@@ -1637,7 +1631,7 @@ def create_mlp_moe(
     # Load pre-trained weights if available
     if combiner_pretrained_weights is not None:
         print(f"Loading pre-trained weights from {combiner_pretrained_weights}")
-        load_partial_weights_from_path(
+        combiner = load_partial_weights_from_path(
             pretrained_weights_path=combiner_pretrained_weights,
             new_model=combiner,
             old_model_params=combiner_pretrained_config,

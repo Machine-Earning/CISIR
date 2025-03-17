@@ -130,6 +130,10 @@ def main():
                 # Load the weights
                 model.load_weights(weight_path)
                 print(f"Loaded weights from {weight_path}")
+                
+                # Remove the forecast head
+                model_no_head = remove_forecast_head(model)
+                print("Removed forecast head from the model")
 
                 # evaluate the model error on test set
                 error_mae = evaluate_mae(model, X_test, y_test)
@@ -238,58 +242,58 @@ def main():
 
                 # Evaluate the model correlation with colored
                 file_path = plot_repr_corr_dist(
-                    model,
+                    model_no_head,
                     X_train_filtered, y_train_filtered,
                     title + "_training",
-                    model_type='features_reg'
+                    model_type='features'
                 )
                 wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
                 print('file_path: ' + file_path)
 
                 file_path = plot_repr_corr_dist(
-                    model,
+                    model_no_head,
                     X_test_filtered, y_test_filtered,
                     title + "_test",
-                    model_type='features_reg'
+                    model_type='features'
                 )
                 wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
                 print('file_path: ' + file_path)
 
                 # Log t-SNE plot
                 stage1_file_path = plot_tsne_delta(
-                    model,
+                    model_no_head,
                     X_train_filtered, y_train_filtered, title,
                     'stage2_training',
-                    model_type='features_reg',
+                    model_type='features',
                     save_tag=current_time, seed=seed)
                 wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
                 print('stage1_file_path: ' + stage1_file_path)
 
                 stage1_file_path = plot_tsne_delta(
-                    model,
+                    model_no_head,
                     X_test_filtered, y_test_filtered, title,
                     'stage2_testing',
-                    model_type='features_reg',
+                    model_type='features',
                     save_tag=current_time, seed=seed)
                 wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
                 print('stage1_file_path: ' + stage1_file_path)
 
-                # Plot the error histograms
-                filename = plot_error_hist(
-                    model,
-                    X_train, y_train,
-                    sample_weights=None,
-                    title=title,
-                    prefix='training')
-                wandb.log({"training_error_hist": wandb.Image(filename)})
+                # # Plot the error histograms
+                # filename = plot_error_hist(
+                #     model,
+                #     X_train, y_train,
+                #     sample_weights=None,
+                #     title=title,
+                #     prefix='training')
+                # wandb.log({"training_error_hist": wandb.Image(filename)})
 
-                filename = plot_error_hist(
-                    model,
-                    X_test, y_test,
-                    sample_weights=None,
-                    title=title,
-                    prefix='testing')
-                wandb.log({"testing_error_hist": wandb.Image(filename)})
+                # filename = plot_error_hist(
+                #     model,
+                #     X_test, y_test,
+                #     sample_weights=None,
+                #     title=title,
+                #     prefix='testing')
+                # wandb.log({"testing_error_hist": wandb.Image(filename)})
 
                 # Finish the wandb run
                 wandb.finish()

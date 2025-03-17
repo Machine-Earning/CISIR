@@ -217,8 +217,7 @@ COMBINER_V3_AE_NOF_2 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weig
 BETTER_REPR_FOR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.00_v8_updated_20241119-210406_reg.h5'
 BETTER_REPR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250225-135335.h5'
 
-FROZEN_REPR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_before_training_mlp2pdcaes1_amse0.40_moe_cheat_combiner_frozenTrue_20250228-082101.h5'
-
+FROZEN_REPR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_combiner_frozenTrue_plotRepr_20250306-150102.h5'
 # assemble hyperparams
 REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]
 RHO_MOE = [1e-2]

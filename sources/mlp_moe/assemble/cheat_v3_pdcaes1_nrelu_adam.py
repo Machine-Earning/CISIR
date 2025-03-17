@@ -84,7 +84,7 @@ def main():
                 batch_size = BATCH_SIZE_MOE_S2  # higher batch size
                 epochs = EPOCHS  # higher epochs
                 hiddens = MLP_HIDDENS  # hidden layers
-                proj_hiddens = None
+                proj_hiddens = PROJ_HIDDENS
 
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 bandwidth = BANDWIDTH
@@ -273,7 +273,7 @@ def main():
                 init_model_sep.summary()
             
                 print(f'Loading combiner to visualize its representation space')
-                init_combiner = init_model_sep.get_layer("combiner")
+                init_combiner = init_model_sep.get_layer("combiner_ext")
                 init_combiner.summary()
 
                 # Log t-SNE plot 
@@ -386,7 +386,7 @@ def main():
                 )
 
                 # save the combiner before training under a different name
-                combiner_submodel = final_model_sep.get_layer("combiner")
+                combiner_submodel = final_model_sep.get_layer("combiner_ext")
                 combiner_submodel.save_weights(f"combiner_v3_weights_before_training_{experiment_name}.h5")
                 print(f"Combiner sub-model weights saved to combiner_v3_weights_before_training_{experiment_name}.h5")
 
@@ -438,7 +438,7 @@ def main():
                 # print(f"Model weights are saved in final_model_moe_weights_{experiment_name}_reg.h5")
 
                 # Save the combiner sub-model weights
-                combiner_submodel = final_model_sep.get_layer("combiner")
+                combiner_submodel = final_model_sep.get_layer("combiner_ext")
                 combiner_submodel.save_weights(f"combiner_v3_weights_{experiment_name}.h5")
                 print(f"Combiner sub-model weights saved to combiner_v3_weights_{experiment_name}.h5")
 

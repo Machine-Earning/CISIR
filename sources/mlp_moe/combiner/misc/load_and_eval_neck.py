@@ -18,7 +18,8 @@ from modules.training.ts_modeling import (
     plot_confusion_matrix,
     create_metrics_table,
     filter_ds,
-    plot_posteriors
+    plot_posteriors,
+    add_proj_head
 )
 
 
@@ -43,7 +44,7 @@ def main():
         
         # Create a unique experiment name with a timestamp
         current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-        experiment_name = f'combiner_v3_better_repr_{current_time}-frozenTrue'
+        experiment_name = f'combiner_v3_better_repr_{current_time}-frozenTrue_softmax_neck'
 
         set_seed(seed)
         
@@ -62,6 +63,7 @@ def main():
         upper_threshold = UPPER_THRESHOLD_MOE  # upper threshold for the delta_p
         rho = RHO_MOE_C[0]
         pretraining = False
+        proj_hiddens = PROJ_HIDDENS
 
         # Initialize wandb
         wandb.init(project="Jan-moe-router-Report", name=experiment_name)
@@ -110,11 +112,11 @@ def main():
         
 
         # Create combiner model
-        combiner_model = create_mlp(
+        init_model = create_mlp(
             input_dim=n_features,
             hiddens=hiddens,
             embed_dim=embed_dim,
-            output_dim=output_dim,
+            output_dim=0, # output_dim,
             dropout=dropout,
             pretraining=pretraining,
             activation=activation,
@@ -123,6 +125,23 @@ def main():
             skipped_layers=skipped_layers,
             sam_rho=rho,
             output_activation='norm_relu'
+        )
+
+        # add the projection head
+        combiner_model = add_proj_head(
+            init_model,
+            output_dim=3,
+            freeze_features=False,  # don't freeze features when load combiner
+            pretraining=False,  # used PDS/PDC
+            hiddens=proj_hiddens,
+            dropout=dropout,
+            activation=activation,
+            norm=norm,
+            skipped_layers=skipped_layers,
+            sam_rho=rho,
+            weight_decay=0.1,
+            output_activation='softmax',
+            name='combiner'
         )
 
         # Load trained weights
