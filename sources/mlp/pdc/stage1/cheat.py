@@ -20,13 +20,11 @@ from modules.training.cme_modeling import ModelBuilder
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
-    cmse,
     build_dataset,
     filter_ds,
     set_seed,
     stratified_batch_dataset,
-    create_mlp,
-    add_decoder
+    create_mlp
 )
 
 
@@ -62,7 +60,7 @@ def main():
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'mlp2ae_pdcStratInj_bs{batch_size}_cheat_adam'
+                title = f'mlp2_pdc_bs{batch_size}_cheat'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -111,8 +109,6 @@ def main():
                 smoothing_method = SMOOTHING_METHOD
                 window_size = 11 # WINDOW_SIZE_PRE  # allows margin of error of 10 epochs
                 val_window_size = 11 # VAL_WINDOW_SIZE_PRE  # allows margin of error of 10 epochs
-                # Set the reconstruction loss weight
-                reconstruction_loss_weight = 0.0 #AE_LAMBDA  # Adjust as needed
 
                 # Initialize wandb
                 wandb.init(project='Repr-Jan-Report', name=experiment_name, config={
@@ -152,7 +148,6 @@ def main():
                     'smoothing_method': smoothing_method,
                     'window_size': window_size,
                     'val_window_size': val_window_size,
-                    'reconstruction_loss_weight': reconstruction_loss_weight,
                     'lr_cb_patience': lr_cb_patience,
                     'lr_cb_factor': lr_cb_factor,
                     'lr_cb_min_lr': lr_cb_min_lr,
@@ -226,7 +221,7 @@ def main():
                     N=N, seed=seed)
 
                 # create the model
-                encoder_model = create_mlp(
+                model = create_mlp(
                     input_dim=n_features,
                     hiddens=hiddens,
                     output_dim=0,
@@ -241,18 +236,7 @@ def main():
                     sam_rho=rho,
                 )
 
-                # Add decoder to create the autoencoder model
-                model_sep = add_decoder(
-                    encoder_model=encoder_model,
-                    hiddens=hiddens,
-                    activation=activation,
-                    norm=norm,
-                    dropout=dropout,
-                    skip_connections=(skipped_layers > 0),
-                    weight_decay=weight_decay
-                )
-
-                model_sep.summary()
+                model.summary()
 
                 # Define the EarlyStopping callback
                 early_stopping = SmoothEarlyStopping(
@@ -264,48 +248,27 @@ def main():
                     smoothing_method=smoothing_method,  # 'moving_average'
                     smoothing_parameters={'window_size': window_size})  # 10
 
-                # Compile the model with separate losses for encoder and decoder
-                model_sep.compile(
+                # Compile the model
+                model.compile(
                     optimizer=Adam(
                         learning_rate=learning_rate,
                     ),
-                    loss=[
-                        # PDC loss for encoder (predicting y from encoded representation)
-                        lambda y_true, z_pred: mb.pdc_loss_linear_vec(
-                            y_true, z_pred,
-                            phase_manager=pm,
-                            train_sample_weights=train_weights_dict,
-                            val_sample_weights=test_weights_dict,
-                        ),
-                        # CMSE loss for decoder (reconstructing X from encoded representation)
-                        lambda x_true, x_pred: cmse(
-                            x_true, x_pred,
-                            phase_manager=pm,
-                            lambda_factor=lambda_factor,
-                            train_mse_weight_dict=train_weights_dict,
-                            val_mse_weight_dict=test_weights_dict,
-                            normalized_weights=normalized_weights
-                        )
-                    ],
-                    loss_weights=[
-                        1.0,  # Weight for PDC loss (encoder)
-                        reconstruction_loss_weight  # Weight for reconstruction loss (decoder)
-                    ]
+                    loss=lambda y_true, z_pred: mb.pdc_loss_linear_vec(
+                        y_true, z_pred,
+                        phase_manager=pm,
+                        train_sample_weights=train_weights_dict,
+                        val_sample_weights=test_weights_dict,
+                    )
                 )
 
                 train_ds, train_steps = stratified_batch_dataset(
                     X_train, y_train, batch_size)
 
-                # Adjust the datasets to include both y and X for reconstruction
-                # First output is y for PDC loss, second output is X for reconstruction loss
-                train_ds = train_ds.map(lambda x, y: (x, (y, x)))
-                val_data = (X_test, (y_test, X_test))
-
-                history = model_sep.fit(
+                history = model.fit(
                     train_ds,
                     steps_per_epoch=train_steps,
                     epochs=epochs,
-                    validation_data=val_data,
+                    validation_data=(X_test, y_test),
                     batch_size=batch_size,
                     callbacks=[
                         reduce_lr_on_plateau,
@@ -344,48 +307,21 @@ def main():
                     sam_rho=rho,
                 )
 
-                # Add decoder to create the autoencoder model
-                final_model_sep = add_decoder(
-                    encoder_model=final_encoder,
-                    hiddens=hiddens,
-                    activation=activation,
-                    norm=norm,
-                    dropout=dropout,
-                    skip_connections=(skipped_layers > 0),
-                    weight_decay=weight_decay
-                )
-
-                final_model_sep.compile(
+                final_encoder.compile(
                     optimizer=Adam(
                         learning_rate=learning_rate,
                     ),
-                    loss=[
-                        lambda y_true, z_pred: mb.pdc_loss_linear_vec(
-                            y_true, z_pred,
-                            phase_manager=pm,
-                            train_sample_weights=train_weights_dict,
-                        ),
-                        lambda x_true, x_pred: cmse(
-                            x_true, x_pred,
-                            phase_manager=pm,
-                            lambda_factor=lambda_factor,
-                            train_mse_weight_dict=train_weights_dict,
-                            normalized_weights=normalized_weights
-                        )
-                    ],
-                    loss_weights=[
-                        1.0,
-                        reconstruction_loss_weight
-                    ]
+                    loss=lambda y_true, z_pred: mb.pdc_loss_linear_vec(
+                        y_true, z_pred,
+                        phase_manager=pm,
+                        train_sample_weights=train_weights_dict,
+                    )
                 )
 
                 train_ds, train_steps = stratified_batch_dataset(
                     X_train, y_train, batch_size)
 
-                # Adjust the dataset to include both y_train and X_train for reconstruction
-                train_ds = train_ds.map(lambda x, y: (x, (y, x)))
-
-                final_model_sep.fit(
+                final_encoder.fit(
                     train_ds,
                     steps_per_epoch=train_steps,
                     epochs=optimal_epochs,
@@ -397,10 +333,6 @@ def main():
                     ],
                     verbose=VERBOSE
                 )
-
-                #since i want to overfit the model, i will save the model as final model
-                # final_encoder = encoder_model
-
 
                 # Save the final model
                 final_encoder.save_weights(f"final_model_weights_{str(experiment_name)}.h5")
