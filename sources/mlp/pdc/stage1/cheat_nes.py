@@ -18,7 +18,6 @@ from modules.reweighting.ImportanceWeighting import ReciprocalImportance
 from modules.shared.globals import *
 from modules.training.cme_modeling import ModelBuilder
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
-from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
     build_dataset,
     filter_ds,
@@ -27,9 +26,6 @@ from modules.training.ts_modeling import (
     create_mlp
 )
 
-
-# Set the environment variable for CUDA (in case it is necessary)
-# os.environ['CUDA_VISIBLE_DEVICES'] = '2'  # left is 1
 
 
 def main():
@@ -70,7 +66,7 @@ def main():
                 experiment_name = f'{title}_{current_time}'
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed, use_deterministic=False)
-                epochs = EPOCHS
+                epochs = int(9e3)  # EPOCHS
                 patience = PATIENCE_PRE
                 learning_rate = START_LR_PRE
                 weight_decay = WEIGHT_DECAY_PRE
@@ -243,7 +239,7 @@ def main():
                     optimizer=Adam(
                         learning_rate=learning_rate,
                     ),
-                    loss=lambda y_true, z_pred: mb.pdc_loss_linear_vec(
+                    loss=lambda y_true, z_pred: mb.pdc_loss_vec(
                         y_true, z_pred,
                         phase_manager=pm,
                         train_sample_weights=train_weights_dict,
@@ -251,8 +247,8 @@ def main():
                     ),
                     metrics=[
                         tf.keras.metrics.MeanMetricWrapper(
-                            lambda y_true, y_pred: mb.pdc_loss_linear_vec(
-                                y_true, y_pred,
+                            lambda y_true, z_pred: mb.pdc_loss_vec(
+                                y_true, z_pred,
                                 phase_manager=pm,
                                 train_sample_weights=train_weights_dict,
                                 val_sample_weights=test_weights_dict,

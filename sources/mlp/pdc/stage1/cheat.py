@@ -261,8 +261,8 @@ def main():
                     ),
                     metrics=[
                         tf.keras.metrics.MeanMetricWrapper(
-                            lambda y_true, y_pred: mb.pdc_loss_vec(
-                                y_true, y_pred,
+                            lambda y_true, z_pred: mb.pdc_loss_vec(
+                                y_true, z_pred,
                                 phase_manager=pm,
                                 train_sample_weights=train_weights_dict,
                                 val_sample_weights=test_weights_dict,
