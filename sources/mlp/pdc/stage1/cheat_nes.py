@@ -60,7 +60,7 @@ def main():
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
 
                 # Construct the title
-                title = f'mlp2_pdc_bs{batch_size}_cheat_pdcVec'
+                title = f'mlp2_pdc_bs{batch_size}_cheat_nes'
 
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
@@ -238,22 +238,12 @@ def main():
 
                 model.summary()
 
-                # Define the EarlyStopping callback
-                early_stopping = SmoothEarlyStopping(
-                    monitor=cvrg_metric,
-                    min_delta=cvrg_min_delta,
-                    patience=patience,
-                    verbose=VERBOSE,
-                    restore_best_weights=ES_CB_RESTORE_WEIGHTS,
-                    smoothing_method=smoothing_method,  # 'moving_average'
-                    smoothing_parameters={'window_size': window_size})  # 10
-
                 # Compile the model
                 model.compile(
                     optimizer=Adam(
                         learning_rate=learning_rate,
                     ),
-                    loss=lambda y_true, z_pred: mb.pdc_loss_vec(
+                    loss=lambda y_true, z_pred: mb.pdc_loss_linear_vec(
                         y_true, z_pred,
                         phase_manager=pm,
                         train_sample_weights=train_weights_dict,
@@ -261,7 +251,7 @@ def main():
                     ),
                     metrics=[
                         tf.keras.metrics.MeanMetricWrapper(
-                            lambda y_true, y_pred: mb.pdc_loss_vec(
+                            lambda y_true, y_pred: mb.pdc_loss_linear_vec(
                                 y_true, y_pred,
                                 phase_manager=pm,
                                 train_sample_weights=train_weights_dict,
@@ -283,101 +273,43 @@ def main():
                     batch_size=batch_size,
                     callbacks=[
                         reduce_lr_on_plateau,
-                        early_stopping,
                         WandbCallback(save_model=WANDB_SAVE_MODEL),
                         IsTraining(pm)
                     ],
                     verbose=VERBOSE
                 )
 
-                # optimal epoch for fold
-                # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
-                # Use the quadratic fit function to find the optimal epoch
-                optimal_epochs = find_optimal_epoch_by_smoothing(
-                    history.history[ES_CB_MONITOR],
-                    smoothing_method=smoothing_method,
-                    smoothing_parameters={'window_size': val_window_size},
-                    mode='min')
-
-                print(f'optimal_epochs: {optimal_epochs}')
-                wandb.log({'optimal_epochs': optimal_epochs})
-
-                # create the model
-                final_encoder = create_mlp(
-                    input_dim=n_features,
-                    hiddens=hiddens,
-                    output_dim=0,
-                    pretraining=pretraining,
-                    embed_dim=embed_dim,
-                    dropout=dropout,
-                    activation=activation,
-                    norm=norm,
-                    skip_repr=skip_repr,
-                    skipped_layers=skipped_layers,
-                    weight_decay=weight_decay,
-                    sam_rho=rho,
-                )
-
-                final_encoder.compile(
-                    optimizer=Adam(
-                        learning_rate=learning_rate,
-                    ),
-                    loss=lambda y_true, z_pred: mb.pdc_loss_vec(
-                        y_true, z_pred,
-                        phase_manager=pm,
-                        train_sample_weights=train_weights_dict,
-                    ),
-                )
-
-                train_ds, train_steps = stratified_batch_dataset(
-                    X_train, y_train, batch_size)
-
-                final_encoder.fit(
-                    train_ds,
-                    steps_per_epoch=train_steps,
-                    epochs=optimal_epochs,
-                    batch_size=batch_size,
-                    callbacks=[
-                        reduce_lr_on_plateau,
-                        WandbCallback(save_model=WANDB_SAVE_MODEL),
-                        IsTraining(pm)
-                    ],
-                    verbose=VERBOSE
-                )
-
-                # Save the final model
-                final_encoder.save_weights(f"final_model_weights_{str(experiment_name)}.h5")
+                # Save the model weights
+                model.save_weights(f"final_model_weights_{str(experiment_name)}.h5")
                 # print where the model weights are saved
                 print(f"Model weights are saved in final_model_weights_{str(experiment_name)}.h5")
 
                 # Evaluate the model correlation on the test set
-                error_pcc = evaluate_pcc_repr(final_encoder, X_test, y_test)
+                error_pcc = evaluate_pcc_repr(model, X_test, y_test)
                 print(f'pcc error delta test: {error_pcc}')
                 wandb.log({"jpcc": error_pcc})
 
                 # Evaluate the model correlation on the training set
-                error_pcc_train = evaluate_pcc_repr(final_encoder, X_train, y_train)
+                error_pcc_train = evaluate_pcc_repr(model, X_train, y_train)
                 print(f'pcc error delta train: {error_pcc_train}')
                 wandb.log({"train_jpcc": error_pcc_train})
-
 
                 above_threshold = mae_plus_threshold  # norm_upper_t
                 # evaluate pcc+ on the test set
                 error_pcc_cond = evaluate_pcc_repr(
-                    final_encoder, X_test, y_test, i_above_threshold=above_threshold)
+                    model, X_test, y_test, i_above_threshold=above_threshold)
                 print(f'pcc error delta i>= {above_threshold} test: {error_pcc_cond}')
                 wandb.log({"jpcc+": error_pcc_cond})
 
                 # evaluate pcc+ on the training set
                 error_pcc_cond_train = evaluate_pcc_repr(
-                    final_encoder, X_train, y_train, i_above_threshold=above_threshold)
+                    model, X_train, y_train, i_above_threshold=above_threshold)
                 print(f'pcc error delta i>= {above_threshold} train: {error_pcc_cond_train}')
                 wandb.log({"train_jpcc+": error_pcc_cond_train})
 
-
                 # Evaluate the model correlation with colored
                 file_path = plot_repr_corr_dist(
-                    final_encoder,
+                    model,
                     X_train_filtered, y_train_filtered,
                     title + "_training"
                 )
@@ -385,7 +317,7 @@ def main():
                 print('file_path: ' + file_path)
 
                 file_path = plot_repr_corr_dist(
-                    final_encoder,
+                    model,
                     X_test_filtered, y_test_filtered,
                     title + "_test"
                 )
@@ -395,7 +327,7 @@ def main():
                 # Log t-SNE plot
                 # Log the training t-SNE plot to wandb
                 stage1_file_path = plot_tsne_delta(
-                    final_encoder,
+                    model,
                     X_train_filtered, y_train_filtered, title,
                     'stage1_training',
                     model_type='features',
@@ -405,7 +337,7 @@ def main():
 
                 # Log the testing t-SNE plot to wandb
                 stage1_file_path = plot_tsne_delta(
-                    final_encoder,
+                    model,
                     X_test_filtered, y_test_filtered, title,
                     'stage1_testing',
                     model_type='features',
@@ -415,7 +347,7 @@ def main():
 
                 # Evaluate the model correlation
                 file_path = plot_repr_correlation(
-                    final_encoder,
+                    model,
                     X_train_filtered, y_train_filtered,
                     title + "_training"
                 )
@@ -423,7 +355,7 @@ def main():
                 print('file_path: ' + file_path)
 
                 file_path = plot_repr_correlation(
-                    final_encoder,
+                    model,
                     X_test_filtered, y_test_filtered,
                     title + "_test"
                 )
@@ -432,7 +364,7 @@ def main():
 
                 # Evaluate the model correlation density
                 file_path = plot_repr_corr_density(
-                    final_encoder,
+                    model,
                     X_train_filtered, y_train_filtered,
                     title + "_training"
                 )
@@ -440,7 +372,7 @@ def main():
                 print('file_path: ' + file_path)
 
                 file_path = plot_repr_corr_density(
-                    final_encoder,
+                    model,
                     X_test_filtered, y_test_filtered,
                     title + "_test"
                 )
