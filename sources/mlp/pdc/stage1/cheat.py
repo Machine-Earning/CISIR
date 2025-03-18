@@ -88,8 +88,8 @@ def main():
                 lr_cb_factor = LR_CB_FACTOR_PRE
                 lr_cb_min_lr = LR_CB_MIN_LR_PRE
                 lr_cb_min_delta = LR_CB_MIN_DELTA
-                cvrg_metric = 'loss' #CVRG_METRIC
-                cvrg_min_delta = 1e-5 # CVRG_MIN_DELTA
+                cvrg_metric = CVRG_METRIC
+                cvrg_min_delta = CVRG_MIN_DELTA
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -107,8 +107,8 @@ def main():
                 upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                 mae_plus_threshold = MAE_PLUS_THRESHOLD
                 smoothing_method = SMOOTHING_METHOD
-                window_size = 11 # WINDOW_SIZE_PRE  # allows margin of error of 10 epochs
-                val_window_size = 11 # VAL_WINDOW_SIZE_PRE  # allows margin of error of 10 epochs
+                window_size = WINDOW_SIZE_PRE  # allows margin of error of 10 epochs
+                val_window_size = VAL_WINDOW_SIZE_PRE  # allows margin of error of 10 epochs
 
                 # Initialize wandb
                 wandb.init(project='Repr-Jan-Report', name=experiment_name, config={
