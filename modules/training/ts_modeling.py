@@ -4313,6 +4313,191 @@ def evaluate_pcc(
     return pcc
 
 
+def _filter_by_ranges(
+    values: np.ndarray,
+    predictions: np.ndarray,
+    ranges: List[Tuple[float, float]]
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Filters the given values and predictions based on a list of intervals.
+    Returns the filtered arrays.
+
+    Parameters:
+    - values (np.ndarray): The values to filter.
+    - predictions (np.ndarray): The predictions to filter.
+    - ranges (List[Tuple[float, float]]): The list of intervals to filter by.
+
+    Returns:
+    - Tuple[np.ndarray, np.ndarray]: The filtered values and predictions.
+    """
+    mask = np.zeros_like(values, dtype=bool)
+    for low, high in ranges:
+        mask |= ((values >= low) & (values <= high))
+    return predictions[mask], values[mask]
+
+
+def eval_lt_mae(
+    model: tf.keras.Model,
+    X_test: Union[np.ndarray, List[np.ndarray]],
+    y_test: np.ndarray,
+    use_dict: bool = False
+) -> Dict[str, float]:
+    """
+    Evaluates Mean Absolute Error (MAE) for three defined ranges of y-values:
+    Frequency, Middle, and Rare. Returns the MAE in each range.
+
+    Parameters:
+    - model (tf.keras.Model): The trained model to evaluate.
+    - X_test (Union[np.ndarray, List[np.ndarray]]): Test features.
+    - y_test (np.ndarray): True target values for the test set.
+    - use_dict (bool, optional): Whether the model returns a dictionary with 
+      named outputs. Defaults to False.
+
+    Returns:
+    - Dict[str, float]: A dictionary with keys "freq", "midd", "rare" 
+      and corresponding MAE values.
+    """
+    # Ranges
+    FREQ_RANGE = [(-0.5, 0.5)]
+    MIDD_RANGE = [(-1, -0.5), (0.5, 1)]
+    RARE_RANGE = [(-2.5, -1), (1, 2.5)]
+
+    # 1) Make predictions
+    if use_dict:
+        res = model.predict(X_test)
+        predictions = res['output']
+    else:
+        _, predictions = model.predict(X_test)
+
+    # 2) Process predictions
+    predictions = process_predictions(predictions)
+    y_test_processed = process_predictions(y_test)
+
+    # 3) Evaluate MAE on each range
+    # --- Frequency range ---
+    freq_preds, freq_y = _filter_by_ranges(y_test_processed, predictions, FREQ_RANGE)
+    freq_mae = mean_absolute_error(freq_y, freq_preds) if len(freq_y) > 0 else float('nan')
+
+    # --- Middle range ---
+    midd_preds, midd_y = _filter_by_ranges(y_test_processed, predictions, MIDD_RANGE)
+    midd_mae = mean_absolute_error(midd_y, midd_preds) if len(midd_y) > 0 else float('nan')
+
+    # --- Rare range ---
+    rare_preds, rare_y = _filter_by_ranges(y_test_processed, predictions, RARE_RANGE)
+    rare_mae = mean_absolute_error(rare_y, rare_preds) if len(rare_y) > 0 else float('nan')
+
+    return {
+        "freq": freq_mae,
+        "midd": midd_mae,
+        "rare": rare_mae
+    }
+
+
+def eval_lt_pcc(
+    model: tf.keras.Model,
+    X_test: Union[np.ndarray, List[np.ndarray]],
+    y_test: np.ndarray,
+    logI_test: np.ndarray = None,
+    logI_prev_test: np.ndarray = None,
+    use_dict: bool = False
+) -> Dict[str, float]:
+    """
+    Evaluates Pearson Correlation Coefficient (PCC) for three defined ranges
+    of y-values: Frequency, Middle, and Rare. Returns the PCC in each range.
+
+    If logI_test and logI_prev_test are provided, PCC is computed using
+    the predicted log intensities (i.e., logI_prev + predicted deltas).
+    Otherwise, PCC is computed using y_test vs. predictions directly.
+
+    Parameters:
+    - model (tf.keras.Model): The trained model to evaluate.
+    - X_test (Union[np.ndarray, List[np.ndarray]]): Test features.
+    - y_test (np.ndarray): True target values for the test set.
+    - logI_test (np.ndarray, optional): True log intensity values.
+    - logI_prev_test (np.ndarray, optional): Previous log intensity values.
+      Required if logI_test is provided.
+    - use_dict (bool, optional): Whether the model returns a dictionary
+      with named outputs. Defaults to False.
+
+    Returns:
+    - Dict[str, float]: A dictionary with keys "freq", "midd", "rare"
+      and corresponding PCC values.
+    """
+    # Ranges
+    FREQ_RANGE = [(-0.5, 0.5)]
+    MIDD_RANGE = [(-1, -0.5), (0.5, 1)]
+    RARE_RANGE = [(-2.5, -1), (1, 2.5)]
+
+    # 1) Make predictions
+    if use_dict:
+        res = model.predict(X_test)
+        predictions = res['output']
+    else:
+        _, predictions = model.predict(X_test)
+
+    # 2) Process predictions
+    predictions = process_predictions(predictions)
+    y_test_processed = process_predictions(y_test)
+
+    # 3) A small helper for computing PCC
+    def _compute_pcc(
+        y_vals: np.ndarray, 
+        pred_vals: np.ndarray, 
+        logI: np.ndarray = None, 
+        logI_prev: np.ndarray = None
+    ) -> float:
+        """
+        Computes Pearson correlation coefficient using either raw deltas 
+        or reconstructed log intensities if logI arrays are provided.
+        """
+        if logI is not None and logI_prev is not None:
+            # predicted logI = logI_prev + predicted delta
+            predicted_logI = logI_prev + pred_vals
+            if len(logI) == 0:
+                return float('nan')
+            corr, _ = pearsonr(logI.flatten(), predicted_logI.flatten())
+            return corr
+        else:
+            if len(y_vals) == 0:
+                return float('nan')
+            corr, _ = pearsonr(y_vals.flatten(), pred_vals.flatten())
+            return corr
+
+    # 4) Compute PCC for each range
+    # --- Frequency range ---
+    freq_preds, freq_y = _filter_by_ranges(y_test_processed, predictions, FREQ_RANGE)
+    if logI_test is not None and logI_prev_test is not None:
+        freq_logI, freq_logI_prev = _filter_by_ranges(y_test_processed, logI_test, FREQ_RANGE)[1], \
+                                    _filter_by_ranges(y_test_processed, logI_prev_test, FREQ_RANGE)[1]
+        freq_pcc = _compute_pcc(freq_y, freq_preds, freq_logI, freq_logI_prev)
+    else:
+        freq_pcc = _compute_pcc(freq_y, freq_preds)
+
+    # --- Middle range ---
+    midd_preds, midd_y = _filter_by_ranges(y_test_processed, predictions, MIDD_RANGE)
+    if logI_test is not None and logI_prev_test is not None:
+        midd_logI, midd_logI_prev = _filter_by_ranges(y_test_processed, logI_test, MIDD_RANGE)[1], \
+                                    _filter_by_ranges(y_test_processed, logI_prev_test, MIDD_RANGE)[1]
+        midd_pcc = _compute_pcc(midd_y, midd_preds, midd_logI, midd_logI_prev)
+    else:
+        midd_pcc = _compute_pcc(midd_y, midd_preds)
+
+    # --- Rare range ---
+    rare_preds, rare_y = _filter_by_ranges(y_test_processed, predictions, RARE_RANGE)
+    if logI_test is not None and logI_prev_test is not None:
+        rare_logI, rare_logI_prev = _filter_by_ranges(y_test_processed, logI_test, RARE_RANGE)[1], \
+                                    _filter_by_ranges(y_test_processed, logI_prev_test, RARE_RANGE)[1]
+        rare_pcc = _compute_pcc(rare_y, rare_preds, rare_logI, rare_logI_prev)
+    else:
+        rare_pcc = _compute_pcc(rare_y, rare_preds)
+
+    return {
+        "freq": freq_pcc,
+        "midd": midd_pcc,
+        "rare": rare_pcc
+    }
+
+
 # def filter_ds_deprecated(
 #         X: np.ndarray, y: np.ndarray,
 #         low_threshold: float, high_threshold: float,
