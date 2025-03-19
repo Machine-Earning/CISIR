@@ -220,6 +220,75 @@ class ReciprocalImportance:
         self.label_importance_map = map_labels_to_importance_weights(
             self.labels, self.importance_weights)
         
+    
+class DenseLossImportance:
+    """
+    Class for generating importance weights based on the PDF of the target values
+    (density-based weighting), as described in the DenseLoss approach.
+    TODO: double check this implementation is correct and matches the paper
+    """
+
+    def __init__(
+        self,
+        features: np.ndarray,
+        labels: np.ndarray,
+        alpha: float = 1.0,
+        bandwidth: Union[float, str] = 0.07,
+        epsilon: float = 1e-3,
+        min_weight: float = 1e-6
+    ) -> None:
+        """
+        Initialize the DenseLossImportance class.
+
+        Parameters:
+        - features: np.ndarray
+            Training instances (not strictly required for this density-based weighting,
+            but included for a consistent interface).
+        - labels: np.ndarray
+            Training labels.
+        - alpha: float
+            Controls how strongly rare (low-density) targets get emphasized. Higher
+            alpha increases the weight of rarer labels.
+        - bandwidth: Union[float, str]
+            Bandwidth parameter for the KDE. Can be a numeric value or a valid string
+            (e.g., 'scott', 'silverman', etc.) for automated selection.
+        - epsilon: float
+            Small value added to the max density for numerical stability.
+        - min_weight: float
+            Clipping value so that no weight falls below this small constant.
+        """
+
+        self.alpha = alpha
+        self.features = features
+        self.labels = labels
+        self.epsilon = epsilon
+        self.min_weight = min_weight
+
+        # Create KDE and get PDF values over the labels
+        self.kde = gaussian_kde(self.labels, bw_method=bandwidth)
+        self.densities = self.kde.evaluate(self.labels)
+
+        # Smooth the density values for high outliers if needed
+        self.densities = smooth_blip(self.labels, self.densities)
+
+        self.min_density = np.min(self.densities)
+        self.max_density = np.max(self.densities)
+
+        # Normalize densities so that they lie approximately in [0, 1]
+        # Using the same approach as your ReciprocalImportance for consistency
+        normalized_densities = self.densities / (self.max_density + self.epsilon)
+
+        # Compute unnormalized importance: a linear decay from 1 down to min_weight
+        unnormed_importance = np.maximum(1.0 - self.alpha * normalized_densities, self.min_weight)
+
+        # Normalize importance so that the average weight is 1
+        mean_val = np.mean(unnormed_importance)
+        self.importance_weights = unnormed_importance / mean_val
+
+        # Create a mapping from labels to importance weights, parallel to your previous approach
+        self.label_importance_map = map_labels_to_importance_weights(
+            self.labels, self.importance_weights)
+
 
 
 
