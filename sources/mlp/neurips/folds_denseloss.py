@@ -4,7 +4,6 @@ from datetime import datetime
 import numpy as np
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
-from tensorflow.data import Dataset
 from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
@@ -20,7 +19,6 @@ from modules.training.ts_modeling import (
     eval_lt_mae,
     eval_lt_pcc,
     process_sep_events,
-    stratified_batch_dataset,
     set_seed,
     cmse,
     filter_ds,
@@ -42,7 +40,7 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in TRIAL_SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1.0, 1.0, 0.0, 0.0)]:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(2.0, 2.0, 0.0, 0.0)]:
             for rho in RHO:  # SAM_RHOS:
                 inputs_to_use = INPUTS_TO_USE[0]
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]
@@ -295,16 +293,11 @@ def main():
                         }
                     )
 
-                    # Create standard TensorFlow dataset
-                    subtrain_ds = Dataset.from_tensor_slices((X_subtrain, {'forecast_head': y_subtrain}))
-                    subtrain_ds = subtrain_ds.batch(batch_size)
-                    subtrain_steps = len(X_subtrain) // batch_size
-
                     # Train the model with the callback
                     history = model_sep.fit(
-                        subtrain_ds,
-                        steps_per_epoch=subtrain_steps,
+                        X_subtrain, {'forecast_head': y_subtrain},
                         epochs=epochs,
+                        batch_size=batch_size,
                         validation_data=(X_val, {'forecast_head': y_val}),
                         callbacks=[
                             early_stopping,
@@ -365,16 +358,11 @@ def main():
                     },
                 )  # Compile the model just like before
 
-                # Create standard dataset for final training
-                train_ds = Dataset.from_tensor_slices((X_train, {'forecast_head': y_train}))
-                train_ds = train_ds.batch(batch_size)
-                train_steps = len(X_train) // batch_size
-
                 # Train on the full dataset
                 final_model_sep.fit(
-                    train_ds,
-                    steps_per_epoch=train_steps,
+                    X_train, {'forecast_head': y_train},
                     epochs=optimal_epochs,
+                    batch_size=batch_size,
                     callbacks=[
                         reduce_lr_on_plateau,
                         WandbCallback(save_model=WANDB_SAVE_MODEL),
