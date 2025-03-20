@@ -234,7 +234,6 @@ class DenseLossImportance:
         labels: np.ndarray,
         alpha: float = 1.0,
         bandwidth: Union[float, str] = 0.07,
-        epsilon: float = 1e-3,
         min_weight: float = 1e-6
     ) -> None:
         """
@@ -252,8 +251,6 @@ class DenseLossImportance:
         - bandwidth: Union[float, str]
             Bandwidth parameter for the KDE. Can be a numeric value or a valid string
             (e.g., 'scott', 'silverman', etc.) for automated selection.
-        - epsilon: float
-            Small value added to the max density for numerical stability.
         - min_weight: float
             Clipping value so that no weight falls below this small constant.
         """
@@ -261,7 +258,6 @@ class DenseLossImportance:
         self.alpha = alpha
         self.features = features
         self.labels = labels
-        self.epsilon = epsilon
         self.min_weight = min_weight
 
         # Create KDE and get PDF values over the labels
@@ -275,10 +271,11 @@ class DenseLossImportance:
         self.max_density = np.max(self.densities)
 
         # Normalize densities so that they lie approximately in [0, 1]
-        # Using the same approach as your ReciprocalImportance for consistency
-        normalized_densities = self.densities / (self.max_density + self.epsilon)
+        # Update to use min-max normalization as described in the paper
+        normalized_densities = (self.densities - self.min_density) / (self.max_density - self.min_density)
 
-        # Compute unnormalized importance: a linear decay from 1 down to min_weight
+        # Compute unnormalized importance: a linear decay from 1 down to min_weight 
+        # alpha = 0 -> uniform weighting, alpha > 0 -> more weight for rarer labels
         unnormed_importance = np.maximum(1.0 - self.alpha * normalized_densities, self.min_weight)
 
         # Normalize importance so that the average weight is 1

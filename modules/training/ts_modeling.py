@@ -5382,11 +5382,9 @@ def cmse(
     """
     # Select the appropriate weight dictionaries based on the mode
     mse_weight_dict = train_mse_weight_dict if phase_manager.is_training_phase() else val_mse_weight_dict
-    pcc_weight_dict = train_pcc_weight_dict if phase_manager.is_training_phase() else val_pcc_weight_dict
-
-    # Generate the weight tensors for MSE and PCC using the optimized function
+    
+    # Generate the weight tensor for MSE using the optimized function
     mse_weights = create_weight_tensor_fast(y_true, mse_weight_dict)
-    pcc_weights = create_weight_tensor_fast(y_true, pcc_weight_dict)
 
     # Apply asymmetric weight if specified
     if asym_type == 'silu':
@@ -5402,7 +5400,18 @@ def cmse(
         mse = tf.reduce_sum(asym_weights * mse_weights * tf.square(y_pred - y_true))
     else:
         mse = tf.reduce_mean(asym_weights * mse_weights * tf.square(y_pred - y_true))
-
+    
+    # Early return if lambda_factor is zero (no PCC component)
+    if lambda_factor == 0:
+        # Add bias penalty if factor is provided
+        if bias_penalty_factor is not None:
+            mse = mse + bias_penalty_factor * bias_penalty(y_true, y_pred)
+        return mse
+    
+    # If lambda_factor is not zero, compute the PCC component
+    pcc_weight_dict = train_pcc_weight_dict if phase_manager.is_training_phase() else val_pcc_weight_dict
+    pcc_weights = create_weight_tensor_fast(y_true, pcc_weight_dict)
+    
     # Compute the correlation regularization term using coreg
     pcc_loss = coreg(y_true, y_pred, pcc_weights)
 
