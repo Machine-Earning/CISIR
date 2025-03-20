@@ -92,7 +92,9 @@ def sam_train_step(
     with tf.GradientTape() as tape:
         y_pred = self(x, training=True)
         loss = self.compiled_loss(
-            y, y_pred, sample_weight=sample_weight, regularization_losses=self.losses
+            y, y_pred, 
+            sample_weight=sample_weight, 
+            regularization_losses=self.losses
         )
 
     # Compute gradients without perturbation
@@ -103,6 +105,7 @@ def sam_train_step(
     e_ws = []
     grad_norm = tf.linalg.global_norm(gradients)
     ew_multiplier = rho / (grad_norm + eps)
+    # apply perturbation
     for grad, var in zip(gradients, trainable_vars):
         e_w = tf.math.multiply(grad, ew_multiplier)
         var.assign_add(e_w)  # w + e_hat(w)
@@ -112,14 +115,16 @@ def sam_train_step(
     with tf.GradientTape() as tape:
         y_pred = self(x, training=True)
         loss = self.compiled_loss(
-            y, y_pred, sample_weight=sample_weight, regularization_losses=self.losses
+            y, y_pred, 
+            sample_weight=sample_weight, 
+            regularization_losses=self.losses
         )
 
     # Compute gradients with perturbed weights
     perturbed_gradients = tape.gradient(loss, trainable_vars)
 
     # revert perturbation to get the original parameters
-    for var, e_w in zip(trainable_vars, e_ws):
+    for e_w, var in zip(e_ws, trainable_vars):
         var.assign_sub(e_w)
 
     # Apply the actual "sharpness-aware" update
