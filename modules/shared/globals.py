@@ -25,7 +25,7 @@ LR_CB_MIN_LR_PRE = 5e-5  # Minimum learning rate for pretraining
 LR_CB_FACTOR_PRE = 0.95 # factor for reducing learning rate in pretraining
 LR_CB_PATIENCE_PRE = 50 # patience for reducing learning rate in pretraining
 PATIENCE_PRE = 8000  # Higher patience for pretraining
-RHO_PRE = [1e-5]  # Pretraining rho parameter
+RHO_PRE = [1e-6]  # Pretraining rho parameter
 REWEIGHTS_PRE = [(0.85, 0.85)]  # Pretraining reweighting parameters
 WEIGHT_DECAY_PRE = 0.01 # Higher weight decay for projection layers
 WINDOW_SIZE_PRE = 151  # NOTE: must be odd
@@ -87,7 +87,7 @@ TARGET_MIN_NORM_WEIGHT = 0.01  # Minimum weight for the target normalization
 # Smoothing Parameters
 SMOOTHING_METHOD = 'moving_average'
 WINDOW_SIZE = 121  # NOTE: must be odd
-VAL_WINDOW_SIZE = 21 # NOTE: must be odd
+VAL_WINDOW_SIZE = 121 # NOTE: must be odd
 
 # Additional Parameters
 RHO = [0]
