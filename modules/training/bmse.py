@@ -7,7 +7,8 @@ from tensorflow.keras.losses import Loss
 
 def get_gmm(data, n_components=64):
     """
-    Fit a Gaussian Mixture Model to the provided data
+    Fit a Gaussian Mixture Model to the provided data.
+    Matches the Torch implementation of Balancing MSE.
     
     Args:
         data: Target values to fit the GMM to (numpy array)
@@ -62,7 +63,8 @@ def gai_loss_md(y_pred, y_true, gmm, noise_var):
     pred_expanded = tf.expand_dims(y_pred, 1)  # [batch, 1, dim]
     
     # Calculate covariance matrices for each component
-    gmm_covs = gmm['variances'] + noise_var * I
+    noise_covs = noise_var * I[tf.newaxis, :, :]  # shape (1, dim, dim)
+    gmm_covs = gmm['variances'] + noise_covs  # shape (components, dim, dim)
     
     # Create distribution for GMM components
     mvn_gmm = tfp.distributions.MultivariateNormalFullCovariance(
@@ -89,6 +91,7 @@ def gai_loss_md(y_pred, y_true, gmm, noise_var):
 class GAILossMD(Loss):
     """
     Keras Loss subclass for balanced MSE using GMM
+    Matches the Torch implementation of Balancing MSE.
     """
     
     def __init__(self, init_noise_sigma=1.0, gmm=None, data=None, n_components=64, name='gai_loss_md'):
@@ -109,6 +112,8 @@ class GAILossMD(Loss):
             self.gmm = get_gmm(data, n_components)
         else:
             self.gmm = gmm
+            # Ensure GMM values are TensorFlow tensors
+            self.gmm = {k: tf.convert_to_tensor(self.gmm[k], dtype=tf.float32) for k in self.gmm}
             
         # Create trainable noise sigma parameter
         self.noise_sigma = tf.Variable(init_noise_sigma, trainable=True, dtype=tf.float32)
@@ -116,6 +121,7 @@ class GAILossMD(Loss):
     def call(self, y_true, y_pred):
         """Calculate loss between y_true and y_pred"""
         noise_var = tf.square(self.noise_sigma)
+        # Note the correct parameter order: y_pred, y_true matches the function signature
         return gai_loss_md(y_pred, y_true, self.gmm, noise_var)
 
 
