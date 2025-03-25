@@ -39,7 +39,7 @@ def main():
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
 
-    for seed in SEEDS:
+    for seed in [456789]:
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1.0, 1.0, 0.0, 0.0)]:
             for rho in RHO:  # SAM_RHOS:
                 inputs_to_use = INPUTS_TO_USE[0]
@@ -100,9 +100,7 @@ def main():
                 smoothing_method = SMOOTHING_METHOD
                 window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
                 val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
-                freq_range = FREQ_RANGE
-                mid_range = MIDD_RANGE
-                rare_range = RARE_RANGE
+                mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                 # Initialize wandb
                 wandb.init(project="NeurIPS-2025-Paper", name=experiment_name, config={
@@ -133,9 +131,7 @@ def main():
                     'architecture': 'mlp_res_repr',
                     'cme_speed_threshold': cme_speed_threshold,
                     'ds_version': DS_VERSION,
-                    'freq_range': freq_range,
-                    'mid_range': mid_range,
-                    'rare_range': rare_range,
+                    'mae_plus_threshold': mae_plus_threshold,
                     'sam_rho': rho,
                     'smoothing_method': smoothing_method,
                     'window_size': window_size,
@@ -386,24 +382,6 @@ def main():
                 print(f'mae error train: {error_mae_train}')
                 wandb.log({"train_mae": error_mae_train})
 
-                # Add range-specific MAE evaluation for test set
-                lt_mae_test = eval_lt_mae(final_model_sep, X_test, y_test)
-                print(f'MAE by range (test): freq={lt_mae_test["freq"]:.4f}, midd={lt_mae_test["midd"]:.4f}, rare={lt_mae_test["rare"]:.4f}')
-                wandb.log({
-                    "mae_freq": lt_mae_test["freq"],
-                    "mae_midd": lt_mae_test["midd"],
-                    "mae_rare": lt_mae_test["rare"]
-                })
-
-                # Add range-specific MAE evaluation for train set
-                lt_mae_train = eval_lt_mae(final_model_sep, X_train, y_train)
-                print(f'MAE by range (train): freq={lt_mae_train["freq"]:.4f}, midd={lt_mae_train["midd"]:.4f}, rare={lt_mae_train["rare"]:.4f}')
-                wandb.log({
-                    "train_mae_freq": lt_mae_train["freq"],
-                    "train_mae_midd": lt_mae_train["midd"],
-                    "train_mae_rare": lt_mae_train["rare"]
-                })
-
                 # evaluate the model correlation on test set
                 error_pcc = evaluate_pcc(final_model_sep, X_test, y_test)
                 print(f'pcc error: {error_pcc}')
@@ -414,51 +392,53 @@ def main():
                 print(f'pcc error train: {error_pcc_train}')
                 wandb.log({"train_pcc": error_pcc_train})
 
-                # Add range-specific PCC evaluation for test set
-                lt_pcc_test = eval_lt_pcc(final_model_sep, X_test, y_test)
-                print(f'PCC by range (test): freq={lt_pcc_test["freq"]:.4f}, midd={lt_pcc_test["midd"]:.4f}, rare={lt_pcc_test["rare"]:.4f}')
-                wandb.log({
-                    "pcc_freq": lt_pcc_test["freq"],
-                    "pcc_midd": lt_pcc_test["midd"],
-                    "pcc_rare": lt_pcc_test["rare"]
-                })
-
-                # Add range-specific PCC evaluation for train set
-                lt_pcc_train = eval_lt_pcc(final_model_sep, X_train, y_train)
-                print(f'PCC by range (train): freq={lt_pcc_train["freq"]:.4f}, midd={lt_pcc_train["midd"]:.4f}, rare={lt_pcc_train["rare"]:.4f}')
-                wandb.log({
-                    "train_pcc_freq": lt_pcc_train["freq"],
-                    "train_pcc_midd": lt_pcc_train["midd"],
-                    "train_pcc_rare": lt_pcc_train["rare"]
-                })
-
                 # evaluate the model correlation on test set based on logI and logI_prev
                 error_pcc_logI = evaluate_pcc(final_model_sep, X_test, y_test, logI_test, logI_prev_test)
                 print(f'pcc error logI: {error_pcc_logI}')
                 wandb.log({"pcc_I": error_pcc_logI})
-
-                # Add range-specific PCC evaluation with logI for test set
-                lt_pcc_logI_test = eval_lt_pcc(final_model_sep, X_test, y_test, logI_test, logI_prev_test)
-                print(f'PCC LogI by range (test): freq={lt_pcc_logI_test["freq"]:.4f}, midd={lt_pcc_logI_test["midd"]:.4f}, rare={lt_pcc_logI_test["rare"]:.4f}')
-                wandb.log({
-                    "pcc_I_freq": lt_pcc_logI_test["freq"],
-                    "pcc_I_midd": lt_pcc_logI_test["midd"],
-                    "pcc_I_rare": lt_pcc_logI_test["rare"]
-                })
 
                 # evaluate the model correlation on training set based on logI and logI_prev
                 error_pcc_logI_train = evaluate_pcc(final_model_sep, X_train, y_train, logI_train, logI_prev_train)
                 print(f'pcc error logI train: {error_pcc_logI_train}')
                 wandb.log({"train_pcc_I": error_pcc_logI_train})
 
-                # Add range-specific PCC evaluation with logI for train set
-                lt_pcc_logI_train = eval_lt_pcc(final_model_sep, X_train, y_train, logI_train, logI_prev_train)
-                print(f'PCC LogI by range (train): freq={lt_pcc_logI_train["freq"]:.4f}, midd={lt_pcc_logI_train["midd"]:.4f}, rare={lt_pcc_logI_train["rare"]:.4f}')
-                wandb.log({
-                    "train_pcc_I_freq": lt_pcc_logI_train["freq"],
-                    "train_pcc_I_midd": lt_pcc_logI_train["midd"],
-                    "train_pcc_I_rare": lt_pcc_logI_train["rare"]
-                })
+                # evaluate the model on test cme_files
+                above_threshold = mae_plus_threshold
+                # evaluate the model error for rare samples on test set
+                error_mae_cond = evaluate_mae(
+                    final_model_sep, X_test, y_test, above_threshold=above_threshold)
+                print(f'mae error delta >= {above_threshold} test: {error_mae_cond}')
+                wandb.log({"mae+": error_mae_cond})
+
+                # evaluate the model error for rare samples on training set
+                error_mae_cond_train = evaluate_mae(
+                    final_model_sep, X_train, y_train, above_threshold=above_threshold)
+                print(f'mae error delta >= {above_threshold} train: {error_mae_cond_train}')
+                wandb.log({"train_mae+": error_mae_cond_train})
+
+                # evaluate the model correlation for rare samples on test set
+                error_pcc_cond = evaluate_pcc(
+                    final_model_sep, X_test, y_test, above_threshold=above_threshold)
+                print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
+                wandb.log({"pcc+": error_pcc_cond})
+
+                # evaluate the model correlation for rare samples on training set
+                error_pcc_cond_train = evaluate_pcc(
+                    final_model_sep, X_train, y_train, above_threshold=above_threshold)
+                print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
+                wandb.log({"train_pcc+": error_pcc_cond_train})
+
+                # evaluate the model correlation for rare samples on test set based on logI and logI_prev
+                error_pcc_cond_logI = evaluate_pcc(
+                    final_model_sep, X_test, y_test, logI_test, logI_prev_test, above_threshold=above_threshold)
+                print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond_logI}')
+                wandb.log({"pcc+_I": error_pcc_cond_logI})
+
+                # evaluate the model correlation for rare samples on training set based on logI and logI_prev
+                error_pcc_cond_logI_train = evaluate_pcc(
+                    final_model_sep, X_train, y_train, logI_train, logI_prev_train, above_threshold=above_threshold)
+                print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_logI_train}')
+                wandb.log({"train_pcc+_I": error_pcc_cond_logI_train})
 
                 # Process SEP event files in the specified directory
                 test_directory = root_dir + '/testing'

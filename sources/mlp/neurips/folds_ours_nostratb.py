@@ -39,14 +39,14 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in TRIAL_SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.7, 0.7, 0.0, 0.0)]:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.85, 0.85, 0.0, 0.0)]:
             for rho in RHO:  # SAM_RHOS:
                 inputs_to_use = INPUTS_TO_USE[0]
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]
                 add_slope = ADD_SLOPE[0]
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = LAMBDA_FACTOR  # lambda for the loss
+                lambda_factor = 0.0  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
