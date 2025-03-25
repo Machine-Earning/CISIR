@@ -39,8 +39,8 @@ def main():
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
 
-    for seed in [456789]:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1.0, 1.0, 0.0, 0.0)]:
+    for seed in TRIAL_SEEDS:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.8, 0.8, 0.0, 0.0)]:
             for rho in RHO:  # SAM_RHOS:
                 inputs_to_use = INPUTS_TO_USE[0]
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]
