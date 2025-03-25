@@ -37,7 +37,7 @@ def main():
     # set the training phase manager - keep for compatibility
     pm = TrainingPhaseManager()
 
-    for seed in [0]:
+    for seed in TRIAL_SEEDS:
         for rho in RHO:  # SAM_RHOS:
             inputs_to_use = INPUTS_TO_USE[0]
             cme_speed_threshold = CME_SPEED_THRESHOLD[0]
