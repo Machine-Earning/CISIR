@@ -225,7 +225,6 @@ class DenseLossImportance:
     """
     Class for generating importance weights based on the PDF of the target values
     (density-based weighting), as described in the DenseLoss approach.
-    TODO: double check this implementation is correct and matches the paper
     """
 
     def __init__(

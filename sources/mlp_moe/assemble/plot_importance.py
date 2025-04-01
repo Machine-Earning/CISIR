@@ -25,7 +25,7 @@ def main():
 
     # Compute delta and prepare reweights
     delta_train = y_train[:, 0]
-    alpha_values = [0.7, 0.9]  # List of alpha values to try
+    alpha_values = [1, 2]  # List of alpha values to try
     bandwidth = BANDWIDTH
 
     # Create directories if they don't exist
@@ -51,12 +51,12 @@ def main():
         #     bandwidth=bandwidth
         # ).label_importance_map
 
-        # quc_weights = quc(
-        #     X_train,
-        #     delta_train,
-        #     alpha=alpha_mse,
-        #     bandwidth=bandwidth
-        # ).label_importance_map
+        quc_weights = quc(
+            X_train,
+            delta_train,
+            alpha=alpha_mse,
+            bandwidth=bandwidth
+        ).label_importance_map
 
         # reciprocal_weights = reciprocal(
         #     X_train,
@@ -65,12 +65,12 @@ def main():
         #     bandwidth=bandwidth
         # ).label_importance_map
 
-        dl_weights = dl(
-            X_train,
-            delta_train,
-            alpha=alpha_mse,
-            bandwidth=bandwidth
-        ).label_importance_map
+        # dl_weights = dl(
+        #     X_train,
+        #     delta_train,
+        #     alpha=alpha_mse,
+        #     bandwidth=bandwidth
+        # ).label_importance_map
 
         print(f"Weights computed successfully for alpha = {alpha_mse}")
 
@@ -79,12 +79,12 @@ def main():
         #                save_path=f"plots/linear/alpha_{alpha_mse}_linear_importance.png")
         # plot_importance(cosine_weights, tag=f"alpha_{alpha_mse}_cosine_importance",
         #                save_path=f"plots/cosine/alpha_{alpha_mse}_cosine_importance.png")
-        # plot_importance(quc_weights, tag=f"alpha_{alpha_mse}_quc_importance",
-        #                save_path=f"plots/quc/alpha_{alpha_mse}_quc_importance.png")
+        plot_importance(quc_weights, tag=f"alpha_{alpha_mse}_quc_importance",
+                       save_path=f"plots/quc/alpha_{alpha_mse}_quc_importance.png")
         # plot_importance(reciprocal_weights, tag=f"alpha_{alpha_mse}_reciprocal_importance",
         #                save_path=f"plots/reciprocal/alpha_{alpha_mse}_reciprocal_importance.png")
-        plot_importance(dl_weights, tag=f"alpha_{alpha_mse}_dl_importance",
-                          save_path=f"plots/dl/alpha_{alpha_mse}_dl_importance.png")
+        # plot_importance(dl_weights, tag=f"alpha_{alpha_mse}_dl_importance",
+        #                   save_path=f"plots/dl/alpha_{alpha_mse}_dl_importance.png")
         # plot_importance(reciprocal_weights, tag=f"alpha_{alpha_mse}_reciprocal_importance",
         #                save_path=f"plots/reciprocal_smoothed/alpha_{alpha_mse}_reciprocal_importance.png")
 
