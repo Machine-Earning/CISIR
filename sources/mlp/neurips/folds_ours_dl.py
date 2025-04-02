@@ -29,7 +29,7 @@ from modules.training.ts_modeling import (
 )
 
 # Set the environment variable for CUDA (in case it is necessary)
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 
 
@@ -50,7 +50,7 @@ def main():
                 add_slope = ADD_SLOPE[0]
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = 0.1 # LAMBDA_FACTOR  # lambda for the loss
+                lambda_factor = 0.05 # LAMBDA_FACTOR  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title

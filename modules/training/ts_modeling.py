@@ -800,7 +800,8 @@ def create_mlp(
         dropout: float = 0.2,
         output_activation='linear',
         name: str = 'mlp',
-        weight_decay: float = 0.0
+        weight_decay: float = 0.0,
+        sam_norm: bool = True
 ) -> Model:
     """
     Create an MLP model with fully connected dense layers and configurable activation functions.
@@ -823,7 +824,8 @@ def create_mlp(
                         or 'norm_relu' for normalized ReLU outputs that sum to 1.
     - name (str): Name of the model.
     - weight_decay (float): L2 regularization factor for kernel weights. Default is 0.0 (no regularization).
-    
+    - sam_norm (bool): If True, the model will use SAM normalization. Default is True.
+
     Returns:
     - Model: A Keras model instance.
 
@@ -950,7 +952,7 @@ def create_mlp(
 
     # Create appropriate model type based on SAM parameter
     if sam_rho > 0.0:
-        model = SAMModel(inputs=input_layer, outputs=model_output, rho=sam_rho, name=name)
+        model = SAMModel(inputs=input_layer, outputs=model_output, rho=sam_rho, name=name, norm=sam_norm)
     else:
         model = Model(inputs=input_layer, outputs=model_output, name=name)
 
