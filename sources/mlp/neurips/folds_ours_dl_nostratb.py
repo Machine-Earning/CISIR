@@ -8,7 +8,7 @@ from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
-from modules.reweighting.ImportanceWeighting import QUCImportance
+from modules.reweighting.ImportanceWeighting import DenseLossImportance
 from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
@@ -19,7 +19,6 @@ from modules.training.ts_modeling import (
     eval_lt_mae,
     eval_lt_pcc,
     process_sep_events,
-    stratified_batch_dataset,
     set_seed,
     cmse,
     filter_ds,
@@ -28,29 +27,33 @@ from modules.training.ts_modeling import (
     load_stratified_folds,
 )
 
+# Set the environment variable for CUDA (in case it is necessary)
+# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+
+
 
 
 def main():
     """
-    Testing WPCC + Reciprocal Importance + Stratified Batching
+    Testing WPCC + Dense Loss Importance without Stratified Batching
     """
 
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
 
     for seed in TRIAL_SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.05, 0.05, 0.0, 0.0)]:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.8, 0.8, 0.0, 0.0)]:
             for rho in RHO:  # SAM_RHOS:
                 inputs_to_use = INPUTS_TO_USE[0]
                 cme_speed_threshold = CME_SPEED_THRESHOLD[0]
                 add_slope = ADD_SLOPE[0]
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = 0.25 # LAMBDA_FACTOR  # lambda for the loss
+                lambda_factor = 0.005 # LAMBDA_FACTOR  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_quc'
+                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_dl_wpcc_nostratb'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -163,17 +166,14 @@ def main():
                 delta_train = y_train[:, 0]
                 print(f'delta_train.shape: {delta_train.shape}')
                 print(f'rebalancing the training set...')
-                mse_train_weights_dict = QUCImportance(
+                mse_train_weights_dict = DenseLossImportance(
                     X_train, delta_train,
                     alpha=alpha_mse, 
                     bandwidth=bandwidth).label_importance_map
-                if alpha_pcc > 0:
-                    pcc_train_weights_dict = QUCImportance(
-                        X_train, delta_train,
-                        alpha=alpha_pcc, 
-                        bandwidth=bandwidth).label_importance_map
-                else:
-                    pcc_train_weights_dict = None
+                pcc_train_weights_dict = DenseLossImportance(
+                    X_train, delta_train,
+                    alpha=alpha_pcc, 
+                    bandwidth=bandwidth).label_importance_map
                 print(f'training set rebalanced.')
                 # get the number of input features
                 n_features = X_train.shape[1]
@@ -221,34 +221,28 @@ def main():
                     delta_subtrain = y_subtrain[:, 0]
                     print(f'delta_subtrain.shape: {delta_subtrain.shape}')
                     print(f'rebalancing the subtraining set...')
-                    mse_subtrain_weights_dict = QUCImportance(
+                    mse_subtrain_weights_dict = DenseLossImportance(
                         X_subtrain, delta_subtrain,
                         alpha=alpha_mse, 
                         bandwidth=bandwidth).label_importance_map
-                    if alpha_pcc > 0:
-                        pcc_subtrain_weights_dict = QUCImportance(
-                            X_subtrain, delta_subtrain,
-                            alpha=alpha_pcc, 
-                            bandwidth=bandwidth).label_importance_map
-                    else:
-                        pcc_subtrain_weights_dict = None
+                    pcc_subtrain_weights_dict = DenseLossImportance(
+                        X_subtrain, delta_subtrain,
+                        alpha=alpha_pcc, 
+                        bandwidth=bandwidth).label_importance_map
                     print(f'subtraining set rebalanced.')
 
                     # Compute the sample weights for validation
                     delta_val = y_val[:, 0]
                     print(f'delta_val.shape: {delta_val.shape}')
                     print(f'rebalancing the validation set...')
-                    mse_val_weights_dict = QUCImportance(
+                    mse_val_weights_dict = DenseLossImportance(
                         X_val, delta_val,
                         alpha=alphaV_mse, 
                         bandwidth=bandwidth).label_importance_map
-                    if alphaV_pcc > 0:
-                        pcc_val_weights_dict = QUCImportance(
-                            X_val, delta_val,
-                            alpha=alphaV_pcc, 
-                            bandwidth=bandwidth).label_importance_map
-                    else:
-                        pcc_val_weights_dict = None
+                    pcc_val_weights_dict = DenseLossImportance(
+                        X_val, delta_val,
+                        alpha=alphaV_pcc, 
+                        bandwidth=bandwidth).label_importance_map
                     print(f'validation set rebalanced.')
 
                     # create the model
@@ -298,22 +292,12 @@ def main():
                         }
                     )
 
-                    # Step 1: Create stratified dataset for the subtraining set only
-                    subtrain_ds, subtrain_steps = stratified_batch_dataset(
-                        X_subtrain, y_subtrain, batch_size)
-
-                    # Map the subtraining dataset to return {'output': y} format
-                    subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'forecast_head': y}))
-                    
-                    # Prepare validation data without batching
-                    val_data = (X_val, {'forecast_head': y_val})
-
                     # Train the model with the callback
                     history = model_sep.fit(
-                        subtrain_ds,
-                        steps_per_epoch=subtrain_steps,
-                        epochs=epochs, batch_size=batch_size,
-                        validation_data=val_data,
+                        X_subtrain, {'forecast_head': y_subtrain},
+                        epochs=epochs,
+                        batch_size=batch_size,
+                        validation_data=(X_val, {'forecast_head': y_val}),
                         callbacks=[
                             early_stopping,
                             reduce_lr_on_plateau,
@@ -324,7 +308,6 @@ def main():
                     )
 
                     # optimal epoch for fold
-                    # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
                     # Use the quadratic fit function to find the optimal epoch
                     optimal_epoch = find_optimal_epoch_by_smoothing(
                         history.history[ES_CB_MONITOR],
@@ -374,16 +357,9 @@ def main():
                     },
                 )  # Compile the model just like before
 
-                train_ds, train_steps = stratified_batch_dataset(
-                    X_train, y_train, batch_size)
-
-                # Map the training dataset to return {'output': y} format
-                train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
-
                 # Train on the full dataset
                 final_model_sep.fit(
-                    train_ds,
-                    steps_per_epoch=train_steps,
+                    X_train, {'forecast_head': y_train},
                     epochs=optimal_epochs,
                     batch_size=batch_size,
                     callbacks=[
