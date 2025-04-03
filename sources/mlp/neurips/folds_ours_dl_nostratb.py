@@ -70,7 +70,7 @@ def main():
                 lr_cb_min_delta = LR_CB_MIN_DELTA
                 cvrg_metric = CVRG_METRIC
                 cvrg_min_delta = CVRG_MIN_DELTA 
-                normalized_weights = NORMALIZED_WEIGHTS
+                normalized_weights = False # NORMALIZED_WEIGHTS
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,

@@ -50,7 +50,7 @@ def main():
                 add_slope = ADD_SLOPE[0]
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = 0.005 # LAMBDA_FACTOR  # lambda for the loss
+                lambda_factor = 0.0 # LAMBDA_FACTOR  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
@@ -71,7 +71,7 @@ def main():
                 lr_cb_min_delta = LR_CB_MIN_DELTA
                 cvrg_metric = CVRG_METRIC
                 cvrg_min_delta = CVRG_MIN_DELTA 
-                normalized_weights = NORMALIZED_WEIGHTS
+                normalized_weights = False # NORMALIZED_WEIGHTS
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
