@@ -30,7 +30,7 @@ from modules.training.ts_modeling import (
 
 def main():
     """
-    Testing WPCC + Reciprocal Importance + Stratified Batching
+    Testing WPCC + QUC Importance + Stratified Batching
     """
 
     # set the training phase manager - necessary for mse + pcc loss

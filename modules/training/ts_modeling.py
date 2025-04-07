@@ -4201,7 +4201,7 @@ def plot_error_hist(
 
 def evaluate_mae(
         model: tf.keras.Model,
-        X_test: Union[np.ndarray, List[np.ndarray]],
+        X_test: np.ndarray,
         y_test: np.ndarray,
         below_threshold: float = None,
         above_threshold: float = None,
@@ -4253,7 +4253,7 @@ def evaluate_mae(
 
 def evaluate_pcc(
         model: tf.keras.Model,
-        X_test: Union[np.ndarray, List[np.ndarray]],
+        X_test: np.ndarray,
         y_test: np.ndarray,
         logI_test: np.ndarray = None,
         logI_prev_test: np.ndarray = None,
