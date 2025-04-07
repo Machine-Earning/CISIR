@@ -1,6 +1,6 @@
 # Dataset configurations
 DS_VERSION = 8  # Dataset version
-DS_PATH = 'data/electron_cme_data_split_v8'  # Path to the dataset
+DS_PATH = 'data/electron_delta'  # Path to the dataset
 
 INPUTS_TO_USE = [['e0.5', 'e4.4', 'p6.1', 'p']]  # Inputs to use
 OUTPUTS_TO_USE = ['delta_p']  # Output to use
@@ -266,4 +266,5 @@ RARE_RANGE = [(-2.5, -1), (1, 2.5)]
 
 
 
-
+## SEP CME DATASET
+DS_PATH_SEP_CME = 'data/sep_cme'
