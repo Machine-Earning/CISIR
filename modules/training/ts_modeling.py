@@ -1,18 +1,16 @@
-import os
-import random
-import traceback
 from collections import Counter
-from pathlib import Path
-from typing import Generator, Tuple, Optional
-from typing import List, Union, Callable, Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import pandas as pd
+import random
 import seaborn as sns
 import tensorflow as tf
+import traceback
 from matplotlib.lines import Line2D
 from numpy import ndarray
+from pathlib import Path
 from scipy import stats
 from scipy.signal import correlate, correlation_lags
 from scipy.stats import pearsonr
@@ -35,8 +33,6 @@ from tensorflow.keras.layers import (
     MaxPooling1D,
     AveragePooling1D,
     Add,
-    Multiply,
-    Lambda,
     Reshape,
     ReLU,
     Layer,
@@ -45,8 +41,10 @@ from tensorflow.keras.layers import (
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Optimizer
 from tensorflow.keras.regularizers import l2
+from typing import Generator, Tuple, Optional
+from typing import List, Union, Callable, Dict
 
-from modules.shared.globals import PLUS_INDEX, MID_INDEX, MINUS_INDEX, MLP_HIDDENS, UPPER_THRESHOLD_MOE, \
+from modules.shared.globals import MLP_HIDDENS, UPPER_THRESHOLD_MOE, \
     LOWER_THRESHOLD_MOE
 from modules.training.normlayer import NormalizeLayer
 from modules.training.phase_manager import TrainingPhaseManager, create_weight_tensor_fast
@@ -183,7 +181,7 @@ def get_subset_ds(
     # Apply mask to all arrays
     filtered = [X[mask], y[mask]]
     filtered.extend(arr[mask] for arr in additional_sets)
-    
+
     return tuple(filtered)
 
 
@@ -555,7 +553,7 @@ def load_partial_weights_from_path(
         proj_neck: bool = False,
         no_head: bool = False,
         freeze_combiner: bool = False
-) -> None:
+) -> Model:
     """
     Load weights from a pre-trained model (via a weights file path) into an existing new model,
     transferring compatible layers and skipping any layers that differ (such as the final output layer).
@@ -672,11 +670,11 @@ def load_partial_weights_from_path(
             output_activation='softmax',
             name='combiner'
         )
-        
+
     else:
         # Remove forecast head from old model
         model_no_head = remove_forecast_head(old_model)
-        
+
         # Add projection head with the same configuration as new_model's forecast_head
         new_model = add_proj_head(
             model_no_head,
@@ -717,14 +715,14 @@ def remove_forecast_head(model: Model) -> Model:
     """
     # Identify representation layer in the model
     layer_names = [layer.name for layer in model.layers]
-    
+
     # Determine which layer to use as the representation layer
     repr_layer_name = None
     if 'normalize_layer' in layer_names:
         repr_layer_name = 'normalize_layer'
     elif 'repr_layer' in layer_names:
         repr_layer_name = 'repr_layer'
-    
+
     if repr_layer_name is None:
         # If neither specific layer exists, find the last layer before forecast_head
         forecast_head_idx = layer_names.index('forecast_head') if 'forecast_head' in layer_names else -1
@@ -734,18 +732,19 @@ def remove_forecast_head(model: Model) -> Model:
             # If all else fails, use the second-to-last layer
             repr_layer_name = model.layers[-2].name
             print(f"Warning: Could not find representation layer, using layer: {repr_layer_name}")
-    
+
     # Get the representation layer
     repr_layer = model.get_layer(repr_layer_name).output
-    
+
     # Create a new model without the forecast head
     new_model = Model(
         inputs=model.input,
         outputs=repr_layer,
         name=f"{model.name}_no_head"
     )
-    
+
     return new_model
+
 
 class NormalizedReLU(Layer):
     """Custom activation layer that applies ReLU followed by L1 normalization.
@@ -785,6 +784,7 @@ class NormalizedReLU(Layer):
         # Normalize along last dimension so outputs sum to 1
         # Add small epsilon to prevent division by zero
         return relu_output / (tf.reduce_sum(relu_output, axis=-1, keepdims=True) + tf.keras.backend.epsilon())
+
 
 def create_mlp(
         input_dim: int = 100,
@@ -884,7 +884,8 @@ def create_mlp(
         if has_residuals and i % skipped_layers == 0:
             # Project the residual layer if needed
             if x.shape[-1] != residual_layer.shape[-1]:
-                residual_proj = Dense(x.shape[-1], use_bias=False, kernel_regularizer=kernel_regularizer)(residual_layer)
+                residual_proj = Dense(x.shape[-1], use_bias=False, kernel_regularizer=kernel_regularizer)(
+                    residual_layer)
             else:
                 residual_proj = residual_layer
             x = Add()([x, residual_proj])
@@ -914,11 +915,11 @@ def create_mlp(
             residual_proj = Dense(embed_dim, use_bias=False, kernel_regularizer=kernel_regularizer)(residual_layer)
         else:
             residual_proj = residual_layer
-        
+
         # Apply dropout before the representation layer
         if dropout > 0:
             x = Dropout(dropout)(x)
-            
+
         # Create representation layer without dropout after it
         x = Add(name='repr_layer')([x, residual_proj])
         if norm == 'layer_norm':
@@ -1001,7 +1002,7 @@ def add_proj_head(
         activation = LeakyReLU()
 
     residual = True if skipped_layers > 0 else False
-    
+
     # Configure kernel regularizer if weight decay is enabled
     kernel_regularizer = tf.keras.regularizers.l2(weight_decay) if weight_decay > 0.0 else None
 
@@ -1034,7 +1035,8 @@ def add_proj_head(
                 # Check if projection is needed
                 if x_proj.shape[-1] != residual_layer.shape[-1]:
                     # Correct projection to match 'x_proj' dimensions
-                    residual_layer = Dense(x_proj.shape[-1], use_bias=False, kernel_regularizer=kernel_regularizer)(residual_layer)
+                    residual_layer = Dense(x_proj.shape[-1], use_bias=False, kernel_regularizer=kernel_regularizer)(
+                        residual_layer)
                 x_proj = Add()([x_proj, residual_layer])
             residual_layer = x_proj  # Update the starting point for the next residual connection
         else:
@@ -1092,14 +1094,14 @@ def add_proj_head(
 
 
 def add_decoder(
-        encoder_model, 
-        hiddens, 
-        activation=None, 
-        norm=None, 
-        dropout=0.0, 
-        skip_connections=False, 
+        encoder_model,
+        hiddens,
+        activation=None,
+        norm=None,
+        dropout=0.0,
+        skip_connections=False,
         weight_decay=0.0
-    ):
+):
     """
     Adds a decoder to the given encoder model, reversing the encoder architecture.
 
@@ -1128,7 +1130,7 @@ def add_decoder(
     residual_layer = x
     has_residuals = skip_connections
     skipped_layers = encoder_model.skipped_layers if hasattr(encoder_model, 'skipped_layers') else 0
-    
+
     # Set up kernel regularizer if weight decay is specified
     kernel_regularizer = tf.keras.regularizers.l2(weight_decay) if weight_decay > 0.0 else None
 
@@ -1145,7 +1147,8 @@ def add_decoder(
         # Add skip connections if enabled
         if has_residuals and skipped_layers > 0 and i % skipped_layers == 0 and i > 0:
             if x.shape[-1] != residual_layer.shape[-1]:
-                residual_proj = Dense(x.shape[-1], use_bias=False, kernel_regularizer=kernel_regularizer)(residual_layer)
+                residual_proj = Dense(x.shape[-1], use_bias=False, kernel_regularizer=kernel_regularizer)(
+                    residual_layer)
             else:
                 residual_proj = residual_layer
             x = Add()([x, residual_proj])
@@ -1460,6 +1463,7 @@ def focal_loss(gamma: float = 3.0, alpha: float = 0.25):
 
     return focal_loss_fn
 
+
 def plot_importance(label_importance_map: dict, tag: str, save_path: Optional[str] = None) -> str:
     """
     Plot the importance (reweight) values against sorted labels.
@@ -1477,7 +1481,7 @@ def plot_importance(label_importance_map: dict, tag: str, save_path: Optional[st
 
     labels = [item[0] for item in sorted_items]
     importance_weights = [item[1] for item in sorted_items]
-    
+
     # Create the plot
     plt.figure(figsize=(10, 6))
     plt.plot(labels, importance_weights, 'b-')
@@ -1485,7 +1489,7 @@ def plot_importance(label_importance_map: dict, tag: str, save_path: Optional[st
     plt.ylabel('Importance')
     plt.title('Label Importance Distribution')
     plt.grid(True)
-    
+
     # Use provided path or generate default in plots directory
     if save_path is None:
         # Create plots directory if it doesn't exist
@@ -1493,11 +1497,11 @@ def plot_importance(label_importance_map: dict, tag: str, save_path: Optional[st
         if not os.path.exists(plots_dir):
             os.makedirs(plots_dir)
         save_path = os.path.join(plots_dir, f'{tag}.png')
-    
+
     # Save the plot
     plt.savefig(save_path)
     plt.close()
-    
+
     return save_path
 
 
@@ -1658,7 +1662,6 @@ def create_mlp_moe(
             expert_minus.load_weights(expert_paths['minus'])
         if 'combiner' in expert_paths and combiner_pretrained_weights is None:
             combiner.load_weights(expert_paths['combiner'])
-        
 
         if freeze_experts:
             for expert in [expert_plus, expert_zero, expert_minus]:
@@ -1666,9 +1669,9 @@ def create_mlp_moe(
                     layer.trainable = False
 
     # Get outputs from each expert model
-    plus_output = expert_plus(input_layer)   # Shape: (batch_size, output_dim)
-    zero_output = expert_zero(input_layer)   # Shape: (batch_size, output_dim)
-    minus_output = expert_minus(input_layer) # Shape: (batch_size, output_dim)
+    plus_output = expert_plus(input_layer)  # Shape: (batch_size, output_dim)
+    zero_output = expert_zero(input_layer)  # Shape: (batch_size, output_dim)
+    minus_output = expert_minus(input_layer)  # Shape: (batch_size, output_dim)
     combiner_output = combiner(input_layer)  # Shape: (batch_size, num_experts)
 
     # Extract routing probabilities from combiner output
@@ -1682,8 +1685,8 @@ def create_mlp_moe(
 
     # Create final model with routing probabilities and combined forecast outputs
     model = Model(
-        inputs=input_layer, 
-        outputs=[routing_probs, forecast_head], 
+        inputs=input_layer,
+        outputs=[routing_probs, forecast_head],
         name=name
     )
     return model
@@ -1699,7 +1702,7 @@ class LinearCombination(Layer):
     
     And returns a weighted sum of shape (batch_size, output_dim)
     """
-    
+
     def call(self, inputs: Tuple[tf.Tensor, tf.Tensor]) -> tf.Tensor:
         """
         Performs the linear combination operation.
@@ -1713,15 +1716,15 @@ class LinearCombination(Layer):
             tf.Tensor: Weighted sum of expert outputs, shape (batch_size, output_dim)
         """
         expert_outputs, routing_probs = inputs
-        
+
         # Reshape routing probs to (batch_size, num_experts, 1) for broadcasting
         # This allows multiplication with expert outputs of shape (batch_size, num_experts, output_dim)
         routing_probs = tf.expand_dims(routing_probs, axis=-1)
-        
+
         # Multiply each expert output by its corresponding routing probability
         # Then sum across the experts dimension
         weighted_sum = tf.reduce_sum(expert_outputs * routing_probs, axis=1)
-        
+
         return weighted_sum
 
 
@@ -2869,7 +2872,7 @@ def locate_high_deltas(
         print(f'Processing file: {file_name}')
         if file_name.endswith('_ie_trim.csv'):
             file_path = os.path.join(directory_path, file_name)
-            X, y = load_file_data(
+            X, y, _, _ = load_file_data(
                 file_path,
                 apply_log,
                 inputs_to_use,
@@ -4316,9 +4319,9 @@ def evaluate_pcc(
 
 
 def _filter_by_ranges(
-    values: np.ndarray,
-    predictions: np.ndarray,
-    ranges: List[Tuple[float, float]]
+        values: np.ndarray,
+        predictions: np.ndarray,
+        ranges: List[Tuple[float, float]]
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Filters the given values and predictions based on a list of intervals.
@@ -4339,10 +4342,10 @@ def _filter_by_ranges(
 
 
 def eval_lt_mae(
-    model: tf.keras.Model,
-    X_test: Union[np.ndarray, List[np.ndarray]],
-    y_test: np.ndarray,
-    use_dict: bool = False
+        model: tf.keras.Model,
+        X_test: Union[np.ndarray, List[np.ndarray]],
+        y_test: np.ndarray,
+        use_dict: bool = False
 ) -> Dict[str, float]:
     """
     Evaluates Mean Absolute Error (MAE) for three defined ranges of y-values:
@@ -4396,12 +4399,12 @@ def eval_lt_mae(
 
 
 def eval_lt_pcc(
-    model: tf.keras.Model,
-    X_test: Union[np.ndarray, List[np.ndarray]],
-    y_test: np.ndarray,
-    logI_test: np.ndarray = None,
-    logI_prev_test: np.ndarray = None,
-    use_dict: bool = False
+        model: tf.keras.Model,
+        X_test: Union[np.ndarray, List[np.ndarray]],
+        y_test: np.ndarray,
+        logI_test: np.ndarray = None,
+        logI_prev_test: np.ndarray = None,
+        use_dict: bool = False
 ) -> Dict[str, float]:
     """
     Evaluates Pearson Correlation Coefficient (PCC) for three defined ranges
@@ -4443,10 +4446,10 @@ def eval_lt_pcc(
 
     # 3) A small helper for computing PCC
     def _compute_pcc(
-        y_vals: np.ndarray, 
-        pred_vals: np.ndarray, 
-        logI: np.ndarray = None, 
-        logI_prev: np.ndarray = None
+            y_vals: np.ndarray,
+            pred_vals: np.ndarray,
+            logI: np.ndarray = None,
+            logI_prev: np.ndarray = None
     ) -> float:
         """
         Computes Pearson correlation coefficient using either raw deltas 
@@ -4470,7 +4473,7 @@ def eval_lt_pcc(
     freq_preds, freq_y = _filter_by_ranges(y_test_processed, predictions, FREQ_RANGE)
     if logI_test is not None and logI_prev_test is not None:
         freq_logI, freq_logI_prev = _filter_by_ranges(y_test_processed, logI_test, FREQ_RANGE)[1], \
-                                    _filter_by_ranges(y_test_processed, logI_prev_test, FREQ_RANGE)[1]
+            _filter_by_ranges(y_test_processed, logI_prev_test, FREQ_RANGE)[1]
         freq_pcc = _compute_pcc(freq_y, freq_preds, freq_logI, freq_logI_prev)
     else:
         freq_pcc = _compute_pcc(freq_y, freq_preds)
@@ -4479,7 +4482,7 @@ def eval_lt_pcc(
     midd_preds, midd_y = _filter_by_ranges(y_test_processed, predictions, MIDD_RANGE)
     if logI_test is not None and logI_prev_test is not None:
         midd_logI, midd_logI_prev = _filter_by_ranges(y_test_processed, logI_test, MIDD_RANGE)[1], \
-                                    _filter_by_ranges(y_test_processed, logI_prev_test, MIDD_RANGE)[1]
+            _filter_by_ranges(y_test_processed, logI_prev_test, MIDD_RANGE)[1]
         midd_pcc = _compute_pcc(midd_y, midd_preds, midd_logI, midd_logI_prev)
     else:
         midd_pcc = _compute_pcc(midd_y, midd_preds)
@@ -4488,7 +4491,7 @@ def eval_lt_pcc(
     rare_preds, rare_y = _filter_by_ranges(y_test_processed, predictions, RARE_RANGE)
     if logI_test is not None and logI_prev_test is not None:
         rare_logI, rare_logI_prev = _filter_by_ranges(y_test_processed, logI_test, RARE_RANGE)[1], \
-                                    _filter_by_ranges(y_test_processed, logI_prev_test, RARE_RANGE)[1]
+            _filter_by_ranges(y_test_processed, logI_prev_test, RARE_RANGE)[1]
         rare_pcc = _compute_pcc(rare_y, rare_preds, rare_logI, rare_logI_prev)
     else:
         rare_pcc = _compute_pcc(rare_y, rare_preds)
@@ -5384,7 +5387,7 @@ def cmse(
     """
     # Select the appropriate weight dictionaries based on the mode
     mse_weight_dict = train_mse_weight_dict if phase_manager.is_training_phase() else val_mse_weight_dict
-    
+
     # Generate the weight tensor for MSE using the optimized function
     mse_weights = create_weight_tensor_fast(y_true, mse_weight_dict)
 
@@ -5402,18 +5405,18 @@ def cmse(
         mse = tf.reduce_sum(asym_weights * mse_weights * tf.square(y_pred - y_true))
     else:
         mse = tf.reduce_mean(asym_weights * mse_weights * tf.square(y_pred - y_true))
-    
+
     # Early return if lambda_factor is zero (no PCC component)
     if lambda_factor == 0:
         # Add bias penalty if factor is provided
         if bias_penalty_factor is not None:
             mse = mse + bias_penalty_factor * bias_penalty(y_true, y_pred)
         return mse
-    
+
     # If lambda_factor is not zero, compute the PCC component
     pcc_weight_dict = train_pcc_weight_dict if phase_manager.is_training_phase() else val_pcc_weight_dict
     pcc_weights = create_weight_tensor_fast(y_true, pcc_weight_dict)
-    
+
     # Compute the correlation regularization term using coreg
     pcc_loss = coreg(y_true, y_pred, pcc_weights)
 

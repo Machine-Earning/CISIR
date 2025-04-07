@@ -25,7 +25,7 @@ def main():
 
     # Compute delta and prepare reweights
     delta_train = y_train[:, 0]
-    alpha_values = [1, 2]  # List of alpha values to try
+    alpha_values = [0.01]  # List of alpha values to try
     bandwidth = BANDWIDTH
 
     # Create directories if they don't exist
