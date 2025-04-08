@@ -4414,60 +4414,6 @@ def eval_lt_pcc(
     }
 
 
-# def filter_ds_deprecated(
-#         X: np.ndarray, y: np.ndarray,
-#         low_threshold: float, high_threshold: float,
-#         N: int, seed: int = None) -> Tuple[np.ndarray, np.ndarray]:
-#     """
-#     Filter and sample the dataset based on the threshold values of y with a random seed for reproducibility.
-
-#     This function creates a subset of the dataset where all samples where y is either
-#     below the low_threshold or above the high_threshold are included. Samples where y
-#     is between the low_threshold and high_threshold are randomly sampled to have a total
-#     of N samples in the resulting dataset, using a specified seed for random number generation.
-
-#     Parameters:
-#         X (np.ndarray): The input features of the dataset.
-#         y (np.ndarray): The output labels of the dataset.
-#         low_threshold (float): The lower bound threshold for selecting high delta values.
-#         high_threshold (float): The upper bound threshold for selecting high delta values.
-#         N (int): The number of samples to include from the low delta range.
-#         seed (int, optional): Seed for the random number generator to ensure reproducibility.
-
-#     Returns:
-#         Tuple[np.ndarray, np.ndarray]: The filtered and sampled input features and output labels.
-#     """
-#     # Set the random seed for reproducibility
-#     np.random.seed(seed)
-
-#     # Flatten the output array to ensure mask works properly with input dimensions
-#     y_flat = y.flatten()
-
-#     # Mask for selecting samples where y is either too low or too high
-#     high_deltas_mask = (y_flat <= low_threshold) | (y_flat >= high_threshold)
-#     X_high_deltas = X[high_deltas_mask]
-#     y_high_deltas = y[high_deltas_mask]
-
-#     # Mask for selecting samples where y is in the middle range
-#     low_deltas_mask = (y_flat > low_threshold) & (y_flat < high_threshold)
-#     X_low_deltas = X[low_deltas_mask]
-#     y_low_deltas = y[low_deltas_mask]
-
-#     # Sample from the low deltas if they exceed the required N samples
-#     if len(y_low_deltas) > N:
-#         sampled_indices = np.random.choice(len(X_low_deltas), size=N, replace=False)
-#         X_low_deltas_sampled = X_low_deltas[sampled_indices]
-#         y_low_deltas_sampled = y_low_deltas[sampled_indices]
-#     else:
-#         X_low_deltas_sampled = X_low_deltas
-#         y_low_deltas_sampled = y_low_deltas
-
-#     # Combine the high delta samples and the sampled low delta samples
-#     X_combined = np.concatenate([X_high_deltas, X_low_deltas_sampled], axis=0)
-#     y_combined = np.concatenate([y_high_deltas, y_low_deltas_sampled], axis=0)
-
-#     return X_combined, y_combined
-
 
 def filter_ds(
         X: np.ndarray, y: np.ndarray,
