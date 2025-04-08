@@ -28,9 +28,8 @@ SKIP_REPR = True  # residual representation
 
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
-START_LR = 1e-4  # starting learning rate
+START_LR = 1e-3  # starting learning rate
 WEIGHT_DECAY = 1e-1  # Higher weight decay
-MOMENTUM_BETA1 = 0.9  # Higher momentum beta1
 NORMALIZED_WEIGHTS = True  # Use normalized weights
 
 # Learning Rate Scheduling
@@ -41,13 +40,13 @@ LR_CB_MIN_DELTA = 1e-5 # Minimum delta for reducing learning rate
 LR_CB_MONITOR = 'loss'  # Monitor validation loss
 
 # Early Stopping
-PATIENCE = int(4e3)  # Higher patience
+PATIENCE = int(2e3)  # Higher patience
 ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
 ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 
 # Data Filtering and Processing
 SEP_THRESHOLD = 2.30258509299  # Threshold for SEP events
-BANDWIDTH = 7e-2 #4.42e-2  # Bandwidth for rebalancing
+BANDWIDTH = 0.88  # Bandwidth for rebalancing
 
 # Smoothing Parameters
 SMOOTHING_METHOD = 'moving_average'

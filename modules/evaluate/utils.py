@@ -483,6 +483,76 @@ def plot_repr_corr_dist(model, X, y, title, model_type='features'):
     return f"representation_correlation_labels_{title}.png"
 
 
+def plot_sep_corr(model, X, y, title, model_type='features', sep_threshold=0.5):
+    """
+    Plots the correlation between distances in target values and distances in the representation space,
+    with each point colored based on the pair of labels using a SEP threshold.
+
+    Parameters:
+    - model: The trained model used to transform input features into a representation space.
+    - X: Input features (NumPy array or compatible).
+    - y: Target values and labels (NumPy array or compatible).
+    - title: Title for the plot.
+    - model_type: The type of model to use (features, features_reg, features_dec, features_reg_dec).
+    - sep_threshold: Threshold value to distinguish SEP events from non-SEP events.
+
+    Returns:
+    - Plots the representation distance correlation plot with label-based coloring.
+    """
+    print('In plot_sep_corr')
+    if model_type in ['features_reg_dec', 'features_reg', 'features_dec', 'features_cls']:
+        representations = model.predict(X)[0]  # Assuming the first output is always features
+    elif model_type == 'dict':
+        representations = model.predict(X)['repr']
+    else:
+        representations = model.predict(X)
+
+    print('Calculating the pairwise distances')
+    distances_target = pdist(y.reshape(-1, 1), 'euclidean')
+    distances_repr = pdist(representations, 'euclidean')
+
+    scaler = MinMaxScaler()
+    distances_target_norm = scaler.fit_transform(distances_target.reshape(-1, 1)).flatten()
+    distances_repr_norm = scaler.fit_transform(distances_repr.reshape(-1, 1)).flatten()
+
+    print('Calculating the spearman rank correlation')
+    r, _ = pearsonr(distances_target_norm, distances_repr_norm)
+
+    print('Assigning colors based on labels')
+
+    def get_color(label):
+        if label >= sep_threshold:
+            return 'red'
+        else:
+            return 'gray'
+
+    label_pairs = [(y[i], y[j]) for i in range(len(y)) for j in range(i + 1, len(y))]
+    colors = [(get_color(label1), get_color(label2)) for label1, label2 in label_pairs]
+
+    # Function to draw a half-colored dot
+    def draw_half_colored_dot(ax, x, y, color1, color2, size=0.01):
+        wedge1 = Wedge((x, y), size, 0, 180, color=color1)
+        wedge2 = Wedge((x, y), size, 180, 360, color=color2)
+        ax.add_patch(wedge1)
+        ax.add_patch(wedge2)
+
+    print('Plotting with label-based colors')
+    fig, ax = plt.subplots(figsize=(8, 6))
+    for i, (x, y) in enumerate(zip(distances_target_norm, distances_repr_norm)):
+        color1, color2 = colors[i]
+        draw_half_colored_dot(ax, x, y, color1, color2, size=0.005)  # Adjust size as needed
+
+    ax.plot([0, 1], [0, 1], 'k--')  # Perfect fit diagonal
+    ax.set_xlabel('Normalized Distance in Target Space')
+    ax.set_ylabel('Normalized Distance in Representation Space')
+    ax.set_title(f'{title}\nRepresentation Space Correlation (pearson r= {r:.2f})')
+    ax.grid(True)
+    plt.savefig(f"representation_correlation_labels_{title}.png")
+    plt.close()
+
+    return f"representation_correlation_labels_{title}.png"
+
+
 # def plot_repr_correlation(model, X, y, title, model_type='features'):
 #     """
 #     Plots the correlation between distances in target values and distances in the representation space.
@@ -812,6 +882,120 @@ def plot_tsne_delta(
         norm=norm,
         s=sizes[common_points],
         alpha=alphas[common_points])
+
+    plt.scatter(
+        tsne_result[rare_points, 0],
+        tsne_result[rare_points, 1],
+        c=y[rare_points],
+        cmap=cmap,
+        norm=norm,
+        s=sizes[rare_points],
+        alpha=alphas[rare_points])
+
+    # Add a color bar
+    cbar = plt.colorbar(sc, ax=axs[0], label='Change in logIntensity', extend='both')
+
+    # Title and labels
+    plt.title(f'{title}\n2D t-SNE Visualization')
+    # plt.xlabel('Dimension 1')
+    # plt.ylabel('Dimension 2')
+
+    # Plot Shepard plot on the second subplot
+    plt.sca(axs[1])
+    plot_shepard(features, tsne_result)
+
+    # Adjust the subplot layout
+    plt.tight_layout()
+
+    # Save the plot
+    file_path = f"{prefix}_tsne_plot_{str(save_tag)}.png"
+    plt.savefig(file_path)
+
+    if show_plot:
+        plt.show()
+
+    plt.close()
+
+    return file_path
+
+def plot_tsne_sep(
+        model,
+        X: np.ndarray,
+        y: np.ndarray,
+        title: str,
+        prefix: str,
+        model_type='features_reg',
+        show_plot=False,
+        save_tag=None,
+        seed=42,
+        sep_threshold=2.30258509299) -> str:
+    """
+    Visualizes changes (e.g., in logIntensity) using t-SNE by coloring points based on their values.
+
+    Parameters:
+    - model: Trained feature extractor model.
+    - X: Input data (NumPy array or compatible).
+    - y: Target labels (NumPy array or compatible), representing changes.
+    - title: Title for the plot.
+    - prefix: Prefix for the file name.
+    - model_type: The type of model output to use ('features', 'features_reg', etc.).
+    - show_plot: If True, display the plot in addition to saving it.
+    - save_tag: Optional tag to append to the file name.
+    - seed: Random seed for t-SNE.
+    - sep_threshold: Threshold for separating frequent and rare events.
+
+    Returns:
+    - The file path of the saved t-SNE plot.
+    """
+
+    # Extract features based on the model type
+    if model_type in ['features_reg_dec', 'features_reg', 'features_dec', 'features_cls']:
+        features = model.predict(X)[0]  # Assuming the first output is always features
+    elif model_type == 'dict':
+        features = model.predict(X)['repr']
+    else:
+        features = model.predict(X)
+
+    # Apply t-SNE
+    tsne = TSNE(n_components=2, random_state=seed)
+    tsne_result = tsne.fit_transform(features)
+
+    # Plot setup
+    fig, axs = plt.subplots(2, 1, figsize=(18, 16), gridspec_kw={'height_ratios': [2, 1]})  # Adjust size as needed
+    # Plot t-SNE on the first subplot
+    plt.sca(axs[0])
+    # Normalize y-values for color intensity
+    norm = plt.Normalize(min(y), max(y))
+    cmap = plt.cm.coolwarm  # Choosing a colormap that spans across negative and positive changes
+
+    # Determine the size and alpha based on sep_threshold
+    sizes = np.where(y >= sep_threshold, 50, 12)  # Larger size for rare values (above threshold)
+    alphas = np.where(y >= sep_threshold, 1.0, 0.3)  # More opaque for rare values (above threshold)
+
+    # Ensure sizes and alphas are 1-dimensional arrays
+    sizes = sizes.ravel()
+    alphas = alphas.ravel()
+
+    # Sort points by size to ensure larger points are plotted last (on top)
+    sort_order = np.argsort(sizes)  # This gives indices that would sort the array
+
+    # Create masks for frequent and rare points
+    frequent_points_mask = sizes[sort_order] == 12
+    rare_points_mask = sizes[sort_order] == 50
+
+    # Now, apply these masks to the sorted indices to get the correct indices for frequent and rare points.
+    frequent_points = sort_order[frequent_points_mask]
+    rare_points = sort_order[rare_points_mask]
+
+    # Proceed with your scatter plot as planned
+    sc = plt.scatter(
+        tsne_result[frequent_points, 0],
+        tsne_result[frequent_points, 1],
+        c=y[frequent_points],
+        cmap=cmap,
+        norm=norm,
+        s=sizes[frequent_points],
+        alpha=alphas[frequent_points])
 
     plt.scatter(
         tsne_result[rare_points, 0],
