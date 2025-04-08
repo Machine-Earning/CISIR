@@ -61,4 +61,4 @@ LAMBDA_FACTOR = 1
 CVRG_MIN_DELTA = 1e-3
 CVRG_METRIC = 'val_loss'
 ASYM_TYPE = None #'sigmoid'
-
+N_FILTER = 300
