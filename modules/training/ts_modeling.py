@@ -2054,40 +2054,6 @@ def stratified_groups(y: np.ndarray, batch_size: int, debug: bool = False) -> np
     return padded_groups
 
 
-# def stratified_groups(y: np.ndarray, batch_size: int, debug: bool = False) -> np.ndarray:
-#     """
-#     Create stratified groups from the dataset by sorting it based on the labels.
-#     The number of groups corresponds to the batch size per GPU.
-#
-#     Parameters:
-#     -----------
-#     y : np.ndarray
-#         Label vector of shape (n_samples, 1).
-#     batch_size : int
-#         Number of samples in each batch per GPU.
-#
-#     Returns:
-#     --------
-#     np.ndarray:
-#         A 2D array where each row represents a stratified group, and all rows have the same length.
-#     """
-#     # Sort the dataset along the second dimension (axis=0)
-#     sorted_indices = np.argsort(y, axis=0).flatten()
-#
-#     # Create groups by slicing the sorted data indices
-#     groups = np.array_split(sorted_indices, batch_size)
-#
-#     # Find the maximum group size
-#     max_size = max(len(group) for group in groups)
-#
-#     # Pad the groups with their last element to make all groups the same size
-#     padded_groups = np.array([
-#         np.pad(group, (0, max_size - len(group)), 'edge') for group in groups
-#     ])
-#
-#     return padded_groups
-
-
 def stratified_data_generator(
         X: np.ndarray,
         y: np.ndarray,
@@ -2275,62 +2241,6 @@ def stratified_data_generator_cls2(
 
         # Yield the current batch
         yield batch_X, batch_y, batch_delta
-
-
-# def stratified_data_generator(
-#         X: np.ndarray,
-#         y: np.ndarray,
-#         groups: np.ndarray,
-#         global_batch_size: int,
-#         shuffle: bool = True,
-#         debug: bool = False
-# ) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
-#     """
-#     Generator that yields stratified batches of (X, y) for MirroredStrategy.
-#
-#     Parameters:
-#     -----------
-#     X : np.ndarray
-#         Feature matrix of shape (n_samples, n_features).
-#     y : np.ndarray
-#         Label vector of shape (n_samples,).
-#     groups : np.ndarray
-#         Precomputed groups of sample indices for stratified sampling.
-#     global_batch_size : int
-#         Total batch size across all GPUs.
-#     shuffle : bool, optional
-#         If True, shuffles the groups and the elements within each group before each epoch (default is True).
-#     debug : bool, optional
-#         If True, prints the generated batches for debugging purposes (default is False).
-#
-#     Yields:
-#     -------
-#     Tuple[np.ndarray, np.ndarray]:
-#         Batches of feature matrix and label vector of size (global_batch_size, n_features) and (global_batch_size,) respectively.
-#     """
-#     while True:
-#         if shuffle:
-#             np.apply_along_axis(np.random.shuffle, 1, groups)
-#
-#         # Select samples to form the global batch
-#         batch_indices = groups[:, :global_batch_size // len(groups)].flatten()
-#
-#         # Optionally, shuffle the order of the selected samples
-#         if shuffle:
-#             np.random.shuffle(batch_indices)
-#
-#         # Create the feature and label batches using the selected indices
-#         batch_X = X[batch_indices]
-#         batch_y = y[batch_indices]
-#
-#         # Ensure the labels have the correct shape
-#         batch_y = batch_y.reshape(-1)
-#
-#         if debug:
-#             print(f'Batch shape: {batch_X.shape}, {batch_y.shape}')
-#             print(f"Batch y:\n{batch_y}")
-#
-#         yield batch_X, batch_y
 
 
 def stratified_batch_dataset(
@@ -6062,7 +5972,7 @@ def plot_avsp_sep(
     norm = plt.Normalize(np.min(prediction_error), np.max(prediction_error))
     cmap = plt.cm.viridis
     
-    scatter = ax.scatter(y_test, predictions, c=prediction_error, cmap=cmap, norm=norm, alpha=0.7, s=40)
+    scatter = ax.scatter(y_test, predictions, c=prediction_error, cmap=cmap, norm=norm, alpha=0.7, s=20)
     
     # Plot perfect prediction line
     min_intensity = min(np.min(y_test), np.min(predictions))
