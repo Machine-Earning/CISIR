@@ -36,7 +36,7 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in TRIAL_SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1.0, 1.0, 0.0, 0.0)]:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1.1, 1.1, 0.0, 0.0)]:
             for rho in RHO:
                 # PARAMS
                 lambda_factor = 0.0 # LAMBDA_FACTOR  # lambda for the loss
