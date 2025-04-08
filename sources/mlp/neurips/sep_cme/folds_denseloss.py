@@ -7,7 +7,7 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
-from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
+from modules.evaluate.utils import plot_sep_corr, plot_tsne_sep
 from modules.reweighting.ImportanceWeighting import DenseLossImportance
 from modules.shared.sep_globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
@@ -21,7 +21,8 @@ from modules.training.ts_modeling import (
     create_mlp,
     plot_error_hist,
     load_folds_sep_ds,
-    plot_avsp_sep
+    plot_avsp_sep,
+    filter_ds_up
 )
 
 
@@ -35,7 +36,7 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in TRIAL_SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.8, 0.8, 0.0, 0.0)]:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1.0, 1.0, 0.0, 0.0)]:
             for rho in RHO:
                 # PARAMS
                 lambda_factor = 0.0 # LAMBDA_FACTOR  # lambda for the loss
@@ -86,7 +87,7 @@ def main():
                 smoothing_method = SMOOTHING_METHOD
                 window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
                 val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
-
+                n_filter = N_FILTER
 
                 # Initialize wandb
                 wandb.init(project="NeurIPS-2025-Paper-SEPds", name=experiment_name, config={
@@ -127,7 +128,8 @@ def main():
                     'cvrg_metric': cvrg_metric,
                     'cvrg_min_delta': cvrg_min_delta,
                     'normalized_weights': normalized_weights,
-                    'sep_threshold': sep_threshold
+                    'sep_threshold': sep_threshold,
+                    'n_filter': n_filter
                 })
 
                 # set the root directory
@@ -164,6 +166,16 @@ def main():
                 )
                 # print the test set shapes
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
+
+                # filtering training and test sets for additional results
+                X_train_filtered, y_train_filtered = filter_ds_up(
+                    X_train, y_train,
+                    high_threshold=sep_threshold,
+                    N=n_filter, seed=seed)
+                X_test_filtered, y_test_filtered = filter_ds_up(
+                    X_test, y_test,
+                    high_threshold=sep_threshold,
+                    N=n_filter, seed=seed)
 
                 # 4-fold cross-validation
                 folds_optimal_epochs = []
@@ -415,46 +427,53 @@ def main():
                 log_title = os.path.basename(filename)
                 wandb.log({f'training_{log_title}': wandb.Image(filename)})
 
-                # Evaluate the model correlation with colored
-                file_path = plot_repr_corr_dist(
+                # Evaluate the model correlation with colored points    
+                file_path = plot_sep_corr(
                     final_model_sep,
-                    X_train, y_train,
+                    X_train_filtered, y_train_filtered,
                     title + "_training",
-                    model_type='features_reg'
+                    model_type='features_reg',
+                    sep_threshold=sep_threshold
                 )
 
                 wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
                 print('file_path: ' + file_path)
 
-                file_path = plot_repr_corr_dist(
+                file_path = plot_sep_corr(
                     final_model_sep,
-                    X_test, y_test,
+                    X_test_filtered, y_test_filtered,
                     title + "_test",
-                    model_type='features_reg'
+                    model_type='features_reg',
+                    sep_threshold=sep_threshold
                 )
                 wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
                 print('file_path: ' + file_path)
 
                 # Log t-SNE plot
                 # Log the training t-SNE plot to wandb
-                stage1_file_path = plot_tsne_delta(
+                stage1_file_path = plot_tsne_sep(
                     final_model_sep,
-                    X_train, y_train, title,
+                    X_train_filtered, y_train_filtered, title,
                     'stage2_training',
                     model_type='features_reg',
-                    save_tag=current_time, seed=seed)
+                    save_tag=current_time, 
+                    seed=seed,
+                    sep_threshold=sep_threshold)
                 wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
                 print('stage1_file_path: ' + stage1_file_path)
 
                 # Log the testing t-SNE plot to wandb
-                stage1_file_path = plot_tsne_delta(
+                stage1_file_path = plot_tsne_sep(
                     final_model_sep,
-                    X_test, y_test, title,
+                    X_test_filtered, y_test_filtered, title,
                     'stage2_testing',
                     model_type='features_reg',
-                    save_tag=current_time, seed=seed)
+                    save_tag=current_time, 
+                    seed=seed,
+                    sep_threshold=sep_threshold)
                 wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
                 print('stage1_file_path: ' + stage1_file_path)
+
 
                 # Plot the error histograms
                 filename = plot_error_hist(
