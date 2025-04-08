@@ -4583,67 +4583,105 @@ def filter_ds(
 
     return X_combined, y_combined
 
-
-# def evaluate_model_dummy(y_test: np.ndarray) -> float:
-#     """
-#     Evaluates dummy predictions (always 0) using Mean Absolute Error (MAE) on the provided test data.
-#
-#     Parameters:
-#     - y_test (np.ndarray): True target values for the test set.
-#
-#     Returns:
-#     - float: The MAE loss for the dummy predictions.
-#     """
-#     # Create dummy predictions, an array of zeros with the same shape as y_test
-#     dummy_predictions = np.zeros_like(y_test)
-#
-#     # Assume process_predictions is a function you use to preprocess your predictions and true labels.
-#     # If you have such a function, apply it here. Otherwise, you can directly calculate MAE.
-#     # dummy_predictions = process_predictions(dummy_predictions)
-#     # y_test = process_predictions(y_test)
-#
-#     # Calculate MAE
-#     mae_loss = mean_absolute_error(y_test, dummy_predictions)
-#
-#     return mae_loss
-
-
-# def evaluate_model_cond_dummy(
-#         y_test: np.ndarray,
-#         below_threshold: float = None,
-#         above_threshold: float = None) -> float:
-#     """
-#     Evaluates dummy predictions (always 0) using Mean Absolute Error (MAE) on the provided test data,
-#     with an option to conditionally calculate MAE based on specified thresholds.
-#
-#     Parameters:
-#     - y_test (np.ndarray): True target values for the test set.
-#     - below_threshold (float, optional): The lower bound threshold for y_test to be included in MAE calculation.
-#     - above_threshold (float, optional): The upper bound threshold for y_test to be included in MAE calculation.
-#
-#     Returns:
-#     - float: The MAE loss for the dummy predictions on the filtered test data.
-#     """
-#     # Create dummy predictions, an array of zeros with the same shape as y_test
-#     dummy_predictions = np.zeros_like(y_test)
-#
-#     # Filter y_test based on thresholds
-#     if below_threshold is not None and above_threshold is not None:
-#         mask = (y_test >= above_threshold) | (y_test <= below_threshold)
-#     elif below_threshold is not None:
-#         mask = y_test <= below_threshold
-#     elif above_threshold is not None:
-#         mask = y_test >= above_threshold
-#     else:
-#         mask = np.ones_like(y_test, dtype=bool)
-#
-#     filtered_y_test = y_test[mask]
-#     filtered_dummy_predictions = dummy_predictions[mask]  # This remains zeros but matches the filtered_y_test's shape
-#
-#     # Calculate MAE
-#     mae_loss = mean_absolute_error(filtered_y_test, filtered_dummy_predictions)
-#
-#     return mae_loss
+def filter_ds_up(
+        X: np.ndarray, y: np.ndarray,
+        high_threshold: float,
+        N: int = 500, bins: int = 10, seed: int = None
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Filter and sample the dataset based on a high threshold value for y with a random seed for reproducibility.
+    
+    This function creates a subset of the dataset where all samples where y is above the high_threshold 
+    are included. Samples where y is below the high_threshold are randomly sampled within bins
+    to have a total of N samples in the resulting dataset.
+    
+    Parameters:
+        X (np.ndarray): The input features of the dataset.
+        y (np.ndarray): The output labels of the dataset.
+        high_threshold (float): The threshold above which all samples are preserved.
+        N (int): The number of samples to include from the range below the threshold.
+        bins (int): The number of bins to split the low value range into.
+        seed (int, optional): Seed for the random number generator to ensure reproducibility.
+        
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: The filtered and sampled input features and output labels.
+    """
+    # Set the random seed for reproducibility
+    np.random.seed(seed)
+    
+    # Flatten the output array to ensure mask works properly with input dimensions
+    y_flat = y.flatten()
+    
+    # Create a mask to identify high values (above high_threshold)
+    high_values_mask = y_flat >= high_threshold
+    
+    # Apply the high values mask to get the corresponding samples
+    X_high_values = X[high_values_mask, :]
+    y_high_values = y[high_values_mask, :]
+    
+    # Create a mask to identify low values (below high_threshold)
+    low_values_mask = y_flat < high_threshold
+    
+    # Apply the low values mask to get the corresponding samples
+    X_low_values = X[low_values_mask, :]
+    y_low_values = y[low_values_mask, :]
+    
+    # If there are fewer low values than N, just include all of them
+    if len(y_low_values) <= N:
+        return np.concatenate([X_high_values, X_low_values], axis=0), np.concatenate([y_high_values, y_low_values], axis=0)
+    
+    # Create bin edges for the low value samples from min to high_threshold
+    min_value = np.min(y_low_values)
+    bins_edges = np.linspace(min_value, high_threshold, bins + 1)
+    
+    # Digitize y_low_values to assign each sample to a bin
+    binned_indices = np.digitize(y_low_values.flatten(), bins_edges) - 1
+    
+    # Determine the budget per bin and remainder
+    budget = N // bins
+    remainder = N % bins
+    
+    # Initialize lists to store sampled low values
+    X_low_values_sampled = []
+    y_low_values_sampled = []
+    
+    # Sample low values from each bin
+    for bin_idx in range(bins):
+        # Create a mask for the current bin
+        bin_mask = binned_indices == bin_idx
+        
+        # Select samples in the current bin
+        X_bin = X_low_values[bin_mask, :]
+        y_bin = y_low_values[bin_mask, :]
+        
+        # Determine the number of samples to draw from this bin
+        bin_budget = budget + (1 if remainder > 0 else 0)
+        remainder = max(0, remainder - 1)
+        
+        # Sample from the bin if it has more samples than the budget
+        if len(y_bin) > bin_budget:
+            sampled_indices = np.random.choice(len(X_bin), size=bin_budget, replace=False)
+            X_low_values_sampled.append(X_bin[sampled_indices])
+            y_low_values_sampled.append(y_bin[sampled_indices])
+        else:
+            # If the bin has fewer samples than the budget, include all samples
+            X_low_values_sampled.append(X_bin)
+            y_low_values_sampled.append(y_bin)
+            remainder += bin_budget - len(y_bin)
+    
+    # Concatenate all sampled low values
+    if X_low_values_sampled:
+        X_low_values_sampled = np.concatenate(X_low_values_sampled, axis=0)
+        y_low_values_sampled = np.concatenate(y_low_values_sampled, axis=0)
+        
+        # Combine high value samples with sampled low value samples
+        X_combined = np.concatenate([X_high_values, X_low_values_sampled], axis=0)
+        y_combined = np.concatenate([y_high_values, y_low_values_sampled], axis=0)
+    else:
+        X_combined = X_high_values
+        y_combined = y_high_values
+    
+    return X_combined, y_combined
 
 
 def reshape_X(

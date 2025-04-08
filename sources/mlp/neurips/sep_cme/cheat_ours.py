@@ -21,7 +21,8 @@ from modules.training.ts_modeling import (
     cmse,
     create_mlp,
     plot_error_hist,
-    plot_avsp_sep
+    plot_avsp_sep,
+    filter_ds_up
 )
 
 
@@ -34,11 +35,11 @@ def main():
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
 
-    for seed in TRIAL_SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.85, 0.85, 0.0, 0.0)]:
+    for seed in [456789]:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1.0, 1.0, 0.0, 0.0)]:
             for rho in RHO:  # SAM_RHOS:
                 # PARAMS
-                lambda_factor = 0.2 # LAMBDA_FACTOR  # lambda for the loss
+                lambda_factor = LAMBDA_FACTOR  # lambda for the loss
                 # Construct the title
                 title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}'
                 # Replace any other characters that are not suitable for filenames (if any)
@@ -86,7 +87,7 @@ def main():
                 smoothing_method = SMOOTHING_METHOD
                 window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
                 val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
-
+                n_filter = N_FILTER
 
                 # Initialize wandb
                 wandb.init(project="NeurIPS-2025-Paper-SEPds", name=experiment_name, config={
@@ -127,7 +128,8 @@ def main():
                     'cvrg_metric': cvrg_metric,
                     'cvrg_min_delta': cvrg_min_delta,
                     'normalized_weights': normalized_weights,
-                    'sep_threshold': sep_threshold
+                    'sep_threshold': sep_threshold,
+                    'n_filter': n_filter
                 })
 
                 # set the root directory
@@ -178,6 +180,16 @@ def main():
                     alpha=alphaV_pcc, 
                     bandwidth=bandwidth).label_importance_map
                 print(f'test set rebalanced.')
+
+                # filtering training and test sets for additional results
+                X_train_filtered, y_train_filtered = filter_ds_up(
+                    X_train, y_train,
+                    high_threshold=sep_threshold,
+                    N=n_filter, seed=seed)
+                X_test_filtered, y_test_filtered = filter_ds_up(
+                    X_test, y_test,
+                    high_threshold=sep_threshold,
+                    N=n_filter, seed=seed)
 
                 # create the model
                 model_sep = create_mlp(
@@ -392,7 +404,7 @@ def main():
                 # Evaluate the model correlation with colored
                 file_path = plot_repr_corr_dist(
                     final_model_sep,
-                    X_train, y_train,
+                    X_train_filtered, y_train_filtered,
                     title + "_training",
                     model_type='features_reg'
                 )
@@ -402,7 +414,7 @@ def main():
 
                 file_path = plot_repr_corr_dist(
                     final_model_sep,
-                    X_test, y_test,
+                    X_test_filtered, y_test_filtered,
                     title + "_test",
                     model_type='features_reg'
                 )
@@ -413,7 +425,7 @@ def main():
                 # Log the training t-SNE plot to wandb
                 stage1_file_path = plot_tsne_delta(
                     final_model_sep,
-                    X_train, y_train, title,
+                    X_train_filtered, y_train_filtered, title,
                     'stage2_training',
                     model_type='features_reg',
                     save_tag=current_time, seed=seed)
@@ -423,7 +435,7 @@ def main():
                 # Log the testing t-SNE plot to wandb
                 stage1_file_path = plot_tsne_delta(
                     final_model_sep,
-                    X_test, y_test, title,
+                    X_test_filtered, y_test_filtered, title,
                     'stage2_testing',
                     model_type='features_reg',
                     save_tag=current_time, seed=seed)
