@@ -21,7 +21,6 @@ from modules.training.ts_modeling import (
     cmse,
     create_mlp,
     plot_error_hist,
-    load_folds_sep_ds,
     plot_avsp_sep
 )
 
@@ -166,138 +165,102 @@ def main():
                 # print the test set shapes
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
 
-                # 4-fold cross-validation
-                folds_optimal_epochs = []
-                for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
-                    load_folds_sep_ds(
-                        root_dir,
-                        random_state=seed,
-                        shuffle=True
-                    )
-                ):
-                    print(f'Fold: {fold_idx}')
-                    # print all cme_files shapes
-                    print(f'X_subtrain.shape: {X_subtrain.shape}, y_subtrain.shape: {y_subtrain.shape}')
-                    print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val.shape}')
+                # rebalancing the test set for validation
+                delta_test = y_test
+                print(f'delta_test.shape: {delta_test.shape}')
+                print(f'rebalancing the test set...')
+                mse_test_weights_dict = ReciprocalImportance(
+                    X_test, delta_test,
+                    alpha=alphaV_mse, 
+                    bandwidth=bandwidth).label_importance_map
+                pcc_test_weights_dict = ReciprocalImportance(
+                    X_test, delta_test,
+                    alpha=alphaV_pcc, 
+                    bandwidth=bandwidth).label_importance_map
+                print(f'test set rebalanced.')
 
-                    # Compute the sample weights for subtraining
-                    delta_subtrain = y_subtrain
-                    print(f'delta_subtrain.shape: {delta_subtrain.shape}')
-                    print(f'rebalancing the subtraining set...')
-                    mse_subtrain_weights_dict = ReciprocalImportance(
-                        X_subtrain, delta_subtrain,
-                        alpha=alpha_mse, 
-                        bandwidth=bandwidth).label_importance_map
-                    pcc_subtrain_weights_dict = ReciprocalImportance(
-                        X_subtrain, delta_subtrain,
-                        alpha=alpha_pcc, 
-                        bandwidth=bandwidth).label_importance_map
-                    print(f'subtraining set rebalanced.')
+                # create the model
+                model_sep = create_mlp(
+                    input_dim=n_features,
+                    hiddens=hiddens,
+                    embed_dim=embed_dim,
+                    output_dim=output_dim,
+                    dropout=dropout,
+                    activation=activation,
+                    norm=norm,
+                    skip_repr=skip_repr,
+                    skipped_layers=skipped_layers,
+                    pretraining=pretraining,
+                    sam_rho=rho,
+                    weight_decay=weight_decay
+                )
+                model_sep.summary()
 
-                    # Compute the sample weights for validation
-                    delta_val = y_val
-                    print(f'delta_val.shape: {delta_val.shape}')
-                    print(f'rebalancing the validation set...')
-                    mse_val_weights_dict = ReciprocalImportance(
-                        X_val, delta_val,
-                        alpha=alphaV_mse, 
-                        bandwidth=bandwidth).label_importance_map
-                    pcc_val_weights_dict = ReciprocalImportance(
-                        X_val, delta_val,
-                        alpha=alphaV_pcc, 
-                        bandwidth=bandwidth).label_importance_map
-                    print(f'validation set rebalanced.')
+                # Define the EarlyStopping callback
+                early_stopping = SmoothEarlyStopping(
+                    monitor=cvrg_metric,
+                    min_delta=cvrg_min_delta,
+                    patience=patience,
+                    verbose=VERBOSE,
+                    restore_best_weights=ES_CB_RESTORE_WEIGHTS,
+                    smoothing_method=smoothing_method,  # 'moving_average'
+                    smoothing_parameters={'window_size': window_size})  # 10
 
-                    # create the model
-                    model_sep = create_mlp(
-                        input_dim=n_features,
-                        hiddens=hiddens,
-                        embed_dim=embed_dim,
-                        output_dim=output_dim,
-                        dropout=dropout,
-                        activation=activation,
-                        norm=norm,
-                        skip_repr=skip_repr,
-                        skipped_layers=skipped_layers,
-                        pretraining=pretraining,
-                        sam_rho=rho,
-                        weight_decay=weight_decay
-                    )
-                    model_sep.summary()
+                # Compile the model with the specified learning rate
+                model_sep.compile(
+                    optimizer=Adam(
+                        learning_rate=learning_rate,
+                    ),
+                    loss={
+                        'forecast_head': lambda y_true, y_pred: cmse(
+                            y_true, y_pred,
+                            phase_manager=pm,
+                            lambda_factor=lambda_factor,
+                            train_mse_weight_dict=mse_train_weights_dict,
+                            train_pcc_weight_dict=pcc_train_weights_dict,
+                            val_mse_weight_dict=mse_test_weights_dict,
+                            val_pcc_weight_dict=pcc_test_weights_dict,
+                            normalized_weights=normalized_weights,
+                            asym_type=asym_type
+                        )
+                    }
+                )
 
-                    # Define the EarlyStopping callback
-                    early_stopping = SmoothEarlyStopping(
-                        monitor=cvrg_metric,
-                        min_delta=cvrg_min_delta,
-                        patience=patience,
-                        verbose=VERBOSE,
-                        restore_best_weights=ES_CB_RESTORE_WEIGHTS,
-                        smoothing_method=smoothing_method,  # 'moving_average'
-                        smoothing_parameters={'window_size': window_size})  # 10
+                # Create stratified dataset for training
+                train_ds, train_steps = stratified_batch_dataset(
+                    X_train, y_train, batch_size)
 
-                    # Compile the model with the specified learning rate
-                    model_sep.compile(
-                        optimizer=Adam(
-                            learning_rate=learning_rate,
-                        ),
-                        loss={
-                            'forecast_head': lambda y_true, y_pred: cmse(
-                                y_true, y_pred,
-                                phase_manager=pm,
-                                lambda_factor=lambda_factor,
-                                train_mse_weight_dict=mse_subtrain_weights_dict,
-                                train_pcc_weight_dict=pcc_subtrain_weights_dict,
-                                val_mse_weight_dict=mse_val_weights_dict,
-                                val_pcc_weight_dict=pcc_val_weights_dict,
-                                normalized_weights=normalized_weights,
-                                asym_type=asym_type
-                            )
-                        }
-                    )
+                # Map the training dataset to return {'output': y} format
+                train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
+                
+                # Prepare validation data without batching
+                val_data = (X_test, {'forecast_head': y_test})
 
-                    # Step 1: Create stratified dataset for the subtraining set only
-                    subtrain_ds, subtrain_steps = stratified_batch_dataset(
-                        X_subtrain, y_subtrain, batch_size)
+                # Train the model with the callback
+                history = model_sep.fit(
+                    train_ds,
+                    steps_per_epoch=train_steps,
+                    epochs=epochs, batch_size=batch_size,
+                    validation_data=val_data,
+                    callbacks=[
+                        early_stopping,
+                        reduce_lr_on_plateau,
+                        WandbCallback(save_model=WANDB_SAVE_MODEL),
+                        IsTraining(pm)
+                    ],
+                    verbose=VERBOSE
+                )
 
-                    # Map the subtraining dataset to return {'output': y} format
-                    subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'forecast_head': y}))
-                    
-                    # Prepare validation data without batching
-                    val_data = (X_val, {'forecast_head': y_val})
+                # Use the function to find the optimal epoch
+                optimal_epoch = find_optimal_epoch_by_smoothing(
+                    history.history[ES_CB_MONITOR],
+                    smoothing_method=smoothing_method,
+                    smoothing_parameters={'window_size': val_window_size},
+                    mode='min')
+                print(f'optimal_epoch: {optimal_epoch}')
+                wandb.log({'optimal_epoch': optimal_epoch})
 
-                    # Train the model with the callback
-                    history = model_sep.fit(
-                        subtrain_ds,
-                        steps_per_epoch=subtrain_steps,
-                        epochs=epochs, batch_size=batch_size,
-                        validation_data=val_data,
-                        callbacks=[
-                            early_stopping,
-                            reduce_lr_on_plateau,
-                            WandbCallback(save_model=WANDB_SAVE_MODEL),
-                            IsTraining(pm)
-                        ],
-                        verbose=VERBOSE
-                    )
-
-                    # optimal epoch for fold
-                    # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
-                    # Use the quadratic fit function to find the optimal epoch
-                    optimal_epoch = find_optimal_epoch_by_smoothing(
-                        history.history[ES_CB_MONITOR],
-                        smoothing_method=smoothing_method,
-                        smoothing_parameters={'window_size': val_window_size},
-                        mode='min')
-                    folds_optimal_epochs.append(optimal_epoch)
-                    # wandb log the fold's optimal
-                    print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
-                    wandb.log({f'fold_{fold_idx}_best_epoch': folds_optimal_epochs[-1]})
-
-                # determine the optimal number of epochs from the folds
-                optimal_epochs = int(np.mean(folds_optimal_epochs))
-                print(f'optimal_epochs: {optimal_epochs}')
-                wandb.log({'optimal_epochs': optimal_epochs})
-
+                # Create a new model for final training
                 final_model_sep = create_mlp(
                     input_dim=n_features,
                     hiddens=hiddens,
@@ -331,17 +294,11 @@ def main():
                     },
                 )  # Compile the model just like before
 
-                train_ds, train_steps = stratified_batch_dataset(
-                    X_train, y_train, batch_size)
-
-                # Map the training dataset to return {'output': y} format
-                train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
-
                 # Train on the full dataset
                 final_model_sep.fit(
                     train_ds,
                     steps_per_epoch=train_steps,
-                    epochs=optimal_epochs,
+                    epochs=optimal_epoch,
                     batch_size=batch_size,
                     callbacks=[
                         reduce_lr_on_plateau,
