@@ -41,7 +41,7 @@ def main():
                 # PARAMS
                 lambda_factor = 0.5 # LAMBDA_FACTOR  # lambda for the loss
                 # Construct the title
-                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}'
+                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_quc'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -142,17 +142,20 @@ def main():
                 # print the training set shapes
                 print(f'X_train.shape: {X_train.shape}, y_train.shape: {y_train.shape}')
                 # getting the reweights for training set
-                delta_train = y_train[:, 0]
+                delta_train = y_train
                 print(f'delta_train.shape: {delta_train.shape}')
                 print(f'rebalancing the training set...')
                 mse_train_weights_dict = QUCImportance(
                     X_train, delta_train,
                     alpha=alpha_mse, 
                     bandwidth=bandwidth).label_importance_map
-                pcc_train_weights_dict = QUCImportance(
-                    X_train, delta_train,
-                    alpha=alpha_pcc, 
-                    bandwidth=bandwidth).label_importance_map
+                if alpha_pcc > 0:
+                    pcc_train_weights_dict = QUCImportance(
+                        X_train, delta_train,
+                        alpha=alpha_pcc, 
+                        bandwidth=bandwidth).label_importance_map
+                else:
+                    pcc_train_weights_dict = None
                 print(f'training set rebalanced.')
                 # get the number of input features
                 n_features = X_train.shape[1]
@@ -181,31 +184,37 @@ def main():
                     print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val.shape}')
 
                     # Compute the sample weights for subtraining
-                    delta_subtrain = y_subtrain[:, 0]
+                    delta_subtrain = y_subtrain
                     print(f'delta_subtrain.shape: {delta_subtrain.shape}')
                     print(f'rebalancing the subtraining set...')
                     mse_subtrain_weights_dict = QUCImportance(
                         X_subtrain, delta_subtrain,
                         alpha=alpha_mse, 
                         bandwidth=bandwidth).label_importance_map
-                    pcc_subtrain_weights_dict = QUCImportance(
-                        X_subtrain, delta_subtrain,
-                        alpha=alpha_pcc, 
-                        bandwidth=bandwidth).label_importance_map
+                    if alpha_pcc > 0:
+                        pcc_subtrain_weights_dict = QUCImportance(
+                            X_subtrain, delta_subtrain,
+                            alpha=alpha_pcc, 
+                            bandwidth=bandwidth).label_importance_map
+                    else:
+                        pcc_subtrain_weights_dict = None
                     print(f'subtraining set rebalanced.')
 
                     # Compute the sample weights for validation
-                    delta_val = y_val[:, 0]
+                    delta_val = y_val
                     print(f'delta_val.shape: {delta_val.shape}')
                     print(f'rebalancing the validation set...')
                     mse_val_weights_dict = QUCImportance(
                         X_val, delta_val,
                         alpha=alphaV_mse, 
                         bandwidth=bandwidth).label_importance_map
-                    pcc_val_weights_dict = QUCImportance(
-                        X_val, delta_val,
-                        alpha=alphaV_pcc, 
-                        bandwidth=bandwidth).label_importance_map
+                    if alphaV_pcc > 0:
+                        pcc_val_weights_dict = QUCImportance(
+                            X_val, delta_val,
+                            alpha=alphaV_pcc, 
+                            bandwidth=bandwidth).label_importance_map
+                    else:
+                        pcc_val_weights_dict = None
                     print(f'validation set rebalanced.')
 
                     # create the model

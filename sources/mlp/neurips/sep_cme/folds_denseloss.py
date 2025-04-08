@@ -40,7 +40,7 @@ def main():
                 # PARAMS
                 lambda_factor = 0.0 # LAMBDA_FACTOR  # lambda for the loss
                 # Construct the title
-                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}'
+                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_denseloss'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -141,7 +141,7 @@ def main():
                 # print the training set shapes
                 print(f'X_train.shape: {X_train.shape}, y_train.shape: {y_train.shape}')
                 # getting the reweights for training set
-                delta_train = y_train[:, 0]
+                delta_train = y_train
                 print(f'delta_train.shape: {delta_train.shape}')
                 print(f'rebalancing the training set...')
                 mse_train_weights_dict = DenseLossImportance(
@@ -180,7 +180,7 @@ def main():
                     print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val.shape}')
 
                     # Compute the sample weights for subtraining
-                    delta_subtrain = y_subtrain[:, 0]
+                    delta_subtrain = y_subtrain
                     print(f'delta_subtrain.shape: {delta_subtrain.shape}')
                     print(f'rebalancing the subtraining set...')
                     mse_subtrain_weights_dict = DenseLossImportance(
@@ -194,7 +194,7 @@ def main():
                     print(f'subtraining set rebalanced.')
 
                     # Compute the sample weights for validation
-                    delta_val = y_val[:, 0]
+                    delta_val = y_val
                     print(f'delta_val.shape: {delta_val.shape}')
                     print(f'rebalancing the validation set...')
                     mse_val_weights_dict = DenseLossImportance(
