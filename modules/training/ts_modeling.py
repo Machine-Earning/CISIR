@@ -4555,33 +4555,32 @@ def filter_ds_up(
     # Set the random seed for reproducibility
     np.random.seed(seed)
     
-    # Flatten the output array to ensure mask works properly with input dimensions
-    y_flat = y.flatten()
-    
     # Create a mask to identify high values (above high_threshold)
-    high_values_mask = y_flat >= high_threshold
+    high_values_mask = y >= high_threshold
     
     # Apply the high values mask to get the corresponding samples
-    X_high_values = X[high_values_mask, :]
-    y_high_values = y[high_values_mask, :]
+    X_high_values = X[high_values_mask]
+    y_high_values = y[high_values_mask]
     
     # Create a mask to identify low values (below high_threshold)
-    low_values_mask = y_flat < high_threshold
+    low_values_mask = y < high_threshold
     
     # Apply the low values mask to get the corresponding samples
-    X_low_values = X[low_values_mask, :]
-    y_low_values = y[low_values_mask, :]
+    X_low_values = X[low_values_mask]
+    y_low_values = y[low_values_mask]
     
     # If there are fewer low values than N, just include all of them
     if len(y_low_values) <= N:
-        return np.concatenate([X_high_values, X_low_values], axis=0), np.concatenate([y_high_values, y_low_values], axis=0)
+        X_combined = np.concatenate([X_high_values, X_low_values], axis=0)
+        y_combined = np.concatenate([y_high_values, y_low_values])
+        return X_combined, y_combined
     
     # Create bin edges for the low value samples from min to high_threshold
     min_value = np.min(y_low_values)
     bins_edges = np.linspace(min_value, high_threshold, bins + 1)
     
     # Digitize y_low_values to assign each sample to a bin
-    binned_indices = np.digitize(y_low_values.flatten(), bins_edges) - 1
+    binned_indices = np.digitize(y_low_values, bins_edges) - 1
     
     # Determine the budget per bin and remainder
     budget = N // bins
@@ -4597,8 +4596,8 @@ def filter_ds_up(
         bin_mask = binned_indices == bin_idx
         
         # Select samples in the current bin
-        X_bin = X_low_values[bin_mask, :]
-        y_bin = y_low_values[bin_mask, :]
+        X_bin = X_low_values[bin_mask]
+        y_bin = y_low_values[bin_mask]
         
         # Determine the number of samples to draw from this bin
         bin_budget = budget + (1 if remainder > 0 else 0)
@@ -4618,11 +4617,11 @@ def filter_ds_up(
     # Concatenate all sampled low values
     if X_low_values_sampled:
         X_low_values_sampled = np.concatenate(X_low_values_sampled, axis=0)
-        y_low_values_sampled = np.concatenate(y_low_values_sampled, axis=0)
+        y_low_values_sampled = np.concatenate(y_low_values_sampled)
         
         # Combine high value samples with sampled low value samples
         X_combined = np.concatenate([X_high_values, X_low_values_sampled], axis=0)
-        y_combined = np.concatenate([y_high_values, y_low_values_sampled], axis=0)
+        y_combined = np.concatenate([y_high_values, y_low_values_sampled])
     else:
         X_combined = X_high_values
         y_combined = y_high_values

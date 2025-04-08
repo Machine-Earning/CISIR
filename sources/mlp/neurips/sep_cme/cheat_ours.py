@@ -41,7 +41,7 @@ def main():
                 # PARAMS
                 lambda_factor = LAMBDA_FACTOR  # lambda for the loss
                 # Construct the title
-                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}'
+                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_cheat'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
