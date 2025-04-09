@@ -1,13 +1,13 @@
 # Dataset configurations
 DS_VERSION = 1  # Dataset version
-DS_PATH = 'data/online_news'  # Path to the dataset
+DS_PATH = 'data/sarcos'  # Path to the dataset
 
 OUTPUT_DIM = 1
 
 
 # Training configurations
 TRIAL_SEEDS = [456789, 42, 123, 0, 9999] # Seeds for trial
-BATCH_SIZE = 4096  # Batch size
+BATCH_SIZE = 200  # Batch size
 EPOCHS = int(2e5)  # Number of epochs
 VERBOSE = 1  # Verbose
 SAVE_BEST = False  # Save best model
@@ -15,10 +15,10 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 FREEZING = [False]
 
 # Model Architecture
-MLP_HIDDENS = [1024, 64, 512, 64, 256, 64, 128, 64]  # Hidden layers
+MLP_HIDDENS = [512, 32, 256, 32, 128, 32, 64, 32]  # Hidden layers
 
-PROJ_HIDDENS = [32]  # Projection hidden layers
-EMBED_DIM = 64  # Representation dimension
+PROJ_HIDDENS = [16]  # Projection hidden layers
+EMBED_DIM = 32  # Representation dimension
 DROPOUT = 0.5  # Dropout rate
 ACTIVATION = None  # No activation for regression so default is LeakyReLU
 NORM = 'batch_norm'  # Use batch normalization
@@ -45,9 +45,8 @@ ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
 ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 
 # Data Filtering and Processing
-LOWER_THRESHOLD = 4  # Lower threshold for rebalancing
-UPPER_THRESHOLD = 12  # Upper threshold for rebalancing
-BANDWIDTH = 1.331  # Bandwidth for rebalancing
+SEP_THRESHOLD = 2.30258509299  # Threshold for SEP events
+BANDWIDTH = 1.508  # Bandwidth for rebalancing
 
 # Smoothing Parameters
 SMOOTHING_METHOD = 'moving_average'
