@@ -1,6 +1,6 @@
 # Dataset configurations
 DS_VERSION = 1  # Dataset version
-DS_PATH = 'data/online_news'  # Path to the dataset
+DS_PATH = 'data/allstate_claims'  # Path to the dataset
 
 OUTPUT_DIM = 1
 
@@ -15,10 +15,10 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 FREEZING = [False]
 
 # Model Architecture
-MLP_HIDDENS = [1024, 64, 512, 64, 256, 64, 128, 64]  # Hidden layers
+MLP_HIDDENS = [4096, 256, 2048, 256, 1024, 256, 512, 256]  # Hidden layers
 
-PROJ_HIDDENS = [32]  # Projection hidden layers
-EMBED_DIM = 64  # Representation dimension
+PROJ_HIDDENS = [128]  # Projection hidden layers
+EMBED_DIM = 512  # Representation dimension
 DROPOUT = 0.5  # Dropout rate
 ACTIVATION = None  # No activation for regression so default is LeakyReLU
 NORM = 'batch_norm'  # Use batch normalization
@@ -45,9 +45,9 @@ ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
 ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 
 # Data Filtering and Processing
-LOWER_THRESHOLD = 4  # Lower threshold for rebalancing
-UPPER_THRESHOLD = 12  # Upper threshold for rebalancing
-BANDWIDTH = 1.331  # Bandwidth for rebalancing
+FREQ_THRESHOLD = 0.2  # Lower threshold for rebalancing
+RARE_THRESHOLD = 10.5  # Upper threshold for rebalancing
+BANDWIDTH = 0.313  # Bandwidth for rebalancing
 
 # Smoothing Parameters
 SMOOTHING_METHOD = 'moving_average'
