@@ -41,10 +41,10 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in TRIAL_SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1.5, 1.5, 0.0, 0.0)]:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.01, 0.01, 0.0, 0.0)]:
             for rho in RHO:  # SAM_RHOS:
                 # PARAMS
-                lambda_factor = 0.5 # LAMBDA_FACTOR  # lambda for the loss
+                lambda_factor = 0.3 # LAMBDA_FACTOR  # lambda for the loss
                 # Construct the title
                 title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_quc'
                 # Replace any other characters that are not suitable for filenames (if any)
