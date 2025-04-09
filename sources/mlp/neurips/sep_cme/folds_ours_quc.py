@@ -23,7 +23,11 @@ from modules.training.ts_modeling import (
     plot_error_hist,
     load_folds_sep_ds,
     plot_avsp_sep,
-    filter_ds_up
+    filter_ds_up,
+    initialize_results_dict,
+    update_trial_results,
+    compute_averages,
+    save_results_to_csv
 )
 
 
@@ -37,7 +41,7 @@ def main():
     pm = TrainingPhaseManager()
 
     for seed in TRIAL_SEEDS:
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1, 1, 0.0, 0.0)]:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(1.5, 1.5, 0.0, 0.0)]:
             for rho in RHO:  # SAM_RHOS:
                 # PARAMS
                 lambda_factor = 0.5 # LAMBDA_FACTOR  # lambda for the loss
@@ -519,6 +523,38 @@ def main():
                     title=title,
                     prefix='testing')
                 wandb.log({"testing_error_hist": wandb.Image(filename)})
+
+                # Initialize results tracking
+                n_trials = len(TRIAL_SEEDS)
+                results = initialize_results_dict(n_trials)
+                results['name'] = experiment_name
+
+                # Update results for this trial
+                trial_idx = TRIAL_SEEDS.index(seed) + 1
+                results = update_trial_results(
+                    results,
+                    trial_idx,
+                    mae=error_mae,
+                    maep=error_mae_cond,
+                    pcc=error_pcc,
+                    pccp=error_pcc_cond
+                )
+                
+                # If this is the last trial, compute averages and save results
+                if trial_idx == n_trials:
+                    results = compute_averages(results, n_trials)
+                    # Create results directory if it doesn't exist
+                    results_dir = os.path.join(os.getcwd(), 'results')
+                    if not os.path.exists(results_dir):
+                        os.makedirs(results_dir)
+                    
+                    # Use the existing title with rho parameter added for the CSV name
+                    csv_filename = f"results_{title}.csv"
+                    csv_path = os.path.join(results_dir, csv_filename)
+                    
+                    # Save results to CSV
+                    save_results_to_csv(results, csv_path)
+
 
                 # Finish the wandb run
                 wandb.finish()

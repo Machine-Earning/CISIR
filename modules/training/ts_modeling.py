@@ -42,7 +42,8 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Optimizer
 from tensorflow.keras.regularizers import l2
 from typing import Generator, Tuple, Optional
-from typing import List, Union, Callable, Dict
+from typing import List, Union, Callable, Dict, Any, Optional
+import csv
 
 from modules.shared.globals import MLP_HIDDENS, UPPER_THRESHOLD_MOE, \
     LOWER_THRESHOLD_MOE
@@ -64,6 +65,138 @@ np.random.seed(seed_value)
 
 # 4. Set `tensorflow` pseudo-random generator at a fixed value
 tf.random.set_seed(seed_value)
+
+
+def initialize_results_dict(n_trials: int) -> Dict[str, Any]:
+    """
+    Initialize a dictionary to store experiment results across multiple trials.
+    
+    Args:
+        n_trials: Number of trials in the experiment
+        
+    Returns:
+        Dictionary with keys for storing experiment results
+    """
+    results = {
+        'name': '',  # Experiment name
+        'avg_mae_maep': 0.0,  # Average of avg_mae and avg_maep
+        'avg_pcc_pccp': 0.0,  # Average of avg_pcc and avg_pccp
+        'avg_mae': 0.0,       # Average MAE across trials
+        'avg_maep': 0.0,      # Average MAE+ across trials
+        'avg_pcc': 0.0,       # Average PCC across trials
+        'avg_pccp': 0.0,      # Average PCC+ across trials
+    }
+    
+    # Add individual trial metrics
+    for i in range(1, n_trials + 1):
+        results[f'trial{i}_mae'] = 0.0
+        results[f'trial{i}_maep'] = 0.0
+        results[f'trial{i}_pcc'] = 0.0
+        results[f'trial{i}_pccp'] = 0.0
+        
+    return results
+
+def update_trial_results(
+    results: Dict[str, Any], 
+    trial_idx: int, 
+    mae: float, 
+    maep: float, 
+    pcc: float, 
+    pccp: float
+) -> Dict[str, Any]:
+    """
+    Update results dictionary with metrics from a single trial.
+    
+    Args:
+        results: The results dictionary to update
+        trial_idx: Current trial index (1-based)
+        mae: Mean Absolute Error for this trial
+        maep: Mean Absolute Error Plus (for samples above threshold) for this trial
+        pcc: Pearson Correlation Coefficient for this trial
+        pccp: Pearson Correlation Coefficient Plus (for samples above threshold) for this trial
+        
+    Returns:
+        Updated results dictionary
+    """
+    # Store individual trial results
+    results[f'trial{trial_idx}_mae'] = mae
+    results[f'trial{trial_idx}_maep'] = maep
+    results[f'trial{trial_idx}_pcc'] = pcc
+    results[f'trial{trial_idx}_pccp'] = pccp
+    
+    return results
+
+def compute_averages(results: Dict[str, Any], n_trials: int) -> Dict[str, Any]:
+    """
+    Compute average metrics across all trials.
+    
+    Args:
+        results: Results dictionary with individual trial metrics
+        n_trials: Number of trials
+        
+    Returns:
+        Updated results dictionary with average metrics
+    """
+    # Calculate average metrics across trials
+    mae_sum = sum(results[f'trial{i}_mae'] for i in range(1, n_trials + 1))
+    maep_sum = sum(results[f'trial{i}_maep'] for i in range(1, n_trials + 1))
+    pcc_sum = sum(results[f'trial{i}_pcc'] for i in range(1, n_trials + 1))
+    pccp_sum = sum(results[f'trial{i}_pccp'] for i in range(1, n_trials + 1))
+    
+    # Store average metrics
+    results['avg_mae'] = mae_sum / n_trials
+    results['avg_maep'] = maep_sum / n_trials
+    results['avg_pcc'] = pcc_sum / n_trials
+    results['avg_pccp'] = pccp_sum / n_trials
+    
+    # Calculate combined metrics
+    results['avg_mae_maep'] = 0.5 * (results['avg_mae'] + results['avg_maep'])
+    results['avg_pcc_pccp'] = 0.5 * (results['avg_pcc'] + results['avg_pccp'])
+    
+    return results
+
+def save_results_to_csv(results: Dict[str, Any], csv_path: str) -> None:
+    """
+    Save experiment results to a CSV file, appending if file exists.
+    
+    Args:
+        results: Results dictionary with all metrics
+        csv_path: Path to the CSV file
+    """
+    # Define headers in required order
+    n_trials = max([int(key.replace('trial', '').split('_')[0]) 
+                    for key in results.keys() if key.startswith('trial')])
+    
+    headers = ['name', 'avg_mae_maep', 'avg_pcc_pccp', 'avg_mae']
+    for i in range(1, n_trials + 1):
+        headers.append(f'trial{i}_mae')
+    
+    headers.append('avg_maep')
+    for i in range(1, n_trials + 1):
+        headers.append(f'trial{i}_maep')
+    
+    headers.append('avg_pcc')
+    for i in range(1, n_trials + 1):
+        headers.append(f'trial{i}_pcc')
+    
+    headers.append('avg_pccp')
+    for i in range(1, n_trials + 1):
+        headers.append(f'trial{i}_pccp')
+    
+    # Check if file exists to determine if we need to write headers
+    file_exists = os.path.isfile(csv_path)
+    
+    with open(csv_path, 'a', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=headers)
+        
+        # Write headers if file is new
+        if not file_exists:
+            writer.writeheader()
+        
+        # Write results row
+        writer.writerow({h: results.get(h, '') for h in headers})
+        
+    print(f"Results saved to {csv_path}")
 
 
 def get_plus_cls(
@@ -4792,6 +4925,8 @@ def prepare_seq_inputs(
             start_index = end_index
 
         return tuple(seq_inputs)
+
+
 
 
 def find_threshold_crossing_indices(values: np.ndarray, threshold: float) -> np.ndarray:
