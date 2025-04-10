@@ -7,13 +7,13 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
-from modules.evaluate.utils import plot_tsne_sarcos, plot_sarcos_corr
+from modules.evaluate.utils import plot_tsne_blogf, plot_blogf_corr
 from modules.reweighting.ImportanceWeighting import ReciprocalImportance
-from modules.shared.sarcos_globals import *
+from modules.shared.blogf_globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
-    build_sarcos_ds,
+    build_blogf_ds,
     evaluate_mae,
     evaluate_pcc,
     stratified_batch_dataset,
