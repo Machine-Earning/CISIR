@@ -7,7 +7,7 @@ OUTPUT_DIM = 1
 
 # Training configurations
 TRIAL_SEEDS = [456789, 42, 123, 0, 9999] # Seeds for trial
-BATCH_SIZE = 200  # Batch size
+BATCH_SIZE = 4800  # Batch size
 EPOCHS = int(2e5)  # Number of epochs
 VERBOSE = 1  # Verbose
 SAVE_BEST = False  # Save best model
@@ -29,7 +29,7 @@ SKIP_REPR = True  # residual representation
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
 START_LR = 5e-4  # starting learning rate
-WEIGHT_DECAY = 1  # Higher weight decay
+WEIGHT_DECAY = 0.1  # Higher weight decay
 NORMALIZED_WEIGHTS = True  # Use normalized weights
 
 # Learning Rate Scheduling
@@ -45,7 +45,8 @@ ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
 ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 
 # Data Filtering and Processing
-SEP_THRESHOLD = 2.30258509299  # Threshold for SEP events
+LOWER_THRESHOLD = -0.5
+UPPER_THRESHOLD = 0.5
 BANDWIDTH = 1.508  # Bandwidth for rebalancing
 
 # Smoothing Parameters
