@@ -22,7 +22,7 @@ from modules.training.ts_modeling import (
     plot_error_hist,
     load_folds_sarcos_ds,
     plot_avsp_sarcos,
-    filter_ds_1d,
+    filter_ds_1d_fr,
     initialize_freq_rare_results_dict,
     update_freq_rare_trial_results,
     compute_freq_rare_averages,
@@ -41,7 +41,7 @@ def main():
 
 
     # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc
-    alphas = [(1.2, 1.2, 0.0, 0.0)]
+    alphas = [(0.8, 0.8, 0.0, 0.0)]
     alpha_amse = alphas[0][0]
     alpha_apcc = alphas[0][1]
 
@@ -186,16 +186,16 @@ def main():
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
 
                 # filtering training and test sets for additional results
-                X_train_filtered, y_train_filtered = filter_ds_1d(
+                X_train_filtered, y_train_filtered = filter_ds_1d_fr(
                     X_train, y_train,
                     low_threshold=lower_threshold,
                     high_threshold=upper_threshold,
-                    N=n_filter, seed=seed)
-                X_test_filtered, y_test_filtered = filter_ds_1d(
+                    N_freq=n_filter, N_rare=n_filter, seed=seed)
+                X_test_filtered, y_test_filtered = filter_ds_1d_fr(
                     X_test, y_test,
                     low_threshold=lower_threshold,
                     high_threshold=upper_threshold,
-                    N=n_filter, seed=seed)
+                    N_freq=n_filter, N_rare=n_filter, seed=seed)
 
                 # 4-fold cross-validation
                 folds_optimal_epochs = []

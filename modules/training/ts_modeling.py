@@ -4951,6 +4951,220 @@ def filter_ds_1d(
 
     return X_combined, y_combined
 
+def filter_ds_1d_fr(
+        X: np.ndarray, y: np.ndarray,
+        low_threshold: float, high_threshold: float,
+        N_freq: int = 500, N_rare: int = 500, 
+        freq_bins: int = 10, rare_bins: int = 5,
+        seed: int = None
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Filter and sample the dataset based on threshold values, handling both frequent and rare samples.
+
+    This function creates a balanced subset where both frequent samples (between thresholds)
+    and rare samples (below low_threshold or above high_threshold) are controlled separately.
+    Both frequent and rare regions are binned and sampled to ensure representative distribution.
+
+    Parameters:
+        X (np.ndarray): The input features of the dataset.
+        y (np.ndarray): The output labels of the dataset.
+        low_threshold (float): The lower bound threshold separating frequent/rare regions.
+        high_threshold (float): The upper bound threshold separating frequent/rare regions.
+        N_freq (int): The number of samples to include from the frequent range.
+        N_rare (int, optional): The number of samples to include from the rare ranges.
+                               If None, include all rare samples.
+        freq_bins (int): The number of bins to split the frequent range into.
+        rare_bins (int): The number of bins to split the rare regions into (half for each side).
+        seed (int, optional): Seed for the random number generator for reproducibility.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: The filtered and sampled input features and output labels.
+    """
+    # Set the random seed for reproducibility
+    np.random.seed(seed)
+
+    # Flatten the output array to ensure mask works properly
+    y_flat = y.flatten()
+
+    # Create masks for rare (high delta) and frequent (low delta) samples
+    rare_lower_mask = y_flat <= low_threshold
+    rare_upper_mask = y_flat >= high_threshold
+    rare_mask = rare_lower_mask | rare_upper_mask
+    freq_mask = ~rare_mask  # Equivalent to: (y_flat > low_threshold) & (y_flat < high_threshold)
+
+    # Apply masks to get the corresponding samples
+    X_rare = X[rare_mask, :]
+    y_rare = y_flat[rare_mask]
+    X_freq = X[freq_mask, :]
+    y_freq = y_flat[freq_mask]
+
+    # Handle frequent samples - bin and sample
+    if len(y_freq) > 0:
+        # Create bin edges for the frequent samples
+        freq_bins_edges = np.linspace(low_threshold, high_threshold, freq_bins + 1)
+        
+        # Digitize to assign each sample to a bin
+        freq_binned_indices = np.digitize(y_freq, freq_bins_edges) - 1
+        
+        # Determine the budget per bin and remainder
+        freq_budget = N_freq // freq_bins
+        freq_remainder = N_freq % freq_bins
+        
+        # Initialize lists to store sampled values
+        X_freq_sampled = []
+        y_freq_sampled = []
+        
+        # Sample from each bin
+        for bin_idx in range(freq_bins):
+            # Create a mask for the current bin
+            bin_mask = freq_binned_indices == bin_idx
+            
+            # Select samples in the current bin
+            X_bin = X_freq[bin_mask, :]
+            y_bin = y_freq[bin_mask]
+            
+            # Determine the number of samples to draw from this bin
+            bin_budget = freq_budget + (1 if freq_remainder > 0 else 0)
+            freq_remainder = max(0, freq_remainder - 1)
+            
+            # Sample from the bin if it has more samples than the budget
+            if len(y_bin) > bin_budget:
+                sampled_indices = np.random.choice(len(X_bin), size=bin_budget, replace=False)
+                X_freq_sampled.append(X_bin[sampled_indices])
+                y_freq_sampled.append(y_bin[sampled_indices])
+            else:
+                # If the bin has fewer samples than the budget, include all samples
+                X_freq_sampled.append(X_bin)
+                y_freq_sampled.append(y_bin)
+        
+        # Concatenate all sampled frequent values if any were selected
+        if X_freq_sampled:  
+            X_freq_sampled = np.concatenate(X_freq_sampled, axis=0)
+            y_freq_sampled = np.concatenate(y_freq_sampled)
+        else:
+            X_freq_sampled = np.empty((0, X.shape[1]))
+            y_freq_sampled = np.empty(0)
+    else:
+        X_freq_sampled = np.empty((0, X.shape[1]))
+        y_freq_sampled = np.empty(0)
+
+    # Handle rare samples - if N_rare is provided, bin and sample rare samples
+    if N_rare is not None and len(y_rare) > 0:
+        # Split rare samples into lower and upper regions
+        rare_lower_X = X[rare_lower_mask, :]
+        rare_lower_y = y_flat[rare_lower_mask]
+        rare_upper_X = X[rare_upper_mask, :]
+        rare_upper_y = y_flat[rare_upper_mask]
+        
+        X_rare_sampled = []
+        y_rare_sampled = []
+        
+        # Process lower rare region if not empty
+        if len(rare_lower_y) > 0:
+            # Create bins for the lower rare region
+            lower_bins = rare_bins // 2
+            if lower_bins > 0:
+                min_val = np.min(rare_lower_y)
+                lower_bin_edges = np.linspace(min_val, low_threshold, lower_bins + 1)
+                
+                # Digitize to assign each sample to a bin
+                lower_binned_indices = np.digitize(rare_lower_y, lower_bin_edges) - 1
+                
+                # Budget allocation for lower rare region
+                lower_budget = (N_rare // 2) // lower_bins
+                lower_remainder = (N_rare // 2) % lower_bins
+                
+                # Sample from each bin
+                for bin_idx in range(lower_bins):
+                    # Create a mask for the current bin
+                    bin_mask = lower_binned_indices == bin_idx
+                    
+                    # Select samples in the current bin
+                    X_bin = rare_lower_X[bin_mask, :]
+                    y_bin = rare_lower_y[bin_mask]
+                    
+                    # Determine the number of samples to draw from this bin
+                    bin_budget = lower_budget + (1 if lower_remainder > 0 else 0)
+                    lower_remainder = max(0, lower_remainder - 1)
+                    
+                    # Sample from the bin if it has more samples than the budget
+                    if len(y_bin) > bin_budget:
+                        sampled_indices = np.random.choice(len(X_bin), size=bin_budget, replace=False)
+                        X_rare_sampled.append(X_bin[sampled_indices])
+                        y_rare_sampled.append(y_bin[sampled_indices])
+                    else:
+                        # If the bin has fewer samples than the budget, include all samples
+                        X_rare_sampled.append(X_bin)
+                        y_rare_sampled.append(y_bin)
+            else:
+                # Include all lower rare samples if no binning
+                X_rare_sampled.append(rare_lower_X)
+                y_rare_sampled.append(rare_lower_y)
+        
+        # Process upper rare region if not empty
+        if len(rare_upper_y) > 0:
+            # Create bins for the upper rare region
+            upper_bins = rare_bins - (rare_bins // 2)
+            if upper_bins > 0:
+                max_val = np.max(rare_upper_y)
+                upper_bin_edges = np.linspace(high_threshold, max_val, upper_bins + 1)
+                
+                # Digitize to assign each sample to a bin
+                upper_binned_indices = np.digitize(rare_upper_y, upper_bin_edges) - 1
+                
+                # Budget allocation for upper rare region
+                upper_budget = (N_rare - (N_rare // 2)) // upper_bins
+                upper_remainder = (N_rare - (N_rare // 2)) % upper_bins
+                
+                # Sample from each bin
+                for bin_idx in range(upper_bins):
+                    # Create a mask for the current bin
+                    bin_mask = upper_binned_indices == bin_idx
+                    
+                    # Select samples in the current bin
+                    X_bin = rare_upper_X[bin_mask, :]
+                    y_bin = rare_upper_y[bin_mask]
+                    
+                    # Determine the number of samples to draw from this bin
+                    bin_budget = upper_budget + (1 if upper_remainder > 0 else 0)
+                    upper_remainder = max(0, upper_remainder - 1)
+                    
+                    # Sample from the bin if it has more samples than the budget
+                    if len(y_bin) > bin_budget:
+                        sampled_indices = np.random.choice(len(X_bin), size=bin_budget, replace=False)
+                        X_rare_sampled.append(X_bin[sampled_indices])
+                        y_rare_sampled.append(y_bin[sampled_indices])
+                    else:
+                        # If the bin has fewer samples than the budget, include all samples
+                        X_rare_sampled.append(X_bin)
+                        y_rare_sampled.append(y_bin)
+            else:
+                # Include all upper rare samples if no binning
+                X_rare_sampled.append(rare_upper_X)
+                y_rare_sampled.append(rare_upper_y)
+        
+        # Concatenate all sampled rare values if any were selected
+        if X_rare_sampled:
+            X_rare_sampled = np.concatenate(X_rare_sampled, axis=0)
+            y_rare_sampled = np.concatenate(y_rare_sampled)
+        else:
+            X_rare_sampled = np.empty((0, X.shape[1]))
+            y_rare_sampled = np.empty(0)
+    else:
+        # If N_rare is None, include all rare samples
+        X_rare_sampled = X_rare
+        y_rare_sampled = y_rare
+
+    # Combine sampled frequent and rare values
+    X_combined = np.concatenate([X_freq_sampled, X_rare_sampled], axis=0)
+    y_combined = np.concatenate([y_freq_sampled, y_rare_sampled])
+
+    # Reshape y_combined to match original y shape if needed
+    if len(y.shape) > 1:
+        y_combined = y_combined.reshape(-1, 1)
+
+    return X_combined, y_combined
+
 def filter_ds_up(
         X: np.ndarray, y: np.ndarray,
         high_threshold: float,
