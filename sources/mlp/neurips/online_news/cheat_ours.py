@@ -331,8 +331,8 @@ def main():
                 print(f"Model weights are saved in final_model_weights_{experiment_name}_reg.h5")
 
                 # Define thresholds for Online News Popularity
-                rare_low_threshold = np.log10(350)
-                rare_high_threshold = np.log10(35000)
+                rare_low_threshold = RARE_LOW_THRESHOLD
+                rare_high_threshold = RARE_HIGH_THRESHOLD
 
                 # REGULAR METRICS (all data)
                 # Test set

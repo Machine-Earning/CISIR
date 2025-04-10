@@ -5165,6 +5165,200 @@ def filter_ds_1d_fr(
 
     return X_combined, y_combined
 
+def filter_ds_1d_fmr(
+        X: np.ndarray, y: np.ndarray,
+        low_threshold: float, high_threshold: float,
+        N_freq: int = 500, N_med: int = 500, N_rare: int = 500, 
+        freq_bins: int = 10, med_bins: int = 8, rare_bins: int = 5,
+        seed: int = None
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Filter and sample the dataset with specific categorization:
+    - Freq: Values below low_threshold
+    - Medium: Values between low_threshold and high_threshold
+    - Rare: Values above high_threshold
+    
+    Parameters:
+        X (np.ndarray): The input features of the dataset.
+        y (np.ndarray): The output labels of the dataset.
+        low_threshold (float): The lower bound threshold.
+        high_threshold (float): The upper bound threshold.
+        N_freq (int): Number of samples to include from the frequent range (below low_threshold).
+        N_med (int): Number of samples to include from the medium range (between thresholds).
+        N_rare (int): Number of samples to include from the rare range (above high_threshold).
+        freq_bins (int): Number of bins for the frequent range.
+        med_bins (int): Number of bins for the medium range.
+        rare_bins (int): Number of bins for the rare range.
+        seed (int, optional): Seed for the random number generator.
+        
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: The filtered and sampled input features and output labels.
+    """
+    # Set the random seed for reproducibility
+    np.random.seed(seed)
+    
+    # Flatten the output array
+    y_flat = y.flatten()
+    
+    # Create masks for the three categories
+    freq_mask = y_flat < low_threshold
+    med_mask = (y_flat >= low_threshold) & (y_flat <= high_threshold)
+    rare_mask = y_flat > high_threshold
+    
+    # Apply masks to get samples for each category
+    X_freq = X[freq_mask, :]
+    y_freq = y_flat[freq_mask]
+    
+    X_med = X[med_mask, :]
+    y_med = y_flat[med_mask]
+    
+    X_rare = X[rare_mask, :]
+    y_rare = y_flat[rare_mask]
+    
+    # HANDLE FREQUENT SAMPLES (below low_threshold)
+    if len(y_freq) > 0 and N_freq > 0:
+        # Create bin edges for the frequent samples
+        min_val = np.min(y_freq)
+        freq_bins_edges = np.linspace(min_val, low_threshold, freq_bins + 1)
+        
+        # Digitize to assign each sample to a bin
+        freq_binned_indices = np.digitize(y_freq, freq_bins_edges) - 1
+        
+        # Determine the budget per bin and remainder
+        freq_budget = N_freq // freq_bins
+        freq_remainder = N_freq % freq_bins
+        
+        # Initialize lists for sampled values
+        X_freq_sampled = []
+        y_freq_sampled = []
+        
+        # Sample from each bin
+        for bin_idx in range(freq_bins):
+            bin_mask = freq_binned_indices == bin_idx
+            X_bin = X_freq[bin_mask, :]
+            y_bin = y_freq[bin_mask]
+            
+            bin_budget = freq_budget + (1 if freq_remainder > 0 else 0)
+            freq_remainder = max(0, freq_remainder - 1)
+            
+            if len(y_bin) > bin_budget:
+                sampled_indices = np.random.choice(len(X_bin), size=bin_budget, replace=False)
+                X_freq_sampled.append(X_bin[sampled_indices])
+                y_freq_sampled.append(y_bin[sampled_indices])
+            else:
+                X_freq_sampled.append(X_bin)
+                y_freq_sampled.append(y_bin)
+        
+        # Concatenate sampled values
+        if X_freq_sampled:
+            X_freq_sampled = np.concatenate(X_freq_sampled, axis=0)
+            y_freq_sampled = np.concatenate(y_freq_sampled)
+        else:
+            X_freq_sampled = np.empty((0, X.shape[1]))
+            y_freq_sampled = np.empty(0)
+    else:
+        X_freq_sampled = np.empty((0, X.shape[1]))
+        y_freq_sampled = np.empty(0)
+    
+    # HANDLE MEDIUM SAMPLES (between thresholds)
+    if len(y_med) > 0 and N_med > 0:
+        # Create bin edges for the medium samples
+        med_bins_edges = np.linspace(low_threshold, high_threshold, med_bins + 1)
+        
+        # Digitize to assign each sample to a bin
+        med_binned_indices = np.digitize(y_med, med_bins_edges) - 1
+        
+        # Determine the budget per bin and remainder
+        med_budget = N_med // med_bins
+        med_remainder = N_med % med_bins
+        
+        # Initialize lists for sampled values
+        X_med_sampled = []
+        y_med_sampled = []
+        
+        # Sample from each bin
+        for bin_idx in range(med_bins):
+            bin_mask = med_binned_indices == bin_idx
+            X_bin = X_med[bin_mask, :]
+            y_bin = y_med[bin_mask]
+            
+            bin_budget = med_budget + (1 if med_remainder > 0 else 0)
+            med_remainder = max(0, med_remainder - 1)
+            
+            if len(y_bin) > bin_budget:
+                sampled_indices = np.random.choice(len(X_bin), size=bin_budget, replace=False)
+                X_med_sampled.append(X_bin[sampled_indices])
+                y_med_sampled.append(y_bin[sampled_indices])
+            else:
+                X_med_sampled.append(X_bin)
+                y_med_sampled.append(y_bin)
+        
+        # Concatenate sampled values
+        if X_med_sampled:
+            X_med_sampled = np.concatenate(X_med_sampled, axis=0)
+            y_med_sampled = np.concatenate(y_med_sampled)
+        else:
+            X_med_sampled = np.empty((0, X.shape[1]))
+            y_med_sampled = np.empty(0)
+    else:
+        X_med_sampled = np.empty((0, X.shape[1]))
+        y_med_sampled = np.empty(0)
+    
+    # HANDLE RARE SAMPLES (above high_threshold)
+    if len(y_rare) > 0 and N_rare > 0:
+        # Create bin edges for the rare samples
+        max_val = np.max(y_rare)
+        rare_bins_edges = np.linspace(high_threshold, max_val, rare_bins + 1)
+        
+        # Digitize to assign each sample to a bin
+        rare_binned_indices = np.digitize(y_rare, rare_bins_edges) - 1
+        
+        # Determine the budget per bin and remainder
+        rare_budget = N_rare // rare_bins
+        rare_remainder = N_rare % rare_bins
+        
+        # Initialize lists for sampled values
+        X_rare_sampled = []
+        y_rare_sampled = []
+        
+        # Sample from each bin
+        for bin_idx in range(rare_bins):
+            bin_mask = rare_binned_indices == bin_idx
+            X_bin = X_rare[bin_mask, :]
+            y_bin = y_rare[bin_mask]
+            
+            bin_budget = rare_budget + (1 if rare_remainder > 0 else 0)
+            rare_remainder = max(0, rare_remainder - 1)
+            
+            if len(y_bin) > bin_budget:
+                sampled_indices = np.random.choice(len(X_bin), size=bin_budget, replace=False)
+                X_rare_sampled.append(X_bin[sampled_indices])
+                y_rare_sampled.append(y_bin[sampled_indices])
+            else:
+                X_rare_sampled.append(X_bin)
+                y_rare_sampled.append(y_bin)
+        
+        # Concatenate sampled values
+        if X_rare_sampled:
+            X_rare_sampled = np.concatenate(X_rare_sampled, axis=0)
+            y_rare_sampled = np.concatenate(y_rare_sampled)
+        else:
+            X_rare_sampled = np.empty((0, X.shape[1]))
+            y_rare_sampled = np.empty(0)
+    else:
+        X_rare_sampled = np.empty((0, X.shape[1]))
+        y_rare_sampled = np.empty(0)
+    
+    # Combine all sampled values
+    X_combined = np.concatenate([X_freq_sampled, X_med_sampled, X_rare_sampled], axis=0)
+    y_combined = np.concatenate([y_freq_sampled, y_med_sampled, y_rare_sampled])
+    
+    # Reshape y_combined to match original y shape if needed
+    if len(y.shape) > 1:
+        y_combined = y_combined.reshape(-1, 1)
+    
+    return X_combined, y_combined
+
 def filter_ds_up(
         X: np.ndarray, y: np.ndarray,
         high_threshold: float,
@@ -7084,3 +7278,229 @@ def plot_avsp_onp(
     plt.close()
     
     return os.path.abspath(plot_filename)
+
+
+#### BLOG FEEDBACK DATASET STUFF ####
+
+def plot_avsp_blogf(
+    model: tf.keras.Model,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    title: str,
+    prefix: str,
+    freq_threshold: float = np.log10(4),
+    rare_threshold: float = np.log10(40),
+    use_dict: bool = False
+) -> str:
+    """
+    Plots actual vs predicted Torque_1 values.
+
+    Parameters:
+    - model (tf.keras.Model): The trained model to evaluate
+    - X_test (np.ndarray): Test features
+    - y_test (np.ndarray): True target values for the test set
+    - title (str): The title of the plot
+    - prefix (str): Prefix for the plot file names
+    - freq_threshold (float): Frequency threshold - values below this are considered frequent. Default is log10(4)
+    - rare_threshold (float): Rare threshold - values above this are considered rare. Default is log10(40)
+    - use_dict (bool): Whether the model returns a dictionary with output names. Default is False.
+
+    Returns:
+    - str: The absolute path to the saved plot file
+    """
+    
+    # Make predictions
+    if use_dict:
+        res = model.predict(X_test)
+        predictions = res['output']
+    else:
+        _, predictions = model.predict(X_test)
+        
+    # Process predictions if needed (flatten if multidimensional)
+    predictions = np.array(predictions).flatten()
+    y_test = np.array(y_test).flatten()
+    
+    # Create the figure with proper axes configuration
+    fig, ax = plt.subplots(figsize=(10, 7))
+    
+    # Scatter plot with a colormap based on prediction error
+    prediction_error = np.abs(y_test - predictions)
+    norm = plt.Normalize(np.min(prediction_error), np.max(prediction_error))
+    cmap = plt.cm.viridis
+    
+    scatter = ax.scatter(y_test, predictions, c=prediction_error, cmap=cmap, norm=norm, alpha=0.7, s=40)
+    
+    # Plot perfect prediction line
+    min_intensity = min(np.min(y_test), np.min(predictions))
+    max_intensity = max(np.max(y_test), np.max(predictions))
+    ax.plot([min_intensity, max_intensity], [min_intensity, max_intensity], 'k--', label='Perfect Prediction')
+    
+    # Add dashed lines at thresholds on both axes if thresholds are provided
+    if freq_threshold is not None:
+        ax.axvline(freq_threshold, color='blue', linestyle='--', label='Frequency Threshold')
+        ax.axhline(freq_threshold, color='blue', linestyle='--')
+    
+    if rare_threshold is not None:
+        ax.axvline(rare_threshold, color='red', linestyle='--', label='Rare Threshold')
+        ax.axhline(rare_threshold, color='red', linestyle='--')
+    
+    # Add labels and title
+    ax.set_xlabel('Actual log_comments_next_24h')
+    ax.set_ylabel('Predicted log_comments_next_24h')
+    ax.set_title(f"{title}\n{prefix}_Actual_vs_Predicted_log_comments_next_24h")
+    
+    # Add colorbar for prediction error
+    cbar = fig.colorbar(scatter, ax=ax, label='Prediction Error', extend='both')
+    
+    # Add grid and legend
+    ax.grid(True)
+    ax.legend()
+    
+    # Highlight regions if thresholds are provided
+    if freq_threshold is not None and rare_threshold is not None:
+        
+        # Add annotations for regions
+        ax.annotate('Frequent', xy=(min_intensity, (min_intensity + freq_threshold)/2), 
+                   xycoords='data', fontsize=10, color='blue')
+        ax.annotate('Medium', xy=((freq_threshold + rare_threshold)/2, (freq_threshold + rare_threshold)/2), 
+                   xycoords='data', fontsize=10, color='green')
+        ax.annotate('Rare', xy=(rare_threshold + (max_intensity-rare_threshold)/2, rare_threshold + (max_intensity-rare_threshold)/2), 
+                   xycoords='data', fontsize=10, color='red')
+    
+    # Adjust layout
+    plt.tight_layout()
+    
+    # Save the plot
+    plot_filename = f"{title}_{prefix}_actual_vs_predicted_log_comments_next_24h.png"
+    plt.savefig(plot_filename)
+    plt.close()
+    
+    return os.path.abspath(plot_filename)
+
+
+def load_folds_blogf_ds(
+        base_dir: str,
+        shuffle: bool = True,
+        random_state: Optional[int] = None,
+        debug: bool = False
+) -> Generator[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], None, None]:
+    """
+    Loads pre-split stratified folds from the blog feedback directory structure using build_blogf_ds function
+    and yields one fold at a time.
+
+    Directory structure expected:
+    base_dir/
+        fold0/
+            blogf_subtraining.csv
+            blogf_validation.csv
+        fold1/
+            blogf_subtraining.csv
+            blogf_validation.csv
+        ...
+
+    Parameters:
+        base_dir (str): Path to the directory containing the fold directories
+        shuffle (bool): Whether to shuffle the data. Default is False.
+        random_state (Optional[int]): Random seed for reproducibility. Default is None.
+        debug (bool): Whether to enable debug printing. Default is False.
+
+    Yields:
+        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Split feature and label data:
+            - X_subtrain: Features for the subtraining set (numpy array)
+            - y_subtrain: Labels for the subtraining set (numpy array)
+            - X_val: Features for the validation set (numpy array)
+            - y_val: Labels for the validation set (numpy array)
+
+    Raises:
+        FileNotFoundError: If any expected fold directory or file is missing
+    """
+    
+    if not os.path.exists(base_dir):
+        raise FileNotFoundError(f"Base directory not found: {base_dir}")
+    
+    # Process each fold
+    for fold_idx in range(4):
+        fold_dir = os.path.join(base_dir, f"fold{fold_idx}")
+        
+        if not os.path.exists(fold_dir):
+            raise FileNotFoundError(f"Missing fold directory: {fold_dir}")
+        
+        # Path to subtraining and validation files
+        subtrain_file = os.path.join(fold_dir, "blogf_subtraining.csv")
+        val_file = os.path.join(fold_dir, "blogf_validation.csv")
+        
+        # Check file existence
+        if not os.path.exists(subtrain_file):
+            raise FileNotFoundError(f"Missing subtraining file: {subtrain_file}")
+        if not os.path.exists(val_file):
+            raise FileNotFoundError(f"Missing validation file: {val_file}")
+        
+        # Load data using build_sep_ds - returns numpy arrays
+        X_subtrain, y_subtrain = build_blogf_ds(
+            file_path=subtrain_file,
+            shuffle_data=shuffle,
+            random_state=random_state
+        )
+        
+        X_val, y_val = build_blogf_ds(
+            file_path=val_file,
+            shuffle_data=shuffle,
+            random_state=random_state
+        )
+        
+        if debug:
+            print(f"Fold {fold_idx}:")
+            print(f"Subtraining shapes: X={X_subtrain.shape}, y={y_subtrain.shape}")
+            print(f"Validation shapes: X={X_val.shape}, y={y_val.shape}")
+            print(f"Subtraining range: {y_subtrain.min():.4f} to {y_subtrain.max():.4f}")
+            print(f"Validation range: {y_val.min():.4f} to {y_val.max():.4f}")
+        
+        yield X_subtrain, y_subtrain, X_val, y_val
+
+def build_blogf_ds(file_path: str, shuffle_data: bool = False, random_state: int = 42) -> tuple:
+    """
+    Build all blog feedback dataset by loading CSV and splitting into features and label.
+    
+    Parameters:
+    -----------
+    file_path : str
+        Path to the CSV file (e.g., 'blogf_training.csv')
+    shuffle_data : bool, default=False
+        Whether to shuffle the dataset
+    random_state : int, default=42
+        Random seed for reproducibility when shuffling
+        
+    Returns:
+    --------
+    tuple
+        X : np.ndarray - Feature columns
+        y : np.ndarray - Target variable ('target_log_comments_next_24h')
+    """
+    # Read the CSV file
+    df = pd.read_csv(file_path)
+    
+    # Check if the last column is target_log_comments_next_24h as expected
+    if df.columns[-1] != "target_log_comments_next_24h":
+        print(f"Warning: Expected 'target_log_comments_next_24h' as the last column, found '{df.columns[-1]}' instead")
+    
+    # Split into features and labels
+    X = df.iloc[:, :-1].values  # All columns except the last, as numpy array
+    y = df.iloc[:, -1].values   # Just the last column, as numpy array
+    
+    # Shuffle if requested
+    if shuffle_data:
+        # Create a shuffled index
+        idx = np.arange(len(df))
+        np.random.seed(random_state)
+        np.random.shuffle(idx)
+        
+        # Reindex X and y using the shuffled indices
+        X = X[idx]
+        y = y[idx]
+        
+        print(f"Data shuffled with random_state={random_state}")
+    
+    print(f"Dataset built from {file_path}")
+    print(f"X shape: {X.shape}, y shape: {y.shape}")
+    
+    return X, y

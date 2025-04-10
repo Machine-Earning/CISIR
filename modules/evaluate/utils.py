@@ -655,6 +655,103 @@ def plot_onp_corr(
     return file_path
 
 
+def plot_blogf_corr(
+    model, 
+    X: np.ndarray, 
+    y: np.ndarray, 
+    title: str, 
+    model_type: str = 'features_reg', 
+    freq_threshold: float = None, 
+    rare_threshold: float = None
+) -> str:
+    """
+    Plots the correlation between distances in target values and distances in the representation space
+    for Blog Feedback dataset, with each point colored based on the target value categories:
+    - Blue for frequent values (y < log10(4))
+    - Green for medium values (log10(4) < y < log10(40))
+    - Red for rare values (y > log10(40))
+
+    Parameters:
+    - model: The trained model used to transform input features into a representation space.
+    - X: Input features (NumPy array).
+    - y: Target values (log10 of comments in next 24h) (NumPy array).
+    - title: Title for the plot.
+    - model_type: The type of model to use (features, features_reg, features_dec, features_reg_dec).
+    - freq_threshold: Threshold for frequent values (default: log10(4)).
+    - rare_threshold: Threshold for rare values (default: log10(40)).
+
+    Returns:
+    - Path to the saved correlation plot.
+    """
+    print('In plot_blogf_corr')
+    # Set default thresholds if not provided
+    if freq_threshold is None:
+        freq_threshold = np.log10(4)
+    if rare_threshold is None:
+        rare_threshold = np.log10(40)
+        
+    if model_type in ['features_reg_dec', 'features_reg', 'features_dec', 'features_cls']:
+        representations = model.predict(X)[0]  # Assuming the first output is always features
+    elif model_type == 'dict':
+        representations = model.predict(X)['repr']
+    else:
+        representations = model.predict(X)
+
+    print('Calculating the pairwise distances')
+    distances_target = pdist(y.reshape(-1, 1), 'euclidean')
+    distances_repr = pdist(representations, 'euclidean')
+
+    scaler = MinMaxScaler()
+    distances_target_norm = scaler.fit_transform(distances_target.reshape(-1, 1)).flatten()
+    distances_repr_norm = scaler.fit_transform(distances_repr.reshape(-1, 1)).flatten()
+
+    print('Calculating the pearson correlation')
+    r, _ = pearsonr(distances_target_norm, distances_repr_norm)
+
+    print('Assigning colors based on value ranges')
+
+    def get_color(label):
+        if label < freq_threshold:
+            return 'blue'  # Frequent values: y < log10(4)
+        elif label > rare_threshold:
+            return 'red'   # Rare values: y > log10(40)
+        else:
+            return 'green'  # Medium values: log10(4) < y < log10(40)
+
+    label_pairs = [(y[i], y[j]) for i in range(len(y)) for j in range(i + 1, len(y))]
+    colors = [(get_color(label1), get_color(label2)) for label1, label2 in label_pairs]
+
+    # Function to draw a half-colored dot
+    def draw_half_colored_dot(ax, x, y, color1, color2, size=0.01):
+        wedge1 = Wedge((x, y), size, 0, 180, color=color1)
+        wedge2 = Wedge((x, y), size, 180, 360, color=color2)
+        ax.add_patch(wedge1)
+        ax.add_patch(wedge2)
+
+    print('Plotting with three-color scheme')
+    fig, ax = plt.subplots(figsize=(8, 6))
+    for i, (x, y) in enumerate(zip(distances_target_norm, distances_repr_norm)):
+        color1, color2 = colors[i]
+        draw_half_colored_dot(ax, x, y, color1, color2, size=0.005)  # Adjust size as needed
+
+    ax.plot([0, 1], [0, 1], 'k--')  # Perfect fit diagonal
+    ax.set_xlabel('Normalized Distance in Target Space')
+    ax.set_ylabel('Normalized Distance in Representation Space')
+    
+    # Add description of color coding to title
+    title_with_thresholds = f'{title}\nRepresentation Space Correlation (pearson r= {r:.2f})\n'
+    title_with_thresholds += f'Blue: frequent (y < {freq_threshold:.2f}), Green: medium, Red: rare (y > {rare_threshold:.2f})'
+    
+    ax.set_title(title_with_thresholds)
+    ax.grid(True)
+    
+    file_path = f"representation_correlation_blogf_{title}.png"
+    plt.savefig(file_path)
+    plt.close()
+
+    return file_path
+
+
 def plot_sep_corr(model, X, y, title, model_type='features', sep_threshold=0.5):
     """
     Plots the correlation between distances in target values and distances in the representation space,
@@ -1267,6 +1364,158 @@ def plot_tsne_onp(
 
     # Save the plot
     file_path = f"{prefix}_tsne_onp_{str(save_tag)}.png"
+    plt.savefig(file_path)
+
+    if show_plot:
+        plt.show()
+
+    plt.close()
+
+    return file_path
+
+def plot_tsne_blogf(
+        model,
+        X: np.ndarray,
+        y: np.ndarray,
+        title: str,
+        prefix: str,
+        model_type='features_reg',
+        freq_threshold=None,
+        rare_threshold=None,
+        show_plot=False,
+        save_tag=None,
+        seed=42) -> str:
+    """
+    Visualizes Blog Feedback data using t-SNE by coloring and sizing points based on their feedback values.
+    
+    Blog Feedback represents log10 of comments in the next 24 hours with:
+    - Frequent values: y < log10(4)
+    - Medium values: log10(4) < y < log10(40)
+    - Rare values: y > log10(40)
+
+    Parameters:
+    - model: Trained feature extractor model.
+    - X: Input data (NumPy array or compatible).
+    - y: Target values (log10 of comments in next 24h) (NumPy array or compatible).
+    - title: Title for the plot.
+    - prefix: Prefix for the file name.
+    - model_type: The type of model output to use.
+    - freq_threshold: Threshold for frequent values (default: log10(4)).
+    - rare_threshold: Threshold for rare values (default: log10(40)).
+    - show_plot: If True, display the plot in addition to saving it.
+    - save_tag: Optional tag to append to the file name.
+    - seed: Random seed for t-SNE.
+
+    Returns:
+    - The file path of the saved t-SNE plot.
+    """
+
+    # Extract features based on the model type
+    if model_type in ['features_reg_dec', 'features_reg', 'features_dec', 'features_cls']:
+        features = model.predict(X)[0]  # Assuming the first output is always features
+    elif model_type == 'dict':
+        features = model.predict(X)['repr']
+    else:
+        features = model.predict(X)
+
+    # Apply t-SNE
+    tsne = TSNE(n_components=2, random_state=seed)
+    tsne_result = tsne.fit_transform(features)
+
+    # Plot setup
+    fig, axs = plt.subplots(2, 1, figsize=(18, 16), gridspec_kw={'height_ratios': [2, 1]})
+    
+    # Set up the colormap - using coolwarm as requested
+    norm = plt.Normalize(np.min(y), np.max(y))
+    cmap = plt.cm.coolwarm  # Using coolwarm colormap as requested
+
+    # Determine the size and alpha dynamically based on thresholds
+    # Default thresholds if not provided
+    if freq_threshold is None:
+        freq_threshold = np.log10(4)
+    if rare_threshold is None:
+        rare_threshold = np.log10(40)
+        
+    # Define categories: frequent (y < log10(4)), medium (log10(4) < y < log10(40)), rare (y > log10(40))
+    is_frequent = y < freq_threshold
+    is_rare = y > rare_threshold
+    is_medium = ~(is_frequent | is_rare)
+    
+    # Assign sizes and alphas based on categories
+    sizes = np.ones_like(y) * 12  # Default medium size
+    sizes[is_frequent] = 30  # Larger for frequent
+    sizes[is_rare] = 50  # Largest for rare
+    
+    alphas = np.ones_like(y) * 0.5  # Default medium alpha
+    alphas[is_frequent] = 0.7  # More opaque for frequent
+    alphas[is_rare] = 1.0  # Most opaque for rare
+
+    # Ensure sizes and alphas are 1-dimensional arrays
+    sizes = sizes.ravel()
+    alphas = alphas.ravel()
+
+    # Sort points by size to ensure larger points are plotted last (on top)
+    sort_order = np.argsort(sizes)
+    
+    # Separate points by category for plotting
+    frequent_points = np.where(is_frequent)[0]
+    medium_points = np.where(is_medium)[0]
+    rare_points = np.where(is_rare)[0]
+
+    # Plot points
+    plt.sca(axs[0])
+    
+    # First plot medium points (medium size and transparency)
+    sc = plt.scatter(
+        tsne_result[medium_points, 0],
+        tsne_result[medium_points, 1],
+        c=y[medium_points],
+        cmap=cmap,
+        norm=norm,
+        s=sizes[medium_points],
+        alpha=alphas[medium_points],
+        label=f'Medium ({freq_threshold:.2f} < y < {rare_threshold:.2f})')
+
+    # Then plot frequent points
+    plt.scatter(
+        tsne_result[frequent_points, 0],
+        tsne_result[frequent_points, 1],
+        c=y[frequent_points],
+        cmap=cmap,
+        norm=norm,
+        s=sizes[frequent_points],
+        alpha=alphas[frequent_points],
+        label=f'Frequent (y < {freq_threshold:.2f})')
+
+    # Finally plot rare points (largest, most opaque) to ensure they're on top
+    plt.scatter(
+        tsne_result[rare_points, 0],
+        tsne_result[rare_points, 1],
+        c=y[rare_points],
+        cmap=cmap,
+        norm=norm,
+        s=sizes[rare_points],
+        alpha=alphas[rare_points],
+        label=f'Rare (y > {rare_threshold:.2f})')
+
+    # Add a color bar with proper label
+    cbar = plt.colorbar(sc, ax=axs[0], label='Log Comments Next 24h', extend='both')
+
+    # Add legend
+    plt.legend()
+
+    # Title
+    plt.title(f'{title}\n2D t-SNE Visualization of Blog Feedback (Log Comments Next 24h)')
+
+    # Plot Shepard plot on the second subplot
+    plt.sca(axs[1])
+    plot_shepard(features, tsne_result)
+
+    # Adjust layout
+    plt.tight_layout()
+
+    # Save the plot
+    file_path = f"{prefix}_tsne_blogf_{str(save_tag)}.png"
     plt.savefig(file_path)
 
     if show_plot:
