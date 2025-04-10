@@ -1,6 +1,8 @@
+import numpy as np
+
 # Dataset configurations
 DS_VERSION = 1  # Dataset version
-DS_PATH = 'data/allstate_claims'  # Path to the dataset
+DS_PATH = 'data/blog_feedback'  # Path to the dataset
 
 OUTPUT_DIM = 1
 
@@ -18,8 +20,8 @@ FREEZING = [False]
 MLP_HIDDENS = [4096, 256, 2048, 256, 1024, 256, 512, 256]  # Hidden layers
 
 PROJ_HIDDENS = [128]  # Projection hidden layers
-EMBED_DIM = 512  # Representation dimension
-DROPOUT = 0.5  # Dropout rate
+EMBED_DIM = 256  # Representation dimension
+DROPOUT = 0.2  # Dropout rate
 ACTIVATION = None  # No activation for regression so default is LeakyReLU
 NORM = 'batch_norm'  # Use batch normalization
 RESIDUAL = True  # Use residual connections
@@ -29,7 +31,7 @@ SKIP_REPR = True  # residual representation
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
 START_LR = 5e-4  # starting learning rate
-WEIGHT_DECAY = 1  # Higher weight decay
+WEIGHT_DECAY = 0.1  # Higher weight decay
 NORMALIZED_WEIGHTS = True  # Use normalized weights
 
 # Learning Rate Scheduling
@@ -45,9 +47,9 @@ ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
 ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 
 # Data Filtering and Processing
-FREQ_THRESHOLD = 0.2  # Lower threshold for rebalancing
-RARE_THRESHOLD = 10.5  # Upper threshold for rebalancing
-BANDWIDTH = 0.313  # Bandwidth for rebalancing
+FREQ_THRESHOLD = np.log10(4)  # Lower threshold for rebalancing
+RARE_THRESHOLD = np.log10(40)  # Upper threshold for rebalancing
+BANDWIDTH = 0.552  # Bandwidth for rebalancing
 
 # Smoothing Parameters
 SMOOTHING_METHOD = 'moving_average'

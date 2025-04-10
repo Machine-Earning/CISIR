@@ -1,3 +1,5 @@
+import numpy as np
+
 # Dataset configurations
 DS_VERSION = 1  # Dataset version
 DS_PATH = 'data/online_news'  # Path to the dataset
@@ -19,7 +21,7 @@ MLP_HIDDENS = [1024, 64, 512, 64, 256, 64, 128, 64]  # Hidden layers
 
 PROJ_HIDDENS = [32]  # Projection hidden layers
 EMBED_DIM = 64  # Representation dimension
-DROPOUT = 0.5  # Dropout rate
+DROPOUT = 0.2  # Dropout rate
 ACTIVATION = None  # No activation for regression so default is LeakyReLU
 NORM = 'batch_norm'  # Use batch normalization
 RESIDUAL = True  # Use residual connections
@@ -29,7 +31,7 @@ SKIP_REPR = True  # residual representation
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
 START_LR = 5e-4  # starting learning rate
-WEIGHT_DECAY = 1  # Higher weight decay
+WEIGHT_DECAY = 0.1  # Higher weight decay
 NORMALIZED_WEIGHTS = True  # Use normalized weights
 
 # Learning Rate Scheduling
@@ -45,9 +47,9 @@ ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
 ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 
 # Data Filtering and Processing
-LOWER_THRESHOLD = 4  # Lower threshold for rebalancing
-UPPER_THRESHOLD = 12  # Upper threshold for rebalancing
-BANDWIDTH = 1.331  # Bandwidth for rebalancing
+RARE_LOW_THRESHOLD = np.log10(350)  # Lower threshold for rare low values
+RARE_HIGH_THRESHOLD = np.log10(35000)  # Upper threshold for rare high values
+BANDWIDTH = 1.429  # Bandwidth for rebalancing
 
 # Smoothing Parameters
 SMOOTHING_METHOD = 'moving_average'
