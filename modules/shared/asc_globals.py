@@ -1,3 +1,5 @@
+import numpy as np
+
 # Dataset configurations
 DS_VERSION = 1  # Dataset version
 DS_PATH = 'data/allstate_claims'  # Path to the dataset
@@ -7,7 +9,7 @@ OUTPUT_DIM = 1
 
 # Training configurations
 TRIAL_SEEDS = [456789, 42, 123, 0, 9999] # Seeds for trial
-BATCH_SIZE = 4096  # Batch size
+BATCH_SIZE = 1024  # Batch size
 EPOCHS = int(2e5)  # Number of epochs
 VERBOSE = 1  # Verbose
 SAVE_BEST = False  # Save best model
@@ -15,11 +17,11 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 FREEZING = [False]
 
 # Model Architecture
-MLP_HIDDENS = [4096, 256, 2048, 256, 1024, 256, 512, 256]  # Hidden layers
+MLP_HIDDENS = [4096, 1024, 2048, 1024]  # Hidden layers
 
 PROJ_HIDDENS = [128]  # Projection hidden layers
-EMBED_DIM = 256  # Representation dimension
-DROPOUT = 0.5  # Dropout rate
+EMBED_DIM = 1024  # Representation dimension
+DROPOUT = 0.2  # Dropout rate
 ACTIVATION = None  # No activation for regression so default is LeakyReLU
 NORM = 'batch_norm'  # Use batch normalization
 RESIDUAL = True  # Use residual connections
@@ -29,7 +31,7 @@ SKIP_REPR = True  # residual representation
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
 START_LR = 5e-4  # starting learning rate
-WEIGHT_DECAY = 1  # Higher weight decay
+WEIGHT_DECAY = 0.1  # Higher weight decay
 NORMALIZED_WEIGHTS = True  # Use normalized weights
 
 # Learning Rate Scheduling
@@ -45,9 +47,9 @@ ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
 ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 
 # Data Filtering and Processing
-LOWER_THRESHOLD = 5  # Lower threshold for rebalancing
-UPPER_THRESHOLD = 10.5  # Upper threshold for rebalancing
-BANDWIDTH = 1.511  # Bandwidth for rebalancing
+RARE_LOW_THRESHOLD = np.log10(200)  # Lower threshold for rare low values 
+RARE_HIGH_THRESHOLD = np.log10(20000)  # Upper threshold for rare high values
+BANDWIDTH = 1.73  # Bandwidth for rebalancing
 
 # Smoothing Parameters
 SMOOTHING_METHOD = 'moving_average'
