@@ -7,7 +7,7 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
-from modules.evaluate.utils import plot_sep_corr, plot_tsne_sep
+from modules.evaluate.utils import plot_tsne_sep, plot_sep_corr
 from modules.reweighting.ImportanceWeighting import ReciprocalImportance
 from modules.shared.sep_globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
@@ -21,13 +21,8 @@ from modules.training.ts_modeling import (
     cmse,
     create_mlp,
     plot_error_hist,
-    load_folds_sep_ds,
     plot_avsp_sep,
-    filter_ds_up,
-    initialize_results_dict,
-    update_trial_results,
-    compute_averages,
-    save_results_to_csv
+    filter_ds_up
 )
 
 
@@ -40,23 +35,13 @@ def main():
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
 
-    # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc
-    alphas = [(1, 1, 0.0, 0.0)]
-    alpha_amse = alphas[0][0]
-    alpha_apcc = alphas[0][1]
-
-    # Initialize results tracking ONCE before the seed loop
-    n_trials = len(TRIAL_SEEDS)
-    results = initialize_results_dict(n_trials)
-    results['name'] = f'mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}'
-
-    for seed_idx, seed in enumerate(TRIAL_SEEDS):
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in alphas:
+    for seed in [456789]:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.85, 0.85, 0.0, 0.0)]:
             for rho in RHO:  # SAM_RHOS:
                 # PARAMS
-                lambda_factor = 0.5 # LAMBDA_FACTOR  # lambda for the loss
+                lambda_factor = 0.2 # LAMBDA_FACTOR  # lambda for the loss
                 # Construct the title
-                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}'
+                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_cheat'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -103,7 +88,6 @@ def main():
                 window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
                 val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
                 n_filter = N_FILTER
-
 
                 # Initialize wandb
                 wandb.init(project="NeurIPS-2025-Paper-SEPds", name=experiment_name, config={
@@ -183,6 +167,20 @@ def main():
                 # print the test set shapes
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
 
+                # rebalancing the test set for validation
+                delta_test = y_test
+                print(f'delta_test.shape: {delta_test.shape}')
+                print(f'rebalancing the test set...')
+                mse_test_weights_dict = ReciprocalImportance(
+                    X_test, delta_test,
+                    alpha=alphaV_mse, 
+                    bandwidth=bandwidth).label_importance_map
+                pcc_test_weights_dict = ReciprocalImportance(
+                    X_test, delta_test,
+                    alpha=alphaV_pcc, 
+                    bandwidth=bandwidth).label_importance_map
+                print(f'test set rebalanced.')
+
                 # filtering training and test sets for additional results
                 X_train_filtered, y_train_filtered = filter_ds_up(
                     X_train, y_train,
@@ -193,138 +191,88 @@ def main():
                     high_threshold=sep_threshold,
                     N=n_filter, seed=seed)
 
-                # 4-fold cross-validation
-                folds_optimal_epochs = []
-                for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
-                    load_folds_sep_ds(
-                        root_dir,
-                        random_state=seed,
-                        shuffle=True
-                    )
-                ):
-                    print(f'Fold: {fold_idx}')
-                    # print all cme_files shapes
-                    print(f'X_subtrain.shape: {X_subtrain.shape}, y_subtrain.shape: {y_subtrain.shape}')
-                    print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val.shape}')
+                # create the model
+                model_sep = create_mlp(
+                    input_dim=n_features,
+                    hiddens=hiddens,
+                    embed_dim=embed_dim,
+                    output_dim=output_dim,
+                    dropout=dropout,
+                    activation=activation,
+                    norm=norm,
+                    skip_repr=skip_repr,
+                    skipped_layers=skipped_layers,
+                    pretraining=pretraining,
+                    sam_rho=rho,
+                    weight_decay=weight_decay
+                )
+                model_sep.summary()
 
-                    # Compute the sample weights for subtraining
-                    delta_subtrain = y_subtrain
-                    print(f'delta_subtrain.shape: {delta_subtrain.shape}')
-                    print(f'rebalancing the subtraining set...')
-                    mse_subtrain_weights_dict = ReciprocalImportance(
-                        X_subtrain, delta_subtrain,
-                        alpha=alpha_mse, 
-                        bandwidth=bandwidth).label_importance_map
-                    pcc_subtrain_weights_dict = ReciprocalImportance(
-                        X_subtrain, delta_subtrain,
-                        alpha=alpha_pcc, 
-                        bandwidth=bandwidth).label_importance_map
-                    print(f'subtraining set rebalanced.')
+                # Define the EarlyStopping callback
+                early_stopping = SmoothEarlyStopping(
+                    monitor=cvrg_metric,
+                    min_delta=cvrg_min_delta,
+                    patience=patience,
+                    verbose=VERBOSE,
+                    restore_best_weights=ES_CB_RESTORE_WEIGHTS,
+                    smoothing_method=smoothing_method,  # 'moving_average'
+                    smoothing_parameters={'window_size': window_size})  # 10
 
-                    # Compute the sample weights for validation
-                    delta_val = y_val
-                    print(f'delta_val.shape: {delta_val.shape}')
-                    print(f'rebalancing the validation set...')
-                    mse_val_weights_dict = ReciprocalImportance(
-                        X_val, delta_val,
-                        alpha=alphaV_mse, 
-                        bandwidth=bandwidth).label_importance_map
-                    pcc_val_weights_dict = ReciprocalImportance(
-                        X_val, delta_val,
-                        alpha=alphaV_pcc, 
-                        bandwidth=bandwidth).label_importance_map
-                    print(f'validation set rebalanced.')
+                # Compile the model with the specified learning rate
+                model_sep.compile(
+                    optimizer=Adam(
+                        learning_rate=learning_rate,
+                    ),
+                    loss={
+                        'forecast_head': lambda y_true, y_pred: cmse(
+                            y_true, y_pred,
+                            phase_manager=pm,
+                            lambda_factor=lambda_factor,
+                            train_mse_weight_dict=mse_train_weights_dict,
+                            train_pcc_weight_dict=pcc_train_weights_dict,
+                            val_mse_weight_dict=mse_test_weights_dict,
+                            val_pcc_weight_dict=pcc_test_weights_dict,
+                            normalized_weights=normalized_weights,
+                            asym_type=asym_type
+                        )
+                    }
+                )
 
-                    # create the model
-                    model_sep = create_mlp(
-                        input_dim=n_features,
-                        hiddens=hiddens,
-                        embed_dim=embed_dim,
-                        output_dim=output_dim,
-                        dropout=dropout,
-                        activation=activation,
-                        norm=norm,
-                        skip_repr=skip_repr,
-                        skipped_layers=skipped_layers,
-                        pretraining=pretraining,
-                        sam_rho=rho,
-                        weight_decay=weight_decay
-                    )
-                    model_sep.summary()
+                # Create stratified dataset for training
+                train_ds, train_steps = stratified_batch_dataset(
+                    X_train, y_train, batch_size)
 
-                    # Define the EarlyStopping callback
-                    early_stopping = SmoothEarlyStopping(
-                        monitor=cvrg_metric,
-                        min_delta=cvrg_min_delta,
-                        patience=patience,
-                        verbose=VERBOSE,
-                        restore_best_weights=ES_CB_RESTORE_WEIGHTS,
-                        smoothing_method=smoothing_method,  # 'moving_average'
-                        smoothing_parameters={'window_size': window_size})  # 10
+                # Map the training dataset to return {'output': y} format
+                train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
+                
+                # Prepare validation data without batching
+                val_data = (X_test, {'forecast_head': y_test})
 
-                    # Compile the model with the specified learning rate
-                    model_sep.compile(
-                        optimizer=Adam(
-                            learning_rate=learning_rate,
-                        ),
-                        loss={
-                            'forecast_head': lambda y_true, y_pred: cmse(
-                                y_true, y_pred,
-                                phase_manager=pm,
-                                lambda_factor=lambda_factor,
-                                train_mse_weight_dict=mse_subtrain_weights_dict,
-                                train_pcc_weight_dict=pcc_subtrain_weights_dict,
-                                val_mse_weight_dict=mse_val_weights_dict,
-                                val_pcc_weight_dict=pcc_val_weights_dict,
-                                normalized_weights=normalized_weights,
-                                asym_type=asym_type
-                            )
-                        }
-                    )
+                # Train the model with the callback
+                history = model_sep.fit(
+                    train_ds,
+                    steps_per_epoch=train_steps,
+                    epochs=epochs, batch_size=batch_size,
+                    validation_data=val_data,
+                    callbacks=[
+                        early_stopping,
+                        reduce_lr_on_plateau,
+                        WandbCallback(save_model=WANDB_SAVE_MODEL),
+                        IsTraining(pm)
+                    ],
+                    verbose=VERBOSE
+                )
 
-                    # Step 1: Create stratified dataset for the subtraining set only
-                    subtrain_ds, subtrain_steps = stratified_batch_dataset(
-                        X_subtrain, y_subtrain, batch_size)
+                # Use the function to find the optimal epoch
+                optimal_epoch = find_optimal_epoch_by_smoothing(
+                    history.history[ES_CB_MONITOR],
+                    smoothing_method=smoothing_method,
+                    smoothing_parameters={'window_size': val_window_size},
+                    mode='min')
+                print(f'optimal_epoch: {optimal_epoch}')
+                wandb.log({'optimal_epoch': optimal_epoch})
 
-                    # Map the subtraining dataset to return {'output': y} format
-                    subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'forecast_head': y}))
-                    
-                    # Prepare validation data without batching
-                    val_data = (X_val, {'forecast_head': y_val})
-
-                    # Train the model with the callback
-                    history = model_sep.fit(
-                        subtrain_ds,
-                        steps_per_epoch=subtrain_steps,
-                        epochs=epochs, batch_size=batch_size,
-                        validation_data=val_data,
-                        callbacks=[
-                            early_stopping,
-                            reduce_lr_on_plateau,
-                            WandbCallback(save_model=WANDB_SAVE_MODEL),
-                            IsTraining(pm)
-                        ],
-                        verbose=VERBOSE
-                    )
-
-                    # optimal epoch for fold
-                    # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
-                    # Use the quadratic fit function to find the optimal epoch
-                    optimal_epoch = find_optimal_epoch_by_smoothing(
-                        history.history[ES_CB_MONITOR],
-                        smoothing_method=smoothing_method,
-                        smoothing_parameters={'window_size': val_window_size},
-                        mode='min')
-                    folds_optimal_epochs.append(optimal_epoch)
-                    # wandb log the fold's optimal
-                    print(f'fold_{fold_idx}_best_epoch: {folds_optimal_epochs[-1]}')
-                    wandb.log({f'fold_{fold_idx}_best_epoch': folds_optimal_epochs[-1]})
-
-                # determine the optimal number of epochs from the folds
-                optimal_epochs = int(np.mean(folds_optimal_epochs))
-                print(f'optimal_epochs: {optimal_epochs}')
-                wandb.log({'optimal_epochs': optimal_epochs})
-
+                # Create a new model for final training
                 final_model_sep = create_mlp(
                     input_dim=n_features,
                     hiddens=hiddens,
@@ -358,17 +306,11 @@ def main():
                     },
                 )  # Compile the model just like before
 
-                train_ds, train_steps = stratified_batch_dataset(
-                    X_train, y_train, batch_size)
-
-                # Map the training dataset to return {'output': y} format
-                train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
-
                 # Train on the full dataset
                 final_model_sep.fit(
                     train_ds,
                     steps_per_epoch=train_steps,
-                    epochs=optimal_epochs,
+                    epochs=optimal_epoch,
                     batch_size=batch_size,
                     callbacks=[
                         reduce_lr_on_plateau,
@@ -524,34 +466,8 @@ def main():
                     prefix='testing')
                 wandb.log({"testing_error_hist": wandb.Image(filename)})
 
-                # Update results for this trial
-                trial_idx = seed_idx + 1
-                results = update_trial_results(
-                    results,
-                    trial_idx,
-                    mae=error_mae,
-                    maep=error_mae_cond,
-                    pcc=error_pcc,
-                    pccp=error_pcc_cond
-                )
-
                 # Finish the wandb run
                 wandb.finish()
-
-    # After all trials are complete, compute averages and save results
-    results = compute_averages(results, n_trials)
-    
-    # Create results directory if it doesn't exist
-    results_dir = os.path.join(os.getcwd(), 'results')
-    if not os.path.exists(results_dir):
-        os.makedirs(results_dir)
-    
-    # Use the title for the CSV name
-    csv_filename = f"results_{title}.csv"
-    csv_path = os.path.join(results_dir, csv_filename)
-    
-    # Save results to CSV
-    save_results_to_csv(results, csv_path)
 
 
 if __name__ == '__main__':
