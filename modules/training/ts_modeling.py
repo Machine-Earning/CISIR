@@ -199,6 +199,155 @@ def save_results_to_csv(results: Dict[str, Any], csv_path: str) -> None:
     print(f"Results saved to {csv_path}")
 
 
+def initialize_freq_rare_results_dict(n_trials: int) -> Dict[str, Any]:
+    """
+    Initialize a dictionary to store experiment results across multiple trials,
+    with separate tracking for frequent and rare samples.
+    
+    Args:
+        n_trials: Number of trials in the experiment
+        
+    Returns:
+        Dictionary with keys for storing experiment results
+    """
+    results = {
+        'name': '',            # Experiment name
+        'avg_mae': 0.0,        # Average MAE across trials
+        'avg_mae_freq': 0.0,   # Average MAE for frequent cases
+        'avg_mae_rare': 0.0,   # Average MAE for rare cases
+        'avg_pcc': 0.0,        # Average PCC across trials
+        'avg_pcc_freq': 0.0,   # Average PCC for frequent cases
+        'avg_pcc_rare': 0.0,   # Average PCC for rare cases
+    }
+    
+    # Add individual trial metrics
+    for i in range(1, n_trials + 1):
+        results[f'trial{i}_mae'] = 0.0
+        results[f'trial{i}_mae_freq'] = 0.0
+        results[f'trial{i}_mae_rare'] = 0.0
+        results[f'trial{i}_pcc'] = 0.0
+        results[f'trial{i}_pcc_freq'] = 0.0
+        results[f'trial{i}_pcc_rare'] = 0.0
+        
+    return results
+
+def update_freq_rare_trial_results(
+    results: Dict[str, Any], 
+    trial_idx: int, 
+    mae: float, 
+    mae_freq: float, 
+    mae_rare: float, 
+    pcc: float, 
+    pcc_freq: float, 
+    pcc_rare: float
+) -> Dict[str, Any]:
+    """
+    Update results dictionary with metrics from a single trial.
+    
+    Args:
+        results: The results dictionary to update
+        trial_idx: Current trial index (1-based)
+        mae: Mean Absolute Error for this trial
+        mae_freq: Mean Absolute Error for frequent samples
+        mae_rare: Mean Absolute Error for rare samples
+        pcc: Pearson Correlation Coefficient for this trial
+        pcc_freq: Pearson Correlation Coefficient for frequent samples
+        pcc_rare: Pearson Correlation Coefficient for rare samples
+        
+    Returns:
+        Updated results dictionary
+    """
+    # Store individual trial results
+    results[f'trial{trial_idx}_mae'] = mae
+    results[f'trial{trial_idx}_mae_freq'] = mae_freq
+    results[f'trial{trial_idx}_mae_rare'] = mae_rare
+    results[f'trial{trial_idx}_pcc'] = pcc
+    results[f'trial{trial_idx}_pcc_freq'] = pcc_freq
+    results[f'trial{trial_idx}_pcc_rare'] = pcc_rare
+    
+    return results
+
+def compute_freq_rare_averages(results: Dict[str, Any], n_trials: int) -> Dict[str, Any]:
+    """
+    Compute average metrics across all trials.
+    
+    Args:
+        results: Results dictionary with individual trial metrics
+        n_trials: Number of trials
+        
+    Returns:
+        Updated results dictionary with average metrics
+    """
+    # Calculate average metrics across trials
+    mae_sum = sum(results[f'trial{i}_mae'] for i in range(1, n_trials + 1))
+    mae_freq_sum = sum(results[f'trial{i}_mae_freq'] for i in range(1, n_trials + 1))
+    mae_rare_sum = sum(results[f'trial{i}_mae_rare'] for i in range(1, n_trials + 1))
+    pcc_sum = sum(results[f'trial{i}_pcc'] for i in range(1, n_trials + 1))
+    pcc_freq_sum = sum(results[f'trial{i}_pcc_freq'] for i in range(1, n_trials + 1))
+    pcc_rare_sum = sum(results[f'trial{i}_pcc_rare'] for i in range(1, n_trials + 1))
+    
+    # Store average metrics
+    results['avg_mae'] = mae_sum / n_trials
+    results['avg_mae_freq'] = mae_freq_sum / n_trials
+    results['avg_mae_rare'] = mae_rare_sum / n_trials
+    results['avg_pcc'] = pcc_sum / n_trials
+    results['avg_pcc_freq'] = pcc_freq_sum / n_trials
+    results['avg_pcc_rare'] = pcc_rare_sum / n_trials
+    
+    return results
+
+def save_freq_rare_results_to_csv(results: Dict[str, Any], csv_path: str) -> None:
+    """
+    Save experiment results to a CSV file, appending if file exists.
+    
+    Args:
+        results: Results dictionary with all metrics
+        csv_path: Path to the CSV file
+    """
+    # Define headers in required order
+    n_trials = max([int(key.replace('trial', '').split('_')[0]) 
+                    for key in results.keys() if key.startswith('trial')])
+    
+    headers = ['name', 'avg_mae']
+    for i in range(1, n_trials + 1):
+        headers.append(f'trial{i}_mae')
+    
+    headers.append('avg_mae_freq')
+    for i in range(1, n_trials + 1):
+        headers.append(f'trial{i}_mae_freq')
+    
+    headers.append('avg_mae_rare')
+    for i in range(1, n_trials + 1):
+        headers.append(f'trial{i}_mae_rare')
+    
+    headers.append('avg_pcc')
+    for i in range(1, n_trials + 1):
+        headers.append(f'trial{i}_pcc')
+    
+    headers.append('avg_pcc_freq')
+    for i in range(1, n_trials + 1):
+        headers.append(f'trial{i}_pcc_freq')
+    
+    headers.append('avg_pcc_rare')
+    for i in range(1, n_trials + 1):
+        headers.append(f'trial{i}_pcc_rare')
+    
+    # Check if file exists to determine if we need to write headers
+    file_exists = os.path.isfile(csv_path)
+    
+    with open(csv_path, 'a', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=headers)
+        
+        # Write headers if file is new
+        if not file_exists:
+            writer.writeheader()
+        
+        # Write results row
+        writer.writerow({h: results.get(h, '') for h in headers})
+        
+    print(f"Results saved to {csv_path}")
+
+
 def get_plus_cls(
         X: np.ndarray,
         y: np.ndarray,
@@ -4679,6 +4828,129 @@ def filter_ds(
 
     return X_combined, y_combined
 
+def filter_ds_1d(
+        X: np.ndarray, y: np.ndarray,
+        low_threshold: float, high_threshold: float,
+        N: int = 500, bins: int = 10, seed: int = None
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Filter and sample the dataset based on the threshold values of y with a random seed for reproducibility.
+
+    This function creates a subset of the dataset where all samples where y is either
+    below the low_threshold or above the high_threshold are included. Samples where y
+    is between the low_threshold and high_threshold are randomly sampled within bins
+    to have a total of N samples in the resulting dataset, using a specified seed for
+    random number generation.
+
+    Parameters:
+        X (np.ndarray): The input features of the dataset.
+        y (np.ndarray): The output labels of the dataset.
+        low_threshold (float): The lower bound threshold for selecting high delta values.
+        high_threshold (float): The upper bound threshold for selecting high delta values.
+        N (int): The number of samples to include from the low delta range.
+        bins (int): The number of bins to split the low delta range into.
+        seed (int, optional): Seed for the random number generator to ensure reproducibility.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: The filtered and sampled input features and output labels.
+    """
+    # Set the random seed for reproducibility
+    np.random.seed(seed)
+
+    # Flatten the output array to ensure mask works properly with input dimensions
+    y_flat = y.flatten()
+
+    # Create a mask to identify high delta samples (below low_threshold or above high_threshold)
+    high_deltas_mask = (y_flat <= low_threshold) | (y_flat >= high_threshold)
+
+    # Apply the high deltas mask to get the corresponding samples
+    X_high_deltas = X[high_deltas_mask, :]
+    y_high_deltas = y_flat[high_deltas_mask]  # Fixed: 1D indexing for 1D array
+
+    # Create a mask to identify low delta samples (between low_threshold and high_threshold)
+    low_deltas_mask = (y_flat > low_threshold) & (y_flat < high_threshold)
+
+    # Apply the low deltas mask to get the corresponding samples
+    X_low_deltas = X[low_deltas_mask, :]
+    y_low_deltas = y_flat[low_deltas_mask]  # Fixed: 1D indexing for 1D array
+
+    # Create bin edges for the low delta samples
+    bins_edges = np.linspace(low_threshold, high_threshold, bins + 1)
+
+    # Digitize y_low_deltas to assign each sample to a bin
+    binned_indices = np.digitize(y_low_deltas, bins_edges) - 1  # Fixed: already flattened
+
+    # Determine the budget per bin and remainder
+    budget = N // bins
+    remainder = N % bins
+
+    # Initialize lists to store sampled low delta values
+    X_low_deltas_sampled = []
+    y_low_deltas_sampled = []
+
+    # Sample low delta values from each bin
+    for bin_idx in range(bins):
+        # Create a mask for the current bin
+        bin_mask = binned_indices == bin_idx
+
+        # Select samples in the current bin
+        X_bin = X_low_deltas[bin_mask, :]
+        y_bin = y_low_deltas[bin_mask]  # Fixed: 1D indexing
+
+        # Determine the number of samples to draw from this bin
+        bin_budget = budget + (1 if remainder > 0 else 0)
+        remainder = max(0, remainder - 1)
+
+        # Sample from the bin if it has more samples than the budget
+        if len(y_bin) > bin_budget:
+            sampled_indices = np.random.choice(len(X_bin), size=bin_budget, replace=False)
+            X_low_deltas_sampled.append(X_bin[sampled_indices])
+            y_low_deltas_sampled.append(y_bin[sampled_indices])
+        else:
+            # If the bin has fewer samples than the budget, include all samples
+            X_low_deltas_sampled.append(X_bin)
+            y_low_deltas_sampled.append(y_bin)
+            remainder += bin_budget - len(y_bin)
+
+    # Distribute the remaining budget to the center bins
+    center_bins = np.arange(bins // 4, 3 * bins // 4)
+    for bin_idx in center_bins:
+        if remainder <= 0:
+            break
+        bin_mask = binned_indices == bin_idx
+        X_bin = X_low_deltas[bin_mask, :]
+        y_bin = y_low_deltas[bin_mask]  # Fixed: 1D indexing
+
+        if len(y_bin) > len(X_low_deltas_sampled[bin_idx]):
+            additional_needed = min(remainder, len(y_bin) - len(X_low_deltas_sampled[bin_idx]))
+            sampled_indices = np.random.choice(
+                np.arange(len(y_bin)),
+                size=additional_needed,
+                replace=False
+            )
+            X_low_deltas_sampled[bin_idx] = np.concatenate((X_low_deltas_sampled[bin_idx], X_bin[sampled_indices]))
+            y_low_deltas_sampled[bin_idx] = np.concatenate((y_low_deltas_sampled[bin_idx], y_bin[sampled_indices]))
+            remainder -= additional_needed
+
+    # Concatenate all sampled low delta values
+    if X_low_deltas_sampled:  # Check if list is not empty
+        X_low_deltas_sampled = np.concatenate(X_low_deltas_sampled, axis=0)
+        y_low_deltas_sampled = np.concatenate(y_low_deltas_sampled)  # Fixed: 1D array
+
+        # Combine high delta samples with sampled low delta samples
+        X_combined = np.concatenate([X_high_deltas, X_low_deltas_sampled], axis=0)
+        y_combined = np.concatenate([y_high_deltas, y_low_deltas_sampled])  # Fixed: 1D array
+    else:
+        # If no low delta samples were selected
+        X_combined = X_high_deltas
+        y_combined = y_high_deltas
+
+    # Reshape y_combined to match original y shape if needed
+    if len(y.shape) > 1:
+        y_combined = y_combined.reshape(-1, 1)
+
+    return X_combined, y_combined
+
 def filter_ds_up(
         X: np.ndarray, y: np.ndarray,
         high_threshold: float,
@@ -6281,8 +6553,8 @@ def plot_avsp_sarcos(
     y_test: np.ndarray,
     title: str,
     prefix: str,
-    l_threshold: float = -0.5,
-    u_threshold: float = 0.5,
+    lower_threshold: float = -0.5,
+    upper_threshold: float = 0.5,
     use_dict: bool = False
 ) -> str:
     """
@@ -6294,8 +6566,8 @@ def plot_avsp_sarcos(
     - y_test (np.ndarray): True target values for the test set
     - title (str): The title of the plot
     - prefix (str): Prefix for the plot file names
-    - l_threshold (float): Lower threshold - values below this are considered rare
-    - u_threshold (float): Upper threshold - values above this are considered rare
+    - lower_threshold (float): Lower threshold - values below this are considered rare
+    - upper_threshold (float): Upper threshold - values above this are considered rare
     - use_dict (bool): Whether the model returns a dictionary with output names. Default is False.
 
     Returns:
@@ -6329,13 +6601,13 @@ def plot_avsp_sarcos(
     ax.plot([min_intensity, max_intensity], [min_intensity, max_intensity], 'k--', label='Perfect Prediction')
     
     # Add dashed lines at thresholds on both axes if thresholds are provided
-    if l_threshold is not None:
-        ax.axvline(l_threshold, color='blue', linestyle='--', label='Lower Threshold')
-        ax.axhline(l_threshold, color='blue', linestyle='--')
+    if lower_threshold is not None:
+        ax.axvline(lower_threshold, color='blue', linestyle='--', label='Lower Threshold')
+        ax.axhline(lower_threshold, color='blue', linestyle='--')
     
-    if u_threshold is not None:
-        ax.axvline(u_threshold, color='red', linestyle='--', label='Upper Threshold')
-        ax.axhline(u_threshold, color='red', linestyle='--')
+    if upper_threshold is not None:
+        ax.axvline(upper_threshold, color='red', linestyle='--', label='Upper Threshold')
+        ax.axhline(upper_threshold, color='red', linestyle='--')
     
     # Add labels and title
     ax.set_xlabel('Actual Torque_1')
@@ -6350,16 +6622,16 @@ def plot_avsp_sarcos(
     ax.legend()
     
     # Highlight regions if thresholds are provided
-    if l_threshold is not None and u_threshold is not None:
+    if lower_threshold is not None and upper_threshold is not None:
         # Add shaded region for frequent values (between thresholds)
-        ax.axvspan(l_threshold, u_threshold, alpha=0.1, color='green', label='Frequent Region')
+        ax.axvspan(lower_threshold, upper_threshold, alpha=0.1, color='green', label='Frequent Region')
         
         # Add annotations for rare and frequent regions
-        ax.annotate('Rare', xy=(min_intensity, (min_intensity + l_threshold)/2), 
+        ax.annotate('Rare', xy=(min_intensity, (min_intensity + lower_threshold)/2), 
                    xycoords='data', fontsize=10, color='blue')
-        ax.annotate('Frequent', xy=((l_threshold + u_threshold)/2, (l_threshold + u_threshold)/2), 
+        ax.annotate('Frequent', xy=((lower_threshold + upper_threshold)/2, (lower_threshold + upper_threshold)/2), 
                    xycoords='data', fontsize=10, color='green')
-        ax.annotate('Rare', xy=(u_threshold + (max_intensity-u_threshold)/2, u_threshold + (max_intensity-u_threshold)/2), 
+        ax.annotate('Rare', xy=(upper_threshold + (max_intensity-upper_threshold)/2, upper_threshold + (max_intensity-upper_threshold)/2), 
                    xycoords='data', fontsize=10, color='red')
     
     # Adjust layout

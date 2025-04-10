@@ -7,13 +7,13 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
-from modules.evaluate.utils import plot_sep_corr, plot_tsne_sep
+from modules.evaluate.utils import plot_tsne_sarcos, plot_sarcos_corr
 from modules.reweighting.ImportanceWeighting import ReciprocalImportance
-from modules.shared.sep_globals import *
+from modules.shared.sarcos_globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
-    build_sep_ds,
+    build_sarcos_ds,
     evaluate_mae,
     evaluate_pcc,
     stratified_batch_dataset,
@@ -21,13 +21,13 @@ from modules.training.ts_modeling import (
     cmse,
     create_mlp,
     plot_error_hist,
-    load_folds_sep_ds,
-    plot_avsp_sep,
-    filter_ds_up,
-    initialize_results_dict,
-    update_trial_results,
-    compute_averages,
-    save_results_to_csv
+    load_folds_sarcos_ds,
+    plot_avsp_sarcos,
+    filter_ds_1d,
+    initialize_freq_rare_results_dict,
+    update_freq_rare_trial_results,
+    compute_freq_rare_averages,
+    save_freq_rare_results_to_csv
 )
 
 
@@ -47,8 +47,8 @@ def main():
 
     # Initialize results tracking ONCE before the seed loop
     n_trials = len(TRIAL_SEEDS)
-    results = initialize_results_dict(n_trials)
-    results['name'] = f'mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}'
+    results = initialize_freq_rare_results_dict(n_trials)
+    results['name'] = f'sarcos_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}'
 
     for seed_idx, seed in enumerate(TRIAL_SEEDS):
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in alphas:
@@ -88,7 +88,8 @@ def main():
                 epochs = EPOCHS  
                 hiddens = MLP_HIDDENS  
                 pretraining = False
-                sep_threshold = SEP_THRESHOLD
+                lower_threshold = LOWER_THRESHOLD
+                upper_threshold = UPPER_THRESHOLD
 
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 bandwidth = BANDWIDTH
@@ -106,7 +107,7 @@ def main():
 
 
                 # Initialize wandb
-                wandb.init(project="NeurIPS-2025-Paper-SEPds", name=experiment_name, config={
+                wandb.init(project="NeurIPS-2025-Paper-Sarcosds", name=experiment_name, config={
                     "patience": patience,
                     "learning_rate": learning_rate,
                     'min_lr': lr_cb_min_lr,
@@ -144,15 +145,16 @@ def main():
                     'cvrg_metric': cvrg_metric,
                     'cvrg_min_delta': cvrg_min_delta,
                     'normalized_weights': normalized_weights,
-                    'sep_threshold': sep_threshold,
+                    'lower_threshold': lower_threshold,
+                    'upper_threshold': upper_threshold,
                     'n_filter': n_filter
                 })
 
                 # set the root directory
                 root_dir = DS_PATH
                 # build the dataset
-                X_train, y_train = build_sep_ds(
-                    root_dir + '/sep_10mev_training.csv',
+                X_train, y_train = build_sarcos_ds(
+                    root_dir + '/sarcos_inv_training.csv',
                     shuffle_data=True,
                     random_state=seed
                 )
@@ -175,8 +177,8 @@ def main():
                 n_features = X_train.shape[1]
                 print(f'n_features: {n_features}')
 
-                X_test, y_test = build_sep_ds(
-                    root_dir + '/sep_10mev_testing.csv',
+                X_test, y_test = build_sarcos_ds(
+                    root_dir + '/sarcos_inv_testing.csv',
                     shuffle_data=False,
                     random_state=seed
                 )
@@ -184,19 +186,21 @@ def main():
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
 
                 # filtering training and test sets for additional results
-                X_train_filtered, y_train_filtered = filter_ds_up(
+                X_train_filtered, y_train_filtered = filter_ds_1d(
                     X_train, y_train,
-                    high_threshold=sep_threshold,
+                    low_threshold=lower_threshold,
+                    high_threshold=upper_threshold,
                     N=n_filter, seed=seed)
-                X_test_filtered, y_test_filtered = filter_ds_up(
+                X_test_filtered, y_test_filtered = filter_ds_1d(
                     X_test, y_test,
-                    high_threshold=sep_threshold,
+                    low_threshold=lower_threshold,
+                    high_threshold=upper_threshold,
                     N=n_filter, seed=seed)
 
                 # 4-fold cross-validation
                 folds_optimal_epochs = []
                 for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
-                    load_folds_sep_ds(
+                    load_folds_sarcos_ds(
                         root_dir,
                         random_state=seed,
                         shuffle=True
@@ -383,63 +387,105 @@ def main():
                 # print where the model weights are saved
                 print(f"Model weights are saved in final_model_weights_{experiment_name}_reg.h5")
 
-                # evaluate the model error on test set
+                # REGULAR METRICS (all data)
+                # Test set
                 error_mae = evaluate_mae(final_model_sep, X_test, y_test)
                 print(f'mae error: {error_mae}')
                 wandb.log({"mae": error_mae})
 
-                # evaluate the model error on training set
+                # Training set
                 error_mae_train = evaluate_mae(final_model_sep, X_train, y_train)
                 print(f'mae error train: {error_mae_train}')
                 wandb.log({"train_mae": error_mae_train})
 
-                # evaluate the model correlation on test set
+                # Test set
                 error_pcc = evaluate_pcc(final_model_sep, X_test, y_test)
                 print(f'pcc error: {error_pcc}')
                 wandb.log({"pcc": error_pcc})
 
-                # evaluate the model correlation on training set
+                # Training set
                 error_pcc_train = evaluate_pcc(final_model_sep, X_train, y_train)
                 print(f'pcc error train: {error_pcc_train}')
                 wandb.log({"train_pcc": error_pcc_train})
 
-               
+                # RARE METRICS (below lower_threshold OR above upper_threshold)
+                # Test set
+                error_mae_rare = evaluate_mae(
+                    final_model_sep, X_test, y_test, 
+                    below_threshold=lower_threshold, 
+                    above_threshold=upper_threshold)
+                print(f'mae rare (y < {lower_threshold} OR y > {upper_threshold}): {error_mae_rare}')
+                wandb.log({"mae_rare": error_mae_rare})
 
-                # evaluate the model on test cme_files
-                above_threshold = sep_threshold
-                # evaluate the model error for rare samples on test set
-                error_mae_cond = evaluate_mae(
-                    final_model_sep, X_test, y_test, above_threshold=above_threshold)
-                print(f'mae error delta >= {above_threshold} test: {error_mae_cond}')
-                wandb.log({"mae+": error_mae_cond})
+                # Training set
+                error_mae_rare_train = evaluate_mae(
+                    final_model_sep, X_train, y_train, 
+                    below_threshold=lower_threshold, 
+                    above_threshold=upper_threshold)
+                print(f'mae rare train (y < {lower_threshold} OR y > {upper_threshold}): {error_mae_rare_train}')
+                wandb.log({"train_mae_rare": error_mae_rare_train})
 
-                # evaluate the model error for rare samples on training set
-                error_mae_cond_train = evaluate_mae(
-                    final_model_sep, X_train, y_train, above_threshold=above_threshold)
-                print(f'mae error delta >= {above_threshold} train: {error_mae_cond_train}')
-                wandb.log({"train_mae+": error_mae_cond_train})
+                # Test set
+                error_pcc_rare = evaluate_pcc(
+                    final_model_sep, X_test, y_test, 
+                    below_threshold=lower_threshold, 
+                    above_threshold=upper_threshold)
+                print(f'pcc rare (y < {lower_threshold} OR y > {upper_threshold}): {error_pcc_rare}')
+                wandb.log({"pcc_rare": error_pcc_rare})
 
-                # evaluate the model correlation for rare samples on test set
-                error_pcc_cond = evaluate_pcc(
-                    final_model_sep, X_test, y_test, above_threshold=above_threshold)
-                print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
-                wandb.log({"pcc+": error_pcc_cond})
+                # Training set
+                error_pcc_rare_train = evaluate_pcc(
+                    final_model_sep, X_train, y_train, 
+                    below_threshold=lower_threshold, 
+                    above_threshold=upper_threshold)
+                print(f'pcc rare train (y < {lower_threshold} OR y > {upper_threshold}): {error_pcc_rare_train}')
+                wandb.log({"train_pcc_rare": error_pcc_rare_train})
 
-                # evaluate the model correlation for rare samples on training set
-                error_pcc_cond_train = evaluate_pcc(
-                    final_model_sep, X_train, y_train, above_threshold=above_threshold)
-                print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
-                wandb.log({"train_pcc+": error_pcc_cond_train})
+                # FREQUENT METRICS (between lower_threshold and upper_threshold)
+                # Test set
+                error_mae_freq = evaluate_mae(
+                    final_model_sep, X_test, y_test, 
+                    below_threshold=lower_threshold, 
+                    above_threshold=upper_threshold, 
+                    between_thresholds=True)
+                print(f'mae freq ({lower_threshold} < y < {upper_threshold}): {error_mae_freq}')
+                wandb.log({"mae_freq": error_mae_freq})
 
-                
+                # Training set
+                error_mae_freq_train = evaluate_mae(
+                    final_model_sep, X_train, y_train, 
+                    below_threshold=lower_threshold, 
+                    above_threshold=upper_threshold, 
+                    between_thresholds=True)
+                print(f'mae freq train ({lower_threshold} < y < {upper_threshold}): {error_mae_freq_train}')
+                wandb.log({"train_mae_freq": error_mae_freq_train})
+
+                # Test set
+                error_pcc_freq = evaluate_pcc(
+                    final_model_sep, X_test, y_test, 
+                    below_threshold=lower_threshold, 
+                    above_threshold=upper_threshold, 
+                    between_thresholds=True)
+                print(f'pcc freq ({lower_threshold} < y < {upper_threshold}): {error_pcc_freq}')
+                wandb.log({"pcc_freq": error_pcc_freq})
+
+                # Training set
+                error_pcc_freq_train = evaluate_pcc(
+                    final_model_sep, X_train, y_train, 
+                    below_threshold=lower_threshold, 
+                    above_threshold=upper_threshold, 
+                    between_thresholds=True)
+                print(f'pcc freq train ({lower_threshold} < y < {upper_threshold}): {error_pcc_freq_train}')
+                wandb.log({"train_pcc_freq": error_pcc_freq_train})
 
                 # Process SEP event files in the specified directory
-                filename =plot_avsp_sep(
+                filename =plot_avsp_sarcos(
                     final_model_sep,
                     X_test, y_test,
                     title=title,
                     prefix='testing',
-                    sep_threshold=sep_threshold
+                    lower_threshold=lower_threshold,
+                    upper_threshold=upper_threshold
                 )
 
                 # Log the plot to wandb
@@ -447,12 +493,13 @@ def main():
                 wandb.log({f'testing_{log_title}': wandb.Image(filename)})
 
                 # Process SEP event files in the specified directory
-                filename = plot_avsp_sep(
+                filename = plot_avsp_sarcos(
                     final_model_sep,
                     X_train, y_train,
                     title=title,
                     prefix='training',
-                    sep_threshold=sep_threshold
+                    lower_threshold=lower_threshold,
+                    upper_threshold=upper_threshold
                 )
 
                 # Log the plot to wandb
@@ -460,49 +507,53 @@ def main():
                 wandb.log({f'training_{log_title}': wandb.Image(filename)})
 
                 # Evaluate the model correlation with colored
-                file_path = plot_sep_corr(
+                file_path = plot_sarcos_corr(
                     final_model_sep,
                     X_train_filtered, y_train_filtered,
                     title + "_training",
                     model_type='features_reg',
-                    sep_threshold=sep_threshold
+                    lower_threshold=lower_threshold,
+                    upper_threshold=upper_threshold
                 )
 
                 wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
                 print('file_path: ' + file_path)
 
-                file_path = plot_sep_corr(
+                file_path = plot_sarcos_corr(
                     final_model_sep,
                     X_test_filtered, y_test_filtered,
                     title + "_test",
                     model_type='features_reg',
-                    sep_threshold=sep_threshold
+                    lower_threshold=lower_threshold,
+                    upper_threshold=upper_threshold
                 )
                 wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
                 print('file_path: ' + file_path)
 
                 # Log t-SNE plot
                 # Log the training t-SNE plot to wandb
-                stage1_file_path = plot_tsne_sep(
+                stage1_file_path = plot_tsne_sarcos(
                     final_model_sep,
                     X_train_filtered, y_train_filtered, title,
                     'stage2_training',
                     model_type='features_reg',
                     save_tag=current_time, 
                     seed=seed,
-                    sep_threshold=sep_threshold)
+                    lower_threshold=lower_threshold,
+                    upper_threshold=upper_threshold)
                 wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
                 print('stage1_file_path: ' + stage1_file_path)
 
                 # Log the testing t-SNE plot to wandb
-                stage1_file_path = plot_tsne_sep(
+                stage1_file_path = plot_tsne_sarcos(
                     final_model_sep,
                     X_test_filtered, y_test_filtered, title,
                     'stage2_testing',
                     model_type='features_reg',
                     save_tag=current_time, 
                     seed=seed,
-                    sep_threshold=sep_threshold)
+                    lower_threshold=lower_threshold,
+                    upper_threshold=upper_threshold)
                 wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
                 print('stage1_file_path: ' + stage1_file_path)
 
@@ -526,20 +577,22 @@ def main():
 
                 # Update results for this trial
                 trial_idx = seed_idx + 1
-                results = update_trial_results(
+                results = update_freq_rare_trial_results(
                     results,
                     trial_idx,
                     mae=error_mae,
-                    maep=error_mae_cond,
+                    mae_freq=error_mae_freq,
+                    mae_rare=error_mae_rare,
                     pcc=error_pcc,
-                    pccp=error_pcc_cond
+                    pcc_freq=error_pcc_freq,
+                    pcc_rare=error_pcc_rare
                 )
 
                 # Finish the wandb run
                 wandb.finish()
 
     # After all trials are complete, compute averages and save results
-    results = compute_averages(results, n_trials)
+    results = compute_freq_rare_averages(results, n_trials)
     
     # Create results directory if it doesn't exist
     results_dir = os.path.join(os.getcwd(), 'results')
@@ -551,7 +604,7 @@ def main():
     csv_path = os.path.join(results_dir, csv_filename)
     
     # Save results to CSV
-    save_results_to_csv(results, csv_path)
+    save_freq_rare_results_to_csv(results, csv_path)
 
 
 if __name__ == '__main__':
