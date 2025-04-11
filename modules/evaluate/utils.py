@@ -654,6 +654,96 @@ def plot_onp_corr(
 
     return file_path
 
+def plot_asc_corr(
+    model, 
+    X: np.ndarray, 
+    y: np.ndarray, 
+    title: str, 
+    model_type: str = 'features_reg', 
+    lower_threshold: float = None, 
+    upper_threshold: float = None
+) -> str:
+    """
+    Plots the correlation between distances in target values and distances in the representation space
+    for All State Claims (ASC) dataset, with each point colored based on the target value categories:
+    - Blue for values below lower_threshold
+    - Red for values above upper_threshold  
+    - Gray for values between thresholds
+
+    Parameters:
+    - model: The trained model used to transform input features into a representation space.
+    - X: Input features (NumPy array).
+    - y: Target values (NumPy array).
+    - title: Title for the plot.
+    - model_type: The type of model to use (features, features_reg, features_dec, features_reg_dec).
+    - lower_threshold: Lower bound threshold for rare values.
+    - upper_threshold: Upper bound threshold for rare values.
+
+    Returns:
+    - Path to the saved correlation plot.
+    """
+    print('In plot_asc_corr')
+    if model_type in ['features_reg_dec', 'features_reg', 'features_dec', 'features_cls']:
+        representations = model.predict(X)[0]  # Assuming the first output is always features
+    elif model_type == 'dict':
+        representations = model.predict(X)['repr']
+    else:
+        representations = model.predict(X)
+
+    print('Calculating the pairwise distances')
+    distances_target = pdist(y.reshape(-1, 1), 'euclidean')
+    distances_repr = pdist(representations, 'euclidean')
+
+    scaler = MinMaxScaler()
+    distances_target_norm = scaler.fit_transform(distances_target.reshape(-1, 1)).flatten()
+    distances_repr_norm = scaler.fit_transform(distances_repr.reshape(-1, 1)).flatten()
+
+    print('Calculating the pearson correlation')
+    r, _ = pearsonr(distances_target_norm, distances_repr_norm)
+
+    print('Assigning colors based on value ranges')
+
+    def get_color(label):
+        if lower_threshold is not None and label < lower_threshold:
+            return 'blue'  # Values below lower threshold
+        elif upper_threshold is not None and label > upper_threshold:
+            return 'red'   # Values above upper threshold
+        else:
+            return 'gray'  # Values in the middle range
+
+    label_pairs = [(y[i], y[j]) for i in range(len(y)) for j in range(i + 1, len(y))]
+    colors = [(get_color(label1), get_color(label2)) for label1, label2 in label_pairs]
+
+    # Function to draw a half-colored dot
+    def draw_half_colored_dot(ax, x, y, color1, color2, size=0.01):
+        wedge1 = Wedge((x, y), size, 0, 180, color=color1)
+        wedge2 = Wedge((x, y), size, 180, 360, color=color2)
+        ax.add_patch(wedge1)
+        ax.add_patch(wedge2)
+
+    print('Plotting with three-color scheme')
+    fig, ax = plt.subplots(figsize=(8, 6))
+    for i, (x, y) in enumerate(zip(distances_target_norm, distances_repr_norm)):
+        color1, color2 = colors[i]
+        draw_half_colored_dot(ax, x, y, color1, color2, size=0.005)  # Adjust size as needed
+
+    ax.plot([0, 1], [0, 1], 'k--')  # Perfect fit diagonal
+    ax.set_xlabel('Normalized Distance in Target Space')
+    ax.set_ylabel('Normalized Distance in Representation Space')
+    
+    # Add description of color coding to title
+    title_with_thresholds = f'{title}\nRepresentation Space Correlation (pearson r= {r:.2f})\n'
+    title_with_thresholds += f'Blue: below {lower_threshold}, Red: above {upper_threshold}, Gray: in between'
+    
+    ax.set_title(title_with_thresholds)
+    ax.grid(True)
+    
+    file_path = f"representation_correlation_asc_{title}.png"
+    plt.savefig(file_path)
+    plt.close()
+
+    return file_path
+
 
 def plot_blogf_corr(
     model, 
@@ -1364,6 +1454,124 @@ def plot_tsne_onp(
 
     # Save the plot
     file_path = f"{prefix}_tsne_onp_{str(save_tag)}.png"
+    plt.savefig(file_path)
+
+    if show_plot:
+        plt.show()
+
+    plt.close()
+
+    return file_path
+
+def plot_tsne_asc(
+        model,
+        X: np.ndarray,
+        y: np.ndarray,
+        title: str,
+        prefix: str,
+        model_type='features_reg',
+        lower_threshold=None,
+        upper_threshold=None,
+        show_plot=False,
+        save_tag=None,
+        seed=42) -> str:
+    """
+    Visualizes All State Claims data using t-SNE by coloring and sizing points based on their log_cost values.
+
+    Parameters:
+    - model: Trained feature extractor model.
+    - X: Input data (NumPy array or compatible).
+    - y: Target values (log_cost) (NumPy array or compatible).
+    - title: Title for the plot.
+    - prefix: Prefix for the file name.
+    - model_type: The type of model output to use.
+    - lower_threshold: Lower bound threshold for rare values.
+    - upper_threshold: Upper bound threshold for rare values.
+    - show_plot: If True, display the plot in addition to saving it.
+    - save_tag: Optional tag to append to the file name.
+    - seed: Random seed for t-SNE.
+
+    Returns:
+    - The file path of the saved t-SNE plot.
+    """
+
+    # Extract features based on the model type
+    if model_type in ['features_reg_dec', 'features_reg', 'features_dec', 'features_cls']:
+        features = model.predict(X)[0]  # Assuming the first output is always features
+    elif model_type == 'dict':
+        features = model.predict(X)['repr']
+    else:
+        features = model.predict(X)
+
+    # Apply t-SNE
+    tsne = TSNE(n_components=2, random_state=seed)
+    tsne_result = tsne.fit_transform(features)
+
+    # Plot setup
+    fig, axs = plt.subplots(2, 1, figsize=(18, 16), gridspec_kw={'height_ratios': [2, 1]})
+    
+    # Set up the colormap - using coolwarm as requested
+    norm = plt.Normalize(np.min(y), np.max(y))
+    cmap = plt.cm.coolwarm  # Using coolwarm colormap as requested
+
+    # Determine the size and alpha dynamically
+    is_rare = ((lower_threshold is not None) & (y < lower_threshold)) | \
+              ((upper_threshold is not None) & (y > upper_threshold))
+    
+    sizes = np.where(is_rare, 50, 12)  # Larger size for rare values
+    alphas = np.where(is_rare, 1.0, 0.3)  # More opaque for rare values
+
+    # Ensure sizes and alphas are 1-dimensional arrays
+    sizes = sizes.ravel()
+    alphas = alphas.ravel()
+
+    # Sort points by size to ensure larger points are plotted last (on top)
+    sort_order = np.argsort(sizes)
+    
+    # Separate common and rare points
+    common_points_mask = sizes[sort_order] == 12
+    rare_points_mask = sizes[sort_order] == 50
+    common_points = sort_order[common_points_mask]
+    rare_points = sort_order[rare_points_mask]
+
+    # Plot points
+    plt.sca(axs[0])
+    
+    # First plot common points (smaller, more transparent)
+    sc = plt.scatter(
+        tsne_result[common_points, 0],
+        tsne_result[common_points, 1],
+        c=y[common_points],
+        cmap=cmap,
+        norm=norm,
+        s=sizes[common_points],
+        alpha=alphas[common_points])
+
+    # Then plot rare points (larger, more opaque) to ensure they're on top
+    plt.scatter(
+        tsne_result[rare_points, 0],
+        tsne_result[rare_points, 1],
+        c=y[rare_points],
+        cmap=cmap,
+        norm=norm,
+        s=sizes[rare_points],
+        alpha=alphas[rare_points])
+
+    # Add a color bar with proper label
+    cbar = plt.colorbar(sc, ax=axs[0], label='Log Shares', extend='both')
+
+    # Title
+    plt.title(f'{title}\n2D t-SNE Visualization of Log Cost')
+
+    # Plot Shepard plot on the second subplot
+    plt.sca(axs[1])
+    plot_shepard(features, tsne_result)
+
+    # Adjust layout
+    plt.tight_layout()
+
+    # Save the plot
+    file_path = f"{prefix}_tsne_asc_{str(save_tag)}.png"
     plt.savefig(file_path)
 
     if show_plot:

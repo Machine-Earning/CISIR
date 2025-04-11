@@ -7504,3 +7504,230 @@ def build_blogf_ds(file_path: str, shuffle_data: bool = False, random_state: int
     print(f"X shape: {X.shape}, y shape: {y.shape}")
     
     return X, y
+
+
+#### ALLSTATE CLAIMS DATASET STUFF ####
+def plot_avsp_asc(
+    model: tf.keras.Model,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    title: str,
+    prefix: str,
+    rare_low_threshold: float = np.log10(200),
+    rare_high_threshold: float = np.log10(20000),
+    use_dict: bool = False
+) -> str:
+    """
+    Plots actual vs predicted log_cost values.
+
+    Parameters:
+    - model (tf.keras.Model): The trained model to evaluate
+    - X_test (np.ndarray): Test features
+    - y_test (np.ndarray): True target values for the test set
+    - title (str): The title of the plot
+    - prefix (str): Prefix for the plot file names
+    - rare_low_threshold (float): Lower threshold - values below this are considered rare (default: log10(200))
+    - rare_high_threshold (float): Upper threshold - values above this are considered rare (default: log10(20000))
+    - use_dict (bool): Whether the model returns a dictionary with output names. Default is False.
+
+    Returns:
+    - str: The absolute path to the saved plot file
+    """
+    
+    # Make predictions
+    if use_dict:
+        res = model.predict(X_test)
+        predictions = res['output']
+    else:
+        _, predictions = model.predict(X_test)
+        
+    # Process predictions if needed (flatten if multidimensional)
+    predictions = np.array(predictions).flatten()
+    y_test = np.array(y_test).flatten()
+    
+    # Create the figure with proper axes configuration
+    fig, ax = plt.subplots(figsize=(10, 7))
+    
+    # Scatter plot with a colormap based on prediction error
+    prediction_error = np.abs(y_test - predictions)
+    norm = plt.Normalize(np.min(prediction_error), np.max(prediction_error))
+    cmap = plt.cm.viridis
+    
+    scatter = ax.scatter(y_test, predictions, c=prediction_error, cmap=cmap, norm=norm, alpha=0.7, s=40)
+    
+    # Plot perfect prediction line
+    min_intensity = min(np.min(y_test), np.min(predictions))
+    max_intensity = max(np.max(y_test), np.max(predictions))
+    ax.plot([min_intensity, max_intensity], [min_intensity, max_intensity], 'k--', label='Perfect Prediction')
+    
+    # Add dashed lines at thresholds on both axes if thresholds are provided
+    if rare_low_threshold is not None:
+        ax.axvline(rare_low_threshold, color='blue', linestyle='--', label='Lower Threshold')
+        ax.axhline(rare_low_threshold, color='blue', linestyle='--')
+    
+    if rare_high_threshold is not None:
+        ax.axvline(rare_high_threshold, color='red', linestyle='--', label='Upper Threshold')
+        ax.axhline(rare_high_threshold, color='red', linestyle='--')
+    
+    # Add labels and title
+    ax.set_xlabel('Actual log_cost')
+    ax.set_ylabel('Predicted log_cost')
+    ax.set_title(f"{title}\n{prefix}_Actual_vs_Predicted_log_cost")
+    
+    # Add colorbar for prediction error
+    cbar = fig.colorbar(scatter, ax=ax, label='Prediction Error', extend='both')
+    
+    # Add grid and legend
+    ax.grid(True)
+    ax.legend()
+    
+    # Highlight regions if thresholds are provided
+    if rare_low_threshold is not None and rare_high_threshold is not None:
+        # Add shaded region for frequent values (between thresholds)
+        ax.axvspan(rare_low_threshold, rare_high_threshold, alpha=0.1, color='green', label='Frequent Region')
+        
+        # Add annotations for rare and frequent regions
+        ax.annotate('Rare', xy=(min_intensity, (min_intensity + rare_low_threshold)/2), 
+                   xycoords='data', fontsize=10, color='blue')
+        ax.annotate('Frequent', xy=((rare_low_threshold + rare_high_threshold)/2, (rare_low_threshold + rare_high_threshold)/2), 
+                   xycoords='data', fontsize=10, color='green')
+        ax.annotate('Rare', xy=(rare_high_threshold + (max_intensity-rare_high_threshold)/2, rare_high_threshold + (max_intensity-rare_high_threshold)/2), 
+                   xycoords='data', fontsize=10, color='red')
+    
+    # Adjust layout
+    plt.tight_layout()
+    
+    # Save the plot
+    plot_filename = f"{title}_{prefix}_actual_vs_predicted_log_cost.png"
+    plt.savefig(plot_filename)
+    plt.close()
+    
+    return os.path.abspath(plot_filename)
+
+def load_folds_asc_ds(
+        base_dir: str,
+        shuffle: bool = True,
+        random_state: Optional[int] = None,
+        debug: bool = False
+) -> Generator[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], None, None]:
+    """
+    Loads pre-split stratified folds from the all state claims directory structure using build_asc_ds function
+    and yields one fold at a time.
+
+    Directory structure expected:
+    base_dir/
+        fold0/
+            allstate_claims_subtraining.csv
+            allstate_claims_validation.csv
+        fold1/
+            allstate_claims_subtraining.csv
+            allstate_claims_validation.csv
+        ...
+
+    Parameters:
+        base_dir (str): Path to the directory containing the fold directories
+        shuffle (bool): Whether to shuffle the data. Default is False.
+        random_state (Optional[int]): Random seed for reproducibility. Default is None.
+        debug (bool): Whether to enable debug printing. Default is False.
+
+    Yields:
+        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Split feature and label data:
+            - X_subtrain: Features for the subtraining set (numpy array)
+            - y_subtrain: Labels for the subtraining set (numpy array)
+            - X_val: Features for the validation set (numpy array)
+            - y_val: Labels for the validation set (numpy array)
+
+    Raises:
+        FileNotFoundError: If any expected fold directory or file is missing
+    """
+    
+    if not os.path.exists(base_dir):
+        raise FileNotFoundError(f"Base directory not found: {base_dir}")
+    
+    # Process each fold
+    for fold_idx in range(4):
+        fold_dir = os.path.join(base_dir, f"fold{fold_idx}")
+        
+        if not os.path.exists(fold_dir):
+            raise FileNotFoundError(f"Missing fold directory: {fold_dir}")
+        
+        # Path to subtraining and validation files
+        subtrain_file = os.path.join(fold_dir, "allstate_claims_subtraining.csv")
+        val_file = os.path.join(fold_dir, "allstate_claims_validation.csv")
+        
+        # Check file existence
+        if not os.path.exists(subtrain_file):
+            raise FileNotFoundError(f"Missing subtraining file: {subtrain_file}")
+        if not os.path.exists(val_file):
+            raise FileNotFoundError(f"Missing validation file: {val_file}")
+        
+        # Load data using build_sep_ds - returns numpy arrays
+        X_subtrain, y_subtrain = build_asc_ds(
+            file_path=subtrain_file,
+            shuffle_data=shuffle,
+            random_state=random_state
+        )
+        
+        X_val, y_val = build_asc_ds(
+            file_path=val_file,
+            shuffle_data=shuffle,
+            random_state=random_state
+        )
+        
+        if debug:
+            print(f"Fold {fold_idx}:")
+            print(f"Subtraining shapes: X={X_subtrain.shape}, y={y_subtrain.shape}")
+            print(f"Validation shapes: X={X_val.shape}, y={y_val.shape}")
+            print(f"Subtraining range: {y_subtrain.min():.4f} to {y_subtrain.max():.4f}")
+            print(f"Validation range: {y_val.min():.4f} to {y_val.max():.4f}")
+        
+        yield X_subtrain, y_subtrain, X_val, y_val
+
+def build_asc_ds(file_path: str, shuffle_data: bool = False, random_state: int = 42) -> tuple:
+    """
+    Build all state claims dataset by loading CSV and splitting into features and label.
+    
+    Parameters:
+    -----------
+    file_path : str
+        Path to the CSV file (e.g., 'allstate_claims_training.csv')
+    shuffle_data : bool, default=False
+        Whether to shuffle the dataset
+    random_state : int, default=42
+        Random seed for reproducibility when shuffling
+        
+    Returns:
+    --------
+    tuple
+        X : np.ndarray - Feature columns
+        y : np.ndarray - Target variable ('log_cost')
+    """
+    # Read the CSV file
+    df = pd.read_csv(file_path)
+    
+    # Check if the last column is ln_peak_intensity as expected
+    if df.columns[-1] != "log_cost":
+        print(f"Warning: Expected 'log_cost' as the last column, found '{df.columns[-1]}' instead")
+    
+    # Split into features and labels
+    # Skip the id column (penultimate column as it is the id) and get the last column as target
+    X = df.iloc[:, :-2].values  # All columns except the last two, as numpy array
+    y = df.iloc[:, -1].values   # Just the last column, as numpy array
+    
+    # Shuffle if requested
+    if shuffle_data:
+        # Create a shuffled index
+        idx = np.arange(len(df))
+        np.random.seed(random_state)
+        np.random.shuffle(idx)
+        
+        # Reindex X and y using the shuffled indices
+        X = X[idx]
+        y = y[idx]
+        
+        print(f"Data shuffled with random_state={random_state}")
+    
+    print(f"Dataset built from {file_path}")
+    print(f"X shape: {X.shape}, y shape: {y.shape}")
+    
+    return X, y

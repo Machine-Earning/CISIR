@@ -387,7 +387,7 @@ def main():
                 # print where the model weights are saved
                 print(f"Model weights are saved in final_model_weights_{experiment_name}_reg.h5")
 
-                # REGULAR METRICS (all data)
+                                # REGULAR METRICS (all data)
                 # Test set
                 error_mae = evaluate_mae(final_model_sep, X_test, y_test)
                 print(f'mae error: {error_mae}')
@@ -407,39 +407,6 @@ def main():
                 error_pcc_train = evaluate_pcc(final_model_sep, X_train, y_train)
                 print(f'pcc error train: {error_pcc_train}')
                 wandb.log({"train_pcc": error_pcc_train})
-
-                # RARE METRICS (below lower_threshold OR above upper_threshold)
-                # Test set
-                error_mae_rare = evaluate_mae(
-                    final_model_sep, X_test, y_test, 
-                    below_threshold=lower_threshold, 
-                    above_threshold=upper_threshold)
-                print(f'mae rare (y < {lower_threshold} OR y > {upper_threshold}): {error_mae_rare}')
-                wandb.log({"mae_rare": error_mae_rare})
-
-                # Training set
-                error_mae_rare_train = evaluate_mae(
-                    final_model_sep, X_train, y_train, 
-                    below_threshold=lower_threshold, 
-                    above_threshold=upper_threshold)
-                print(f'mae rare train (y < {lower_threshold} OR y > {upper_threshold}): {error_mae_rare_train}')
-                wandb.log({"train_mae_rare": error_mae_rare_train})
-
-                # Test set
-                error_pcc_rare = evaluate_pcc(
-                    final_model_sep, X_test, y_test, 
-                    below_threshold=lower_threshold, 
-                    above_threshold=upper_threshold)
-                print(f'pcc rare (y < {lower_threshold} OR y > {upper_threshold}): {error_pcc_rare}')
-                wandb.log({"pcc_rare": error_pcc_rare})
-
-                # Training set
-                error_pcc_rare_train = evaluate_pcc(
-                    final_model_sep, X_train, y_train, 
-                    below_threshold=lower_threshold, 
-                    above_threshold=upper_threshold)
-                print(f'pcc rare train (y < {lower_threshold} OR y > {upper_threshold}): {error_pcc_rare_train}')
-                wandb.log({"train_pcc_rare": error_pcc_rare_train})
 
                 # FREQUENT METRICS (between lower_threshold and upper_threshold)
                 # Test set
@@ -477,6 +444,64 @@ def main():
                     between_thresholds=True)
                 print(f'pcc freq train ({lower_threshold} < y < {upper_threshold}): {error_pcc_freq_train}')
                 wandb.log({"train_pcc_freq": error_pcc_freq_train})
+
+                # RARE LOW METRICS (y < lower_threshold)
+                # Test set
+                error_mae_rare_low = evaluate_mae(
+                    final_model_sep, X_test, y_test, 
+                    below_threshold=lower_threshold)
+                print(f'mae rare low (y < {lower_threshold}): {error_mae_rare_low}')
+                wandb.log({"mae_rare_low": error_mae_rare_low})
+
+                # Training set
+                error_mae_rare_low_train = evaluate_mae(
+                    final_model_sep, X_train, y_train, 
+                    below_threshold=lower_threshold)
+                print(f'mae rare low train (y < {lower_threshold}): {error_mae_rare_low_train}')
+                wandb.log({"train_mae_rare_low": error_mae_rare_low_train})
+
+                # Test set
+                error_pcc_rare_low = evaluate_pcc(
+                    final_model_sep, X_test, y_test, 
+                    below_threshold=lower_threshold)
+                print(f'pcc rare low (y < {lower_threshold}): {error_pcc_rare_low}')
+                wandb.log({"pcc_rare_low": error_pcc_rare_low})
+
+                # Training set
+                error_pcc_rare_low_train = evaluate_pcc(
+                    final_model_sep, X_train, y_train, 
+                    below_threshold=lower_threshold)
+                print(f'pcc rare low train (y < {lower_threshold}): {error_pcc_rare_low_train}')
+                wandb.log({"train_pcc_rare_low": error_pcc_rare_low_train})
+
+                # RARE HIGH METRICS (y > upper_threshold)
+                # Test set
+                error_mae_rare_high = evaluate_mae(
+                    final_model_sep, X_test, y_test, 
+                    above_threshold=upper_threshold)
+                print(f'mae rare high (y > {upper_threshold}): {error_mae_rare_high}')
+                wandb.log({"mae_rare_high": error_mae_rare_high})
+
+                # Training set
+                error_mae_rare_high_train = evaluate_mae(
+                    final_model_sep, X_train, y_train, 
+                    above_threshold=upper_threshold)
+                print(f'mae rare high train (y > {upper_threshold}): {error_mae_rare_high_train}')
+                wandb.log({"train_mae_rare_high": error_mae_rare_high_train})
+
+                # Test set
+                error_pcc_rare_high = evaluate_pcc(
+                    final_model_sep, X_test, y_test, 
+                    above_threshold=upper_threshold)
+                print(f'pcc rare high (y > {upper_threshold}): {error_pcc_rare_high}')
+                wandb.log({"pcc_rare_high": error_pcc_rare_high})
+
+                # Training set
+                error_pcc_rare_high_train = evaluate_pcc(
+                    final_model_sep, X_train, y_train, 
+                    above_threshold=upper_threshold)
+                print(f'pcc rare high train (y > {upper_threshold}): {error_pcc_rare_high_train}')
+                wandb.log({"train_pcc_rare_high": error_pcc_rare_high_train})
 
                 # Process SEP event files in the specified directory
                 filename =plot_avsp_sarcos(
