@@ -636,7 +636,7 @@ def main():
         os.makedirs(results_dir)
     
     # Use the title for the CSV name
-    csv_filename = f"results_{title}.csv"
+    csv_filename = f"sarcos_results_{title}.csv"
     csv_path = os.path.join(results_dir, csv_filename)
     
     # Save results to CSV
