@@ -9,7 +9,7 @@ OUTPUT_DIM = 1
 
 # Training configurations
 TRIAL_SEEDS = [456789, 42, 123, 0, 9999] # Seeds for trial
-BATCH_SIZE = 4096  # Batch size
+BATCH_SIZE = 8192  # Batch size
 EPOCHS = int(2e5)  # Number of epochs
 VERBOSE = 1  # Verbose
 SAVE_BEST = False  # Save best model
@@ -17,10 +17,10 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 FREEZING = [False]
 
 # Model Architecture
-MLP_HIDDENS = [4096, 256, 2048, 256, 1024, 256, 512, 256]  # Hidden layers
+MLP_HIDDENS = [4096, 280, 2048, 280, 1024, 280, 512, 280]  # Hidden layers
 
 PROJ_HIDDENS = [128]  # Projection hidden layers
-EMBED_DIM = 256  # Representation dimension
+EMBED_DIM = 280  # Representation dimension
 DROPOUT = 0.2  # Dropout rate
 ACTIVATION = None  # No activation for regression so default is LeakyReLU
 NORM = 'batch_norm'  # Use batch normalization
@@ -30,7 +30,7 @@ SKIP_REPR = True  # residual representation
 
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
-START_LR = 5e-4  # starting learning rate
+START_LR = 1e-4  # starting learning rate
 WEIGHT_DECAY = 0.1  # Higher weight decay
 NORMALIZED_WEIGHTS = True  # Use normalized weights
 

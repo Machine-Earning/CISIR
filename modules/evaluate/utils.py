@@ -553,7 +553,7 @@ def plot_sarcos_corr(model, X, y, title, model_type='features_reg', lower_thresh
     
     # Add description of color coding to title
     title_with_thresholds = f'{title}\nRepresentation Space Correlation (pearson r= {r:.2f})\n'
-    title_with_thresholds += f'Blue: below {lower_threshold}, Red: above {upper_threshold}, Gray: in between'
+    title_with_thresholds += f'Blue: below {lower_threshold:.2f}, Red: above {upper_threshold:.2f}, Gray: in between'
     
     ax.set_title(title_with_thresholds)
     ax.grid(True)
@@ -643,7 +643,7 @@ def plot_onp_corr(
     
     # Add description of color coding to title
     title_with_thresholds = f'{title}\nRepresentation Space Correlation (pearson r= {r:.2f})\n'
-    title_with_thresholds += f'Blue: below {lower_threshold}, Red: above {upper_threshold}, Gray: in between'
+    title_with_thresholds += f'Blue: below {lower_threshold:.2f}, Red: above {upper_threshold:.2f}, Gray: in between'
     
     ax.set_title(title_with_thresholds)
     ax.grid(True)
@@ -733,7 +733,7 @@ def plot_asc_corr(
     
     # Add description of color coding to title
     title_with_thresholds = f'{title}\nRepresentation Space Correlation (pearson r= {r:.2f})\n'
-    title_with_thresholds += f'Blue: below {lower_threshold}, Red: above {upper_threshold}, Gray: in between'
+    title_with_thresholds += f'Blue: below {lower_threshold:.2f}, Red: above {upper_threshold:.2f}, Gray: in between'
     
     ax.set_title(title_with_thresholds)
     ax.grid(True)
