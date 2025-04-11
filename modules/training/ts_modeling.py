@@ -202,7 +202,7 @@ def save_results_to_csv(results: Dict[str, Any], csv_path: str) -> None:
 def initialize_freq_rare_results_dict(n_trials: int) -> Dict[str, Any]:
     """
     Initialize a dictionary to store experiment results across multiple trials,
-    with separate tracking for frequent and rare samples.
+    with separate tracking for frequent, high rare, and low rare samples.
     
     Args:
         n_trials: Number of trials in the experiment
@@ -214,20 +214,24 @@ def initialize_freq_rare_results_dict(n_trials: int) -> Dict[str, Any]:
         'name': '',            # Experiment name
         'avg_mae': 0.0,        # Average MAE across trials
         'avg_mae_freq': 0.0,   # Average MAE for frequent cases
-        'avg_mae_rare': 0.0,   # Average MAE for rare cases
+        'avg_mae_rare_high': 0.0,   # Average MAE for high rare cases
+        'avg_mae_rare_low': 0.0,   # Average MAE for low rare cases
         'avg_pcc': 0.0,        # Average PCC across trials
         'avg_pcc_freq': 0.0,   # Average PCC for frequent cases
-        'avg_pcc_rare': 0.0,   # Average PCC for rare cases
+        'avg_pcc_rare_high': 0.0,   # Average PCC for high rare cases
+        'avg_pcc_rare_low': 0.0,   # Average PCC for low rare cases
     }
     
     # Add individual trial metrics
     for i in range(1, n_trials + 1):
         results[f'trial{i}_mae'] = 0.0
         results[f'trial{i}_mae_freq'] = 0.0
-        results[f'trial{i}_mae_rare'] = 0.0
+        results[f'trial{i}_mae_rare_high'] = 0.0
+        results[f'trial{i}_mae_rare_low'] = 0.0
         results[f'trial{i}_pcc'] = 0.0
         results[f'trial{i}_pcc_freq'] = 0.0
-        results[f'trial{i}_pcc_rare'] = 0.0
+        results[f'trial{i}_pcc_rare_high'] = 0.0
+        results[f'trial{i}_pcc_rare_low'] = 0.0
         
     return results
 
@@ -236,10 +240,12 @@ def update_freq_rare_trial_results(
     trial_idx: int, 
     mae: float, 
     mae_freq: float, 
-    mae_rare: float, 
+    mae_rare_high: float,
+    mae_rare_low: float, 
     pcc: float, 
     pcc_freq: float, 
-    pcc_rare: float
+    pcc_rare_high: float,
+    pcc_rare_low: float
 ) -> Dict[str, Any]:
     """
     Update results dictionary with metrics from a single trial.
@@ -249,10 +255,12 @@ def update_freq_rare_trial_results(
         trial_idx: Current trial index (1-based)
         mae: Mean Absolute Error for this trial
         mae_freq: Mean Absolute Error for frequent samples
-        mae_rare: Mean Absolute Error for rare samples
+        mae_rare_high: Mean Absolute Error for high rare samples
+        mae_rare_low: Mean Absolute Error for low rare samples
         pcc: Pearson Correlation Coefficient for this trial
         pcc_freq: Pearson Correlation Coefficient for frequent samples
-        pcc_rare: Pearson Correlation Coefficient for rare samples
+        pcc_rare_high: Pearson Correlation Coefficient for high rare samples
+        pcc_rare_low: Pearson Correlation Coefficient for low rare samples
         
     Returns:
         Updated results dictionary
@@ -260,10 +268,12 @@ def update_freq_rare_trial_results(
     # Store individual trial results
     results[f'trial{trial_idx}_mae'] = mae
     results[f'trial{trial_idx}_mae_freq'] = mae_freq
-    results[f'trial{trial_idx}_mae_rare'] = mae_rare
+    results[f'trial{trial_idx}_mae_rare_high'] = mae_rare_high
+    results[f'trial{trial_idx}_mae_rare_low'] = mae_rare_low
     results[f'trial{trial_idx}_pcc'] = pcc
     results[f'trial{trial_idx}_pcc_freq'] = pcc_freq
-    results[f'trial{trial_idx}_pcc_rare'] = pcc_rare
+    results[f'trial{trial_idx}_pcc_rare_high'] = pcc_rare_high
+    results[f'trial{trial_idx}_pcc_rare_low'] = pcc_rare_low
     
     return results
 
@@ -281,18 +291,22 @@ def compute_freq_rare_averages(results: Dict[str, Any], n_trials: int) -> Dict[s
     # Calculate average metrics across trials
     mae_sum = sum(results[f'trial{i}_mae'] for i in range(1, n_trials + 1))
     mae_freq_sum = sum(results[f'trial{i}_mae_freq'] for i in range(1, n_trials + 1))
-    mae_rare_sum = sum(results[f'trial{i}_mae_rare'] for i in range(1, n_trials + 1))
+    mae_rare_high_sum = sum(results[f'trial{i}_mae_rare_high'] for i in range(1, n_trials + 1))
+    mae_rare_low_sum = sum(results[f'trial{i}_mae_rare_low'] for i in range(1, n_trials + 1))
     pcc_sum = sum(results[f'trial{i}_pcc'] for i in range(1, n_trials + 1))
     pcc_freq_sum = sum(results[f'trial{i}_pcc_freq'] for i in range(1, n_trials + 1))
-    pcc_rare_sum = sum(results[f'trial{i}_pcc_rare'] for i in range(1, n_trials + 1))
+    pcc_rare_high_sum = sum(results[f'trial{i}_pcc_rare_high'] for i in range(1, n_trials + 1))
+    pcc_rare_low_sum = sum(results[f'trial{i}_pcc_rare_low'] for i in range(1, n_trials + 1))
     
     # Store average metrics
     results['avg_mae'] = mae_sum / n_trials
     results['avg_mae_freq'] = mae_freq_sum / n_trials
-    results['avg_mae_rare'] = mae_rare_sum / n_trials
+    results['avg_mae_rare_high'] = mae_rare_high_sum / n_trials
+    results['avg_mae_rare_low'] = mae_rare_low_sum / n_trials
     results['avg_pcc'] = pcc_sum / n_trials
     results['avg_pcc_freq'] = pcc_freq_sum / n_trials
-    results['avg_pcc_rare'] = pcc_rare_sum / n_trials
+    results['avg_pcc_rare_high'] = pcc_rare_high_sum / n_trials
+    results['avg_pcc_rare_low'] = pcc_rare_low_sum / n_trials
     
     return results
 
@@ -316,9 +330,13 @@ def save_freq_rare_results_to_csv(results: Dict[str, Any], csv_path: str) -> Non
     for i in range(1, n_trials + 1):
         headers.append(f'trial{i}_mae_freq')
     
-    headers.append('avg_mae_rare')
+    headers.append('avg_mae_rare_high')
     for i in range(1, n_trials + 1):
-        headers.append(f'trial{i}_mae_rare')
+        headers.append(f'trial{i}_mae_rare_high')
+        
+    headers.append('avg_mae_rare_low')
+    for i in range(1, n_trials + 1):
+        headers.append(f'trial{i}_mae_rare_low')
     
     headers.append('avg_pcc')
     for i in range(1, n_trials + 1):
@@ -328,9 +346,13 @@ def save_freq_rare_results_to_csv(results: Dict[str, Any], csv_path: str) -> Non
     for i in range(1, n_trials + 1):
         headers.append(f'trial{i}_pcc_freq')
     
-    headers.append('avg_pcc_rare')
+    headers.append('avg_pcc_rare_high')
     for i in range(1, n_trials + 1):
-        headers.append(f'trial{i}_pcc_rare')
+        headers.append(f'trial{i}_pcc_rare_high')
+        
+    headers.append('avg_pcc_rare_low')
+    for i in range(1, n_trials + 1):
+        headers.append(f'trial{i}_pcc_rare_low')
     
     # Check if file exists to determine if we need to write headers
     file_exists = os.path.isfile(csv_path)

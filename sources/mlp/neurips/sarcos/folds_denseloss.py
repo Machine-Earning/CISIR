@@ -41,7 +41,7 @@ def main():
 
 
     # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc
-    alphas = [(0.8, 0.8, 0.0, 0.0)]
+    alphas = [(1, 1, 0.0, 0.0)]
     alpha_amse = alphas[0][0]
     alpha_apcc = alphas[0][1]
 
@@ -486,7 +486,7 @@ def main():
                     above_threshold=upper_threshold)
                 print(f'pcc rare high train (y > {upper_threshold}): {error_pcc_rare_high_train}')
                 wandb.log({"train_pcc_rare_high": error_pcc_rare_high_train})
-                
+
 
                 # Process SEP event files in the specified directory
                 filename =plot_avsp_sarcos(
@@ -592,10 +592,12 @@ def main():
                     trial_idx,
                     mae=error_mae,
                     mae_freq=error_mae_freq,
-                    mae_rare=error_mae_rare,
+                    mae_rare_high=error_mae_rare_high,
+                    mae_rare_low=error_mae_rare_low,
                     pcc=error_pcc,
                     pcc_freq=error_pcc_freq,
-                    pcc_rare=error_pcc_rare
+                    pcc_rare_high=error_pcc_rare_high,
+                    pcc_rare_low=error_pcc_rare_low
                 )
 
                 # Finish the wandb run
