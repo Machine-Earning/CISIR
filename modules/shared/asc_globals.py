@@ -17,10 +17,10 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 FREEZING = [False]
 
 # Model Architecture
-MLP_HIDDENS = [4096, 1024, 2048, 1024]  # Hidden layers
+MLP_HIDDENS = [4096, 512, 2048, 512, 1024, 512]  # Hidden layers
 
 PROJ_HIDDENS = [128]  # Projection hidden layers
-EMBED_DIM = 1024  # Representation dimension
+EMBED_DIM = 512  # Representation dimension
 DROPOUT = 0.2  # Dropout rate
 ACTIVATION = None  # No activation for regression so default is LeakyReLU
 NORM = 'batch_norm'  # Use batch normalization

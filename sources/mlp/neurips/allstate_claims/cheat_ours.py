@@ -25,6 +25,14 @@ from modules.training.ts_modeling import (
     filter_ds_1d_fr
 )
 
+# Set specific GPU device
+import os
+
+# Select a specific GPU (e.g., GPU 0)
+gpu_to_use = 1
+os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_to_use)
+print(f"Using GPU: {gpu_to_use}")
+
 
 
 def main():
