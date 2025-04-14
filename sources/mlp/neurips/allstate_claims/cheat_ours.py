@@ -29,7 +29,7 @@ from modules.training.ts_modeling import (
 import os
 
 # Select a specific GPU (e.g., GPU 0)
-gpu_to_use = 1
+gpu_to_use = 2
 os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_to_use)
 print(f"Using GPU: {gpu_to_use}")
 
