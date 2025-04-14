@@ -29,7 +29,7 @@ from modules.training.ts_modeling import (
 import os
 
 # Select a specific GPU (e.g., GPU 0)
-gpu_to_use = 3
+gpu_to_use = 1
 os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_to_use)
 print(f"Using GPU: {gpu_to_use}")
 
@@ -247,7 +247,8 @@ def main():
                             val_pcc_weight_dict=pcc_test_weights_dict,
                             normalized_weights=normalized_weights,
                             asym_type=asym_type
-                        )
+                        ),
+                        'repr_layer': None  # Add None for the unused output
                     }
                 )
 
