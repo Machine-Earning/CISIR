@@ -9,7 +9,7 @@ OUTPUT_DIM = 1
 
 # Training configurations
 TRIAL_SEEDS = [456789, 42, 123, 0, 9999] # Seeds for trial
-BATCH_SIZE = 8192  # 32768  # Batch size
+BATCH_SIZE = 32768  # Batch size
 EPOCHS = int(2e5)  # Number of epochs
 VERBOSE = 1  # Verbose
 SAVE_BEST = False  # Save best model
@@ -21,7 +21,7 @@ MLP_HIDDENS = [4096, 1024, 2048, 1024]  # Hidden layers
 
 PROJ_HIDDENS = [128]  # Projection hidden layers
 EMBED_DIM = 1024  # Representation dimension
-DROPOUT = 0.2  # Dropout rate
+DROPOUT = 0.1  # Dropout rate
 ACTIVATION = None  # No activation for regression so default is LeakyReLU
 NORM = 'batch_norm'  # Use batch normalization
 RESIDUAL = True  # Use residual connections
