@@ -32,9 +32,12 @@ if [ -z "$TYPE" ] || [ -z "$MODULE" ]; then
     usage
 fi
 
+# Create logs directory if it doesn't exist
+mkdir -p logs
+
 # Create a datetime code (format: YYYYMMDD_HHMMSS)
 DATETIME_CODE=$(date +%Y%m%d_%H%M%S)
-LOG_FILE="${TYPE}.${DATETIME_CODE}.log"
+LOG_FILE="logs/${TYPE}.${DATETIME_CODE}.log"
 
 # Inform the user
 echo "Starting job: python -m ${MODULE}"
