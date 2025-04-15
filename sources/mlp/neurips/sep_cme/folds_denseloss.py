@@ -48,7 +48,7 @@ def main():
     # Initialize results tracking ONCE before the seed loop
     n_trials = len(TRIAL_SEEDS)
     results = initialize_results_dict(n_trials)
-    results['name'] = f'mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_denseloss'
+    results['name'] = f'sep_cme_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_denseloss'
 
 
     for seed_idx, seed in enumerate(TRIAL_SEEDS):
@@ -532,7 +532,7 @@ def main():
         os.makedirs(results_dir)
     
     # Use the title for the CSV name
-    csv_filename = f"results_{title}.csv"
+    csv_filename = f"sep_cme_results_{title}.csv"
     csv_path = os.path.join(results_dir, csv_filename)
     
     # Save results to CSV
