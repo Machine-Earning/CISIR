@@ -41,7 +41,7 @@ def main():
     pm = TrainingPhaseManager()
 
     # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc
-    alphas = [(0.4, 0.4, 0.0, 0.0)]
+    alphas = [(0.4, 0.4, 0.1, 0.1)]
     alpha_amse = alphas[0][0]
     alpha_apcc = alphas[0][1]
 
