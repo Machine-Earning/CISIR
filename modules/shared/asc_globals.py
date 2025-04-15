@@ -42,7 +42,7 @@ LR_CB_MIN_DELTA = 1e-5 # Minimum delta for reducing learning rate
 LR_CB_MONITOR = 'loss'  # Monitor validation loss
 
 # Early Stopping
-PATIENCE = int(3e3)  # Higher patience
+PATIENCE = int(2e3)  # Higher patience
 ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
 ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 
