@@ -29,6 +29,11 @@ from modules.training.ts_modeling import (
     save_freq_rare_results_to_csv
 )
 
+# Select a specific GPU (e.g., GPU 0)
+gpu_to_use = 5
+os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_to_use)
+print(f"Using GPU: {gpu_to_use}")
+
 
 
 def main():

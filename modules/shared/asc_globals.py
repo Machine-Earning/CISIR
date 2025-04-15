@@ -21,7 +21,7 @@ MLP_HIDDENS = [4096, 1024, 2048, 1024]  # Hidden layers
 
 PROJ_HIDDENS = [128]  # Projection hidden layers
 EMBED_DIM = 1024  # Representation dimension
-DROPOUT = 0.1  # Dropout rate
+DROPOUT = 0.2  # Dropout rate
 ACTIVATION = None  # No activation for regression so default is LeakyReLU
 NORM = 'batch_norm'  # Use batch normalization
 RESIDUAL = True  # Use residual connections
@@ -30,7 +30,7 @@ SKIP_REPR = True  # residual representation
 
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
-START_LR = 5e-4  # starting learning rate
+START_LR = 1e-3  # starting learning rate
 WEIGHT_DECAY = 0.1  # Higher weight decay
 NORMALIZED_WEIGHTS = True  # Use normalized weights
 
