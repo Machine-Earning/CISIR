@@ -31,7 +31,7 @@ from modules.training.ts_modeling import (
 )
 
 # Select a specific GPU (e.g., GPU 0)
-gpu_to_use = 3
+gpu_to_use = 1
 os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_to_use)
 print(f"Using GPU: {gpu_to_use}")
 
@@ -46,7 +46,7 @@ def main():
     pm = TrainingPhaseManager()
 
     # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc
-    alphas = [(0.01, 0.01, 0.0, 0.0)]
+    alphas = [(0.5, 0.5, 0.0, 0.0)]
     alpha_amse = alphas[0][0]
     alpha_apcc = alphas[0][1]
 
