@@ -41,7 +41,7 @@ def main():
     pm = TrainingPhaseManager()
 
     # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc
-    alphas = [(0.85, 0.85, 0.0, 0.0)]
+    alphas = [(1, 1, 0.0, 0.0)]
     alpha_amse = alphas[0][0]
     alpha_apcc = alphas[0][1]
 
@@ -54,7 +54,7 @@ def main():
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in alphas:
             for rho in RHO:  # SAM_RHOS:
                 # PARAMS
-                lambda_factor = 0.2 # LAMBDA_FACTOR  # lambda for the loss
+                lambda_factor = 2  # LAMBDA_FACTOR  # lambda for the loss
                 # Construct the title
                 title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}'
                 # Replace any other characters that are not suitable for filenames (if any)

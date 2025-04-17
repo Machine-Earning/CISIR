@@ -21,7 +21,7 @@ MLP_HIDDENS = [4096, 1024, 2048, 1024]  # Hidden layers
 
 PROJ_HIDDENS = [128]  # Projection hidden layers
 EMBED_DIM = 1024  # Representation dimension
-DROPOUT = 0.1  # Dropout rate
+DROPOUT = 0.2  # Dropout rate
 ACTIVATION = None  # No activation for regression so default is LeakyReLU
 NORM = 'batch_norm'  # Use batch normalization
 RESIDUAL = True  # Use residual connections
@@ -42,7 +42,7 @@ LR_CB_MIN_DELTA = 1e-5 # Minimum delta for reducing learning rate
 LR_CB_MONITOR = 'loss'  # Monitor validation loss
 
 # Early Stopping
-PATIENCE = int(3e3)  # Higher patience
+PATIENCE = int(2e3)  # Higher patience
 ES_CB_MONITOR = 'val_loss'  # Monitor validation loss
 ES_CB_RESTORE_WEIGHTS = True  # Restore weights
 

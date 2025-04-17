@@ -17,11 +17,11 @@ WANDB_SAVE_MODEL = False  # Save model to wandb
 FREEZING = [False]
 
 # Model Architecture
-MLP_HIDDENS = [1024, 64, 512, 64, 256, 64, 128, 64]  # Hidden layers
+MLP_HIDDENS = [2048, 128, 1024, 128, 512, 128, 256, 128]  # Hidden layers
 
 PROJ_HIDDENS = [32]  # Projection hidden layers
-EMBED_DIM = 64  # Representation dimension
-DROPOUT = 0.15  # Dropout rate
+EMBED_DIM = 128  # Representation dimension
+DROPOUT = 0.1  # Dropout rate
 ACTIVATION = None  # No activation for regression so default is LeakyReLU
 NORM = 'batch_norm'  # Use batch normalization
 RESIDUAL = True  # Use residual connections
@@ -31,7 +31,7 @@ SKIP_REPR = True  # residual representation
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
 START_LR = 5e-4  # starting learning rate
-WEIGHT_DECAY = 0.05  # Higher weight decay
+WEIGHT_DECAY = 0.1  # Higher weight decay
 NORMALIZED_WEIGHTS = True  # Use normalized weights
 
 # Learning Rate Scheduling
@@ -53,13 +53,13 @@ BANDWIDTH = 1.429  # Bandwidth for rebalancing
 
 # Smoothing Parameters
 SMOOTHING_METHOD = 'moving_average'
-WINDOW_SIZE = 21  # NOTE: must be odd
-VAL_WINDOW_SIZE = 21 # NOTE: must be odd
+WINDOW_SIZE = 121  # NOTE: must be odd
+VAL_WINDOW_SIZE = 121 # NOTE: must be odd
 
 # Additional Parameters
 RHO = [0]
 REWEIGHTS = [(0.85, 0.85, 0.0, 0.0)]
-LAMBDA_FACTOR = 1
+LAMBDA_FACTOR = 10
 CVRG_MIN_DELTA = 1e-3
 CVRG_METRIC = 'val_loss'
 ASYM_TYPE = None #'sigmoid'

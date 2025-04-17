@@ -453,3 +453,56 @@ class CosineImportance:
         self.label_importance_map = map_labels_to_importance_weights(
             self.labels, self.importance_weights)
 
+
+class SQInvImportance:
+    """
+    Class for generating importance weights based on the square root of the 
+    reciprocal of the PDF (density), analogous to SQINV weighting for binned data.
+    Weights are smoothed at the tails like ReciprocalImportance.
+    """
+    def __init__(
+            self, 
+            features: np.ndarray, 
+            labels: np.ndarray,
+            bandwidth: Union[float, str] = 0.07,
+            epsilon: float = 1e-3
+        ) -> None:
+        """
+        Initialize the SQInvReciprocalImportance class.
+
+        Parameters:
+        - features: np.ndarray - Training instances
+        - labels: np.ndarray - Training labels
+        - bandwidth: Union[float, str] - Bandwidth for the KDE
+        - epsilon: float - Small value added to max_pdf for normalization
+        """
+        # Note: alpha is effectively fixed at 0.5 for the square-root relationship
+        self.alpha = 0.5 
+        self.features = features
+        self.labels = labels
+
+        # Create KDE and get PDF values
+        self.kde = gaussian_kde(self.labels, bw_method=bandwidth)
+        self.densities = self.kde.evaluate(self.labels)
+        
+        # Smooth the density values for high outliers
+        self.densities = smooth_blip(self.labels, self.densities)
+        
+        self.min_density = np.min(self.densities)
+        self.max_density = np.max(self.densities)
+
+        # Calculate normalized PDF so PDF is between 0 and 1 using vectorized ops
+        # Consistent with ReciprocalImportance normalization
+        normalized_densities = np.divide(self.densities, self.max_density + epsilon)
+
+        # Calculate reweighting factors using SQINV logic: (1/density)^0.5
+        self.importance_weights = np.power(np.reciprocal(normalized_densities + 1e-8), self.alpha)
+
+        # Normalize importance weights to sum to 1 using numpy ops
+        self.importance_weights = np.divide(self.importance_weights, np.sum(self.importance_weights))
+
+        # Create mapping dictionary
+        self.label_importance_map = map_labels_to_importance_weights(
+            self.labels, self.importance_weights)
+        
+
