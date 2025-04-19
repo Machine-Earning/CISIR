@@ -41,9 +41,9 @@ def main():
 
 
     # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc
-    alphas = [(1.5, 1.5, 0.0, 0.0)]
+    alphas = [(2.5, 2.5, 0.0, 0.0)]
     alpha_amse = alphas[0][0]
-    alpha_apcc = alphas[0][1]
+    alpha_apcc = alphas[0][2]
 
     # Initialize results tracking ONCE before the seed loop
     n_trials = len(TRIAL_SEEDS)
