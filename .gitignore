@@ -168,6 +168,8 @@ fit/
 
 
 *.xlsx
+*.csv
+
 
 # error and output files from panther ai
 *.err
