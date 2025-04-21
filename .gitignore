@@ -166,7 +166,7 @@ weights/
 # tensorboard
 fit/
 
-*.csv
+
 *.xlsx
 
 # error and output files from panther ai
@@ -190,7 +190,6 @@ modules/training/code_snippet.py
 #wandb
 wandb/
 
-*.csv
 .idea/inspectionProfiles/profiles_settings.xml
 /.idea
 .idea/keras-functional-api.iml
