@@ -41,7 +41,7 @@ def main():
 
 
     # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc
-    alphas = [(2, 2, 0.0, 0.0)]
+    alphas = [(2.1, 2.1, 0.0, 0.0)]
     alpha_amse = alphas[0][0]
     alpha_apcc = alphas[0][2]
 
