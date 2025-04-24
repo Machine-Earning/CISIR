@@ -8,7 +8,7 @@ from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import plot_tsne_onp, plot_onp_corr
-from modules.reweighting.ImportanceWeighting import ReciprocalImportance
+from modules.reweighting.ImportanceWeighting import DenseLossImportance
 from modules.shared.onp_globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
@@ -41,7 +41,7 @@ def main():
     pm = TrainingPhaseManager()
 
     # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc
-    alphas = [(0.5, 0.5, 0.0, 0.0)]
+    alphas = [(1.1, 1.1, 0.0, 0.0)]
     alpha_amse = alphas[0][0]
     alpha_apcc = alphas[0][2]
     lambda_factor = 0.7 # LAMBDA_FACTOR  # lambda for the loss
@@ -49,14 +49,14 @@ def main():
     # Initialize results tracking ONCE before the seed loop
     n_trials = len(TRIAL_SEEDS)
     results = initialize_freq_rare_results_dict(n_trials)
-    results['name'] = f'onp_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_lambda{lambda_factor:.2f}_sqinv'
+    results['name'] = f'onp_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_lambda{lambda_factor:.2f}_denseloss'
 
     for seed_idx, seed in enumerate(TRIAL_SEEDS):
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in alphas:
             for rho in RHO:  # SAM_RHOS:
                 # PARAMS
                 # Construct the title
-                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor:.2f}_sqinv'
+                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor:.2f}_denseloss'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -73,7 +73,7 @@ def main():
                 lr_cb_min_delta = LR_CB_MIN_DELTA
                 cvrg_metric = CVRG_METRIC
                 cvrg_min_delta = CVRG_MIN_DELTA 
-                normalized_weights = NORMALIZED_WEIGHTS
+                normalized_weights = False
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -147,7 +147,7 @@ def main():
                     'normalized_weights': normalized_weights,
                     'lower_threshold': lower_threshold,
                     'upper_threshold': upper_threshold,
-                    'n_filter': n_filter
+                    'n_filter': n_filter,
                 })
 
                 # set the root directory
@@ -164,11 +164,11 @@ def main():
                 delta_train = y_train
                 print(f'delta_train.shape: {delta_train.shape}')
                 print(f'rebalancing the training set...')
-                mse_train_weights_dict = ReciprocalImportance(
+                mse_train_weights_dict = DenseLossImportance(
                     X_train, delta_train,
                     alpha=alpha_mse, 
                     bandwidth=bandwidth).label_importance_map
-                pcc_train_weights_dict = ReciprocalImportance(
+                pcc_train_weights_dict = DenseLossImportance(
                     X_train, delta_train,
                     alpha=alpha_pcc, 
                     bandwidth=bandwidth).label_importance_map
@@ -215,11 +215,11 @@ def main():
                     delta_subtrain = y_subtrain
                     print(f'delta_subtrain.shape: {delta_subtrain.shape}')
                     print(f'rebalancing the subtraining set...')
-                    mse_subtrain_weights_dict = ReciprocalImportance(
+                    mse_subtrain_weights_dict = DenseLossImportance(
                         X_subtrain, delta_subtrain,
                         alpha=alpha_mse, 
                         bandwidth=bandwidth).label_importance_map
-                    pcc_subtrain_weights_dict = ReciprocalImportance(
+                    pcc_subtrain_weights_dict = DenseLossImportance(
                         X_subtrain, delta_subtrain,
                         alpha=alpha_pcc, 
                         bandwidth=bandwidth).label_importance_map
@@ -229,11 +229,11 @@ def main():
                     delta_val = y_val
                     print(f'delta_val.shape: {delta_val.shape}')
                     print(f'rebalancing the validation set...')
-                    mse_val_weights_dict = ReciprocalImportance(
+                    mse_val_weights_dict = DenseLossImportance(
                         X_val, delta_val,
                         alpha=alphaV_mse, 
                         bandwidth=bandwidth).label_importance_map
-                    pcc_val_weights_dict = ReciprocalImportance(
+                    pcc_val_weights_dict = DenseLossImportance(
                         X_val, delta_val,
                         alpha=alphaV_pcc, 
                         bandwidth=bandwidth).label_importance_map
