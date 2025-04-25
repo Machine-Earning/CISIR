@@ -41,10 +41,10 @@ def main():
     pm = TrainingPhaseManager()
 
     # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc
-    alphas = [(1, 1, 0.0, 0.0)]
+    alphas = [(0.9, 0.9, 0.0, 0.0)]
     alpha_amse = alphas[0][0]
     alpha_apcc = alphas[0][2]
-    lambda_factor = 0.3 # LAMBDA_FACTOR  # lambda for the loss
+    lambda_factor = 0.5 # LAMBDA_FACTOR  # lambda for the loss
 
     # Initialize results tracking ONCE before the seed loop
     n_trials = len(TRIAL_SEEDS)
