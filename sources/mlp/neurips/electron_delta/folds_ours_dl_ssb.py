@@ -7,56 +7,52 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
-from modules.evaluate.utils import plot_blogf_corr, plot_tsne_blogf
-from modules.reweighting.ImportanceWeighting import QUCImportance
-from modules.shared.blogf_globals import *
+from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
+from modules.reweighting.ImportanceWeighting import DenseLossImportance
+from modules.shared.globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
-    build_blogf_ds,
+    build_dataset,
     evaluate_mae,
     evaluate_pcc,
+    process_sep_events,
     stratified_batch_dataset,
     set_seed,
     cmse,
+    filter_ds,
     create_mlp,
     plot_error_hist,
-    load_folds_blogf_ds,
-    plot_avsp_blogf,
-    filter_ds_1d_fmr,
-    initialize_freq_med_rare_results_dict,
-    update_freq_med_rare_trial_results,
-    compute_freq_med_rare_averages,
-    save_freq_med_rare_results_to_csv
+    load_stratified_folds,
 )
+
+# Set the environment variable for CUDA (in case it is necessary)
+# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+
 
 
 
 def main():
     """
-    Testing WPCC + QUC Importance + Stratified Batching
+    Testing WPCC + Dense Loss Importance + Stratified Batching
     """
 
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
 
-    # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc
-    alphas = [(0.18, 0.18, 0.0, 0.0)]
-    alpha_amse = alphas[0][0]
-    alpha_apcc = alphas[0][2]
-    lambda_factor = 1
-
-    # Initialize results tracking ONCE before the seed loop
-    n_trials = len(TRIAL_SEEDS)
-    results = initialize_freq_med_rare_results_dict(n_trials)
-    results['name'] = f'blogf_mlp_amse{alpha_amse:.3f}_apcc{alpha_apcc:.2f}_lambda{lambda_factor:.2f}_quc'
-
-    for seed_idx, seed in enumerate(TRIAL_SEEDS):
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in alphas:
+    for seed in TRIAL_SEEDS:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in [(0.8, 0.8, 0.0, 0.0)]:
             for rho in RHO:  # SAM_RHOS:
+                inputs_to_use = INPUTS_TO_USE[0]
+                cme_speed_threshold = CME_SPEED_THRESHOLD[0]
+                add_slope = ADD_SLOPE[0]
                 # PARAMS
+                outputs_to_use = OUTPUTS_TO_USE
+                lambda_factor = 0 # LAMBDA_FACTOR  # lambda for the loss
+                # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
+                inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp_amse{alpha_mse:.3f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor:.2f}_quc'
+                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor:.2f}_dl_ssb'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -73,7 +69,7 @@ def main():
                 lr_cb_min_delta = LR_CB_MIN_DELTA
                 cvrg_metric = CVRG_METRIC
                 cvrg_min_delta = CVRG_MIN_DELTA 
-                normalized_weights = NORMALIZED_WEIGHTS
+                normalized_weights = False # NORMALIZED_WEIGHTS
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -88,26 +84,30 @@ def main():
                 epochs = EPOCHS  
                 hiddens = MLP_HIDDENS  
                 pretraining = False
-                lower_threshold = FREQ_THRESHOLD
-                upper_threshold = RARE_THRESHOLD
+                mae_plus_threshold = MAE_PLUS_THRESHOLD
 
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
                 bandwidth = BANDWIDTH
-                output_dim = OUTPUT_DIM
                 embed_dim = EMBED_DIM
+                output_dim = len(outputs_to_use)
                 dropout = DROPOUT
                 activation = ACTIVATION
                 norm = NORM
+                cme_speed_threshold = cme_speed_threshold
                 skip_repr = SKIP_REPR
                 skipped_layers = SKIPPED_LAYERS
+                N = N_FILTERED  # number of samples to keep outside the threshold
+                lower_threshold = LOWER_THRESHOLD  # lower threshold for the delta_p
+                upper_threshold = UPPER_THRESHOLD  # upper threshold for the delta_p
                 smoothing_method = SMOOTHING_METHOD
                 window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
                 val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
-                n_filter = N_FILTER
 
 
                 # Initialize wandb
-                wandb.init(project="NeurIPS-2025-Paper-BlogF", name=experiment_name, config={
+                wandb.init(project="NeurIPS-2025-Paper", name=experiment_name, config={
+                    "inputs_to_use": inputs_to_use,
+                    "add_slope": add_slope,
                     "patience": patience,
                     "learning_rate": learning_rate,
                     'min_lr': lr_cb_min_lr,
@@ -131,6 +131,7 @@ def main():
                     'optimizer': 'adam',
                     'output_dim': output_dim,
                     'architecture': 'mlp_res_repr',
+                    'cme_speed_threshold': cme_speed_threshold,
                     'ds_version': DS_VERSION,
                     'sam_rho': rho,
                     'smoothing_method': smoothing_method,
@@ -145,70 +146,69 @@ def main():
                     'cvrg_metric': cvrg_metric,
                     'cvrg_min_delta': cvrg_min_delta,
                     'normalized_weights': normalized_weights,
-                    'lower_threshold': lower_threshold,
-                    'upper_threshold': upper_threshold,
-                    'n_filter': n_filter
+                    'mae_plus_threshold': mae_plus_threshold
                 })
 
                 # set the root directory
                 root_dir = DS_PATH
                 # build the dataset
-                X_train, y_train = build_blogf_ds(
-                    root_dir + '/blogf_training.csv',
-                    shuffle_data=True,
-                    random_state=seed
-                )
+                X_train, y_train, logI_train, logI_prev_train = build_dataset(
+                    root_dir + '/training',
+                    inputs_to_use=inputs_to_use,
+                    add_slope=add_slope,
+                    outputs_to_use=outputs_to_use,
+                    cme_speed_threshold=cme_speed_threshold,
+                    shuffle_data=True)
                 # print the training set shapes
                 print(f'X_train.shape: {X_train.shape}, y_train.shape: {y_train.shape}')
                 # getting the reweights for training set
-                delta_train = y_train
+                delta_train = y_train[:, 0]
                 print(f'delta_train.shape: {delta_train.shape}')
                 print(f'rebalancing the training set...')
-                mse_train_weights_dict = QUCImportance(
+                mse_train_weights_dict = DenseLossImportance(
                     X_train, delta_train,
                     alpha=alpha_mse, 
                     bandwidth=bandwidth).label_importance_map
-                if alpha_pcc > 0:
-                    pcc_train_weights_dict = QUCImportance(
-                        X_train, delta_train,
-                        alpha=alpha_pcc, 
-                        bandwidth=bandwidth).label_importance_map
-                else:
-                    pcc_train_weights_dict = None
+                pcc_train_weights_dict = DenseLossImportance(
+                    X_train, delta_train,
+                    alpha=alpha_pcc, 
+                    bandwidth=bandwidth).label_importance_map
                 print(f'training set rebalanced.')
                 # get the number of input features
                 n_features = X_train.shape[1]
                 print(f'n_features: {n_features}')
 
-                X_test, y_test = build_blogf_ds(
-                    root_dir + '/blogf_testing.csv',
-                    shuffle_data=False,
-                    random_state=seed
-                )
+                X_test, y_test, logI_test, logI_prev_test = build_dataset(
+                    root_dir + '/testing',
+                    inputs_to_use=inputs_to_use,
+                    add_slope=add_slope,
+                    outputs_to_use=outputs_to_use,
+                    cme_speed_threshold=cme_speed_threshold)
                 # print the test set shapes
                 print(f'X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}')
 
                 # filtering training and test sets for additional results
-                X_train_filtered, y_train_filtered = filter_ds_1d_fmr(
+                X_train_filtered, y_train_filtered = filter_ds(
                     X_train, y_train,
                     low_threshold=lower_threshold,
                     high_threshold=upper_threshold,
-                    N_freq=n_filter, N_rare=n_filter, N_med=n_filter,
-                    seed=seed)
-                X_test_filtered, y_test_filtered = filter_ds_1d_fmr(
+                    N=N, seed=seed)
+                X_test_filtered, y_test_filtered = filter_ds(
                     X_test, y_test,
                     low_threshold=lower_threshold,
                     high_threshold=upper_threshold,
-                    N_freq=n_filter, N_rare=n_filter, N_med=n_filter,
-                    seed=seed)
+                    N=N, seed=seed)
 
                 # 4-fold cross-validation
                 folds_optimal_epochs = []
                 for fold_idx, (X_subtrain, y_subtrain, X_val, y_val) in enumerate(
-                    load_folds_blogf_ds(
+                    load_stratified_folds(
                         root_dir,
-                        random_state=seed,
-                        shuffle=True
+                        inputs_to_use=inputs_to_use,
+                        add_slope=add_slope,
+                        outputs_to_use=outputs_to_use,
+                        cme_speed_threshold=cme_speed_threshold,
+                        seed=seed, shuffle=True
                     )
                 ):
                     print(f'Fold: {fold_idx}')
@@ -217,37 +217,31 @@ def main():
                     print(f'X_val.shape: {X_val.shape}, y_val.shape: {y_val.shape}')
 
                     # Compute the sample weights for subtraining
-                    delta_subtrain = y_subtrain
+                    delta_subtrain = y_subtrain[:, 0]
                     print(f'delta_subtrain.shape: {delta_subtrain.shape}')
                     print(f'rebalancing the subtraining set...')
-                    mse_subtrain_weights_dict = QUCImportance(
+                    mse_subtrain_weights_dict = DenseLossImportance(
                         X_subtrain, delta_subtrain,
                         alpha=alpha_mse, 
                         bandwidth=bandwidth).label_importance_map
-                    if alpha_pcc > 0:
-                        pcc_subtrain_weights_dict = QUCImportance(
-                            X_subtrain, delta_subtrain,
-                            alpha=alpha_pcc, 
-                            bandwidth=bandwidth).label_importance_map
-                    else:
-                        pcc_subtrain_weights_dict = None
+                    pcc_subtrain_weights_dict = DenseLossImportance(
+                        X_subtrain, delta_subtrain,
+                        alpha=alpha_pcc, 
+                        bandwidth=bandwidth).label_importance_map
                     print(f'subtraining set rebalanced.')
 
                     # Compute the sample weights for validation
-                    delta_val = y_val
+                    delta_val = y_val[:, 0]
                     print(f'delta_val.shape: {delta_val.shape}')
                     print(f'rebalancing the validation set...')
-                    mse_val_weights_dict = QUCImportance(
+                    mse_val_weights_dict = DenseLossImportance(
                         X_val, delta_val,
                         alpha=alphaV_mse, 
                         bandwidth=bandwidth).label_importance_map
-                    if alphaV_pcc > 0:
-                        pcc_val_weights_dict = QUCImportance(
-                            X_val, delta_val,
-                            alpha=alphaV_pcc, 
-                            bandwidth=bandwidth).label_importance_map
-                    else:
-                        pcc_val_weights_dict = None
+                    pcc_val_weights_dict = DenseLossImportance(
+                        X_val, delta_val,
+                        alpha=alphaV_pcc, 
+                        bandwidth=bandwidth).label_importance_map
                     print(f'validation set rebalanced.')
 
                     # create the model
@@ -398,202 +392,148 @@ def main():
                 # print where the model weights are saved
                 print(f"Model weights are saved in final_model_weights_{experiment_name}_reg.h5")
 
-                # Define thresholds for Blog Feedback dataset
-                freq_threshold = FREQ_THRESHOLD  # log10(4)
-                rare_threshold = RARE_THRESHOLD  # log10(40)
-
-                # REGULAR METRICS (all data)
-                # Test set
+                # evaluate the model error on test set
                 error_mae = evaluate_mae(final_model_sep, X_test, y_test)
                 print(f'mae error: {error_mae}')
                 wandb.log({"mae": error_mae})
 
-                # Training set
+                # evaluate the model error on training set
                 error_mae_train = evaluate_mae(final_model_sep, X_train, y_train)
                 print(f'mae error train: {error_mae_train}')
                 wandb.log({"train_mae": error_mae_train})
 
-                # Test set
+                # evaluate the model correlation on test set
                 error_pcc = evaluate_pcc(final_model_sep, X_test, y_test)
                 print(f'pcc error: {error_pcc}')
                 wandb.log({"pcc": error_pcc})
 
-                # Training set
+                # evaluate the model correlation on training set
                 error_pcc_train = evaluate_pcc(final_model_sep, X_train, y_train)
                 print(f'pcc error train: {error_pcc_train}')
                 wandb.log({"train_pcc": error_pcc_train})
 
-                # FREQUENT METRICS (y < freq_threshold)
-                # Test set
-                error_mae_freq = evaluate_mae(
-                    final_model_sep, X_test, y_test, 
-                    below_threshold=freq_threshold)
-                print(f'mae freq (y < {freq_threshold}): {error_mae_freq}')
-                wandb.log({"mae_freq": error_mae_freq})
+                # evaluate the model correlation on test set based on logI and logI_prev
+                error_pcc_logI = evaluate_pcc(final_model_sep, X_test, y_test, logI_test, logI_prev_test)
+                print(f'pcc error logI: {error_pcc_logI}')
+                wandb.log({"pcc_I": error_pcc_logI})
 
-                # Training set
-                error_mae_freq_train = evaluate_mae(
-                    final_model_sep, X_train, y_train, 
-                    below_threshold=freq_threshold)
-                print(f'mae freq train (y < {freq_threshold}): {error_mae_freq_train}')
-                wandb.log({"train_mae_freq": error_mae_freq_train})
+                # evaluate the model correlation on training set based on logI and logI_prev
+                error_pcc_logI_train = evaluate_pcc(final_model_sep, X_train, y_train, logI_train, logI_prev_train)
+                print(f'pcc error logI train: {error_pcc_logI_train}')
+                wandb.log({"train_pcc_I": error_pcc_logI_train})
 
-                # Test set
-                error_pcc_freq = evaluate_pcc(
-                    final_model_sep, X_test, y_test, 
-                    below_threshold=freq_threshold)
-                print(f'pcc freq (y < {freq_threshold}): {error_pcc_freq}')
-                wandb.log({"pcc_freq": error_pcc_freq})
+                # evaluate the model on test cme_files
+                above_threshold = mae_plus_threshold
+                # evaluate the model error for rare samples on test set
+                error_mae_cond = evaluate_mae(
+                    final_model_sep, X_test, y_test, above_threshold=above_threshold)
+                print(f'mae error delta >= {above_threshold} test: {error_mae_cond}')
+                wandb.log({"mae+": error_mae_cond})
 
-                # Training set
-                error_pcc_freq_train = evaluate_pcc(
-                    final_model_sep, X_train, y_train, 
-                    below_threshold=freq_threshold)
-                print(f'pcc freq train (y < {freq_threshold}): {error_pcc_freq_train}')
-                wandb.log({"train_pcc_freq": error_pcc_freq_train})
+                # evaluate the model error for rare samples on training set
+                error_mae_cond_train = evaluate_mae(
+                    final_model_sep, X_train, y_train, above_threshold=above_threshold)
+                print(f'mae error delta >= {above_threshold} train: {error_mae_cond_train}')
+                wandb.log({"train_mae+": error_mae_cond_train})
 
-                # MEDIUM METRICS (freq_threshold < y < rare_threshold)
-                # Test set
-                error_mae_med = evaluate_mae(
-                    final_model_sep, X_test, y_test, 
-                    below_threshold=freq_threshold,
-                    above_threshold=rare_threshold,
-                    between_thresholds=True)
-                print(f'mae med ({freq_threshold} < y < {rare_threshold}): {error_mae_med}')
-                wandb.log({"mae_med": error_mae_med})
+                # evaluate the model correlation for rare samples on test set
+                error_pcc_cond = evaluate_pcc(
+                    final_model_sep, X_test, y_test, above_threshold=above_threshold)
+                print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond}')
+                wandb.log({"pcc+": error_pcc_cond})
 
-                # Training set
-                error_mae_med_train = evaluate_mae(
-                    final_model_sep, X_train, y_train, 
-                    below_threshold=freq_threshold,
-                    above_threshold=rare_threshold,
-                    between_thresholds=True)
-                print(f'mae med train ({freq_threshold} < y < {rare_threshold}): {error_mae_med_train}')
-                wandb.log({"train_mae_med": error_mae_med_train})
+                # evaluate the model correlation for rare samples on training set
+                error_pcc_cond_train = evaluate_pcc(
+                    final_model_sep, X_train, y_train, above_threshold=above_threshold)
+                print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_train}')
+                wandb.log({"train_pcc+": error_pcc_cond_train})
 
-                # Test set
-                error_pcc_med = evaluate_pcc(
-                    final_model_sep, X_test, y_test, 
-                    below_threshold=freq_threshold,
-                    above_threshold=rare_threshold,
-                    between_thresholds=True)
-                print(f'pcc med ({freq_threshold} < y < {rare_threshold}): {error_pcc_med}')
-                wandb.log({"pcc_med": error_pcc_med})
+                # evaluate the model correlation for rare samples on test set based on logI and logI_prev
+                error_pcc_cond_logI = evaluate_pcc(
+                    final_model_sep, X_test, y_test, logI_test, logI_prev_test, above_threshold=above_threshold)
+                print(f'pcc error delta >= {above_threshold} test: {error_pcc_cond_logI}')
+                wandb.log({"pcc+_I": error_pcc_cond_logI})
 
-                # Training set
-                error_pcc_med_train = evaluate_pcc(
-                    final_model_sep, X_train, y_train, 
-                    below_threshold=freq_threshold,
-                    above_threshold=rare_threshold,
-                    between_thresholds=True)
-                print(f'pcc med train ({freq_threshold} < y < {rare_threshold}): {error_pcc_med_train}')
-                wandb.log({"train_pcc_med": error_pcc_med_train})
-
-                # RARE METRICS (y > rare_threshold)
-                # Test set
-                error_mae_rare = evaluate_mae(
-                    final_model_sep, X_test, y_test, 
-                    above_threshold=rare_threshold)
-                print(f'mae rare (y > {rare_threshold}): {error_mae_rare}')
-                wandb.log({"mae_rare": error_mae_rare})
-
-                # Training set
-                error_mae_rare_train = evaluate_mae(
-                    final_model_sep, X_train, y_train, 
-                    above_threshold=rare_threshold)
-                print(f'mae rare train (y > {rare_threshold}): {error_mae_rare_train}')
-                wandb.log({"train_mae_rare": error_mae_rare_train})
-
-                # Test set
-                error_pcc_rare = evaluate_pcc(
-                    final_model_sep, X_test, y_test, 
-                    above_threshold=rare_threshold)
-                print(f'pcc rare (y > {rare_threshold}): {error_pcc_rare}')
-                wandb.log({"pcc_rare": error_pcc_rare})
-
-                # Training set
-                error_pcc_rare_train = evaluate_pcc(
-                    final_model_sep, X_train, y_train, 
-                    above_threshold=rare_threshold)
-                print(f'pcc rare train (y > {rare_threshold}): {error_pcc_rare_train}')
-                wandb.log({"train_pcc_rare": error_pcc_rare_train})
+                # evaluate the model correlation for rare samples on training set based on logI and logI_prev
+                error_pcc_cond_logI_train = evaluate_pcc(
+                    final_model_sep, X_train, y_train, logI_train, logI_prev_train, above_threshold=above_threshold)
+                print(f'pcc error delta >= {above_threshold} train: {error_pcc_cond_logI_train}')
+                wandb.log({"train_pcc+_I": error_pcc_cond_logI_train})
 
                 # Process SEP event files in the specified directory
-                filename =plot_avsp_blogf(
+                test_directory = root_dir + '/testing'
+                filenames = process_sep_events(
+                    test_directory,
                     final_model_sep,
-                    X_test, y_test,
                     title=title,
-                    prefix='testing',
-                    freq_threshold=freq_threshold,
-                    rare_threshold=rare_threshold
-                )
+                    inputs_to_use=inputs_to_use,
+                    add_slope=add_slope,
+                    outputs_to_use=outputs_to_use,
+                    show_avsp=True,
+                    using_cme=True,
+                    cme_speed_threshold=cme_speed_threshold)
 
                 # Log the plot to wandb
-                log_title = os.path.basename(filename)
-                wandb.log({f'testing_{log_title}': wandb.Image(filename)})
+                for filename in filenames:
+                    log_title = os.path.basename(filename)
+                    wandb.log({f'testing_{log_title}': wandb.Image(filename)})
 
                 # Process SEP event files in the specified directory
-                filename = plot_avsp_blogf(
+                test_directory = root_dir + '/training'
+                filenames = process_sep_events(
+                    test_directory,
                     final_model_sep,
-                    X_train, y_train,
                     title=title,
+                    inputs_to_use=inputs_to_use,
+                    add_slope=add_slope,
+                    outputs_to_use=outputs_to_use,
+                    show_avsp=True,
                     prefix='training',
-                    freq_threshold=freq_threshold,
-                    rare_threshold=rare_threshold
-                )
+                    using_cme=True,
+                    cme_speed_threshold=cme_speed_threshold)
 
                 # Log the plot to wandb
-                log_title = os.path.basename(filename)
-                wandb.log({f'training_{log_title}': wandb.Image(filename)})
+                for filename in filenames:
+                    log_title = os.path.basename(filename)
+                    wandb.log({f'training_{log_title}': wandb.Image(filename)})
 
                 # Evaluate the model correlation with colored
-                file_path = plot_blogf_corr(
+                file_path = plot_repr_corr_dist(
                     final_model_sep,
                     X_train_filtered, y_train_filtered,
                     title + "_training",
-                    model_type='features_reg',
-                    freq_threshold=freq_threshold,
-                    rare_threshold=rare_threshold
+                    model_type='features_reg'
                 )
-
                 wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
                 print('file_path: ' + file_path)
 
-                file_path = plot_blogf_corr(
+                file_path = plot_repr_corr_dist(
                     final_model_sep,
                     X_test_filtered, y_test_filtered,
                     title + "_test",
-                    model_type='features_reg',
-                    freq_threshold=freq_threshold,
-                    rare_threshold=rare_threshold
+                    model_type='features_reg'
                 )
                 wandb.log({'representation_correlation_colored_plot_test': wandb.Image(file_path)})
                 print('file_path: ' + file_path)
 
                 # Log t-SNE plot
                 # Log the training t-SNE plot to wandb
-                stage1_file_path = plot_tsne_blogf(
+                stage1_file_path = plot_tsne_delta(
                     final_model_sep,
                     X_train_filtered, y_train_filtered, title,
                     'stage2_training',
                     model_type='features_reg',
-                    save_tag=current_time, 
-                    seed=seed,
-                    freq_threshold=freq_threshold,
-                    rare_threshold=rare_threshold)
+                    save_tag=current_time, seed=seed)
                 wandb.log({'stage2_tsne_training_plot': wandb.Image(stage1_file_path)})
                 print('stage1_file_path: ' + stage1_file_path)
 
                 # Log the testing t-SNE plot to wandb
-                stage1_file_path = plot_tsne_blogf(
+                stage1_file_path = plot_tsne_delta(
                     final_model_sep,
                     X_test_filtered, y_test_filtered, title,
                     'stage2_testing',
                     model_type='features_reg',
-                    save_tag=current_time, 
-                    seed=seed,
-                    freq_threshold=freq_threshold,
-                    rare_threshold=rare_threshold)
+                    save_tag=current_time, seed=seed)
                 wandb.log({'stage2_tsne_testing_plot': wandb.Image(stage1_file_path)})
                 print('stage1_file_path: ' + stage1_file_path)
 
@@ -615,39 +555,8 @@ def main():
                     prefix='testing')
                 wandb.log({"testing_error_hist": wandb.Image(filename)})
 
-
-                # Update results for this trial
-                trial_idx = seed_idx + 1
-                results = update_freq_med_rare_trial_results(
-                    results,
-                    trial_idx,
-                    mae=error_mae,
-                    mae_freq=error_mae_freq,
-                    mae_med=error_mae_med,
-                    mae_rare=error_mae_rare,
-                    pcc=error_pcc,
-                    pcc_freq=error_pcc_freq,
-                    pcc_med=error_pcc_med,
-                    pcc_rare=error_pcc_rare
-                )
-
                 # Finish the wandb run
                 wandb.finish()
-
-    # After all trials are complete, compute averages and save results
-    results = compute_freq_med_rare_averages(results, n_trials)
-    
-    # Create results directory if it doesn't exist
-    results_dir = os.path.join(os.getcwd(), 'results')
-    if not os.path.exists(results_dir):
-        os.makedirs(results_dir)
-    
-    # Use the title for the CSV name
-    csv_filename = f"blogf_results_{title}.csv"
-    csv_path = os.path.join(results_dir, csv_filename)
-    
-    # Save results to CSV
-    save_freq_med_rare_results_to_csv(results, csv_path)
 
 
 if __name__ == '__main__':
