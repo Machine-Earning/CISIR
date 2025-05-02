@@ -7,8 +7,8 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
-from modules.evaluate.utils import plot_tsne_blogf, plot_blogf_corr
-from modules.reweighting.ImportanceWeighting import ReciprocalImportance
+from modules.evaluate.utils import plot_blogf_corr, plot_tsne_blogf
+from modules.reweighting.ImportanceWeighting import DenseLossImportance
 from modules.shared.blogf_globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
@@ -16,7 +16,6 @@ from modules.training.ts_modeling import (
     build_blogf_ds,
     evaluate_mae,
     evaluate_pcc,
-    stratified_batch_dataset,
     set_seed,
     cmse,
     create_mlp,
@@ -34,29 +33,30 @@ from modules.training.ts_modeling import (
 
 def main():
     """
-    Testing WPCC + Reciprocal Importance + Stratified Batching
+    Testing Dense Loss
     """
 
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
 
+
     # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc
-    alphas = [(0.3, 0.3, 0.0, 0.0)]
+    alphas = [(0.4, 0.4, 0.0, 0.0)]
     alpha_amse = alphas[0][0]
     alpha_apcc = alphas[0][2]
-    lambda_factor = LAMBDA_FACTOR
+    lambda_factor = 1
 
     # Initialize results tracking ONCE before the seed loop
     n_trials = len(TRIAL_SEEDS)
     results = initialize_freq_med_rare_results_dict(n_trials)
-    results['name'] = f'blogf_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_lambda{lambda_factor:.2f}'
+    results['name'] = f'blogf_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_lambda{lambda_factor:.2f}_dl_wpcc'
+
 
     for seed_idx, seed in enumerate(TRIAL_SEEDS):
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in alphas:
-            for rho in RHO:  # SAM_RHOS:
-                # PARAMS
+            for rho in RHO:
                 # Construct the title
-                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor:.2f}'
+                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor:.2f}_dl_wpcc'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -73,7 +73,7 @@ def main():
                 lr_cb_min_delta = LR_CB_MIN_DELTA
                 cvrg_metric = CVRG_METRIC
                 cvrg_min_delta = CVRG_MIN_DELTA 
-                normalized_weights = NORMALIZED_WEIGHTS
+                normalized_weights = False
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -104,7 +104,6 @@ def main():
                 window_size = WINDOW_SIZE  # allows margin of error of 10 epochs
                 val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
                 n_filter = N_FILTER
-
 
                 # Initialize wandb
                 wandb.init(project="NeurIPS-2025-Paper-BlogF", name=experiment_name, config={
@@ -164,11 +163,11 @@ def main():
                 delta_train = y_train
                 print(f'delta_train.shape: {delta_train.shape}')
                 print(f'rebalancing the training set...')
-                mse_train_weights_dict = ReciprocalImportance(
+                mse_train_weights_dict = DenseLossImportance(
                     X_train, delta_train,
                     alpha=alpha_mse, 
                     bandwidth=bandwidth).label_importance_map
-                pcc_train_weights_dict = ReciprocalImportance(
+                pcc_train_weights_dict = DenseLossImportance(
                     X_train, delta_train,
                     alpha=alpha_pcc, 
                     bandwidth=bandwidth).label_importance_map
@@ -217,11 +216,11 @@ def main():
                     delta_subtrain = y_subtrain
                     print(f'delta_subtrain.shape: {delta_subtrain.shape}')
                     print(f'rebalancing the subtraining set...')
-                    mse_subtrain_weights_dict = ReciprocalImportance(
+                    mse_subtrain_weights_dict = DenseLossImportance(
                         X_subtrain, delta_subtrain,
                         alpha=alpha_mse, 
                         bandwidth=bandwidth).label_importance_map
-                    pcc_subtrain_weights_dict = ReciprocalImportance(
+                    pcc_subtrain_weights_dict = DenseLossImportance(
                         X_subtrain, delta_subtrain,
                         alpha=alpha_pcc, 
                         bandwidth=bandwidth).label_importance_map
@@ -231,11 +230,11 @@ def main():
                     delta_val = y_val
                     print(f'delta_val.shape: {delta_val.shape}')
                     print(f'rebalancing the validation set...')
-                    mse_val_weights_dict = ReciprocalImportance(
+                    mse_val_weights_dict = DenseLossImportance(
                         X_val, delta_val,
                         alpha=alphaV_mse, 
                         bandwidth=bandwidth).label_importance_map
-                    pcc_val_weights_dict = ReciprocalImportance(
+                    pcc_val_weights_dict = DenseLossImportance(
                         X_val, delta_val,
                         alpha=alphaV_pcc, 
                         bandwidth=bandwidth).label_importance_map
@@ -288,22 +287,12 @@ def main():
                         }
                     )
 
-                    # Step 1: Create stratified dataset for the subtraining set only
-                    subtrain_ds, subtrain_steps = stratified_batch_dataset(
-                        X_subtrain, y_subtrain, batch_size)
-
-                    # Map the subtraining dataset to return {'output': y} format
-                    subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'forecast_head': y}))
-                    
-                    # Prepare validation data without batching
-                    val_data = (X_val, {'forecast_head': y_val})
-
                     # Train the model with the callback
                     history = model_sep.fit(
-                        subtrain_ds,
-                        steps_per_epoch=subtrain_steps,
-                        epochs=epochs, batch_size=batch_size,
-                        validation_data=val_data,
+                        X_subtrain, {'forecast_head': y_subtrain},
+                        epochs=epochs,
+                        batch_size=batch_size,
+                        validation_data=(X_val, {'forecast_head': y_val}),
                         callbacks=[
                             early_stopping,
                             reduce_lr_on_plateau,
@@ -312,6 +301,7 @@ def main():
                         ],
                         verbose=VERBOSE
                     )
+
 
                     # optimal epoch for fold
                     # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
@@ -364,16 +354,9 @@ def main():
                     },
                 )  # Compile the model just like before
 
-                train_ds, train_steps = stratified_batch_dataset(
-                    X_train, y_train, batch_size)
-
-                # Map the training dataset to return {'output': y} format
-                train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
-
                 # Train on the full dataset
                 final_model_sep.fit(
-                    train_ds,
-                    steps_per_epoch=train_steps,
+                    X_train, {'forecast_head': y_train},
                     epochs=optimal_epochs,
                     batch_size=batch_size,
                     callbacks=[
@@ -605,7 +588,6 @@ def main():
                     title=title,
                     prefix='testing')
                 wandb.log({"testing_error_hist": wandb.Image(filename)})
-
 
                 # Update results for this trial
                 trial_idx = seed_idx + 1

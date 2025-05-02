@@ -7,7 +7,7 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
-from modules.evaluate.utils import plot_tsne_sarcos, plot_sarcos_corr
+from modules.evaluate.utils import plot_sarcos_corr, plot_tsne_sarcos
 from modules.reweighting.ImportanceWeighting import DenseLossImportance
 from modules.shared.sarcos_globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
@@ -16,7 +16,6 @@ from modules.training.ts_modeling import (
     build_sarcos_ds,
     evaluate_mae,
     evaluate_pcc,
-    stratified_batch_dataset,
     set_seed,
     cmse,
     create_mlp,
@@ -34,29 +33,30 @@ from modules.training.ts_modeling import (
 
 def main():
     """
-    Testing WPCC + Reciprocal Importance + Stratified Batching
+    Testing Dense Loss
     """
 
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
 
+
     # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc
     alphas = [(1.0, 1.0, 0.0, 0.0)]
     alpha_amse = alphas[0][0]
     alpha_apcc = alphas[0][2]
-    lambda_factor = 0.2 # LAMBDA_FACTOR  # lambda for the loss
-
+    lambda_factor = 1
+    
     # Initialize results tracking ONCE before the seed loop
     n_trials = len(TRIAL_SEEDS)
     results = initialize_freq_rare_results_dict(n_trials)
-    results['name'] = f'sarcos_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_lambda{lambda_factor:.2f}_denseloss'
+    results['name'] = f'sarcos_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_lambda{lambda_factor:.2f}_dl_wpcc'
+
 
     for seed_idx, seed in enumerate(TRIAL_SEEDS):
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in alphas:
-            for rho in RHO:  # SAM_RHOS:
-                # PARAMS
+            for rho in RHO:
                 # Construct the title
-                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor:.2f}_denseloss'
+                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor:.2f}_dl_wpcc'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -105,7 +105,6 @@ def main():
                 val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
                 n_filter = N_FILTER
 
-
                 # Initialize wandb
                 wandb.init(project="NeurIPS-2025-Paper-Sarcosds", name=experiment_name, config={
                     "patience": patience,
@@ -147,8 +146,7 @@ def main():
                     'normalized_weights': normalized_weights,
                     'lower_threshold': lower_threshold,
                     'upper_threshold': upper_threshold,
-                    'n_filter': n_filter,
-                    'normalized_weights': normalized_weights
+                    'n_filter': n_filter
                 })
 
                 # set the root directory
@@ -287,22 +285,12 @@ def main():
                         }
                     )
 
-                    # Step 1: Create stratified dataset for the subtraining set only
-                    subtrain_ds, subtrain_steps = stratified_batch_dataset(
-                        X_subtrain, y_subtrain, batch_size)
-
-                    # Map the subtraining dataset to return {'output': y} format
-                    subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'forecast_head': y}))
-                    
-                    # Prepare validation data without batching
-                    val_data = (X_val, {'forecast_head': y_val})
-
                     # Train the model with the callback
                     history = model_sep.fit(
-                        subtrain_ds,
-                        steps_per_epoch=subtrain_steps,
-                        epochs=epochs, batch_size=batch_size,
-                        validation_data=val_data,
+                        X_subtrain, {'forecast_head': y_subtrain},
+                        epochs=epochs,
+                        batch_size=batch_size,
+                        validation_data=(X_val, {'forecast_head': y_val}),
                         callbacks=[
                             early_stopping,
                             reduce_lr_on_plateau,
@@ -311,6 +299,7 @@ def main():
                         ],
                         verbose=VERBOSE
                     )
+
 
                     # optimal epoch for fold
                     # folds_optimal_epochs.append(np.argmin(history.history[ES_CB_MONITOR]) + 1)
@@ -363,16 +352,9 @@ def main():
                     },
                 )  # Compile the model just like before
 
-                train_ds, train_steps = stratified_batch_dataset(
-                    X_train, y_train, batch_size)
-
-                # Map the training dataset to return {'output': y} format
-                train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
-
                 # Train on the full dataset
                 final_model_sep.fit(
-                    train_ds,
-                    steps_per_epoch=train_steps,
+                    X_train, {'forecast_head': y_train},
                     epochs=optimal_epochs,
                     batch_size=batch_size,
                     callbacks=[
@@ -503,6 +485,7 @@ def main():
                     above_threshold=upper_threshold)
                 print(f'pcc rare high train (y > {upper_threshold}): {error_pcc_rare_high_train}')
                 wandb.log({"train_pcc_rare_high": error_pcc_rare_high_train})
+
 
                 # Process SEP event files in the specified directory
                 filename =plot_avsp_sarcos(

@@ -47,11 +47,11 @@ def main():
                 add_slope = ADD_SLOPE[0]
                 # PARAMS
                 outputs_to_use = OUTPUTS_TO_USE
-                lambda_factor = 0.5 # LAMBDA_FACTOR  # lambda for the loss
+                lambda_factor = 1 # LAMBDA_FACTOR  # lambda for the loss
                 # Join the inputs_to_use list into a string, replace '.' with '_', and join with '-'
                 inputs_str = "_".join(input_type.replace('.', '_') for input_type in inputs_to_use)
                 # Construct the title
-                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_denseloss_wpcc'
+                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor:.2f}_dl_wpcc'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
