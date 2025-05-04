@@ -49,14 +49,14 @@ def main():
     # Initialize results tracking ONCE before the seed loop
     n_trials = len(TRIAL_SEEDS)
     results = initialize_freq_rare_results_dict(n_trials)
-    results['name'] = f'onp_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_lambda{lambda_factor:.2f}_quc'
+    results['name'] = f'onp_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_lambda{lambda_factor:.2f}_quc_wpcc'
 
     for seed_idx, seed in enumerate(TRIAL_SEEDS):
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in alphas:
             for rho in RHO:  # SAM_RHOS:
                 # PARAMS
                 # Construct the title
-                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor:.2f}_quc'
+                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor:.2f}_quc_wpcc'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -295,22 +295,12 @@ def main():
                         }
                     )
 
-                    # Step 1: Create stratified dataset for the subtraining set only
-                    subtrain_ds, subtrain_steps = stratified_batch_dataset(
-                        X_subtrain, y_subtrain, batch_size)
-
-                    # Map the subtraining dataset to return {'output': y} format
-                    subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'forecast_head': y}))
-                    
-                    # Prepare validation data without batching
-                    val_data = (X_val, {'forecast_head': y_val})
-
                     # Train the model with the callback
                     history = model_sep.fit(
-                        subtrain_ds,
-                        steps_per_epoch=subtrain_steps,
-                        epochs=epochs, batch_size=batch_size,
-                        validation_data=val_data,
+                        X_subtrain, {'forecast_head': y_subtrain},
+                        epochs=epochs, 
+                        batch_size=batch_size,
+                        validation_data=(X_val, {'forecast_head': y_val}),
                         callbacks=[
                             early_stopping,
                             reduce_lr_on_plateau,
@@ -371,16 +361,9 @@ def main():
                     },
                 )  # Compile the model just like before
 
-                train_ds, train_steps = stratified_batch_dataset(
-                    X_train, y_train, batch_size)
-
-                # Map the training dataset to return {'output': y} format
-                train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
-
                 # Train on the full dataset
                 final_model_sep.fit(
-                    train_ds,
-                    steps_per_epoch=train_steps,
+                    X_train, {'forecast_head': y_train},
                     epochs=optimal_epochs,
                     batch_size=batch_size,
                     callbacks=[
