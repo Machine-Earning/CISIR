@@ -44,19 +44,19 @@ def main():
     alphas = [(0.4, 0.4, 0.0, 0.0)]
     alpha_amse = alphas[0][0]
     alpha_apcc = alphas[0][2]
-    lambda_factor = 6e-2
+    lambda_factor = 9e-4
 
     # Initialize results tracking ONCE before the seed loop
     n_trials = len(TRIAL_SEEDS)
     results = initialize_freq_med_rare_results_dict(n_trials)
-    results['name'] = f'blogf_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_lambda{lambda_factor:.2f}_dl_wpcc'
+    results['name'] = f'blogf_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_lambda{lambda_factor}_dl_wpcc'
 
 
     for seed_idx, seed in enumerate(TRIAL_SEEDS):
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in alphas:
             for rho in RHO:
                 # Construct the title
-                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor:.2f}_dl_wpcc'
+                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor}_dl_wpcc'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
