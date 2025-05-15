@@ -13,20 +13,20 @@ def main():
     Load a pre-trained model and plot using plot_sarcos_cisir on test set
     """
     # Set a fixed seed for reproducibility
-    # # denseloss
-    # seed = 42
-    # MODEL_PATH = "C:/Users/the_3/Documents/github/keras-functional-api/sources/mlp/neurips/sarcos/final_model_weights_mlp_amse1.00_apcc0.00_denseloss_20250411-092807_reg.h5"
-    # title = "(c) DenseLoss"
+    # denseloss
+    seed = 42
+    MODEL_PATH = "C:/Users/the_3/Documents/github/keras-functional-api/sources/mlp/neurips/sarcos/final_model_weights_mlp_amse1.00_apcc0.00_denseloss_20250411-092807_reg.h5"
+    title = "(c) DenseLoss"
 
     # # recip+wPCC+SSB
     # seed = 123
     # MODEL_PATH = "C:/Users/the_3/Documents/github/keras-functional-api/sources/mlp/neurips/sarcos/final_model_weights_mlp_amse2.00_apcc0.50_lambda1.00_20250421-182738_reg.h5"
     # title = "(d) Recip+wPCC+SSB"
 
-    # CISIR
-    seed = 9999
-    MODEL_PATH = "C:/Users/the_3/Documents/github/keras-functional-api/sources/mlp/neurips/sarcos/final_model_weights_mlp_amse0.20_apcc0.00_lambda0.20_quc_20250422-131239_reg.h5"
-    title = "(e) CISIR"
+    # # CISIR
+    # seed = 9999
+    # MODEL_PATH = "C:/Users/the_3/Documents/github/keras-functional-api/sources/mlp/neurips/sarcos/final_model_weights_mlp_amse0.20_apcc0.00_lambda0.20_quc_20250422-131239_reg.h5"
+    # title = "(e) CISIR"
 
     hiddens = MLP_HIDDENS
     embed_dim = EMBED_DIM

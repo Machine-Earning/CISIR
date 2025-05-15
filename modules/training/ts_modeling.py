@@ -7311,11 +7311,11 @@ def plot_sarcos_cisir(
     ax.plot([min_intensity, max_intensity], [min_intensity, max_intensity], 'k--', label='Perfect Prediction')
     
     # Add threshold lines (both orange)
-    ax.axvline(lower_threshold, color='orange', linestyle='--', label='Rare Thresholds')
-    ax.axhline(lower_threshold, color='orange', linestyle='--')
+    ax.axvline(lower_threshold, color='brown', linestyle='--', label='Rare Thresholds')
+    ax.axhline(lower_threshold, color='brown', linestyle='--')
     
-    ax.axvline(upper_threshold, color='orange', linestyle='--')
-    ax.axhline(upper_threshold, color='orange', linestyle='--')
+    ax.axvline(upper_threshold, color='brown', linestyle='--')
+    ax.axhline(upper_threshold, color='brown', linestyle='--')
     
     # Add labels and title with larger font
     ax.set_xlabel('Actual Torque_1', fontsize=18)
