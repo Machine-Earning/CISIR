@@ -7255,6 +7255,92 @@ def plot_avsp_sarcos(
     return os.path.abspath(plot_filename)
 
 
+def plot_sarcos_cisir(
+    model: tf.keras.Model,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    title: str = "(e) CISIR",
+    lower_threshold: float = -0.5,
+    upper_threshold: float = 0.5,
+    output_dir: str = "./plots",
+    filename_prefix: str = "sarcos",
+    use_dict: bool = False,
+    figsize: Tuple[int, int] = (10, 7)
+) -> str:
+    """
+    Simplified plotting function for actual vs predicted Torque_1 values on SARCOS dataset.
+    
+    Parameters:
+    - model (tf.keras.Model): The trained model to evaluate
+    - X_test (np.ndarray): Test features
+    - y_test (np.ndarray): True target values for the test set
+    - title (str): Plot title, e.g. "(a) CISIR"
+    - lower_threshold (float): Lower threshold for rare values
+    - upper_threshold (float): Upper threshold for rare values
+    - output_dir (str): Directory to save the plot
+    - filename_prefix (str): Prefix for the saved file
+    - use_dict (bool): Whether the model returns a dictionary with output names
+    - figsize (Tuple[int, int]): Figure size (width, height) in inches
+    
+    Returns:
+    - str: Path to the saved plot
+    """
+    # Make predictions
+    if use_dict:
+        res = model.predict(X_test)
+        predictions = res['output']
+    else:
+        _, predictions = model.predict(X_test)
+        
+    # Process predictions (flatten if multidimensional)
+    predictions = np.array(predictions).flatten()
+    y_test = np.array(y_test).flatten()
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Create scatter plot with single color
+    scatter = ax.scatter(y_test, predictions, 
+                         alpha=0.5, 
+                         s=30,
+                         color='blue')
+    
+    # Add perfect prediction line
+    min_intensity = min(np.min(y_test), np.min(predictions))
+    max_intensity = max(np.max(y_test), np.max(predictions))
+    ax.plot([min_intensity, max_intensity], [min_intensity, max_intensity], 'k--', label='Perfect Prediction')
+    
+    # Add threshold lines (both orange)
+    ax.axvline(lower_threshold, color='orange', linestyle='--', label='Rare Thresholds')
+    ax.axhline(lower_threshold, color='orange', linestyle='--')
+    
+    ax.axvline(upper_threshold, color='orange', linestyle='--')
+    ax.axhline(upper_threshold, color='orange', linestyle='--')
+    
+    # Add labels and title with larger font
+    ax.set_xlabel('Actual Torque_1', fontsize=18)
+    ax.set_ylabel('Predicted Torque_1', fontsize=18)
+    ax.set_title(title, fontsize=18)
+    
+    # Add grid and legend with larger font
+    ax.grid(True)
+    ax.legend(fontsize=18)
+    
+    # Increase tick font size
+    ax.tick_params(axis='both', which='major', labelsize=14)
+    
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Save the plot
+    plot_filename = f"{filename_prefix}_cisir_actual_vs_predicted.png"
+    plot_path = os.path.join(output_dir, plot_filename)
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    return plot_path
+
+
 #### ONLINE NEWS DATASET STUFF ####
 
 def build_onp_ds(file_path: str, shuffle_data: bool = False, random_state: int = 42) -> tuple:
