@@ -224,6 +224,7 @@ def main():
                     skip_repr=skip_repr,
                     skipped_layers=skipped_layers,
                     sam_rho=rho,
+                    weight_decay=weight_decay
                 )
                 model_sep.summary()
 
@@ -294,6 +295,7 @@ def main():
                 skip_repr=skip_repr,
                 skipped_layers=skipped_layers,
                 sam_rho=rho,
+                weight_decay=weight_decay
             )
 
             final_model_sep.compile(

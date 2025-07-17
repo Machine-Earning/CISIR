@@ -30,15 +30,26 @@ from modules.training.ts_modeling import (
     initialize_results_dict,
     update_trial_results,
     compute_averages,
-    save_results_to_csv
+    save_results_to_csv,
+    add_proj_head
 )
 
 
-WEIGHTS_PATH = {
-    'pdc_s1': '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
-    'pds_s1': '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdsStratInj_bs3600_rho0.10_20241115-021423.h5',
+PDC_WEIGHTS_PATH = {
+    456789: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc2.40_mdi_s1_quad_nae_20250717-103956.h5',
+    42: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc2.40_mdi_s1_quad_nae_20250717-105505.h5',
+    123: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc2.40_mdi_s1_quad_nae_20250717-111414.h5',
+    0: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc2.40_mdi_s1_quad_nae_20250717-112915.h5',
+    9999: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc2.40_mdi_s1_quad_nae_20250717-114345.h5',
 }
 
+# PDC_WEIGHTS_PATH = {
+#     456789: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
+#     42: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
+#     123: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
+#     0: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
+#     9999: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
+# }
 
 def main():
     """
@@ -82,6 +93,7 @@ def main():
                 cvrg_metric = CVRG_METRIC
                 cvrg_min_delta = CVRG_MIN_DELTA 
                 normalized_weights = NORMALIZED_WEIGHTS
+                freeze = False
 
                 reduce_lr_on_plateau = ReduceLROnPlateau(
                     monitor=LR_CB_MONITOR,
@@ -95,7 +107,8 @@ def main():
                 batch_size = BATCH_SIZE  
                 epochs = EPOCHS  
                 hiddens = MLP_HIDDENS  
-                pretraining = False
+                proj_hiddens = PROJ_HIDDENS
+                pretraining = True
                 sep_threshold = SEP_THRESHOLD
 
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
@@ -112,7 +125,6 @@ def main():
                 val_window_size = VAL_WINDOW_SIZE  # allows margin of error of 10 epochs
                 n_filter = N_FILTER
 
-
                 # Initialize wandb
                 wandb.init(project="2025-Papers-SEPC", name=experiment_name, config={
                     "patience": patience,
@@ -121,6 +133,7 @@ def main():
                     "weight_decay": weight_decay,
                     "batch_size": batch_size,
                     "epochs": epochs,
+                    "freeze": freeze,
                     # hidden in a more readable format  (wandb does not support lists)
                     "hiddens": hiddens_str,
                     "loss": 'mse_pcc',
@@ -154,7 +167,7 @@ def main():
                     'normalized_weights': normalized_weights,
                     'sep_threshold': sep_threshold,
                     'n_filter': n_filter,
-                    'weights_path': weights_path
+                    'weights_path': PDC_WEIGHTS_PATH[seed]
                 })
 
                 # set the root directory
@@ -254,17 +267,40 @@ def main():
                     print(f'validation set rebalanced.')
 
                     # create the model
-                    model_sep = create_mlp(
+                    model_sep_s1 = create_mlp(
                         input_dim=n_features,
                         hiddens=hiddens,
+                        output_dim=0,
+                        pretraining=pretraining,
                         embed_dim=embed_dim,
-                        output_dim=output_dim,
                         dropout=dropout,
                         activation=activation,
                         norm=norm,
                         skip_repr=skip_repr,
                         skipped_layers=skipped_layers,
+                        sam_rho=rho,
+                        weight_decay=weight_decay
+                    )
+                    model_sep_s1.summary()
+
+                    # load the weights from the first stage
+                    print(f'weights loading from: {PDC_WEIGHTS_PATH[seed]}')
+                    model_sep_s1.load_weights(PDC_WEIGHTS_PATH[seed])
+                    # print the save
+                    print(f'weights loaded successfully from: {PDC_WEIGHTS_PATH[seed]}')
+
+                    # create the model
+                    model_sep = add_proj_head(
+                        model_sep_s1,
+                        output_dim=output_dim,
+                        freeze_features=freeze,
                         pretraining=pretraining,
+                        hiddens=proj_hiddens,
+                        dropout=dropout,
+                        activation=activation,
+                        norm=norm,
+                        skipped_layers=skipped_layers,
+                        name='mlp',
                         sam_rho=rho,
                         weight_decay=weight_decay
                     )
@@ -343,17 +379,38 @@ def main():
                 print(f'optimal_epochs: {optimal_epochs}')
                 wandb.log({'optimal_epochs': optimal_epochs})
 
-                final_model_sep = create_mlp(
+                # create the final model
+                final_model_sep_s1 = create_mlp(
                     input_dim=n_features,
                     hiddens=hiddens,
+                    output_dim=0,
+                    pretraining=pretraining,
                     embed_dim=embed_dim,
-                    output_dim=output_dim,
                     dropout=dropout,
                     activation=activation,
                     norm=norm,
                     skip_repr=skip_repr,
                     skipped_layers=skipped_layers,
+                    sam_rho=rho,
+                    weight_decay=weight_decay
+                )
+                # load the weights from the first stage
+                print(f'weights loading from: {PDC_WEIGHTS_PATH[seed]}')
+                final_model_sep_s1.load_weights(PDC_WEIGHTS_PATH[seed])
+                # print the save
+                print(f'weights loaded successfully from: {PDC_WEIGHTS_PATH[seed]}')
+
+                final_model_sep = add_proj_head(
+                    final_model_sep_s1,
+                    output_dim=output_dim,
+                    freeze_features=freeze,
                     pretraining=pretraining,
+                    hiddens=proj_hiddens,
+                    dropout=dropout,
+                    activation=activation,
+                    norm=norm,
+                    skipped_layers=skipped_layers,
+                    name='mlp',
                     sam_rho=rho,
                     weight_decay=weight_decay
                 )
