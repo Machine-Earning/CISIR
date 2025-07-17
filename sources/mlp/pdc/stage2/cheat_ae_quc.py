@@ -8,7 +8,7 @@ from tensorflow_addons.optimizers import AdamW
 from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import plot_tsne_delta, plot_repr_corr_dist
-from modules.reweighting.ImportanceWeighting import QUCImportance
+from modules.reweighting.ImportanceWeighting import MDI
 from modules.shared.globals import *
 from modules.training.cme_modeling import ModelBuilder
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
@@ -181,11 +181,11 @@ def main():
                     delta_train = y_train[:, 0]
                     print(f'delta_train.shape: {delta_train.shape}')
                     print(f'rebalancing the training set...')
-                    mse_train_weights_dict = QUCImportance(
+                    mse_train_weights_dict = MDI(
                         X_train, delta_train,
                         alpha=alpha_mse, 
                         bandwidth=bandwidth).label_importance_map
-                    pcc_train_weights_dict = QUCImportance(
+                    pcc_train_weights_dict = MDI(
                         X_train, delta_train,
                         alpha=alpha_pcc, 
                         bandwidth=bandwidth).label_importance_map
@@ -206,11 +206,11 @@ def main():
                     delta_test = y_test[:, 0]
                     print(f'delta_test.shape: {delta_test.shape}')
                     print(f'rebalancing the test set...')
-                    mse_test_weights_dict = QUCImportance(
+                    mse_test_weights_dict = MDI(
                         X_test, delta_test,
                         alpha=alphaV_mse, 
                         bandwidth=bandwidth).label_importance_map
-                    pcc_test_weights_dict = QUCImportance(
+                    pcc_test_weights_dict = MDI(
                         X_test, delta_test,
                         alpha=alphaV_pcc, 
                         bandwidth=bandwidth).label_importance_map

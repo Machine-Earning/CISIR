@@ -2213,6 +2213,8 @@ class ModelBuilder:
         sample_weights = train_sample_weights if phase_manager.is_training_phase() else val_sample_weights
         if sample_weights is not None:
             weights = create_weight_tensor_fast(y_true, sample_weights)
+            # Ensure weights is 1D by squeezing any extra dimensions
+            weights = tf.squeeze(weights)
             weights_matrix = tf.cast(weights[:, None] * weights[None, :], dtype)
 
         # Reshape diagonal zeros to match weights_matrix shape

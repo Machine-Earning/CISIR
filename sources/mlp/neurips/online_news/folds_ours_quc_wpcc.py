@@ -8,7 +8,7 @@ from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import plot_onp_corr, plot_tsne_onp
-from modules.reweighting.ImportanceWeighting import QUCImportance
+from modules.reweighting.ImportanceWeighting import MDI
 from modules.shared.onp_globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
@@ -164,12 +164,12 @@ def main():
                 delta_train = y_train
                 print(f'delta_train.shape: {delta_train.shape}')
                 print(f'rebalancing the training set...')
-                mse_train_weights_dict = QUCImportance(
+                mse_train_weights_dict = MDI(
                     X_train, delta_train,
                     alpha=alpha_mse, 
                     bandwidth=bandwidth).label_importance_map
                 if alpha_pcc > 0:
-                    pcc_train_weights_dict = QUCImportance(
+                    pcc_train_weights_dict = MDI(
                         X_train, delta_train,
                         alpha=alpha_pcc, 
                         bandwidth=bandwidth).label_importance_map
@@ -218,12 +218,12 @@ def main():
                     delta_subtrain = y_subtrain
                     print(f'delta_subtrain.shape: {delta_subtrain.shape}')
                     print(f'rebalancing the subtraining set...')
-                    mse_subtrain_weights_dict = QUCImportance(
+                    mse_subtrain_weights_dict = MDI(
                         X_subtrain, delta_subtrain,
                         alpha=alpha_mse, 
                         bandwidth=bandwidth).label_importance_map
                     if alpha_pcc > 0:
-                        pcc_subtrain_weights_dict = QUCImportance(
+                        pcc_subtrain_weights_dict = MDI(
                             X_subtrain, delta_subtrain,
                             alpha=alpha_pcc, 
                             bandwidth=bandwidth).label_importance_map
@@ -235,12 +235,12 @@ def main():
                     delta_val = y_val
                     print(f'delta_val.shape: {delta_val.shape}')
                     print(f'rebalancing the validation set...')
-                    mse_val_weights_dict = QUCImportance(
+                    mse_val_weights_dict = MDI(
                         X_val, delta_val,
                         alpha=alphaV_mse, 
                         bandwidth=bandwidth).label_importance_map
                     if alphaV_pcc > 0:
-                        pcc_val_weights_dict = QUCImportance(
+                        pcc_val_weights_dict = MDI(
                             X_val, delta_val,
                             alpha=alphaV_pcc, 
                             bandwidth=bandwidth).label_importance_map

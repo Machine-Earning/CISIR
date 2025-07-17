@@ -1,7 +1,7 @@
 import os
 from modules.reweighting.ImportanceWeighting import LinearImportance as linear
 from modules.reweighting.ImportanceWeighting import CosineImportance as cosine
-from modules.reweighting.ImportanceWeighting import QUCImportance as quc
+from modules.reweighting.ImportanceWeighting import MDI as quc
 from modules.reweighting.ImportanceWeighting import ReciprocalImportance as reciprocal
 from modules.reweighting.ImportanceWeighting import DenseLossImportance as dl
 

@@ -288,7 +288,7 @@ class DenseLossImportance:
 
 
 
-class QUCImportance:
+class MDI:
     """
     Class for generating importance weights based on the Quarter of the Unit Circle (QUC).
     """
@@ -302,7 +302,7 @@ class QUCImportance:
             epsilon: float = 1e-3
         ) -> None:
         """
-        Initialize the QUCImportance class.
+        Initialize the MDI class.
 
         The reweighting uses importance_weight = [1- density^(alpha)]^(1/alpha) where density is normalized density between 0 and 1.
 

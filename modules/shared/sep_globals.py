@@ -61,3 +61,35 @@ CVRG_MIN_DELTA = 1e-3
 CVRG_METRIC = 'val_loss'
 ASYM_TYPE = None #'sigmoid'
 N_FILTER = 500
+
+
+###############
+# Pretraining related hyperparams
+# PDC
+EPOCHS_PRE = int(9e4)  # Higher patience for pretraining
+BATCH_SIZE_PRE = 750  # Batch size for pretraining
+START_LR_PRE = 1e-4 # starting learning rate for pretraining
+LR_CB_MIN_LR_PRE = 1e-5  # Minimum learning rate for pretraining
+LR_CB_FACTOR_PRE = 0.95 # factor for reducing learning rate in pretraining
+LR_CB_PATIENCE_PRE = 50 # patience for reducing learning rate in pretraining
+PATIENCE_PRE = 3000  # Higher patience for pretraining
+RHO_PRE = [0.0]  # Pretraining rho parameter
+WEIGHT_DECAY_PRE = 1 # Higher weight decay for projection layers
+WINDOW_SIZE_PRE = 11  # NOTE: must be odd
+VAL_WINDOW_SIZE_PRE = 11  # NOTE: must be odd
+DROPOUT_PRE = 0.4  # Dropout rate for pretraining
+AE_LAMBDA = 1
+
+# PDS configurations
+START_LR_PDS = 1e-4
+LR_CB_MIN_LR_PDS = 1e-6
+LR_CB_FACTOR_PDS = 0.99
+LR_CB_PATIENCE_PDS = 50
+REWEIGHTS_PDS = [(0.2, 0.2)]  # PDS reweighting parameters
+WINDOW_SIZE_PDS = 25  # NOTE: must be odd
+VAL_WINDOW_SIZE_PDS = 25  # NOTE: must be odd
+
+# PDC Weight Path
+PDC_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcStratInj_bs6000_v8_20241203-194954.h5"
+
+
