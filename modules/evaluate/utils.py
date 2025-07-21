@@ -842,7 +842,7 @@ def plot_blogf_corr(
     return file_path
 
 
-def plot_sep_corr(model, X, y, title, model_type='features', sep_threshold=0.5):
+def plot_sep_corr(model, X, y, title, model_type='features', sep_threshold=2.30258509299):
     """
     Plots the correlation between distances in target values and distances in the representation space,
     with each point colored based on the pair of labels using a SEP threshold.

@@ -9,11 +9,10 @@ from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import (
-    plot_tsne_delta,
-    plot_repr_correlation,
-    plot_repr_corr_dist,
+    plot_tsne_sep,
     plot_repr_corr_density,
-    evaluate_pcc_repr
+    evaluate_pcc_repr,
+    plot_sep_corr
 )
 
 from modules.reweighting.ImportanceWeighting import MDI
@@ -44,7 +43,8 @@ def main():
     mb = ModelBuilder()  # Model builder
     pm = TrainingPhaseManager()  # Training phase manager
     
-    alphas = [(2.4, 2.4)] # a list in case I want to run multiple alphas
+    # TODO: try alpha = 1, 0.5, 0.1 
+    alphas = [(0.1, 0.1)] # a list in case I want to run multiple alphas
     alpha_pdc = alphas[0][0]
     n_trials = len(TRIAL_SEEDS)
     results = initialize_results_dict(n_trials)
@@ -352,7 +352,7 @@ def main():
             wandb.log({"train_jpcc+": error_pcc_cond_train})
 
             # Evaluate the model correlation with colored
-            file_path = plot_repr_corr_dist(
+            file_path = plot_sep_corr(
                 final_model_sep,
                 X_train_filtered, y_train_filtered,
                 title + "_training"
@@ -360,7 +360,7 @@ def main():
             wandb.log({'representation_correlation_colored_plot_train': wandb.Image(file_path)})
             print('file_path: ' + file_path)
 
-            file_path = plot_repr_corr_dist(
+            file_path = plot_sep_corr(
                 final_model_sep,
                 X_test_filtered, y_test_filtered,
                 title + "_test"
@@ -370,7 +370,7 @@ def main():
 
             # Log t-SNE plot
             # Log the training t-SNE plot to wandb
-            stage1_file_path = plot_tsne_delta(
+            stage1_file_path = plot_tsne_sep(
                 final_model_sep,
                 X_train_filtered, y_train_filtered, title,
                 'stage1_training',
@@ -380,7 +380,7 @@ def main():
             print('stage1_file_path: ' + stage1_file_path)
 
             # Log the testing t-SNE plot to wandb
-            stage1_file_path = plot_tsne_delta(
+            stage1_file_path = plot_tsne_sep(
                 final_model_sep,
                 X_test_filtered, y_test_filtered, title,
                 'stage1_testing',
@@ -388,23 +388,6 @@ def main():
                 save_tag=current_time, seed=seed)
             wandb.log({'stage1_tsne_testing_plot': wandb.Image(stage1_file_path)})
             print('stage1_file_path: ' + stage1_file_path)
-
-            # Evaluate the model correlation
-            file_path = plot_repr_correlation(
-                final_model_sep,
-                X_train_filtered, y_train_filtered,
-                title + "_training"
-            )
-            wandb.log({'representation_correlation_plot_train': wandb.Image(file_path)})
-            print('file_path: ' + file_path)
-
-            file_path = plot_repr_correlation(
-                final_model_sep,
-                X_test_filtered, y_test_filtered,
-                title + "_test"
-            )
-            wandb.log({'representation_correlation_plot_test': wandb.Image(file_path)})
-            print('file_path: ' + file_path)
 
             # Evaluate the model correlation density
             file_path = plot_repr_corr_density(
