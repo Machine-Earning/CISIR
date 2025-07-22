@@ -43,7 +43,7 @@ def main():
     mb = ModelBuilder()  # Model builder
     pm = TrainingPhaseManager()  # Training phase manager
     
-    alphas = [(2.4, 2.4)] # a list in case I want to run multiple alphas
+    alphas = [(1, 1)] # a list in case I want to run multiple alphas
     alpha_pds = alphas[0][0]
     n_trials = len(TRIAL_SEEDS)
     results = initialize_results_dict(n_trials)
@@ -69,14 +69,14 @@ def main():
             epochs = EPOCHS
             patience = PATIENCE_PRE
             learning_rate = START_LR_PRE
-            weight_decay = WEIGHT_DECAY_PRE
+            weight_decay = WEIGHT_DECAY_PDS
             normalized_weights = NORMALIZED_WEIGHTS
             lr_cb_patience = LR_CB_PATIENCE_PRE
             lr_cb_factor = LR_CB_FACTOR_PRE
             lr_cb_min_lr = LR_CB_MIN_LR_PRE
             lr_cb_min_delta = LR_CB_MIN_DELTA
             cvrg_metric = CVRG_METRIC
-            cvrg_min_delta = CVRG_MIN_DELTA
+            cvrg_min_delta = CVRG_MIN_DELTA_PDS
 
             hiddens = MLP_HIDDENS
             hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
@@ -223,6 +223,7 @@ def main():
                     skip_repr=skip_repr,
                     skipped_layers=skipped_layers,
                     sam_rho=rho,
+                    weight_decay=weight_decay
                 )
                 model_sep.summary()
 
@@ -293,6 +294,7 @@ def main():
                 skip_repr=skip_repr,
                 skipped_layers=skipped_layers,
                 sam_rho=rho,
+                weight_decay=weight_decay
             )
 
             final_model_sep.compile(

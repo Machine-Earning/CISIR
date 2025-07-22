@@ -44,7 +44,7 @@ def main():
     pm = TrainingPhaseManager()  # Training phase manager
     
     # TODO: try alpha = 1, 0.5, 0.1 
-    alphas = [(0.1, 0.1)] # a list in case I want to run multiple alphas
+    alphas = [(1, 1)] # a list in case I want to run multiple alphas
     alpha_pdc = alphas[0][0]
     n_trials = len(TRIAL_SEEDS)
     results = initialize_results_dict(n_trials)

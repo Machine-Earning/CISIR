@@ -1782,11 +1782,16 @@ def plot_tsne_sep(
     plt.sca(axs[0])
     # Normalize y-values for color intensity
     norm = plt.Normalize(min(y), max(y))
-    cmap = plt.cm.coolwarm  # Choosing a colormap that spans across negative and positive changes
+    cmap = plt.cm.turbo  # Choosing a colormap that spans across negative and positive changes
 
+
+    rare_size = 50
+    freq_size = 30
+    rare_alpha = 1.0
+    freq_alpha = 1.0
     # Determine the size and alpha based on sep_threshold
-    sizes = np.where(y >= sep_threshold, 50, 12)  # Larger size for rare values (above threshold)
-    alphas = np.where(y >= sep_threshold, 1.0, 0.3)  # More opaque for rare values (above threshold)
+    sizes = np.where(y >= sep_threshold, rare_size, freq_size)  # Larger size for rare values (above threshold)
+    alphas = np.where(y >= sep_threshold, rare_alpha, freq_alpha)  # More opaque for rare values (above threshold)
 
     # Ensure sizes and alphas are 1-dimensional arrays
     sizes = sizes.ravel()
@@ -1796,8 +1801,8 @@ def plot_tsne_sep(
     sort_order = np.argsort(sizes)  # This gives indices that would sort the array
 
     # Create masks for frequent and rare points
-    frequent_points_mask = sizes[sort_order] == 12
-    rare_points_mask = sizes[sort_order] == 50
+    frequent_points_mask = sizes[sort_order] == freq_size
+    rare_points_mask = sizes[sort_order] == rare_size
 
     # Now, apply these masks to the sorted indices to get the correct indices for frequent and rare points.
     frequent_points = sort_order[frequent_points_mask]
@@ -1823,7 +1828,7 @@ def plot_tsne_sep(
         alpha=alphas[rare_points])
 
     # Add a color bar
-    cbar = plt.colorbar(sc, ax=axs[0], label='Change in logIntensity', extend='both')
+    cbar = plt.colorbar(sc, ax=axs[0], label='logIntensity', extend='both')
 
     # Title and labels
     plt.title(f'{title}\n2D t-SNE Visualization')
