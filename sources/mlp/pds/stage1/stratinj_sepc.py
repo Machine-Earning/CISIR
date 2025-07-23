@@ -43,7 +43,7 @@ def main():
     mb = ModelBuilder()  # Model builder
     pm = TrainingPhaseManager()  # Training phase manager
     
-    alphas = [(1, 1)] # a list in case I want to run multiple alphas
+    alphas = [(1.5, 1.5)] # a list in case I want to run multiple alphas
     alpha_pds = alphas[0][0]
     n_trials = len(TRIAL_SEEDS)
     results = initialize_results_dict(n_trials)

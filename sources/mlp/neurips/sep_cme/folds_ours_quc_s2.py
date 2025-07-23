@@ -36,20 +36,13 @@ from modules.training.ts_modeling import (
 
 
 PDC_WEIGHTS_PATH = {
-    456789: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc2.40_mdi_s1_quad_nae_20250717-103956.h5',
-    42: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc2.40_mdi_s1_quad_nae_20250717-105505.h5',
-    123: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc2.40_mdi_s1_quad_nae_20250717-111414.h5',
-    0: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc2.40_mdi_s1_quad_nae_20250717-112915.h5',
-    9999: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc2.40_mdi_s1_quad_nae_20250717-114345.h5',
+    456789: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc0.10_mdi_s1_quad_nae_seed456789_20250721-075809.h5',
+    42: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc0.10_mdi_s1_quad_nae_seed42_20250721-094737.h5',
+    123: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc0.10_mdi_s1_quad_nae_seed123_20250721-114400.h5',
+    0: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc0.10_mdi_s1_quad_nae_seed0_20250721-135844.h5',
+    9999: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc0.10_mdi_s1_quad_nae_seed9999_20250721-160658.h5',
 }
 
-# PDC_WEIGHTS_PATH = {
-#     456789: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
-#     42: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
-#     123: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
-#     0: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
-#     9999: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
-# }
 
 def main():
     """
@@ -68,7 +61,7 @@ def main():
     # Initialize results tracking ONCE before the seed loop
     n_trials = len(TRIAL_SEEDS)
     results = initialize_results_dict(n_trials)
-    results['name'] = f'sep_cme_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_lambda{lambda_factor:.2f}_quc_s2'
+    results['name'] = f'sepc_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_l{lambda_factor:.2f}_quc_s2'
 
     for seed_idx, seed in enumerate(TRIAL_SEEDS):
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in alphas:

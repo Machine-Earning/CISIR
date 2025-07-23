@@ -7,6 +7,7 @@ OUTPUT_DIM = 1
 
 # Training configurations
 TRIAL_SEEDS = [456789, 42, 123, 0, 9999] # Seeds for trial
+TRIAL_SEEDS_SPEC = [9999, 0]
 BATCH_SIZE = 200  # Batch size
 EPOCHS = int(2e5)  # Number of epochs
 VERBOSE = 1  # Verbose
@@ -28,7 +29,7 @@ SKIP_REPR = True  # residual representation
 
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
-START_LR = 5e-4  # starting learning rate
+START_LR = 1e-4  # starting learning rate
 WEIGHT_DECAY = 1  # Higher weight decay
 NORMALIZED_WEIGHTS = True  # Use normalized weights
 
@@ -58,7 +59,7 @@ RHO = [0]
 REWEIGHTS = [(0.85, 0.85, 0.0, 0.0)]
 LAMBDA_FACTOR = 1
 CVRG_MIN_DELTA = 1e-3
-CVRG_MIN_DELTA_PDS = 1e-5
+CVRG_MIN_DELTA_PDS = 1e-4
 CVRG_METRIC = 'val_loss'
 ASYM_TYPE = None #'sigmoid'
 N_FILTER = 500

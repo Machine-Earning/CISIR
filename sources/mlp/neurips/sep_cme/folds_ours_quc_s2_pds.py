@@ -37,11 +37,11 @@ from modules.training.ts_modeling import (
 
 
 PDS_WEIGHTS_PATH = {
-    456789: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
-    42: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
-    123: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
-    0: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
-    9999: '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5',
+    456789: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apds1.00_mdi_s1_quad_nae_seed456789_20250722-083145.h5',
+    42: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apds1.00_mdi_s1_quad_nae_seed42_20250722-085024.h5',
+    123: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apds1.00_mdi_s1_quad_nae_seed123_20250722-090914.h5',
+    0: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apds1.00_mdi_s1_quad_nae_seed0_20250722-092705.h5',
+    9999: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apds1.00_mdi_s1_quad_nae_seed9999_20250722-094549.h5',
 }
 
 def main():
@@ -53,7 +53,7 @@ def main():
     pm = TrainingPhaseManager()
 
     # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc
-    alphas = [(2.4, 2.4, 1.7, 1.7)]
+    alphas = [(1, 1, 1.7, 1.7)]
     alpha_amse = alphas[0][0]
     alpha_apcc = alphas[0][2]
     lambda_factor = 0.5 # LAMBDA_FACTOR  # lambda for the loss

@@ -1782,13 +1782,13 @@ def plot_tsne_sep(
     plt.sca(axs[0])
     # Normalize y-values for color intensity
     norm = plt.Normalize(min(y), max(y))
-    cmap = plt.cm.turbo  # Choosing a colormap that spans across negative and positive changes
+    cmap = plt.cm.rainbow  # Choosing a colormap that spans across negative and positive changes
 
 
-    rare_size = 50
-    freq_size = 30
+    rare_size = 60
+    freq_size = 20
     rare_alpha = 1.0
-    freq_alpha = 1.0
+    freq_alpha = 0.7
     # Determine the size and alpha based on sep_threshold
     sizes = np.where(y >= sep_threshold, rare_size, freq_size)  # Larger size for rare values (above threshold)
     alphas = np.where(y >= sep_threshold, rare_alpha, freq_alpha)  # More opaque for rare values (above threshold)
