@@ -4601,7 +4601,8 @@ def evaluate_mae(
         below_threshold: float = None,
         above_threshold: float = None,
         between_thresholds: bool = False,  # Add new parameter
-        use_dict: bool = False) -> float:
+        use_dict: bool = False,
+        print_individual_errors: bool = False) -> float:
     """
     Evaluates a given model using Mean Absolute Error (MAE) on the provided test data,
     with options to conditionally calculate MAE based on specified thresholds.
@@ -4615,6 +4616,7 @@ def evaluate_mae(
     - between_thresholds (bool, optional): If True, selects values BETWEEN thresholds
                                           rather than outside them. Default is False.
     - use_dict (bool, optional): Whether the model returns a dictionary with output names.
+    - print_individual_errors (bool, optional): If True, prints individual error for each sample.
 
     Returns:
     - float: The MAE loss of the model on the filtered test data.
@@ -4649,6 +4651,18 @@ def evaluate_mae(
     else:
         filtered_predictions = predictions
         filtered_y_test = y_test
+
+    # Calculate individual errors
+    individual_errors = np.abs(filtered_y_test - filtered_predictions)
+    
+    # Print individual errors if requested
+    if print_individual_errors:
+        print(f"\nIndividual Sample Errors (Total samples: {len(individual_errors)}):")
+        print("-" * 60)
+        for i, (true_val, pred_val, error) in enumerate(zip(filtered_y_test, filtered_predictions, individual_errors)):
+            print(f"Sample {i+1:4d}: True={true_val:8.4f}, Pred={pred_val:8.4f}, Error={error:8.4f}")
+        print("-" * 60)
+        print(f"Mean Absolute Error: {np.mean(individual_errors):.4f}")
 
     # Calculate MAE
     mae_loss = mean_absolute_error(filtered_y_test, filtered_predictions)

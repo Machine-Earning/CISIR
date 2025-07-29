@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 
 import numpy as np
+import tensorflow as tf
 import wandb
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
@@ -13,6 +14,7 @@ from wandb.integration.keras import WandbCallback
 from modules.evaluate.utils import plot_sep_corr, plot_tsne_sep
 from modules.reweighting.ImportanceWeighting import MDI
 from modules.shared.sep_globals import *
+from modules.training.cme_modeling import ModelBuilder
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
@@ -31,44 +33,114 @@ from modules.training.ts_modeling import (
     update_trial_results,
     compute_averages,
     save_results_to_csv,
-    add_proj_head
 )
 
 
-PDC_WEIGHTS_PATH = {
-    456789: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc0.10_mdi_s1_quad_nae_seed456789_20250721-075809.h5',
-    42: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc0.10_mdi_s1_quad_nae_seed42_20250721-094737.h5',
-    123: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc0.10_mdi_s1_quad_nae_seed123_20250721-114400.h5',
-    0: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc0.10_mdi_s1_quad_nae_seed0_20250721-135844.h5',
-    9999: '/home1/jmoukpe2016/keras-functional-api/fm_sepc_apdc0.10_mdi_s1_quad_nae_seed9999_20250721-160658.h5',
-}
+def pdc_loss_fn(
+    y_true, representations,
+    phase_manager,
+    mb: ModelBuilder,
+    train_pdc_weight_dict=None,
+    val_pdc_weight_dict=None
+):
+    """
+    PDC loss function for representations output.
+    
+    Args:
+        y_true: Ground truth labels
+        representations: Representation vectors from model
+        phase_manager: Training phase manager
+        mb: ModelBuilder instance for PDC loss computation
+        train_pdc_weight_dict: Training weights for PDC
+        val_pdc_weight_dict: Validation weights for PDC
+    """
+    # Ensure y_true is 2D for PDC loss computation
+    # y_true = tf.expand_dims(y_true, -1) if tf.rank(y_true) == 1 else y_true
+
+    # print the shapes
+    # print(f'y_true.shape: {y_true.shape}, representations.shape: {representations.shape}')
+    
+    # Compute PDC loss on representations
+    pdc_loss = mb.pdc_loss_vec(
+        y_true, representations,
+        phase_manager=phase_manager,
+        train_sample_weights=train_pdc_weight_dict,
+        val_sample_weights=val_pdc_weight_dict
+    )
+    
+    return pdc_loss
+
+
+def cmse_loss_fn(
+    y_true, predictions,
+    lambda_factor: float,
+    phase_manager,
+    train_mse_weight_dict=None,
+    val_mse_weight_dict=None,
+    train_pcc_weight_dict=None,
+    val_pcc_weight_dict=None,
+    normalized_weights=False,
+    asym_type=None
+):
+    """
+    CMSE loss function for predictions output.
+    
+    Args:
+        y_true: Ground truth labels
+        predictions: Predictions from model
+        lambda_factor: Weight for PCC component in CMSE
+        phase_manager: Training phase manager
+        Other parameters: Same as cmse function
+    """
+
+    # print the shapes
+    # print(f'y_true.shape: {y_true.shape}, predictions.shape: {predictions.shape}')
+
+    # Compute the standard CMSE loss (MSE + PCC) on predictions
+    mse_pcc_loss = cmse(
+        y_true, predictions,
+        lambda_factor=lambda_factor,
+        phase_manager=phase_manager,
+        train_mse_weight_dict=train_mse_weight_dict,
+        val_mse_weight_dict=val_mse_weight_dict,
+        train_pcc_weight_dict=train_pcc_weight_dict,
+        val_pcc_weight_dict=val_pcc_weight_dict,
+        normalized_weights=normalized_weights,
+        asym_type=asym_type
+    )
+    
+    return mse_pcc_loss
 
 
 def main():
     """
-    Testing WPCC + QUC Importance + Stratified Batching
+    Testing WPCC + QUC Importance + Stratified Batching + PDC reg
     """
 
     # set the training phase manager - necessary for mse + pcc loss
     pm = TrainingPhaseManager()
+    # Initialize ModelBuilder for PDC loss computation
+    mb = ModelBuilder()
 
-    # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc
-    alphas = [(0.5, 0.5, 0.5, 0.5)]
+    # get the alpha_mse, alpha_pcc, alphaV_mse, alphaV_pcc, alpha_pdc, alphaV_pdc
+    alphas = [(2.4, 2.4, 1.7, 1.7, 0.1, 0.1)]
     alpha_amse = alphas[0][0]
     alpha_apcc = alphas[0][2]
+    alpha_pdc = alphas[0][4]
     lambda_factor = 0.5 # LAMBDA_FACTOR  # lambda for the loss
+    pdc_factor = 0.5 # for the importance on PDC in the loss
 
     # Initialize results tracking ONCE before the seed loop
     n_trials = len(TRIAL_SEEDS)
     results = initialize_results_dict(n_trials)
-    results['name'] = f'sepc_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_l{lambda_factor:.2f}_quc_s2'
+    results['name'] = f'sepc_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_apdc{alpha_pdc:.2f}_pdcf{pdc_factor:.2f}_l{lambda_factor:.2f}_quc_s2'
 
     for seed_idx, seed in enumerate(TRIAL_SEEDS):
-        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in alphas:
+        for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc, alpha_pdc, alphaV_pdc in alphas:
             for rho in RHO:  # SAM_RHOS:
                 # PARAMS
                 # Construct the title
-                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor:.2f}_quc_s2'
+                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_apdc{alpha_pdc:.2f}_pdcf{pdc_factor:.2f}_lambda{lambda_factor:.2f}_quc_s2'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -100,12 +172,12 @@ def main():
                 batch_size = BATCH_SIZE  
                 epochs = EPOCHS  
                 hiddens = MLP_HIDDENS  
-                proj_hiddens = PROJ_HIDDENS
+                # proj_hiddens = PROJ_HIDDENS
                 pretraining = True
                 sep_threshold = SEP_THRESHOLD
 
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
-                proj_hiddens_str = (", ".join(map(str, proj_hiddens))).replace(', ', '_')
+                # proj_hiddens_str = (", ".join(map(str, proj_hiddens))).replace(', ', '_')
                 bandwidth = BANDWIDTH
                 output_dim = OUTPUT_DIM
                 embed_dim = EMBED_DIM
@@ -130,14 +202,17 @@ def main():
                     "freeze": freeze,
                     # hidden in a more readable format  (wandb does not support lists)
                     "hiddens": hiddens_str,
-                    "proj_hiddens": proj_hiddens_str,
-                    "loss": 'mse_pcc',
+                    # "proj_hiddens": proj_hiddens_str,
+                    "loss": 'mse_pcc_pdc',
                     "lambda": lambda_factor,
                     "seed": seed,
                     "alpha_mse": alpha_mse,
                     "alphaV_mse": alphaV_mse,
                     "alpha_pcc": alpha_pcc,
                     "alphaV_pcc": alphaV_pcc,
+                    "alpha_pdc": alpha_pdc,
+                    "alphaV_pdc": alphaV_pdc,
+                    "pdc_factor": pdc_factor,
                     "bandwidth": bandwidth,
                     "embed_dim": embed_dim,
                     "dropout": dropout,
@@ -145,7 +220,7 @@ def main():
                     "norm": norm,
                     'optimizer': 'adam',
                     'output_dim': output_dim,
-                    'architecture': 'mlp_res_repr',
+                    'architecture': 'mlp_res_repr_pdc',
                     'ds_version': DS_VERSION,
                     'sam_rho': rho,
                     'smoothing_method': smoothing_method,
@@ -162,7 +237,6 @@ def main():
                     'normalized_weights': normalized_weights,
                     'sep_threshold': sep_threshold,
                     'n_filter': n_filter,
-                    'weights_path': PDC_WEIGHTS_PATH[seed]
                 })
 
                 # set the root directory
@@ -190,6 +264,15 @@ def main():
                         bandwidth=bandwidth).label_importance_map
                 else:
                     pcc_train_weights_dict = None
+                
+                # Compute PDC weights if PDC is enabled
+                if alpha_pdc > 0:
+                    pdc_train_weights_dict = MDI(
+                        X_train, delta_train,
+                        alpha=alpha_pdc, 
+                        bandwidth=bandwidth).label_importance_map
+                else:
+                    pdc_train_weights_dict = None
                 print(f'training set rebalanced.')
                 # get the number of input features
                 n_features = X_train.shape[1]
@@ -242,6 +325,15 @@ def main():
                             bandwidth=bandwidth).label_importance_map
                     else:
                         pcc_subtrain_weights_dict = None
+                    
+                    # Compute PDC weights for subtraining
+                    if alpha_pdc > 0:
+                        pdc_subtrain_weights_dict = MDI(
+                            X_subtrain, delta_subtrain,
+                            alpha=alpha_pdc, 
+                            bandwidth=bandwidth).label_importance_map
+                    else:
+                        pdc_subtrain_weights_dict = None
                     print(f'subtraining set rebalanced.')
 
                     # Compute the sample weights for validation
@@ -259,43 +351,29 @@ def main():
                             bandwidth=bandwidth).label_importance_map
                     else:
                         pcc_val_weights_dict = None
+                    
+                    # Compute PDC weights for validation
+                    if alphaV_pdc > 0:
+                        pdc_val_weights_dict = MDI(
+                            X_val, delta_val,
+                            alpha=alphaV_pdc, 
+                            bandwidth=bandwidth).label_importance_map
+                    else:
+                        pdc_val_weights_dict = None
                     print(f'validation set rebalanced.')
 
                     # create the model
-                    model_sep_s1 = create_mlp(
+                    model_sep = create_mlp(
                         input_dim=n_features,
                         hiddens=hiddens,
-                        output_dim=0,
-                        pretraining=pretraining,
                         embed_dim=embed_dim,
+                        output_dim=output_dim,
                         dropout=dropout,
                         activation=activation,
                         norm=norm,
                         skip_repr=skip_repr,
                         skipped_layers=skipped_layers,
-                        sam_rho=rho,
-                        weight_decay=weight_decay
-                    )
-                    model_sep_s1.summary()
-
-                    # load the weights from the first stage
-                    print(f'weights loading from: {PDC_WEIGHTS_PATH[seed]}')
-                    model_sep_s1.load_weights(PDC_WEIGHTS_PATH[seed])
-                    # print the save
-                    print(f'weights loaded successfully from: {PDC_WEIGHTS_PATH[seed]}')
-
-                    # create the model
-                    model_sep = add_proj_head(
-                        model_sep_s1,
-                        output_dim=output_dim,
-                        freeze_features=freeze,
                         pretraining=pretraining,
-                        hiddens=proj_hiddens,
-                        dropout=dropout,
-                        activation=activation,
-                        norm=norm,
-                        skipped_layers=skipped_layers,
-                        name='mlp',
                         sam_rho=rho,
                         weight_decay=weight_decay
                     )
@@ -312,23 +390,35 @@ def main():
                         smoothing_parameters={'window_size': window_size})  # 10
 
                     # Compile the model with the specified learning rate
+                    # Model outputs: [representations, predictions]
+                    # Use a list of loss functions for each output
                     model_sep.compile(
                         optimizer=Adam(
                             learning_rate=learning_rate,
                         ),
-                        loss={
-                            'forecast_head': lambda y_true, y_pred: cmse(
-                                y_true, y_pred,
+                        loss=[
+                            # Loss for representations (first output)
+                            lambda y_true, y_pred_repr: pdc_loss_fn(
+                                y_true, y_pred_repr,
                                 phase_manager=pm,
+                                mb=mb,
+                                train_pdc_weight_dict=pdc_subtrain_weights_dict,
+                                val_pdc_weight_dict=pdc_val_weights_dict
+                            ),
+                            # Loss for predictions (second output)  
+                            lambda y_true, y_pred_forecast: cmse_loss_fn(
+                                y_true, y_pred_forecast,
                                 lambda_factor=lambda_factor,
+                                phase_manager=pm,
                                 train_mse_weight_dict=mse_subtrain_weights_dict,
-                                train_pcc_weight_dict=pcc_subtrain_weights_dict,
                                 val_mse_weight_dict=mse_val_weights_dict,
+                                train_pcc_weight_dict=pcc_subtrain_weights_dict,
                                 val_pcc_weight_dict=pcc_val_weights_dict,
                                 normalized_weights=normalized_weights,
                                 asym_type=asym_type
                             )
-                        }
+                        ],
+                        loss_weights=[pdc_factor, 1.0]  # Weight PDC vs CMSE losses
                     )
 
                     # Step 1: Create stratified dataset for the subtraining set only
@@ -336,10 +426,10 @@ def main():
                         X_subtrain, y_subtrain, batch_size)
 
                     # Map the subtraining dataset to return {'output': y} format
-                    subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'forecast_head': y}))
+                    # subtrain_ds = subtrain_ds.map(lambda x, y: (x, {'forecast_head': y}))
                     
                     # Prepare validation data without batching
-                    val_data = (X_val, {'forecast_head': y_val})
+                    val_data = (X_val, y_val)
 
                     # Train the model with the callback
                     history = model_sep.fit(
@@ -375,37 +465,17 @@ def main():
                 wandb.log({'optimal_epochs': optimal_epochs})
 
                 # create the final model
-                final_model_sep_s1 = create_mlp(
+                final_model_sep = create_mlp(
                     input_dim=n_features,
                     hiddens=hiddens,
-                    output_dim=0,
-                    pretraining=pretraining,
                     embed_dim=embed_dim,
+                    output_dim=output_dim,
                     dropout=dropout,
                     activation=activation,
                     norm=norm,
                     skip_repr=skip_repr,
                     skipped_layers=skipped_layers,
-                    sam_rho=rho,
-                    weight_decay=weight_decay
-                )
-                # load the weights from the first stage
-                print(f'weights loading from: {PDC_WEIGHTS_PATH[seed]}')
-                final_model_sep_s1.load_weights(PDC_WEIGHTS_PATH[seed])
-                # print the save
-                print(f'weights loaded successfully from: {PDC_WEIGHTS_PATH[seed]}')
-
-                final_model_sep = add_proj_head(
-                    final_model_sep_s1,
-                    output_dim=output_dim,
-                    freeze_features=freeze,
                     pretraining=pretraining,
-                    hiddens=proj_hiddens,
-                    dropout=dropout,
-                    activation=activation,
-                    norm=norm,
-                    skipped_layers=skipped_layers,
-                    name='mlp',
                     sam_rho=rho,
                     weight_decay=weight_decay
                 )
@@ -415,24 +485,36 @@ def main():
                     optimizer=Adam(
                         learning_rate=learning_rate,
                     ),
-                    loss={
-                        'forecast_head': lambda y_true, y_pred: cmse(
-                            y_true, y_pred,
+                    loss=[
+                        # Loss for representations (first output)
+                        lambda y_true, y_pred_repr: pdc_loss_fn(
+                            y_true, y_pred_repr,
                             phase_manager=pm,
+                            mb=mb,
+                            train_pdc_weight_dict=pdc_train_weights_dict,
+                            val_pdc_weight_dict=None  # No validation weights for final training
+                        ),
+                        # Loss for predictions (second output)
+                        lambda y_true, y_pred_forecast: cmse_loss_fn(
+                            y_true, y_pred_forecast,
                             lambda_factor=lambda_factor,
+                            phase_manager=pm,
                             train_mse_weight_dict=mse_train_weights_dict,
+                            val_mse_weight_dict=None,  # No validation weights for final training
                             train_pcc_weight_dict=pcc_train_weights_dict,
+                            val_pcc_weight_dict=None,  # No validation weights for final training
                             normalized_weights=normalized_weights,
                             asym_type=asym_type
                         )
-                    },
+                    ],
+                    loss_weights=[pdc_factor, 1.0]  # Weight PDC vs CMSE losses
                 )  # Compile the model just like before
 
                 train_ds, train_steps = stratified_batch_dataset(
                     X_train, y_train, batch_size)
 
                 # Map the training dataset to return {'output': y} format
-                train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
+                # train_ds = train_ds.map(lambda x, y: (x, {'forecast_head': y}))
 
                 # Train on the full dataset
                 final_model_sep.fit(

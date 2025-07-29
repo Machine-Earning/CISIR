@@ -6,7 +6,7 @@ OUTPUT_DIM = 1
 
 
 # Training configurations
-TRIAL_SEEDS = [456789, 42, 123, 0, 9999] # Seeds for trial
+TRIAL_SEEDS = [456789] #, 42, 123, 0, 9999] # Seeds for trial
 TRIAL_SEEDS_SPEC = [9999, 0]
 BATCH_SIZE = 200  # Batch size
 EPOCHS = int(2e5)  # Number of epochs
@@ -19,6 +19,7 @@ FREEZING = [False]
 MLP_HIDDENS = [512, 32, 256, 32, 128, 32, 64, 32]  # Hidden layers
 
 PROJ_HIDDENS = [16]  # Projection hidden layers
+PROJ_HIDDENS_B = [16, 8, 4, 2]  # Projection hidden layers for pretraining
 EMBED_DIM = 32  # Representation dimension
 DROPOUT = 0.5  # Dropout rate
 ACTIVATION = None  # No activation for regression so default is LeakyReLU
@@ -29,7 +30,7 @@ SKIP_REPR = True  # residual representation
 
 # Loss and Optimization
 LOSS_KEY = 'cmse'  # Correlated Mean squared error regression loss
-START_LR = 1e-4  # starting learning rate
+START_LR = 5e-4  # starting learning rate
 WEIGHT_DECAY = 1  # Higher weight decay
 NORMALIZED_WEIGHTS = True  # Use normalized weights
 
