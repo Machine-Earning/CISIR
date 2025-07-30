@@ -4,6 +4,7 @@ from tensorflow import Tensor
 from tensorflow.keras import layers
 
 
+# TODO: double check if there is a bug in the normalization layer.
 class NormalizeLayer(layers.Layer):
     def __init__(self, epsilon: float = 1e-9, **kwargs):
         """

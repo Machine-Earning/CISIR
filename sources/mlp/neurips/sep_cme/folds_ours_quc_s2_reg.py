@@ -128,7 +128,7 @@ def main():
     alpha_apcc = alphas[0][2]
     alpha_pdc = alphas[0][4]
     lambda_factor = 0.5 # LAMBDA_FACTOR  # lambda for the loss
-    pdc_factor = 0.5 # for the importance on PDC in the loss
+    pdc_factor = 2 # for the importance on PDC in the loss
 
     # Initialize results tracking ONCE before the seed loop
     n_trials = len(TRIAL_SEEDS)
@@ -169,11 +169,11 @@ def main():
                     min_lr=lr_cb_min_lr)
 
                 weight_decay = WEIGHT_DECAY  
-                batch_size = BATCH_SIZE  
+                batch_size = 512 # BATCH_SIZE  
                 epochs = EPOCHS  
                 hiddens = MLP_HIDDENS  
                 # proj_hiddens = PROJ_HIDDENS
-                pretraining = True
+                pretraining = False
                 sep_threshold = SEP_THRESHOLD
 
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
@@ -237,6 +237,7 @@ def main():
                     'normalized_weights': normalized_weights,
                     'sep_threshold': sep_threshold,
                     'n_filter': n_filter,
+                    'pretraining': pretraining,
                 })
 
                 # set the root directory
