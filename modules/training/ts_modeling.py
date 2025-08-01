@@ -51,6 +51,67 @@ from modules.training.normlayer import NormalizeLayer
 from modules.training.phase_manager import TrainingPhaseManager, create_weight_tensor_fast
 from modules.training.sam_keras import SAMModel
 
+
+# Custom UnitNormalization layer for TensorFlow 2.6 compatibility
+class UnitNormalization(Layer):
+    """Unit normalization layer.
+
+    Normalize a batch of inputs so that each input in the batch has a L2 norm
+    equal to 1 (across the axes specified in `axis`).
+
+    Example:
+
+    >>> data = np.arange(6).reshape(2, 3)
+    >>> normalized_data = UnitNormalization()(data)
+    >>> np.sum(normalized_data[0, :] ** 2)
+    1.0
+
+    Args:
+        axis: Integer or list/tuple. The axis or axes to normalize across.
+            Typically, this is the features axis or axes. The left-out axes are
+            typically the batch axis or axes. `-1` is the last dimension
+            in the input. Defaults to `-1`.
+    """
+
+    def __init__(self, axis=-1, **kwargs):
+        super().__init__(**kwargs)
+        if isinstance(axis, (list, tuple)):
+            self.axis = list(axis)
+        elif isinstance(axis, int):
+            self.axis = axis
+        else:
+            raise TypeError(
+                "Invalid value for `axis` argument: "
+                "expected an int or a list/tuple of ints. "
+                f"Received: axis={axis}"
+            )
+        self.supports_masking = True
+
+    def call(self, inputs):
+        # Use tf.nn.l2_normalize for TensorFlow 2.6 compatibility
+        return tf.nn.l2_normalize(inputs, axis=self.axis, epsilon=1e-12)
+
+    def compute_output_shape(self, input_shape):
+        # Ensure axis is always treated as a list
+        if isinstance(self.axis, int):
+            axes = [self.axis]
+        else:
+            axes = self.axis
+
+        for axis in axes:
+            if axis >= len(input_shape) or axis < -len(input_shape):
+                raise ValueError(
+                    f"Axis {self.axis} is out of bounds for "
+                    f"input shape {input_shape}."
+                )
+        return input_shape
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({"axis": self.axis})
+        return config
+
+
 # Seeds for reproducibility
 seed_value = 42
 
@@ -1270,6 +1331,180 @@ class NormalizedReLU(Layer):
         return relu_output / (tf.reduce_sum(relu_output, axis=-1, keepdims=True) + tf.keras.backend.epsilon())
 
 
+def create_mlp_wUN(
+        input_dim: int = 100,
+        output_dim: int = 1,
+        hiddens=None,
+        skipped_layers: int = 1,
+        embed_dim: int = 128,
+        skip_repr: bool = True,
+        pretraining: bool = False,
+        activation=None,
+        norm: str = 'batch_norm',
+        sam_rho: float = 1e-2,
+        dropout: float = 0.2,
+        output_activation='linear',
+        name: str = 'mlp',
+        weight_decay: float = 0.0,
+        sam_norm: bool = True
+) -> Model:
+    """
+    Create an MLP model with fully connected dense layers and configurable activation functions.
+    Residual connections are automatically added when skipped_layers > 0.
+
+    Parameters:
+    - input_dim (int): The number of features in the input data.
+    - output_dim (int): The dimension of the output layer. Default is 1 for regression tasks.
+    - hiddens (list): A list of integers where each integer is the number of units in a hidden layer.
+    - skipped_layers (int): Number of layers between residual connections. If 0, no residual connections.
+                           Must be less than the total number of hidden layers.
+    - embed_dim (int): The number of features in the final representation vector.
+    - skip_repr (bool): If True and skipped_layers > 0, adds a residual connection to the representation layer.
+    - pretraining (bool): If True, the model will use PDS/PDC and there will have its representations normalized.
+    - activation: Optional activation function to use. If None, defaults to LeakyReLU.
+    - norm (str): Optional normalization type to use ('batch_norm' or 'layer_norm'). Default is None.
+    - sam_rho (float): Size of the neighborhood for perturbation in SAM. Default is 0.05. If 0.0, SAM is not used.
+    - dropout (float): Dropout rate to apply after activations or residual connections. If 0.0, no dropout is applied.
+    - output_activation: Optional activation function for output layer. Use 'softmax' for multi-class, 'sigmoid' for binary,
+                        or 'norm_relu' for normalized ReLU outputs that sum to 1.
+    - name (str): Name of the model.
+    - weight_decay (float): L2 regularization factor for kernel weights. Default is 0.0 (no regularization).
+    - sam_norm (bool): If True, the model will use SAM normalization. Default is True.
+
+    Returns:
+    - Model: A Keras model instance.
+
+    Raises:
+    - ValueError: If skipped_layers is greater than or equal to the number of hidden layers.
+    """
+    # Set default hidden layers if none provided
+    if hiddens is None:
+        hiddens = [50, 50]
+
+    # Validate skipped_layers parameter
+    if skipped_layers >= len(hiddens):
+        raise ValueError(
+            f"skipped_layers ({skipped_layers}) must be less than the number of hidden layers ({len(hiddens)})"
+        )
+
+    # Configure kernel regularizer if weight decay is enabled
+    kernel_regularizer = tf.keras.regularizers.l2(weight_decay) if weight_decay > 0.0 else None
+
+    # Create input layer
+    input_layer = Input(shape=(input_dim,))
+    has_residuals = skipped_layers > 0
+
+    # First block (special case to ensure proper skip from input)
+    x = Dense(hiddens[0], kernel_regularizer=kernel_regularizer)(input_layer)
+    if norm == 'batch_norm':
+        x = BatchNormalization()(x)
+    x = activation(x) if callable(activation) else LeakyReLU()(x)
+
+    # First skip connection (from input)
+    if has_residuals:
+        if x.shape[-1] != input_layer.shape[-1]:
+            residual_proj = Dense(x.shape[-1], use_bias=False, kernel_regularizer=kernel_regularizer)(input_layer)
+        else:
+            residual_proj = input_layer
+        x = Add()([x, residual_proj])
+        if norm == 'layer_norm':
+            x = LayerNormalization()(x)
+        # Add dropout after residual connection if dropout > 0
+        if dropout > 0:
+            x = Dropout(dropout)(x)
+    elif dropout > 0:  # No residuals, add dropout after activation
+        x = Dropout(dropout)(x)
+
+    residual_layer = x
+
+    # Remaining hidden layers
+    for i, units in enumerate(hiddens[1:], start=1):
+        # Dense + Norm + Activation block
+        x = Dense(units, kernel_regularizer=kernel_regularizer)(x)
+        if norm == 'batch_norm':
+            x = BatchNormalization()(x)
+        x = activation(x) if callable(activation) else LeakyReLU()(x)
+
+        # Add skip connection if at a skip point
+        if has_residuals and i % skipped_layers == 0:
+            # Project the residual layer if needed
+            if x.shape[-1] != residual_layer.shape[-1]:
+                residual_proj = Dense(x.shape[-1], use_bias=False, kernel_regularizer=kernel_regularizer)(
+                    residual_layer)
+            else:
+                residual_proj = residual_layer
+            x = Add()([x, residual_proj])
+            if norm == 'layer_norm':
+                x = LayerNormalization()(x)
+            # Add dropout after residual connection if dropout > 0
+            if dropout > 0:
+                x = Dropout(dropout)(x)
+            residual_layer = x
+        elif dropout > 0:  # No residuals, add dropout after activation
+            x = Dropout(dropout)(x)
+
+    # Create final representation layer
+    x = Dense(embed_dim, kernel_regularizer=kernel_regularizer)(x)
+    if norm == 'batch_norm':
+        x = BatchNormalization()(x)
+
+    # Apply activation with appropriate naming based on skip_repr
+    if skip_repr:  # if skip_repr, then the add down the line is the repr layer
+        x = activation(x) if callable(activation) else LeakyReLU()(x)
+    else:  # if no skip_repr, then the activation is repr layer
+        x = activation(x) if callable(activation) else LeakyReLU(name='repr_layer')(x)
+
+    # Add final skip connection if enabled
+    if skip_repr and has_residuals:
+        if x.shape[-1] != residual_layer.shape[-1]:
+            residual_proj = Dense(embed_dim, use_bias=False, kernel_regularizer=kernel_regularizer)(residual_layer)
+        else:
+            residual_proj = residual_layer
+
+        # Apply dropout before the representation layer
+        if dropout > 0:
+            x = Dropout(dropout)(x)
+
+        # Create representation layer without dropout after it
+        x = Add(name='repr_layer')([x, residual_proj])
+        if norm == 'layer_norm':
+            x = LayerNormalization()(x)
+        # Remove dropout here to avoid affecting the representation
+    elif dropout > 0:  # No residuals
+        # Apply dropout before the representation layer is defined
+        x = Dropout(dropout)(x)
+        # No dropout after this point if this is the representation layer
+    elif norm == 'layer_norm':
+        x = LayerNormalization()(x)
+
+    # Handle PDS normalization if needed
+    if pretraining:
+        final_repr_output = UnitNormalization(axis=1, name='normalize_layer')(x)
+    else:
+        final_repr_output = x
+
+    # Add output layer if output_dim > 0
+    if output_dim > 0:
+        dense_output = Dense(
+            output_dim,
+            activation=output_activation if output_activation != 'norm_relu' else None,
+            kernel_regularizer=kernel_regularizer,
+            name='forecast_head')(final_repr_output)
+        if output_activation == 'norm_relu':
+            dense_output = NormalizedReLU()(dense_output)
+        model_output = [final_repr_output, dense_output]
+    else:
+        model_output = final_repr_output
+
+    # Create appropriate model type based on SAM parameter
+    if sam_rho > 0.0:
+        model = SAMModel(inputs=input_layer, outputs=model_output, rho=sam_rho, name=name, norm=sam_norm)
+    else:
+        model = Model(inputs=input_layer, outputs=model_output, name=name)
+
+    return model
+
+
 def create_mlp(
         input_dim: int = 100,
         output_dim: int = 1,
@@ -1418,7 +1653,7 @@ def create_mlp(
 
     # Handle PDS normalization if needed
     if pretraining:
-        final_repr_output = NormalizeLayer(name='normalize_layer')(x)
+        final_repr_output = UnitNormalization(axis=1, name='normalize_layer')(x)
     else:
         final_repr_output = x
 

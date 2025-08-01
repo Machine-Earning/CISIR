@@ -2003,6 +2003,100 @@ class ModelBuilder:
 
         return 1.0 - pcc
 
+
+    @tf.autograph.experimental.do_not_convert
+    def pdc_loss_vec_geo(
+            self,
+            y_true: tf.Tensor,
+            z_pred: tf.Tensor,
+            phase_manager: TrainingPhaseManager,
+            train_sample_weights: Optional[Dict[float, float]] = None,
+            val_sample_weights: Optional[Dict[float, float]] = None,
+            reduction: tf.keras.losses.Reduction = tf.keras.losses.Reduction.NONE
+    ) -> tf.Tensor:
+        """
+        Computes the PDC (Pairwise Distance Correlation) loss with diagonal terms excluded,
+        using absolute differences for labels and geodesic distance on unit sphere for representations.
+        Checks if z_pred is normalized and normalizes if necessary.
+
+        Args:
+            y_true: A batch of true label values, shape of [batch_size, 1]
+            z_pred: A batch of predicted feature vectors, shape of [batch_size, n_features]
+            phase_manager: Manager that tracks training/validation phase
+            train_sample_weights: Dictionary mapping label values to weights during training
+            val_sample_weights: Dictionary mapping label values to weights during validation
+            reduction: Type of reduction to apply (Note: loss is scalar, reduction has no effect)
+
+        Returns:
+            The PDC loss value as a scalar tensor using geodesic distance
+        """
+        # Cast tensors to float32 for stability
+        batch_size = tf.shape(y_true)[0]
+        dtype = tf.float32  # Use high precision for stability
+        y_true = tf.cast(y_true, dtype)
+        z_pred = tf.cast(z_pred, dtype)
+        epsilon = tf.keras.backend.epsilon()
+
+        # Check if features are normalized and normalize if necessary
+        norms = tf.norm(z_pred, axis=-1)
+        is_normalized = tf.reduce_all(tf.abs(norms - 1.0) < 1e-6)
+        z_pred_norm = tf.cond(
+            is_normalized,
+            lambda: z_pred,  # Already normalized
+            lambda: tf.nn.l2_normalize(z_pred, axis=-1)  # Normalize
+        )
+
+        # Compute distance matrices
+        # For labels: absolute difference (same as original)
+        y_diff = tf.abs(y_true - tf.transpose(y_true))
+
+        # For representations: geodesic distance on unit sphere
+        # Compute pairwise dot products
+        dot_products = tf.matmul(z_pred_norm, z_pred_norm, transpose_b=True)
+        
+        # Clamp dot products to [-1, 1] to handle numerical errors
+        dot_products = tf.clip_by_value(dot_products, -1.0 + epsilon, 1.0 - epsilon)
+        
+        # Geodesic distance = arccos(dot_product) 
+        z_diff = tf.acos(dot_products)
+
+        y_diff = tf.cast(y_diff, dtype)
+
+        off_diag_size = tf.cast(batch_size * (batch_size - 1), dtype)
+
+        # Compute means excluding diagonal terms
+        Dy_mean = tf.reduce_sum(y_diff) / off_diag_size
+        Dz_mean = tf.reduce_sum(z_diff) / off_diag_size
+
+        # Center the variables
+        Dy_centered = y_diff - Dy_mean
+        Dz_centered = z_diff - Dz_mean
+
+        # Create weights matrix
+        weights_matrix = tf.ones((batch_size, batch_size), dtype=dtype)
+
+        # Apply sample weights if provided
+        sample_weights = train_sample_weights if phase_manager.is_training_phase() else val_sample_weights
+        if sample_weights is not None:
+            weights = tf.squeeze(create_weight_tensor_fast(y_true, sample_weights), axis=-1)
+            weights_matrix = tf.cast(weights[:, None] * weights[None, :], dtype)
+
+        # Reshape diagonal zeros to match weights_matrix shape
+        diag_zeros = tf.zeros([batch_size], dtype=dtype)
+        weights_matrix = tf.linalg.set_diag(weights_matrix, diag_zeros)
+
+        # Compute moments
+        cov_Dy_Dz = tf.reduce_sum(weights_matrix * Dy_centered * Dz_centered)
+        var_Dy = tf.reduce_sum(weights_matrix * tf.square(Dy_centered))
+        var_Dz = tf.reduce_sum(weights_matrix * tf.square(Dz_centered))
+
+        # Compute correlation
+        pcc = cov_Dy_Dz / tf.sqrt((var_Dy * var_Dz) + epsilon)
+
+        return 1.0 - pcc
+
+    
+
     def pdc_loss_linear_vec(
             self,
             y_true: tf.Tensor,

@@ -62,7 +62,7 @@ def pdc_loss_fn(
     # print(f'y_true.shape: {y_true.shape}, representations.shape: {representations.shape}')
     
     # Compute PDC loss on representations
-    pdc_loss = mb.pdc_loss_vec(
+    pdc_loss = mb.pdc_loss_vec_geo(
         y_true, representations,
         phase_manager=phase_manager,
         train_sample_weights=train_pdc_weight_dict,
@@ -129,19 +129,19 @@ def main():
     alpha_apcc = alphas[0][2]
     alpha_pdc = alphas[0][4]
     lambda_factor = 0.5 # LAMBDA_FACTOR  # lambda for the loss
-    pdc_factor = 1.0 # for the importance on PDC in the loss
+    pdc_factor = 1 # for the importance on PDC in the loss
 
     # Initialize results tracking ONCE before the seed loop
-    n_trials = len(TRIAL_SEED)
+    n_trials = len(TRIAL_SEEDS)
     results = initialize_results_dict(n_trials)
-    results['name'] = f'sepc_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_apdc{alpha_pdc:.2f}_pdcf{pdc_factor:.2f}_l{lambda_factor:.2f}_quc_s2'
+    results['name'] = f'geo_sepc_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_apdc{alpha_pdc:.2f}_pdcf{pdc_factor:.2f}_l{lambda_factor:.2f}_quc_s2'
 
-    for seed_idx, seed in enumerate(TRIAL_SEED):
+    for seed_idx, seed in enumerate(TRIAL_SEEDS):
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc, alpha_pdc, alphaV_pdc in alphas:
             for rho in RHO:  # SAM_RHOS:
                 # PARAMS
                 # Construct the title
-                title = f'sepc_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_apdc{alpha_pdc:.2f}_pdcf{pdc_factor:.2f}_lambda{lambda_factor:.2f}_quc_s2'
+                title = f'geo_mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_apdc{alpha_pdc:.2f}_pdcf{pdc_factor:.2f}_lambda{lambda_factor:.2f}_quc_s2'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
@@ -150,7 +150,7 @@ def main():
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed)
                 patience = PATIENCE  # higher patience
-                learning_rate = 1e-1 # START_LR  # starting learning rate
+                learning_rate = START_LR  # starting learning rate
                 asym_type = ASYM_TYPE
                 lr_cb_patience = LR_CB_PATIENCE
                 lr_cb_factor = LR_CB_FACTOR
@@ -174,7 +174,7 @@ def main():
                 epochs = EPOCHS  
                 hiddens = MLP_HIDDENS  
                 # proj_hiddens = PROJ_HIDDENS
-                pretraining = True
+                pretraining = False
                 sep_threshold = SEP_THRESHOLD
 
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')

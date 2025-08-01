@@ -6,8 +6,8 @@ OUTPUT_DIM = 1
 
 
 # Training configurations
-TRIAL_SEEDS = [456789] #, 42, 123, 0, 9999] # Seeds for trial
-TRIAL_SEEDS_SPEC = [9999, 0]
+TRIAL_SEEDS = [456789, 42, 123, 0, 9999] # Seeds for trial
+TRIAL_SEED = [456789]
 BATCH_SIZE = 200  # Batch size
 EPOCHS = int(2e5)  # Number of epochs
 VERBOSE = 1  # Verbose
