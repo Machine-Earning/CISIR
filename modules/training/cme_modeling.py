@@ -24,7 +24,6 @@ from tensorflow.keras.layers import (
     LayerNormalization,
     Add
 )
-from tensorflow_addons.optimizers import AdamW
 
 # from modules.reweighting.ImportanceWeighting import exDenseReweightsD
 from modules.shared.globals import TARGET_MIN_NORM_WEIGHT, ES_CB_MONITOR
