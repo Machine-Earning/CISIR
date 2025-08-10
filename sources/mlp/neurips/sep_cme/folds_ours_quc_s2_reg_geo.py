@@ -149,10 +149,10 @@ def main():
                 experiment_name = f'{title}_{current_time}'
                 # Set the early stopping patience and learning rate as variables
                 set_seed(seed)
-                patience = PATIENCE  # higher patience
+                patience = int(1e4) # PATIENCE  # higher patience
                 learning_rate = START_LR  # starting learning rate
                 asym_type = ASYM_TYPE
-                lr_cb_patience = LR_CB_PATIENCE
+                lr_cb_patience = 30 # LR_CB_PATIENCE
                 lr_cb_factor = LR_CB_FACTOR
                 lr_cb_min_lr = LR_CB_MIN_LR
                 lr_cb_min_delta = LR_CB_MIN_DELTA
@@ -174,7 +174,7 @@ def main():
                 epochs = EPOCHS  
                 hiddens = MLP_HIDDENS  
                 # proj_hiddens = PROJ_HIDDENS
-                pretraining = False
+                pretraining = True
                 sep_threshold = SEP_THRESHOLD
 
                 hiddens_str = (", ".join(map(str, hiddens))).replace(', ', '_')
