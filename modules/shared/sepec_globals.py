@@ -259,7 +259,7 @@ BATCH_SIZE_MOE_INV = 2800
 REWEIGHTS_MOE_QTC = [(0.2, 0.2, 0.0, 0.0)] # [(0.25, 0.25, 0.0, 0.0)]
 
 
-# NEURIPS
+# 
 FREQ_RANGE = [(-0.5, 0.5)]
 MIDD_RANGE = [(-1, -0.5), (0.5, 1)]
 RARE_RANGE = [(-2.5, -1), (1, 2.5)]

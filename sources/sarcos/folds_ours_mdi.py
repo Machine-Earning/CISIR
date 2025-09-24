@@ -107,7 +107,7 @@ def main():
 
 
                 # Initialize wandb
-                wandb.init(project="NeurIPS-2025-Paper-Sarcosds", name=experiment_name, config={
+                wandb.init(project="ICMLA-2025-Paper-Sarcosds", name=experiment_name, config={
                     "patience": patience,
                     "learning_rate": learning_rate,
                     'min_lr': lr_cb_min_lr,

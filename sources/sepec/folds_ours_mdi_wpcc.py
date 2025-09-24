@@ -101,7 +101,7 @@ def main():
 
 
                 # Initialize wandb
-                wandb.init(project="NeurIPS-2025-Paper", name=experiment_name, config={
+                wandb.init(project="ICMLA-2025-Paper", name=experiment_name, config={
                     "inputs_to_use": inputs_to_use,
                     "add_slope": add_slope,
                     "patience": patience,

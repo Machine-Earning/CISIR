@@ -24,4 +24,4 @@ echo "Current working directory is $(pwd)"
 srun python -m $1
 
 # how to use this script:
-# sbatch --job-name=inj aip_scripts/slurm_gpu1.sh sources.mlp.misc.overfitting.pds_delta_cme_inj
+# sbatch --job-name=cisir aip_scripts/slurm_gpu1.sh sources.sepec.folds_ours_cisir
