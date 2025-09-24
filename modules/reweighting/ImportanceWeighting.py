@@ -290,7 +290,7 @@ class DenseLossImportance:
 
 class MDI:
     """
-    Class for generating importance weights based on the Quarter of the Unit Circle (QUC).
+    Class for generating importance weights based on MDI.
     """
 
     def __init__(
