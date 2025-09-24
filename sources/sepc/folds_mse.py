@@ -8,7 +8,7 @@ from tensorflow.keras.optimizers import Adam
 from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import plot_sep_corr, plot_tsne_sep
-from modules.shared.sep_globals import *
+from modules.shared.sepc_globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (

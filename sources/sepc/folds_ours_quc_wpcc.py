@@ -9,7 +9,7 @@ from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import plot_sep_corr, plot_tsne_sep
 from modules.reweighting.ImportanceWeighting import MDI
-from modules.shared.sep_globals import *
+from modules.shared.sepc_globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (
@@ -34,7 +34,7 @@ from modules.training.ts_modeling import (
 
 def main():
     """
-    Testing WPCC + QUC Importance + Stratified Batching
+    Testing WPCC + MDI Importance + Stratified Batching
     """
 
     # set the training phase manager - necessary for mse + pcc loss
@@ -49,14 +49,14 @@ def main():
     # Initialize results tracking ONCE before the seed loop
     n_trials = len(TRIAL_SEEDS)
     results = initialize_results_dict(n_trials)
-    results['name'] = f'sep_cme_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_lambda{lambda_factor:.2f}_quc_wpcc'
+    results['name'] = f'sep_cme_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_lambda{lambda_factor:.2f}_mdi_wpcc'
 
     for seed_idx, seed in enumerate(TRIAL_SEEDS):
         for alpha_mse, alphaV_mse, alpha_pcc, alphaV_pcc in alphas:
             for rho in RHO:  # SAM_RHOS:
                 # PARAMS
                 # Construct the title
-                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor:.2f}_quc_wpcc'
+                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_lambda{lambda_factor:.2f}_mdi_wpcc'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp

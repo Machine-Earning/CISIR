@@ -9,7 +9,7 @@ from wandb.integration.keras import WandbCallback
 
 from modules.evaluate.utils import plot_repr_corr_dist, plot_tsne_delta
 from modules.reweighting.ImportanceWeighting import MDI
-from modules.shared.globals import *
+from modules.shared.sepec_globals import *
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining
 from modules.training.smooth_early_stopping import SmoothEarlyStopping, find_optimal_epoch_by_smoothing
 from modules.training.ts_modeling import (

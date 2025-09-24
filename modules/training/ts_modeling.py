@@ -45,7 +45,7 @@ from typing import Generator, Tuple, Optional
 from typing import List, Union, Callable, Dict, Any, Optional
 import csv
 
-from modules.shared.globals import MLP_HIDDENS, UPPER_THRESHOLD_MOE, \
+from modules.shared.sepec_globals import MLP_HIDDENS, UPPER_THRESHOLD_MOE, \
     LOWER_THRESHOLD_MOE
 from modules.training.normlayer import NormalizeLayer
 from modules.training.phase_manager import TrainingPhaseManager, create_weight_tensor_fast

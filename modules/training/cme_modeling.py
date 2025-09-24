@@ -26,7 +26,7 @@ from tensorflow.keras.layers import (
 )
 
 # from modules.reweighting.ImportanceWeighting import exDenseReweightsD
-from modules.shared.globals import TARGET_MIN_NORM_WEIGHT, ES_CB_MONITOR
+from modules.shared.sepec_globals import TARGET_MIN_NORM_WEIGHT, ES_CB_MONITOR
 from modules.training.normlayer import NormalizeLayer
 from modules.training.phase_manager import TrainingPhaseManager, IsTraining, create_weight_tensor_fast
 from modules.training.sam_keras import SAMModel
