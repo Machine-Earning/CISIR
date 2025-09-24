@@ -18,30 +18,6 @@ SAVE_BEST = False  # Save best model
 WANDB_SAVE_MODEL = False  # Save model to wandb
 FREEZING = [False]
 
-# Pretraining configurations
-BATCH_SIZE_PRE = 4000  # Batch size for PDS
-START_LR_PRE = 1e-3 # starting learning rate for pretraining
-LR_CB_MIN_LR_PRE = 5e-5  # Minimum learning rate for pretraining
-LR_CB_FACTOR_PRE = 0.95 # factor for reducing learning rate in pretraining
-LR_CB_PATIENCE_PRE = 50 # patience for reducing learning rate in pretraining
-PATIENCE_PRE = 8000  # Higher patience for pretraining
-RHO_PRE = [1e-6]  # Pretraining rho parameter
-REWEIGHTS_PRE = [(0.85, 0.85)]  # Pretraining reweighting parameters
-WEIGHT_DECAY_PRE = 0.01 # Higher weight decay for projection layers
-WINDOW_SIZE_PRE = 151  # NOTE: must be odd
-VAL_WINDOW_SIZE_PRE = 51  # NOTE: must be odd
-DROPOUT_PRE = 0.4  # Dropout rate for pretraining
-LAMBDA_PRE = 1 # lambda for cmse with reciprocal importances
-AE_LAMBDA = 1
-
-# PDS 
-START_LR_PDS = 1e-3
-LR_CB_MIN_LR_PDS = 1e-6
-LR_CB_FACTOR_PDS = 0.99
-LR_CB_PATIENCE_PDS = 50
-REWEIGHTS_PDS = [(0.2, 0.2)]  # Pretraining reweighting parameters
-WINDOW_SIZE_PDS = 25  # NOTE: must be odd
-VAL_WINDOW_SIZE_PDS = 25  # NOTE: must be odd
 
 # Model Architecture
 MLP_HIDDENS = [2048, 128, 1024, 128, 512, 128, 256, 128]  # Hidden layers
@@ -97,112 +73,7 @@ CVRG_MIN_DELTA = 1e-3
 CVRG_METRIC = 'val_loss'
 ASYM_TYPE = None #'sigmoid'
 
-# ATTM AREA
-BLOCKS_HIDDENS = [128 for _ in range(3)]
-ATTM_START_LR = 1e-3
-ATTM_LR_CB_MIN_LR = 5e-6
-ATTM_ACTIVATION = 'leaky_relu'
-ATTM_SKIPPED_BLOCKS = 1
-ATTM_RESIDUAL = True
-ATTM_DROPOUT = 0.02
-ATTM_NORM = 'batch_norm'
-ATTM_WD = 1e-6
-ATTM_LR_CB_FACTOR = 0.95
-ATTM_LR_CB_PATIENCE = 50
-ATTM_RHO = [1e-3]  #[1e-3]
-ATTM_PATIENCE = int(2e3)
-ATTM_CVRG_MIN_DELTA = 1e-2
-ATTM_VAL_WINDOW_SIZE = 15
-ATTM_WINDOW_SIZE = 15
-LAMBDA_FACTOR_ATTM = 6
-
-# ATTN AREA
-ATTN_HIDDENS = [256, 128, 256]  # this architecture is good enough to predict on its own
-ATTN_SKIPPED_LAYERS = 1
-ATTN_RESIDUAL = True
-ATTN_DROPOUT = 0.2
-ATTN_NORM = 'batch_norm'
-
-# FF AREA
-FF_HIDDENS = [128, 256, 128]  # this architecture is good enough to predict on its own
-FF_SKIPPED_LAYERS = 1
-FF_RESIDUAL = True
-FF_DROPOUT = 0.2
-FF_NORM = 'batch_norm'
-
 LEAKY_RELU_ALPHA = 0.3
-
-# MOE
-COMBINER_OUTPUT_DIM = 3  # 3 classes for routing
-BATCH_SIZE_MOE = 20  # Batch size for Moe
-BATCH_SIZE_MOE_0 = 2048  # Batch size for Moe
-PLUS_INDEX = 0
-MID_INDEX = 1
-MINUS_INDEX = 2
-RHO_MOE_C = [1e-2]
-RHO_MOE_0 = [1e-1]
-RHO_MOE_P = [5e-1]
-RHO_MOE_M = [5e-1]
-PATIENCE_MOE_C = int(2e3)
-PATIENCE_MOE_M = int(3.3e3)
-PATIENCE_MOE_P = int(3.3e3)
-PATIENCE_MOE_0 = int(3.3e3)
-
-LOWER_THRESHOLD_MOE = -0.4
-UPPER_THRESHOLD_MOE = 0.4
-REWEIGHTS_MOE_C = [(0.65, 0.65, 0.0, 0.0)]
-REWEIGHTS_MOE_P = [(0.11, 0.11, 0.0, 0.0)]
-REWEIGHTS_MOE_M = [(0.03, 0.03, 0.0, 0.0)]
-REWEIGHTS_MOE_0 = [(0.4, 0.4, 0.0, 0.0)]  # [(0.0, 0.0, 0.0, 0.0)]
-LAMBDA_FACTOR_MOE_P = 6
-LAMBDA_FACTOR_MOE_M = 6
-
-START_LR_MOE_M = 1e-4
-START_LR_MOE_P = 1e-4
-
-FOP_FACTOR = 1.5  # 1 full penalty, 0 no penalty
-
-ASYM_TYPE_0 = None
-
-# assemble hyperparams
-REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]
-RHO_MOE = [1e-2]
-LAMBDA_FACTOR_MOE = 1
-START_LR_MOE = 1e-4
-LR_CB_MIN_LR_MOE = 2e-5
-LR_CB_FACTOR_MOE = 0.95
-LR_CB_PATIENCE_MOE = 50
-WEIGHT_DECAY_MOE = 1e-1
-PATIENCE_MOE = int(3e3)
-ASYM_TYPE_MOE = None
-BATCH_SIZE_MOE_S2 = 2400
-
-FREEZE_EXPERT = True
-PRETRAINING_MOE = False
-MODE_MOE = 'soft'
-
-
-LAMBDA_PN_CCE = 1
-LAMBDA_NZ_CCE = 1
-LAMBDA_CE = 0.5
-
-START_LR_MOE_C = 1e-4
-REWEIGHTS_MOE_C2 = [(1.0, 1.0, 1.0, 1.0)]
-BATCH_SIZE_NEG = 70
-
-
-# INVESTIGATION
-START_LR_MOE_INV = 1e-4
-IMPORTANCE_MOE_INV = [(0.4, 0.4, 0.0, 0.0)]
-RHO_MOE_INV = [1e-2]
-LAMBDA_FACTOR_MOE_INV = 8
-PATIENCE_MOE_INV = int(3e3)
-ASYM_TYPE_MOE_INV = None
-BATCH_SIZE_MOE_INV = 2800
-
-
-# QTC
-REWEIGHTS_MOE_QTC = [(0.2, 0.2, 0.0, 0.0)] # [(0.25, 0.25, 0.0, 0.0)]
 
 
 # 
@@ -210,7 +81,3 @@ FREQ_RANGE = [(-0.5, 0.5)]
 MIDD_RANGE = [(-1, -0.5), (0.5, 1)]
 RARE_RANGE = [(-2.5, -1), (1, 2.5)]
 
-
-
-## SEP CME DATASET
-DS_PATH_SEP_CME = 'data/sep_cme'
