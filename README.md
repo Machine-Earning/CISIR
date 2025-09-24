@@ -1,11 +1,18 @@
 # Highly Imbalanced Regression with Tabular Data in SEP and Other Applications
 
+[![arXiv](https://img.shields.io/badge/arXiv-2509.16339-b31b1b.svg)](https://arxiv.org/abs/2509.16339)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/release/python-380/)
 
 ## Abstract
 
 We investigate imbalanced regression with tabular data that have an imbalance ratio larger than 1,000 ("highly imbalanced"). Accurately estimating the target values of rare instances is important in applications such as forecasting the intensity of rare harmful Solar Energetic Particle (SEP) events. For regression, the MSE loss does not consider the correlation between predicted and actual values. Typical inverse importance functions allow only convex functions. Uniform sampling might yield mini-batches that do not have rare instances. We propose CISIR that incorporates correlation, Monotonically Decreasing Involution (MDI) importance, and stratified sampling. Based on five datasets, our experimental results indicate that CISIR can achieve lower error and higher correlation than some recent methods. Also, adding our correlation component to other recent methods can improve their performance. Lastly, MDI importance can outperform other importance functions.
+
+## The Problem with MSE
+
+![MSE Issue](assets/mse_issue.png)
+
+*Figure 1: An issue with MSE. While Models 1 and 2 have identical MSE values (2.00), Model 2 shows better correlation with actual values, demonstrating why correlation-aware loss functions are crucial for regression tasks.*
 
 ## Overview
 
