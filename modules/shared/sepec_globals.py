@@ -163,61 +163,7 @@ START_LR_MOE_P = 1e-4
 FOP_FACTOR = 1.5  # 1 full penalty, 0 no penalty
 
 ASYM_TYPE_0 = None
-PDC_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcStratInj_bs6000_v8_20241203-194954.h5"
 
-PRE_WEIGHT_PATH = "/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.00_v8_updated_20241120-180201_reg.h5"
-# Model paths
-POS_EXPERT_PATH = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse0.10_plus_e_20241212-140850_reg.h5'
-NEG_EXPERT_PATH = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse0.03_minus_e_20241212-133248_reg.h5'
-NZ_EXPERT_PATH = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse0.10_zero_e_20241205-111054_reg.h5'
-COMBINER_PATH = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2_ace0.65_combiner_lpn1.00_lnz1.00_dualsig_20250107-152210.h5'
-COMBINER_PATH_NOC = '/home1/jmoukpe2016/keras-functional-api/final_router_model_weights_mlp2_ace0.60_router_20241218-021242.h5'
-COMBINER_PDCAE_S1 = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2ae_pdcStratInj_bs3600_rho0.10_20241115-021423.h5'
-COMBINER_PDCAE_S2 = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_pdcaeS2_amse1.00_v8_frFalse_20241121-102817_s2min_reg.h5'
-COMBINER_V3 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.50_moe_cheat_v3_randInitCombiner_20250117-155615.h5'
-COMBINER_PCC_CE = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2_combiner_lce0.50_20250117-133726.h5'
-COMBINER_PCC_CE_PDCAE_S1 = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2pdcaes1_ace0.65_combiner_lpn0.00_lnz0.00_lce1.00_20250118-101801.h5'
-COMBINER_PCC_CE_PDCAE_S2 = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2pdcaes2_combiner_lce0.50_20250118-145316.h5'
-COMBINER_PCC_CE_S2 = '/home1/jmoukpe2016/keras-functional-api/final_combiner_weights_mlp2_amse0.40_moe_cheat_pcc_ce_20250117-160500.h5'
-COMBINER_PN_NZ = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2_combiner_lpn1.00_lnz1.00_lce0.00_20250117-133720.h5'
-COMBINER_V2_PDCAE_S1 = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2pdcaes1_ace0.65_combiner_lpn0.00_lnz0.00_lce1.00_20250118-101801.h5'
-COMBINER_V2_PDCAE_S2 = '/home1/jmoukpe2016/keras-functional-api/final_combiner_model_weights_mlp2pdcaes2_ace0.65_combiner_lpn0.00_lnz0.00_lce1.00_20250118-101801.h5'
-COMBINER_V3_PDCAE_S2 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.39_moe_cheat_v3_randInitCombiner_20250122-160802.h5'
-COMBINER_V3_A0 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.00_moe_cheat_v3_randInitCombiner_20250121-142443.h5'
-COMBINER_V3_NRELU = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.10_moe_cheat_v3nrelu_randInitCombiner_20250122-162810.h5'
-COMBINER_V3_PDCAE_S2_NRELU = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_randInitCombiner_20250123-133559.h5'
-COMBINER_V2_PCC_CE_S2_A0 = '/home1/jmoukpe2016/keras-functional-api/final_combiner_weights_mlp2_amse0.00_moe_cheat_pcc_ce_20250123-144353.h5'
-COMBINER_V3_COS = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse1.00_moe_cheat_v3cos_randInitCombiner_20250128-142530.h5'
-# weights for investigation
-COMBINER_V2_PCC_CE_S2_A0_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.00_v2_moe_cheat_pcc_ce_investigation_A_20250127-113654.h5'
-COMBINER_V2_PCC_CE_S2_B0_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.00_v2_moe_cheat_pcc_ce_investigation_B_20250127-114150.h5'
-COMBINER_V2_PCC_CE_S2_C0_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.00_v2_moe_cheat_pcc_ce_investigation_C_20250127-114528.h5'
-COMBINER_V2_PCC_CE_S2_D0_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/final_combiner_weights_mlp2_amse0.00_v2_moe_cheat_pcc_ce_investigation_20250128-142235.h5'
-COMBINER_V2_PCC_CE_S2_A04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_A_20250127-113651.h5'
-COMBINER_V2_PCC_CE_S2_B04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_B_20250127-114151.h5'
-COMBINER_V2_PCC_CE_S2_C04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_C_20250127-114523.h5'
-COMBINER_V2_PCC_CE_S2_D04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/final_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_20250128-142357.h5'
-
-COMBINER_V2_PCC_CE_S2_A04_INVESTIGATION_BS64 = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_A_20250203-115542.h5'
-COMBINER_V2_PCC_CE_S2_A04_INVESTIGATION_BS82 = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_A_20250204-133928.h5'
-
-COMBINER_V2_PCC_CE_S2_B04_INVESTIGATION_BS1800 = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_B_20250206-122228.h5'
-COMBINER_V2_PCC_CE_S2_C04_INVESTIGATION_BS800 = '/home1/jmoukpe2016/keras-functional-api/inv_combiner_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_C_20250206-133229.h5'
-
-MOE_V2_PCC_CE_S2_A04_INVESTIGATION = '/home1/jmoukpe2016/keras-functional-api/inv_model_moe_weights_mlp2_amse0.40_v2_moe_cheat_pcc_ce_investigation_A_20250127-113651_reg.h5'
-MOE_V2_PCC_CE_S2_BS1024 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.40_moe_cheat_v3nrelu_20250210-145340.h5'
-
-COMBINER_V3_AE_OF = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250213-131806.h5'
-COMBINER_V3_OF = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2_amse0.40_moe_cheat_v3nrelu_of_20250213-133238.h5'
-
-COMBINER_V3_AE_NOF_1 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250218-231845.h5'
-
-COMBINER_V3_AE_NOF_2 = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250218-231650.h5'
-
-BETTER_REPR_FOR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/final_model_weights_mlp2_amse1.00_v8_updated_20241119-210406_reg.h5'
-BETTER_REPR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_v3nrelu_of_20250225-135335.h5'
-
-FROZEN_REPR_COMBINER = '/home1/jmoukpe2016/keras-functional-api/combiner_v3_weights_mlp2pdcaes1_amse0.40_moe_cheat_combiner_frozenTrue_plotRepr_20250306-150102.h5'
 # assemble hyperparams
 REWEIGHTS_MOE = [(0.4, 0.4, 0.0, 0.0)]
 RHO_MOE = [1e-2]
