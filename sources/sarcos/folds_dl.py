@@ -48,7 +48,7 @@ def main():
     # Initialize results tracking ONCE before the seed loop
     n_trials = len(TRIAL_SEEDS)
     results = initialize_freq_rare_results_dict(n_trials)
-    results['name'] = f'sarcos_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_denseloss'
+    results['name'] = f'sarcos_mlp_amse{alpha_amse:.2f}_apcc{alpha_apcc:.2f}_dl'
 
 
     for seed_idx, seed in enumerate(TRIAL_SEEDS):
@@ -57,7 +57,7 @@ def main():
                 # PARAMS
                 lambda_factor = 0.0 # LAMBDA_FACTOR  # lambda for the loss
                 # Construct the title
-                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_denseloss'
+                title = f'mlp_amse{alpha_mse:.2f}_apcc{alpha_pcc:.2f}_dl'
                 # Replace any other characters that are not suitable for filenames (if any)
                 title = title.replace(' ', '_').replace(':', '_')
                 # Create a unique experiment name with a timestamp
