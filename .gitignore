@@ -176,9 +176,6 @@ fit/
 *.out
 *.h5
 
-# plots
-*.png
-
 #MLFlow stuffs
 logs/mlruns/
 logs/mlartifacts/
