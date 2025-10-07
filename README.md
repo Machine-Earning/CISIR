@@ -77,11 +77,11 @@ Florida Institute of Technology, Melbourne, FL, USA
 If you find this repository useful in your research, please consider giving a star ⭐️ and a citation:
 
 ```bibtex
-@inproceedings{moukpe2024cisir,
+@inproceedings{moukpe2025cisir,
   title={Highly Imbalanced Regression with Tabular Data in SEP and Other Applications},
   author={Moukpe, Josias K. and Chan, Philip K. and Zhang, Ming},
   booktitle={Proceedings of the IEEE International Conference on Machine Learning and Applications (ICMLA)},
-  year={2024},
+  year={2025},
   organization={IEEE}
 }
 ```
