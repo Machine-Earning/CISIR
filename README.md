@@ -10,7 +10,7 @@ We investigate imbalanced regression with tabular data that have an imbalance ra
 
 ## The Problem with MSE
 
-![MSE Issue](assets/mse_issue.png)
+<img src="assets/mse_issue.png" alt="MSE Issue" width="33%" height="33%">
 
 *Figure 1: An issue with MSE. While Models 1 and 2 have identical MSE values (2.00), Model 2 shows better correlation with actual values, demonstrating why correlation-aware loss functions are crucial for regression tasks.*
 
